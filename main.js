@@ -4,6 +4,11 @@ const fs = require('fs');
 const https = require('https');
 const { spawn } = require('child_process');
 
+// ── Patreon entitlement service ─────────────────────────────────────────────
+// Optional sign-in; the app boots for everyone. Active Tier 2 / Tier 3
+// supporters unlock Early Access (EA) features live. See patreon-auth.js.
+const patreonAuth = require('./patreon-auth');
+
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
   try { return path.join(app.getPath('userData'), 'streamfusion-crash.log'); }
@@ -617,6 +622,21 @@ app.whenReady().then(() => {
   createWindow();
   startCtrlPoller();
 
+  // Patreon entitlement service. Register IPC handlers and point it at the
+  // main window so entitlement changes reach the renderer. Kick off a
+  // launch-time check on a small delay so the renderer has had time to
+  // wire up its listener. If the user is already signed in, start the
+  // hourly re-verification loop too.
+  patreonAuth.setMainWindow(mainWindow);
+  patreonAuth.registerIpcHandlers();
+  setTimeout(function() {
+    patreonAuth.getEntitlement().then(function(state) {
+      if (state && state.signedIn) patreonAuth.startRuntimeChecks();
+    }).catch(function(e) {
+      logToFile('AUTH-ERR', 'launch entitlement check failed: ' + (e && e.message));
+    });
+  }, 2500);
+
   // Check for updates (non-blocking)
   if (autoUpdater) {
     autoUpdater.on('update-available', (info) => {
@@ -645,6 +665,7 @@ app.on('before-quit', () => {
   isQuitting = true;
   try { globalShortcut.unregisterAll(); } catch (e) {}
   stopCtrlPoller();
+  try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────

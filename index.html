@@ -1173,8 +1173,27 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
       <div class="ob-nav"><button class="ob-back" onclick="obBack()">Back</button><button class="ob-next" onclick="obNext()">Next</button></div>
     </div>
 
-    <!-- Page 9: All set -->
+    <!-- Page 9: Early Access (Patreon) -->
     <div class="ob-page" id="obPage9">
+      <div class="ob-ic" style="background:linear-gradient(135deg,#ff424d 0%,#f59e0b 100%)"><svg viewBox="0 0 569 546" style="width:20px;height:20px;fill:#fff"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg></div>
+      <div class="ob-hd">Unlock Early Access</div>
+      <div class="ob-sub" style="text-align:left">
+        Want new features <strong>before everyone else</strong>? Support StreamFusion on Patreon and connect your account here &mdash; <strong>Tier 2</strong> and <strong>Tier 3</strong> supporters get Early Access features automatically.<br><br>
+        Sign in whenever you&rsquo;re ready. StreamFusion checks your membership in the background and unlocks / locks features live &mdash; no restart needed.
+      </div>
+      <div id="obEaStatus" style="min-height:18px;font-size:11px;color:var(--mut);margin:4px 0;text-align:center"></div>
+      <div class="ob-nav">
+        <button class="ob-back" onclick="obBack()">Back</button>
+        <button class="ob-skip" onclick="obNext()">Skip for now</button>
+        <button class="ob-next" id="obEaConnectBtn" onclick="obConnectPatreon()" style="background:#ff424d;border-color:#ff424d;display:flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 569 546" style="width:11px;height:11px;fill:currentColor"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg>
+          Connect Patreon
+        </button>
+      </div>
+    </div>
+
+    <!-- Page 10: All set -->
+    <div class="ob-page" id="obPage10">
       <div class="ob-ic go"><svg class="ic" style="width:24px;height:24px"><use href="#i-check"/></svg></div>
       <div class="ob-hd">You're ready to stream!</div>
       <div class="ob-sub">Open <strong>Settings</strong> (<svg class="ic" style="width:12px;height:12px"><use href="#i-cog"/></svg>) to configure connections, sounds, filters, goals, and more.<br><br>You can replay this guide any time from <strong>Settings &rarr; About &rarr; Setup Guide</strong>.</div>
@@ -1341,6 +1360,11 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
       </div>
       <div class="settings-tabs" id="settingsTabs">
         <div class="settings-tab active" data-tab="accounts" onclick="switchSettingsTab('accounts')">Accounts</div>
+        <!-- Patreon-red accent + tiny dot icon so the supporter-only tab is
+             always visible at first glance, even when the tab row wraps. -->
+        <div class="settings-tab tab-patreon" data-tab="earlyaccess" onclick="switchSettingsTab('earlyaccess')">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Early Access
+        </div>
         <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
         <div class="settings-tab" data-tab="events" onclick="switchSettingsTab('events')">Events</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
@@ -1674,6 +1698,36 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
           </div>
         </div>
 
+        <!-- ═══ EARLY ACCESS TAB ═══ -->
+        <div class="settings-pane" id="pane-earlyaccess">
+          <div class="sec">
+            <div class="sec-hd">Patreon &mdash; Early Access</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
+              Support StreamFusion on Patreon and connect your account to unlock <strong style="color:var(--txt)">Early Access</strong> features &mdash; available to <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> supporters.
+            </div>
+            <!-- Status card: shows current connection state. Updated live via
+                 renderEaSettings() whenever the entitlement changes. -->
+            <div id="eaStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+              <div id="eaStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
+              <div id="eaStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Sign in with Patreon to check your tier.</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button id="eaConnectBtn" onclick="connectPatreon()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#ff424d;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                <svg viewBox="0 0 569 546" style="width:11px;height:11px;fill:currentColor"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg>
+                <span id="eaConnectBtnText">Connect Patreon</span>
+              </button>
+              <button id="eaSignOutBtn" onclick="disconnectPatreon()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
+            </div>
+            <div style="font-size:13px;color:var(--txt);margin-top:14px;line-height:1.5;text-align:center;padding:10px 12px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px">
+              Don&rsquo;t have a membership yet?<br>
+              <a href="https://www.patreon.com/cw/aquilo" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;color:#ff424d;text-decoration:none;font-weight:700;font-size:14px">
+                <svg viewBox="0 0 569 546" style="width:13px;height:13px;fill:currentColor"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg>
+                Pledge on Patreon &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+
         <!-- ═══ ABOUT TAB ═══ -->
         <div class="settings-pane" id="pane-about">
           <div class="sec" style="text-align:center;padding:20px 14px">
@@ -1804,7 +1858,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 if (window.electronAPI) document.body.classList.add('is-electron');
 
 // ── Onboarding ───────────────────────────────────────────────────────────────
-var _obPage = 0, _obTotal = 10;
+var _obPage = 0, _obTotal = 11;
 function _obBuildDots() {
   var c = document.getElementById('obSteps'); if (!c) return;
   var html = '';
@@ -1852,6 +1906,157 @@ function showWelcome() {
   document.getElementById('wOverlay').classList.remove('hidden');
 }
 
+// ── Patreon entitlement (Early Access) ─────────────────────────────────────
+// Called by the "Connect Patreon" button on both the onboarding card
+// (Page 9) and the Early Access settings tab. Opens Patreon in the system
+// browser via the main-process OAuth flow; the main process pushes the
+// result back through the `patreon-entitlement-changed` listener we set
+// up on load, so we don't need to await anything in the UI beyond
+// "request is in flight".
+function _eaSigningIn(flag) {
+  // Toggle the "connecting..." state on both the onboarding button and the
+  // settings button. If either element is missing (e.g. settings modal not
+  // mounted), the toggle is a harmless no-op.
+  var obBtn = document.getElementById('obEaConnectBtn');
+  var stBtn = document.getElementById('eaConnectBtn');
+  var obStatus = document.getElementById('obEaStatus');
+  var stBtnText = document.getElementById('eaConnectBtnText');
+  if (obBtn) obBtn.disabled = flag;
+  if (stBtn) stBtn.disabled = flag;
+  if (flag) {
+    if (obStatus) obStatus.textContent = 'Complete the sign-in in your browser…';
+    if (stBtnText) stBtnText.textContent = 'Waiting for browser…';
+  } else {
+    if (stBtnText) stBtnText.textContent = S.patreon.signedIn ? 'Re-check membership' : 'Connect Patreon';
+  }
+}
+
+async function connectPatreon() {
+  if (!window.electronAPI || !window.electronAPI.patreonBeginAuth) return;
+  _eaSigningIn(true);
+  try {
+    // Main process emits the entitlement-changed event on success, which
+    // updates S.patreon + re-renders both UIs. The return value here is
+    // the same shape — we use it to catch "error" and show a message.
+    var result = await window.electronAPI.patreonBeginAuth();
+    applyPatreonState(result);
+    if (result && result.reason === 'error') {
+      var obStatus = document.getElementById('obEaStatus');
+      if (obStatus) obStatus.textContent = 'Sign-in failed. Please try again.';
+    }
+  } catch (e) {
+    var obStatus2 = document.getElementById('obEaStatus');
+    if (obStatus2) obStatus2.textContent = 'Sign-in failed: ' + (e && e.message ? e.message : e);
+  } finally {
+    _eaSigningIn(false);
+  }
+}
+
+async function disconnectPatreon() {
+  if (!window.electronAPI || !window.electronAPI.patreonSignOut) return;
+  var result = await window.electronAPI.patreonSignOut();
+  applyPatreonState(result);
+}
+
+// Called by the onboarding page's "Connect Patreon" button.
+function obConnectPatreon() { connectPatreon(); }
+
+// Single point of truth: every path that changes entitlement routes here.
+// Updates the S state, the onboarding status line, and the settings panel.
+function applyPatreonState(state) {
+  if (!state) return;
+  S.patreon = state;
+  S.hasEarlyAccess = !!state.entitled;
+  renderEaOnboarding();
+  renderEaSettings();
+}
+
+// Map an entitlement state to a human message, used on both the onboarding
+// card and the settings panel. Keeping this in one place means the two UIs
+// stay in sync whenever we add a new `reason` code later.
+function _eaMessages(state) {
+  var title, sub;
+  if (!state || !state.signedIn) {
+    title = 'Not connected';
+    sub = 'Sign in with Patreon to check your tier.';
+  } else if (state.entitled) {
+    var tierLabel = state.tier === 'tier3' ? 'Tier 3' : 'Tier 2';
+    title = 'Connected as ' + (state.userName || 'you') + ' — ' + tierLabel;
+    sub = 'Early Access features are unlocked. Thanks for supporting!';
+  } else if (state.reason === 'insufficient_tier') {
+    title = 'Connected as ' + (state.userName || 'you') + ' — below Tier 2';
+    sub = 'Early Access requires Tier 2 or Tier 3. Upgrade on Patreon to unlock.';
+  } else if (state.reason === 'declined_patron') {
+    title = 'Payment declined';
+    sub = 'Your last Patreon payment didn’t go through. Update it on Patreon to restore Early Access.';
+  } else if (state.reason === 'former_patron') {
+    title = 'Membership ended';
+    sub = 'Re-pledge at Tier 2 or higher to get Early Access back.';
+  } else if (state.reason === 'not_a_member' || state.reason === 'follower') {
+    title = 'Connected as ' + (state.userName || 'you') + ' — not a supporter yet';
+    sub = 'Pledge at Tier 2 or Tier 3 on Patreon to unlock Early Access.';
+  } else if (state.reason === 'offline_grace') {
+    title = 'Couldn’t reach Patreon';
+    sub = 'Running on cached membership status — we’ll re-check automatically.';
+  } else if (state.reason === 'reverify_failed') {
+    title = 'Couldn’t verify membership';
+    sub = 'Try signing in again, or check your connection.';
+  } else {
+    title = 'Connected';
+    sub = '';
+  }
+  return { title: title, sub: sub };
+}
+
+function renderEaOnboarding() {
+  var el = document.getElementById('obEaStatus');
+  if (!el) return;
+  var m = _eaMessages(S.patreon);
+  // On the onboarding page we don't want a long paragraph — just a one-liner
+  // that confirms the result. Title captures the essential status; sub is
+  // hidden to avoid cluttering the compact card.
+  el.textContent = m.title;
+  el.style.color = S.hasEarlyAccess ? 'var(--ok, #22c55e)' : 'var(--mut)';
+  // Swap the CTA text to match state — "Re-check" reads better than "Connect"
+  // if the user is already signed in but not yet entitled.
+  var btn = document.getElementById('obEaConnectBtn');
+  if (btn) {
+    var textNode = btn.childNodes[btn.childNodes.length - 1];
+    if (textNode && textNode.nodeType === 3) {
+      textNode.textContent = S.patreon.signedIn && !S.hasEarlyAccess ? ' Re-check membership' : ' Connect Patreon';
+    }
+  }
+}
+
+function renderEaSettings() {
+  var cardText = document.getElementById('eaStatusText');
+  var cardSub  = document.getElementById('eaStatusSub');
+  var btn      = document.getElementById('eaConnectBtn');
+  var btnText  = document.getElementById('eaConnectBtnText');
+  var signOut  = document.getElementById('eaSignOutBtn');
+  if (!cardText || !cardSub || !btn || !signOut) return;   // pane not open yet
+  var m = _eaMessages(S.patreon);
+  cardText.textContent = m.title;
+  cardSub.textContent  = m.sub;
+  // Tint the status text when entitled, so the "you're in" state is visible
+  // at a glance without hunting through the copy.
+  cardText.style.color = S.hasEarlyAccess ? 'var(--ok, #22c55e)' : 'var(--txt)';
+  signOut.style.display = S.patreon.signedIn ? '' : 'none';
+  if (btnText) btnText.textContent = S.patreon.signedIn ? 'Re-check membership' : 'Connect Patreon';
+}
+
+// Initial fetch + live subscription. Runs once at load.
+(function initPatreonEntitlement() {
+  if (!window.electronAPI || !window.electronAPI.onPatreonEntitlementChanged) return;
+  window.electronAPI.onPatreonEntitlementChanged(function(state) { applyPatreonState(state); });
+  // Kick off the initial state check. The main process may also push one
+  // on its own ~2.5s after launch; both paths funnel through applyPatreonState
+  // which is idempotent, so duplicate updates are harmless.
+  if (window.electronAPI.patreonGetEntitlement) {
+    window.electronAPI.patreonGetEntitlement().then(applyPatreonState).catch(function() {});
+  }
+})();
+
 // ── State ─────────────────────────────────────────────────────────────────────
 var S = {
   sbWS: null, tfWS: null,
@@ -1873,7 +2078,13 @@ var S = {
   twLogin: '',
   kkLogin: '',
   ttLikes: 0,
-  stats: { follows:{tw:0,yt:0,kk:0,tt:0}, twSubs:0, kkSubs:0, bits:0, kicks:0, ttCoins:0, twSubRev:0, kkSubRev:0 }
+  stats: { follows:{tw:0,yt:0,kk:0,tt:0}, twSubs:0, kkSubs:0, bits:0, kicks:0, ttCoins:0, twSubRev:0, kkSubRev:0 },
+  // Patreon entitlement — updated by patreon-entitlement-changed events and
+  // by the initial patreonGetEntitlement() call. `hasEarlyAccess === true`
+  // means the user is an active Tier 2 or Tier 3 supporter; gate any
+  // Early Access features on this boolean.
+  patreon: { signedIn: false, entitled: false, tier: 'none', patronStatus: null, reason: 'not_signed_in', userName: '', verifiedAt: null },
+  hasEarlyAccess: false
 };
 
 var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-ext-other','ev-se-tip','hideCmd'];
