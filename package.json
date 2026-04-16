@@ -1,6 +1,6 @@
 {
   "name": "streamfusion",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Unified multi-platform stream chat viewer",
   "main": "main.js",
   "scripts": {
@@ -23,16 +23,7 @@
     "directories": {
       "output": "dist"
     },
-    "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "overlay.html",
-      "banner.html",
-      "promo.html",
-      "assets/**",
-      "node_modules/**/*"
-    ],
+    "asarUnpack": [],
     "publish": [
       {
         "provider": "github",
