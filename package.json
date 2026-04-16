@@ -1,0 +1,69 @@
+{
+  "name": "streamfusion",
+  "version": "1.2.0",
+  "description": "Unified multi-platform stream chat viewer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --publish never",
+    "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win portable --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.0"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.streamfusion.app",
+    "productName": "StreamFusion",
+    "copyright": "StreamFusion",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "overlay.html",
+      "banner.html",
+      "assets/**"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "aquiloplays",
+        "repo": "StreamFusion"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico",
+      "signingHashAlgorithms": ["sha256"],
+      "sign": null
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.entertainment"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StreamFusion",
+      "installerHeaderIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "StreamFusion-Portable.exe"
+    }
+  }
+}

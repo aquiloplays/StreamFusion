@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>StreamFusion — Promo Overlay (for OBS capture)</title>
+<style>
+:root{
+  --surf:rgba(14,14,16,.82);--surf2:rgba(14,14,16,.65);--bdr:rgba(42,42,48,.5);
+  --txt:#efeff1;--mut:#adadb8;
+  --tw:#9147ff;--yt:#ff0000;--tt:#00f2ea;--kk:#53fc18;--cc:#f5a524;--ev:#f0b429;
+  --grn:#3fb950;--org:#f0883e;--red:#f85149;--se:#7cdf21;
+  --r:6px;--chat-size:13px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:transparent}
+/* Promo padding-bottom = event reserve (72px) + CTA strip (56px) = 128px.
+   Overlay uses 72px; we extend so the CTA at the bottom never overlaps
+   chat-bar / hotbar / event-area. See `.pr-cta` and the `.ov-event-area`
+   override below — both live in the promo-specific block at the end of
+   this stylesheet. */
+body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;padding-bottom:128px;box-sizing:border-box}
+
+/* ── Drag bar ─────────────────────────────────────────────────── */
+.ov-drag{height:28px;background:var(--surf);display:flex;align-items:center;padding:0 8px;flex-shrink:0;-webkit-app-region:drag;user-select:none;border-bottom:1px solid var(--bdr);gap:6px;border-radius:8px 8px 0 0}
+.ov-drag-title{font-size:10px;font-weight:700;color:var(--mut);flex:1;letter-spacing:.6px;text-transform:uppercase}
+.ov-drag-btn{width:22px;height:18px;border:none;border-radius:3px;background:rgba(255,255,255,.08);color:var(--mut);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-app-region:no-drag;transition:all .15s}
+.ov-drag-btn:hover{background:rgba(255,255,255,.18);color:var(--txt)}
+.ov-drag-btn.close:hover{background:#c42b1c;color:#fff}
+.ov-ctrl-hint{font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.3px;flex-shrink:0;display:none;font-weight:600}
+body.clickthrough .ov-ctrl-hint{display:block}
+body.clickthrough.interactive .ov-ctrl-hint{color:#3A86FF}
+
+/* Click-through mode: all non-interactive unless temporarily unlocked */
+body.clickthrough{pointer-events:none}
+body.clickthrough.interactive{pointer-events:auto}
+body.clickthrough.interactive .ov-drag{border-bottom-color:#3A86FF;box-shadow:0 0 12px rgba(58,134,255,.4)}
+body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
+
+/* ── Settings panel ───────────────────────────────────────────── */
+.ov-settings{background:var(--surf);border-bottom:1px solid var(--bdr);padding:8px 10px;display:none;flex-direction:column;gap:6px;flex-shrink:0;max-height:80vh;overflow-y:auto}
+.ov-drag-btn.lock-on{background:#3A86FF;color:#fff}
+.ov-drag-btn.lock-on:hover{background:#5CA3FF}
+.ov-settings.show{display:flex}
+.ov-settings::-webkit-scrollbar{width:3px}.ov-settings::-webkit-scrollbar-thumb{background:var(--bdr)}
+.ov-s-hd{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut)}
+.ov-s-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--txt);padding:2px 0}
+.ov-s-row input[type=checkbox]{accent-color:#3A86FF;width:13px;height:13px;cursor:pointer}
+.ov-s-row input[type=range]{flex:1;max-width:100px;accent-color:#3A86FF;cursor:pointer;margin:0 6px}
+.ov-s-val{font-size:10px;color:var(--mut);min-width:28px;text-align:right}
+
+/* ── Live-on bar ──────────────────────────────────────────────── */
+.ov-live{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;white-space:nowrap;overflow-x:auto}
+.ov-live::-webkit-scrollbar{height:3px}.ov-live::-webkit-scrollbar-thumb{background:var(--bdr)}
+.ov-live-lbl{font-size:10px;font-weight:900;letter-spacing:1.4px;color:var(--mut);text-transform:uppercase;padding-right:2px;flex-shrink:0}
+.ov-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:livePulse 1.3s ease-in-out infinite;flex-shrink:0}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}
+.ov-live-chip{font-size:12px;font-weight:800;padding:4px 8px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);color:var(--mut);letter-spacing:.5px;flex-shrink:0;transition:all .2s;display:inline-flex;align-items:center;justify-content:center}
+.ov-live-chip svg{display:block;flex-shrink:0}
+.ov-live-chip.on.tw{color:var(--tw);border-color:var(--tw);background:rgba(145,71,255,.15);box-shadow:0 0 10px rgba(145,71,255,.3)}
+.ov-live-chip.on.yt{color:var(--yt);border-color:var(--yt);background:rgba(255,0,0,.15);box-shadow:0 0 10px rgba(255,0,0,.3)}
+.ov-live-chip.on.tt{color:var(--tt);border-color:var(--tt);background:rgba(0,242,234,.15);box-shadow:0 0 10px rgba(0,242,234,.3)}
+.ov-live-chip.on.kk{color:var(--kk);border-color:var(--kk);background:rgba(83,252,24,.15);box-shadow:0 0 10px rgba(83,252,24,.3)}
+.ov-live-timer{margin-left:auto;font-size:14px;font-weight:900;color:var(--txt);font-variant-numeric:tabular-nums;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:10px;padding:4px 10px;flex-shrink:0;letter-spacing:1px}
+.ov-live-timer.off{color:var(--mut);opacity:.55}
+
+/* ── Stats bar ─────────────────────────────────────────────────── */
+.ov-stats{display:flex;flex-wrap:wrap;gap:10px;padding:11px 14px;background:var(--surf2);border-bottom:1px solid var(--bdr);flex-shrink:0;align-items:center;overflow-x:auto;white-space:nowrap;row-gap:8px}
+.ov-stats::-webkit-scrollbar{height:3px}.ov-stats::-webkit-scrollbar-thumb{background:var(--bdr)}
+.ov-stats.show{display:flex}
+.ov-stats.hidden{display:none}
+.ov-st{font-size:13px;font-weight:700;padding:6px 14px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.ov-st .ov-st-num{font-size:15px;font-weight:900;color:var(--txt);margin-left:5px}
+.ov-st.tw{color:var(--tw);border-color:rgba(145,71,255,.45)}
+.ov-st.yt{color:var(--yt);border-color:rgba(255,0,0,.45)}
+.ov-st.tt{color:var(--tt);border-color:rgba(0,242,234,.45)}
+.ov-st.kk{color:var(--kk);border-color:rgba(83,252,24,.45)}
+.ov-st.bits{color:#bf94ff;border-color:rgba(191,148,255,.45)}
+.ov-st.coins{color:#ffd54a;border-color:rgba(255,213,74,.45)}
+.ov-st.rev{color:#ffd700;border-color:rgba(255,215,0,.45);background:rgba(255,215,0,.08);font-size:14px;padding:6px 16px}
+.ov-st.likes{position:relative}
+.ov-fly-heart{position:absolute;bottom:100%;left:50%;pointer-events:none;font-size:13px;opacity:1;animation:ovFlyHeart 1.2s ease-out forwards;z-index:10}
+@keyframes ovFlyHeart{0%{opacity:1;transform:translate(-50%,0) scale(.7)}40%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--hx)),calc(-34px + var(--hy))) scale(1.1)}}
+.ov-st.rev .ov-st-num{color:#ffd700;font-size:16px}
+.ov-stats-lbl{font-size:10px;font-weight:900;color:var(--mut);text-transform:uppercase;letter-spacing:1.2px;padding:0 6px 0 4px}
+.ov-stats-div{width:1px;height:22px;background:var(--bdr);margin:0 8px;flex-shrink:0}
+
+/* ── Goals bar ────────────────────────────────────────────────── */
+.ov-goals{display:none;padding:4px 8px;background:var(--surf2);border-bottom:1px solid var(--bdr);flex-shrink:0;gap:6px;flex-wrap:wrap}
+.ov-goals.show{display:flex}
+.ov-goal{flex:1;min-width:80px}
+.ov-goal-hd{display:flex;align-items:center;justify-content:space-between;font-size:8px;font-weight:700;color:var(--mut);letter-spacing:.3px;margin-bottom:1px}
+.ov-goal-hd .ov-goal-ct{color:var(--txt);font-size:9px;font-weight:800}
+.ov-goal-track{height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.ov-goal-fill{height:100%;border-radius:3px;transition:width .5s ease;min-width:0}
+.ov-goal-fill.followers{background:linear-gradient(90deg,#3fb950,#7af2a1)}
+.ov-goal-fill.subs{background:linear-gradient(90deg,#3A86FF,#7BB8FF)}
+.ov-goal-fill.bits{background:linear-gradient(90deg,#bf94ff,#e2c4ff)}
+.ov-goal-fill.revenue{background:linear-gradient(90deg,#ffd700,#ffe680)}
+.ov-goal.done .ov-goal-fill{filter:brightness(1.3)}.ov-goal.done .ov-goal-hd{color:var(--grn)}
+
+/* ── Hype train ───────────────────────────────────────────────── */
+.ov-hype{display:none;padding:4px 8px;background:var(--surf2);border-bottom:1px solid var(--bdr);flex-shrink:0}
+.ov-hype.show{display:block}
+.ov-hype-hd{display:flex;align-items:center;justify-content:space-between;font-size:9px;font-weight:700;color:var(--org);text-transform:uppercase;margin-bottom:2px}
+.ov-hype-lv{background:var(--org);color:#000;font-size:8px;font-weight:900;border-radius:3px;padding:0 5px;margin-left:4px}
+.ov-hype-timer{color:var(--mut);font-variant-numeric:tabular-nums;margin-left:auto}
+.ov-hype-track{height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;position:relative}
+.ov-hype-fill{height:100%;background:linear-gradient(90deg,#c85a00,#f0883e,#ffd700);border-radius:3px;transition:width .5s ease;min-width:3px;position:relative;overflow:hidden}
+.ov-hype-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);animation:ovShimmer 1.8s ease-in-out infinite}
+@keyframes ovShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+@keyframes ovHypeSlide{0%{transform:translateX(-100%);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translateX(100%);opacity:0}}
+.ov-hype-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;text-shadow:0 0 6px rgba(255,200,0,.8);animation:ovHypeSlide 2s ease-in-out forwards;pointer-events:none;z-index:5;letter-spacing:2px}
+
+/* ── Poll / Prediction panels ─────────────────────────────────── */
+.ov-poll,.ov-pred{display:none;padding:5px 8px;background:var(--surf2);border-bottom:1px solid var(--bdr);flex-shrink:0}
+.ov-poll:not(.hidden),.ov-pred:not(.hidden){display:block}
+.ov-poll-hd,.ov-pred-hd{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px}
+.ov-poll-hd{color:#9b59b6} .ov-pred-hd{color:#e67e22}
+.ov-poll-status,.ov-pred-status{margin-left:auto;font-size:8px;font-weight:900;border-radius:3px;padding:1px 5px;letter-spacing:.5px}
+.ov-poll-status{background:#9b59b6;color:#fff} .ov-pred-status{background:#e67e22;color:#fff}
+.ov-poll-status.ended{background:var(--mut);opacity:.7} .ov-pred-status.ended{background:var(--mut);opacity:.7}
+.ov-poll-status.resolved{background:#27ae60} .ov-pred-status.resolved{background:#27ae60}
+.ov-pred-status.locked{background:#e74c3c}
+.ov-poll-choice,.ov-pred-outcome{display:flex;align-items:center;gap:5px;font-size:10px;margin:2px 0;position:relative}
+.ov-poll-choice-bar,.ov-pred-outcome-bar{position:absolute;left:0;top:0;bottom:0;border-radius:3px;opacity:.18;transition:width .4s ease}
+.ov-poll-choice-bar{background:#9b59b6} .ov-pred-outcome-bar{background:#e67e22}
+.ov-poll-choice-name,.ov-pred-outcome-name{position:relative;z-index:1;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 4px}
+.ov-poll-choice-val,.ov-pred-outcome-val{position:relative;z-index:1;font-variant-numeric:tabular-nums;color:var(--mut);font-size:9px;padding-right:4px}
+.ov-poll-choice.winner .ov-poll-choice-name,.ov-pred-outcome.winner .ov-pred-outcome-name{color:#2ecc71;font-weight:700}
+
+/* ── Chat feed ────────────────────────────────────────────────── */
+.ov-feed{flex:1;overflow-y:auto;padding:4px 6px;display:flex;flex-direction:column-reverse;gap:1px;background:var(--surf2)}
+.ov-feed::-webkit-scrollbar{width:3px}
+.ov-feed::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+@keyframes ovMsgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* Flat row: avatar on the left, then a flex:1 body column (name/badges row,
+   badge-line row if first-msg/first-words, text row). Using a column body
+   instead of flex-wrap lets the username stay compact while the message text
+   always gets the full remaining width — no more one-word-per-line when the
+   overlay is narrow. */
+.ov-msg{display:flex;gap:5px;padding:3px 5px;border-radius:4px;border-left:2px solid transparent;font-size:var(--chat-size);animation:ovMsgInPop .35s cubic-bezier(.16,1,.3,1) both;line-height:1.5;word-break:break-word;transition:background .25s ease;position:relative;align-items:flex-start}
+.ov-mbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ov-mhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;min-width:0}
+.ov-msg.tw{border-color:var(--tw)}.ov-msg.yt{border-color:var(--yt)}.ov-msg.tt{border-color:var(--tt)}.ov-msg.kk{border-color:var(--kk)}
+.ov-msg:hover{background:rgba(255,255,255,.04)}
+/* Mod menu (Twitch only) — hidden until msg is hovered or menu is open */
+.ov-mod-wrap{position:absolute;top:2px;right:4px;opacity:0;transition:opacity .15s ease;z-index:20}
+.ov-msg:hover .ov-mod-wrap,.ov-mod-wrap.open{opacity:1}
+.ov-mod-btn{background:rgba(0,0,0,.55);border:1px solid var(--bdr);border-radius:4px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mut);padding:0}
+.ov-mod-btn:hover{color:var(--txt);background:rgba(145,71,255,.3);border-color:var(--tw)}
+.ov-mod-btn svg{width:12px;height:12px}
+.ov-mod-menu{display:none;position:absolute;top:22px;right:0;background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:3px;min-width:120px;box-shadow:0 4px 14px rgba(0,0,0,.55);z-index:30}
+.ov-mod-menu.show{display:flex;flex-direction:column;gap:1px}
+.ov-mod-item{padding:4px 8px;font-size:11px;border-radius:4px;cursor:pointer;color:var(--txt);white-space:nowrap;transition:background .12s,padding-left .15s}
+.ov-mod-item:hover{background:rgba(255,255,255,.08);padding-left:12px}
+.ov-mod-item.danger{color:var(--red)}
+.ov-mod-item.danger:hover{background:rgba(248,81,73,.15)}
+.ov-user{font-weight:700;flex-shrink:0;white-space:nowrap}
+.ov-user.tw{color:var(--tw)}.ov-user.yt{color:var(--yt)}.ov-user.tt{color:var(--tt)}.ov-user.kk{color:var(--kk)}
+.ov-text{color:var(--txt);min-width:0}
+.ov-badge{width:14px;height:14px;vertical-align:middle;margin:0 1px;border-radius:2px}
+.ov-avatar{width:20px;height:20px;border-radius:50%;flex-shrink:0;object-fit:cover;margin-top:1px;border:1px solid rgba(255,255,255,.1)}
+.ov-pico{width:14px;height:14px;border-radius:50%;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center}
+.ov-pico svg{width:8px;height:8px}
+.ov-pico.tw{background:var(--tw);color:#fff}.ov-pico.yt{background:var(--yt);color:#fff}.ov-pico.tt{background:var(--tt);color:#000}.ov-pico.kk{background:var(--kk);color:#000}
+.ov-fmsg-badge,.ov-fwords-badge{display:inline-block;font-size:8px;font-weight:900;padding:1px 5px;border-radius:8px;letter-spacing:.5px;vertical-align:middle;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+.ov-fmsg-badge{background:linear-gradient(135deg,#ffd700,#f0883e);color:#1a1a1f;box-shadow:0 0 6px rgba(255,200,0,.5)}
+.ov-fwords-badge{background:linear-gradient(135deg,#53fc18,#2fa80d);color:#041c00;box-shadow:0 0 6px rgba(83,252,24,.55);animation:ovFwordsBadgePulse 1.8s ease-out 2}
+/* Badge line sits on its OWN row UNDER the username — keeps narrow overlay
+   columns from vertically stacking the badge letters or pushing text off. */
+.ov-fbadge-row{display:flex;gap:4px;margin:1px 0 2px;flex-wrap:wrap}
+.ov-text{display:block;width:100%}
+.ov-ev-gift{display:flex;align-items:center;gap:5px;margin-top:4px;padding:3px 6px;background:rgba(255,255,255,.06);border-radius:6px;font-size:11px;max-width:100%;overflow:hidden;flex-wrap:wrap}
+.ov-ev-gift img{width:24px;height:24px;border-radius:4px;object-fit:contain;flex-shrink:0}
+.ov-ev-gift .hidden{display:none}
+/* gift-count / gift-diamonds come from index.html's buildGiftHTML output.
+   TikTok gift thumbnails only render when Tikfinity supplies a CDN URL —
+   no bundled fallback art, so no inline-SVG sizing rules needed here. */
+.ov-ev-gift .gift-count{background:var(--tt);color:#000;font-size:10px;font-weight:900;border-radius:8px;padding:1px 5px;white-space:nowrap;flex-shrink:0}
+.ov-ev-gift .gift-diamonds{color:var(--mut);font-size:10px;white-space:nowrap;display:inline-flex;align-items:center;gap:3px;flex-shrink:0}
+.ov-ev-gift .gift-diamonds svg{width:10px;height:10px;flex-shrink:0}
+.ov-msg.first-msg{background:linear-gradient(90deg,rgba(255,200,0,.18),transparent);border-left-color:#ffd700!important}
+.ov-msg.first-words{background:linear-gradient(90deg,rgba(83,252,24,.14),transparent);border-left-color:#53fc18!important}
+.ov-msg.first-words .ov-user{position:relative;padding:1px 5px;border-radius:4px;animation:ovFwordsNamePulse 2.4s ease-out 1 both}
+.ov-msg.first-words .ov-user::before{content:"";position:absolute;inset:-2px;border-radius:6px;border:2px solid #53fc18;opacity:0;animation:ovFwordsRing 1.6s ease-out 2 both;pointer-events:none}
+@keyframes ovFwordsNamePulse{
+  0%{box-shadow:0 0 0 0 rgba(83,252,24,.7),0 0 14px 2px rgba(83,252,24,.55);background:rgba(83,252,24,.22)}
+  40%{box-shadow:0 0 0 6px rgba(83,252,24,0),0 0 18px 4px rgba(83,252,24,.35);background:rgba(83,252,24,.12)}
+  100%{box-shadow:0 0 0 0 rgba(83,252,24,0),0 0 0 0 rgba(83,252,24,0);background:rgba(83,252,24,.05)}
+}
+@keyframes ovFwordsRing{
+  0%{opacity:.95;transform:scale(.88)}
+  60%{opacity:.55;transform:scale(1.14)}
+  100%{opacity:0;transform:scale(1.28)}
+}
+@keyframes ovFwordsBadgePulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.14)}
+}
+
+/* ── Event toast (compact, below feed) ────────────────────────── */
+@keyframes evToastIn{
+  0%{opacity:0;transform:translateY(-8px) scale(.95)}
+  60%{opacity:1;transform:translateY(1px) scale(1.01)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes evToastOut{
+  0%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(6px) scale(.95)}
+}
+@keyframes evToastShine{
+  0%{transform:translateX(-120%) skewX(-18deg)}
+  100%{transform:translateX(220%) skewX(-18deg)}
+}
+/* Event area is fixed at the bottom inside the reserved padding-bottom space
+   so it never covers chat and never shifts the flex layout. Height auto-
+   expands upward for tall events (e.g. gift+message toasts) so the bottom
+   row never gets clipped — min-height keeps the empty-state reservation. */
+.ov-event-area{position:fixed;bottom:0;left:0;right:0;min-height:64px;display:flex;align-items:flex-end;justify-content:center;z-index:180;pointer-events:none;padding:6px 10px 10px;box-sizing:border-box;overflow:visible}
+.ov-event-area .ov-event{pointer-events:auto}
+.ov-event{
+  position:relative;
+  padding:10px 18px;
+  border-radius:12px;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.35;
+  animation:evToastIn .45s cubic-bezier(.34,1.56,.64,1) both;
+  border:2px solid var(--ev);
+  border-left-width:5px;
+  background:linear-gradient(135deg,rgba(240,180,41,.22),rgba(240,180,41,.08));
+  box-shadow:0 4px 20px rgba(0,0,0,.5),0 0 16px rgba(240,180,41,.35);
+  text-align:center;
+  min-width:min(300px,92%);
+  max-width:97%;
+  width:max-content;
+  overflow:hidden;
+  backdrop-filter:blur(10px);
+  color:#fff;
+  text-shadow:0 1px 6px rgba(0,0,0,.7);
+}
+.ov-event::after{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.2) 50%,transparent 65%);
+  pointer-events:none;
+  animation:evToastShine 2.2s ease-in-out infinite;
+}
+.ov-event.tw{border-color:var(--tw);background:linear-gradient(135deg,rgba(145,71,255,.2),rgba(145,71,255,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(145,71,255,.25)}
+.ov-event.yt{border-color:var(--yt);background:linear-gradient(135deg,rgba(255,0,0,.2),rgba(255,0,0,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(255,0,0,.25)}
+.ov-event.tt{border-color:var(--tt);background:linear-gradient(135deg,rgba(0,242,234,.2),rgba(0,242,234,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(0,242,234,.25)}
+.ov-event.kk{border-color:var(--kk);background:linear-gradient(135deg,rgba(83,252,24,.2),rgba(83,252,24,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(83,252,24,.25)}
+.ov-event.se{border-color:var(--se);background:linear-gradient(135deg,rgba(124,223,33,.18),rgba(124,223,33,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(124,223,33,.25)}
+.ov-event.cc{border-color:var(--cc);background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(245,165,36,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(245,165,36,.25)}
+.ov-event.out{animation:evToastOut .35s cubic-bezier(.4,0,.6,1) forwards}
+.ov-ev-head{display:block}
+.ov-ev-user{color:var(--ev);font-weight:900;font-size:16px;text-shadow:0 0 10px currentColor;margin-right:5px}
+.ov-ev-msg{margin-top:5px;padding:5px 10px;font-size:12px;font-style:italic;color:#e9e9ef;background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.35);border-radius:4px;line-height:1.4;word-break:break-word;animation:ovEvMsgIn .35s .1s ease-out both}
+.ov-ev-msg::before{content:'\201C';opacity:.55;margin-right:2px}
+.ov-ev-msg::after{content:'\201D';opacity:.55;margin-left:2px}
+@keyframes ovEvMsgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.ov-event.tw .ov-ev-user{color:var(--tw)}.ov-event.yt .ov-ev-user{color:var(--yt)}
+.ov-event.tt .ov-ev-user{color:var(--tt)}.ov-event.kk .ov-ev-user{color:var(--kk)}
+.ov-event.se .ov-ev-user{color:var(--se)}.ov-event.cc .ov-ev-user{color:var(--cc)}
+
+/* ── Big Banner (subs, gifts, cheers) ──────────────────────────── */
+/* Multi-stage spring entry: drops in big with a small overshoot, settles, then a tiny re-bounce */
+@keyframes ovBnrIn{
+  0%{opacity:0;transform:translateY(-50%) scale(.35) translateX(40px) rotate(-6deg);filter:blur(6px)}
+  35%{opacity:1;transform:translateY(-50%) scale(1.18) translateX(-8px) rotate(2deg);filter:blur(0)}
+  55%{transform:translateY(-50%) scale(.96) translateX(4px) rotate(-1deg)}
+  75%{transform:translateY(-50%) scale(1.04) translateX(-2px) rotate(.5deg)}
+  100%{opacity:1;transform:translateY(-50%) scale(1) translateX(0) rotate(0)}
+}
+@keyframes ovBnrOut{
+  0%{opacity:1;transform:translateX(-50%) scale(1) translateY(0)}
+  100%{opacity:0;transform:translateX(-50%) scale(.78) translateY(40px);filter:blur(4px)}
+}
+/* Multi-color glow halo cycling around the banner */
+@keyframes ovBnrGlow{
+  0%,100%{box-shadow:0 0 38px rgba(255,200,80,.65),0 0 80px rgba(255,200,80,.35),inset 0 0 22px rgba(255,200,80,.12)}
+  25%{box-shadow:0 0 46px rgba(58,134,255,.75),0 0 96px rgba(58,134,255,.45),inset 0 0 24px rgba(58,134,255,.16)}
+  50%{box-shadow:0 0 50px rgba(255,80,180,.78),0 0 100px rgba(255,80,180,.48),inset 0 0 26px rgba(255,80,180,.18)}
+  75%{box-shadow:0 0 46px rgba(80,200,255,.75),0 0 96px rgba(80,200,255,.45),inset 0 0 24px rgba(80,200,255,.16)}
+}
+/* Conic gradient ring rotating behind the banner */
+@keyframes ovBnrRing{to{transform:rotate(360deg)}}
+/* Diagonal shimmer sweep across the banner surface */
+@keyframes ovBnrSweep{
+  0%{transform:translateX(-150%) skewX(-22deg);opacity:0}
+  20%{opacity:.9}
+  80%{opacity:.9}
+  100%{transform:translateX(260%) skewX(-22deg);opacity:0}
+}
+/* Border color cycling for paid events */
+@keyframes ovBnrBorder{
+  0%,100%{border-color:#ffd700}
+  25%{border-color:#3A86FF}
+  50%{border-color:#ff66cc}
+  75%{border-color:#00E5A0}
+}
+/* Halo ring that expands outward continuously */
+@keyframes ovBnrHalo{
+  0%{transform:translate(-50%,-50%) scale(.6);opacity:.85}
+  100%{transform:translate(-50%,-50%) scale(2.4);opacity:0}
+}
+.ov-banner{
+  position:fixed;
+  top:50%;left:auto;right:auto;bottom:auto;
+  transform:translateY(-50%);
+  background:linear-gradient(135deg,#1a1a1f 0%,#1a2440 50%,#1a1a1f 100%);
+  border:3px solid var(--ev);
+  border-radius:clamp(14px,1.8vw,22px);
+  padding:clamp(14px,2.4vw,26px) clamp(18px,3vw,36px);
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  z-index:200;
+  min-width:0;
+  width:clamp(220px,70vw,400px);
+  max-width:min(88vw,480px);
+  pointer-events:none;
+  overflow:visible;
+  isolation:isolate;
+}
+/* Side-anchor: if the overlay is on the left half of the screen the banner
+   hugs the right edge; if on the right half it hugs the left edge. The JS
+   toggles these classes dynamically before each show. */
+.ov-banner.side-right{right:6px}
+.ov-banner.side-left{left:6px}
+.ov-banner::before{
+  /* Conic rainbow ring rotating around the banner */
+  content:'';
+  position:absolute;
+  inset:-4px;
+  border-radius:20px;
+  padding:3px;
+  background:conic-gradient(from 0deg,#ffd700,#3A86FF,#ff66cc,#00E5A0,#53fc18,#ffd700);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  animation:ovBnrRing 4s linear infinite;
+  pointer-events:none;
+  z-index:-1;
+  opacity:.85;
+}
+.ov-banner::after{
+  /* Diagonal shine sweep */
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%);
+  border-radius:18px;
+  pointer-events:none;
+  animation:ovBnrSweep 2.6s ease-in-out infinite;
+  mix-blend-mode:overlay;
+}
+.ov-banner.show{
+  display:flex;
+  animation:ovBnrIn .85s cubic-bezier(.34,1.56,.64,1) both,ovBnrGlow 3.2s ease-in-out 0.85s infinite,ovBnrBorder 4s ease-in-out 0.85s infinite;
+}
+.ov-banner.out{animation:ovBnrOut .45s cubic-bezier(.4,0,.6,1) forwards!important}
+.ov-banner.tw{background:linear-gradient(135deg,#1a1a1f 0%,#2a1f3d 50%,#1a1a1f 100%)}
+.ov-banner.yt{background:linear-gradient(135deg,#1a1a1f 0%,#3d1f1f 50%,#1a1a1f 100%)}
+.ov-banner.kk{background:linear-gradient(135deg,#1a1a1f 0%,#1f3d1f 50%,#1a1a1f 100%)}
+.ov-banner.tt{background:linear-gradient(135deg,#1a1a1f 0%,#1f3d3a 50%,#1a1a1f 100%)}
+.ov-bn-icon{
+  width:clamp(44px,6vw,80px);
+  height:clamp(44px,6vw,80px);
+  line-height:1;
+  margin-bottom:8px;
+  color:#ffd700;
+  fill:currentColor;
+  animation:ovBnrIcon 1.5s ease-in-out infinite;
+  filter:drop-shadow(0 0 14px rgba(255,215,0,.75)) drop-shadow(0 0 26px rgba(255,200,80,.4));
+  transform-origin:center center;
+}
+.ov-banner.tw .ov-bn-icon{color:#e2c4ff;filter:drop-shadow(0 0 14px rgba(145,71,255,.8)) drop-shadow(0 0 26px rgba(145,71,255,.4))}
+.ov-banner.yt .ov-bn-icon{color:#ffb3b3;filter:drop-shadow(0 0 14px rgba(255,0,0,.8)) drop-shadow(0 0 26px rgba(255,0,0,.4))}
+.ov-banner.tt .ov-bn-icon{color:#b3faf6;filter:drop-shadow(0 0 14px rgba(0,242,234,.8)) drop-shadow(0 0 26px rgba(0,242,234,.4))}
+.ov-banner.kk .ov-bn-icon{color:#cff7b3;filter:drop-shadow(0 0 14px rgba(83,252,24,.8)) drop-shadow(0 0 26px rgba(83,252,24,.4))}
+/* Bit cheer tier colors — overrides platform color when banner is a cheer */
+@keyframes ovBnBitSpin{0%{transform:scale(0) rotate(-540deg);opacity:0}60%{transform:scale(1.25) rotate(20deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes ovBnBitPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes ovBnBitSparkle{0%{transform:translate(0,0) scale(.2);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+.ov-banner.cheer .ov-bn-icon{animation:ovBnBitSpin .75s cubic-bezier(.34,1.56,.64,1) both,ovBnBitPulse 1.2s ease-in-out .75s infinite}
+.ov-banner.bit-tier-gray .ov-bn-icon{color:#c8c8c8;filter:drop-shadow(0 0 14px rgba(200,200,200,.9)) drop-shadow(0 0 28px rgba(200,200,200,.5))!important}
+.ov-banner.bit-tier-purple .ov-bn-icon{color:#c39dff;filter:drop-shadow(0 0 14px rgba(145,71,255,.95)) drop-shadow(0 0 28px rgba(145,71,255,.5))!important}
+.ov-banner.bit-tier-green .ov-bn-icon{color:#7af2a1;filter:drop-shadow(0 0 14px rgba(31,191,85,.95)) drop-shadow(0 0 28px rgba(31,191,85,.5))!important}
+.ov-banner.bit-tier-blue .ov-bn-icon{color:#9ed2ff;filter:drop-shadow(0 0 14px rgba(43,155,255,.95)) drop-shadow(0 0 28px rgba(43,155,255,.5))!important}
+.ov-banner.bit-tier-red .ov-bn-icon{color:#ff9aa8;filter:drop-shadow(0 0 14px rgba(255,51,85,.95)) drop-shadow(0 0 28px rgba(255,51,85,.5))!important}
+.ov-banner.bit-tier-orange .ov-bn-icon{color:#ffd195;filter:drop-shadow(0 0 14px rgba(255,138,31,.95)) drop-shadow(0 0 28px rgba(255,138,31,.5))!important}
+.ov-bn-sparkles{position:absolute;top:40px;left:50%;width:0;height:0;pointer-events:none;z-index:5}
+.ov-bn-sparkles i{position:absolute;top:0;left:0;width:7px;height:7px;margin:-3px 0 0 -3px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor,0 0 16px currentColor;animation:ovBnBitSparkle .85s cubic-bezier(.2,.8,.4,1) both}
+@keyframes ovBnrIcon{
+  0%,100%{transform:scale(1) rotate(0deg)}
+  20%{transform:scale(1.32) rotate(-12deg)}
+  40%{transform:scale(1.14) rotate(0deg)}
+  60%{transform:scale(1.28) rotate(12deg)}
+  80%{transform:scale(1.1) rotate(0deg)}
+}
+@keyframes ovBnrTextIn{
+  0%{opacity:0;transform:translateY(14px);filter:blur(4px)}
+  100%{opacity:1;transform:translateY(0);filter:blur(0)}
+}
+.ov-bn-title{
+  font-size:clamp(20px,2.6vw,34px);
+  font-weight:900;
+  color:#fff;
+  text-shadow:0 2px 12px rgba(0,0,0,.8),0 0 18px rgba(255,215,0,.45);
+  text-align:center;
+  letter-spacing:.5px;
+  animation:ovBnrTextIn .55s .25s ease-out both;
+}
+.ov-bn-sub{
+  font-size:clamp(13px,1.5vw,20px);
+  font-weight:600;
+  color:rgba(255,255,255,.92);
+  margin-top:4px;
+  text-align:center;
+  animation:ovBnrTextIn .55s .35s ease-out both;
+}
+@keyframes ovBnrAmtPop{
+  0%{opacity:0;transform:scale(0) rotate(-200deg)}
+  55%{opacity:1;transform:scale(1.45) rotate(10deg)}
+  80%{transform:scale(.94) rotate(-3deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}
+}
+.ov-bn-amt{
+  font-size:clamp(18px,2.4vw,30px);
+  font-weight:900;
+  color:#ffd700;
+  margin-top:6px;
+  text-shadow:0 0 14px rgba(255,215,0,.85),0 0 28px rgba(255,215,0,.4);
+  animation:ovBnrAmtPop .65s .45s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+/* ── Raid Splash (full overlay takeover) ────────────────────────── */
+@keyframes ovRaidIn{0%{opacity:0;transform:scale(.4) rotate(-12deg)}60%{transform:scale(1.1) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0deg)}}
+@keyframes ovRaidOut{from{opacity:1}to{opacity:0;transform:scale(.85)}}
+@keyframes ovRaidGlow{0%,100%{box-shadow:0 0 40px rgba(145,71,255,.7),inset 0 0 40px rgba(145,71,255,.2)}50%{box-shadow:0 0 80px rgba(145,71,255,1),inset 0 0 60px rgba(145,71,255,.4)}}
+@keyframes ovRaidShake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-3px)}20%,40%,60%,80%{transform:translateX(3px)}}
+.ov-raid{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:300;background:radial-gradient(ellipse at center,rgba(145,71,255,.3) 0%,rgba(0,0,0,.85) 70%);animation:ovBnrIn .4s ease-out both;pointer-events:none}
+.ov-raid.show{display:flex}
+.ov-raid.out{animation:ovRaidOut .4s ease-in forwards}
+.ov-raid.kk{background:radial-gradient(ellipse at center,rgba(83,252,24,.3) 0%,rgba(0,0,0,.85) 70%)}
+.ov-raid-card{background:linear-gradient(135deg,#1a1a1f 0%,#2a1a3d 100%);border:3px solid var(--tw);border-radius:16px;padding:18px 26px;text-align:center;animation:ovRaidIn .8s cubic-bezier(.34,1.56,.64,1) both,ovRaidGlow 1.8s ease-in-out 0.8s infinite;max-width:90%}
+.ov-raid.kk .ov-raid-card{border-color:var(--kk)}
+.ov-raid.kk .ov-raid-card{background:linear-gradient(135deg,#1a1a1f 0%,#1a3d1a 100%)}
+.ov-raid-icon{font-size:42px;line-height:1;margin-bottom:6px;animation:ovRaidShake .5s ease-in-out infinite}
+.ov-raid-title{font-size:11px;font-weight:900;color:var(--tw);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px}
+.ov-raid.kk .ov-raid-title{color:var(--kk)}
+.ov-raid-name{font-size:20px;font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(145,71,255,.7);margin-bottom:2px;word-break:break-word}
+.ov-raid.kk .ov-raid-name{text-shadow:0 2px 12px rgba(83,252,24,.7)}
+.ov-raid-cnt{font-size:13px;font-weight:700;color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,.5);margin-top:4px}
+
+/* ── Hype Train LEVEL UP (full overlay takeover) ──────────────── */
+@keyframes ovHluFade{from{opacity:0}to{opacity:1}}
+@keyframes ovHluFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes ovHluCardSpin{0%{transform:scale(0) rotate(-720deg);opacity:0;filter:blur(8px)}55%{transform:scale(1.22) rotate(15deg);opacity:1;filter:blur(0)}80%{transform:scale(.95) rotate(-4deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes ovHluCardPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes ovHluLabelShift{0%,100%{letter-spacing:6px}50%{letter-spacing:10px}}
+@keyframes ovHluNumPop{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+@keyframes ovHluRaySpin{from{transform:rotate(var(--a,0deg))}to{transform:rotate(calc(var(--a,0deg) + 360deg))}}
+@keyframes ovHluRayFade{0%{opacity:0}30%{opacity:.85}100%{opacity:.4}}
+#ovHypeLevelUp{position:fixed;inset:0;z-index:305;pointer-events:none;display:none;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(240,136,62,.42) 0%,rgba(0,0,0,.88) 72%);opacity:0}
+#ovHypeLevelUp.show{display:flex;animation:ovHluFade .55s ease-out forwards}
+#ovHypeLevelUp.out{animation:ovHluFadeOut .45s ease-in forwards}
+.ov-hlu-card{position:relative;text-align:center;color:#fff;animation:ovHluCardSpin 1.1s cubic-bezier(.34,1.56,.64,1) both,ovHluCardPulse 1.4s ease-in-out 1.1s infinite}
+.ov-hlu-label{font-size:12px;font-weight:900;color:#ffd700;letter-spacing:6px;text-transform:uppercase;text-shadow:0 0 14px rgba(255,215,0,.85),0 0 28px rgba(240,136,62,.6);margin-bottom:4px;animation:ovHluLabelShift 2.4s ease-in-out infinite}
+.ov-hlu-title{font-size:clamp(40px,9vw,78px);font-weight:900;line-height:1;background:linear-gradient(180deg,#fff 0%,#ffd700 35%,#f0883e 65%,#c85a00 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 4px 16px rgba(240,136,62,.9)) drop-shadow(0 0 36px rgba(255,215,0,.55));margin:0;letter-spacing:-2px}
+.ov-hlu-level{margin-top:6px;font-size:clamp(16px,2.4vw,22px);font-weight:900;color:#fff;text-shadow:0 0 12px rgba(240,136,62,.9)}
+.ov-hlu-level b{color:#ffd700;font-size:clamp(22px,3vw,32px);display:inline-block;margin-left:8px;animation:ovHluNumPop 1.4s ease-in-out infinite}
+.ov-hlu-rays{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:-1}
+.ov-hlu-rays i{position:absolute;left:0;top:0;width:2px;height:420px;margin:-210px 0 0 -1px;background:linear-gradient(180deg,rgba(255,215,0,0),rgba(255,215,0,.55) 20%,rgba(240,136,62,.85) 50%,rgba(255,215,0,.55) 80%,rgba(255,215,0,0));transform-origin:0 210px;animation:ovHluRaySpin 4s linear infinite,ovHluRayFade 1.1s ease-out both}
+
+/* ── Chat input ───────────────────────────────────────────────── */
+.ov-chat-bar{display:flex;align-items:flex-end;gap:6px;padding:6px 8px;background:var(--surf);border-top:1px solid var(--bdr);flex-shrink:0}
+.ov-chat-bar.hidden{display:none}
+.ov-chat-input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;resize:none;outline:none;max-height:90px;min-height:28px;line-height:1.4}
+.ov-chat-input:focus{border-color:#3A86FF;background:rgba(58,134,255,.08)}
+.ov-chat-input::placeholder{color:var(--mut);opacity:.7}
+.ov-chat-send{background:#3A86FF;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:11px;padding:0 12px;height:28px;cursor:pointer;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
+.ov-chat-send:hover{background:#5CA3FF}
+.ov-chat-send:disabled{background:rgba(255,255,255,.08);color:var(--mut);cursor:not-allowed}
+
+/* ── Quick-actions hotbar (mirrors the main app's SB actions hotbar) ── */
+.ov-hotbar{display:flex;gap:5px;padding:6px 8px;background:var(--surf);border-top:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap;align-items:center;border-radius:0 0 8px 8px}
+.ov-hotbar.hidden{display:none}
+.ov-hotbar-lbl{font-size:9px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;padding-right:2px;flex-shrink:0}
+.ov-hbtn{background:linear-gradient(180deg,rgba(58,134,255,.22),rgba(58,134,255,.12));border:1px solid rgba(58,134,255,.45);color:#efeff1;font-size:11px;font-weight:700;padding:5px 10px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap;letter-spacing:.3px;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.ov-hbtn:hover{background:linear-gradient(180deg,rgba(58,134,255,.38),rgba(58,134,255,.22));border-color:rgba(58,134,255,.75);transform:translateY(-1px);box-shadow:0 3px 10px rgba(58,134,255,.35)}
+.ov-hbtn:active{transform:translateY(0)}
+.ov-hbtn-firing{animation:ovHbtnFire .55s ease}
+@keyframes ovHbtnFire{0%{box-shadow:0 0 0 0 rgba(58,134,255,.9)}50%{box-shadow:0 0 0 8px rgba(58,134,255,0)}100%{box-shadow:0 0 0 0 rgba(58,134,255,0)}}
+.ov-hotbar-empty{font-size:10px;color:var(--mut);font-style:italic;padding:4px 0}
+
+/* ── Window shake for big paid events ──────────────────────────── */
+@keyframes ovShake{
+  0%,100%{transform:translate(0,0) rotate(0)}
+  10%{transform:translate(-6px,3px) rotate(-.4deg)}
+  20%{transform:translate(7px,-3px) rotate(.5deg)}
+  30%{transform:translate(-5px,4px) rotate(-.3deg)}
+  40%{transform:translate(6px,-2px) rotate(.4deg)}
+  50%{transform:translate(-4px,3px) rotate(-.2deg)}
+  60%{transform:translate(4px,-3px) rotate(.2deg)}
+  70%{transform:translate(-3px,2px) rotate(-.15deg)}
+  80%{transform:translate(3px,-2px) rotate(.1deg)}
+  90%{transform:translate(-1px,1px) rotate(-.05deg)}
+}
+body.ov-shake > *:not(.ov-raid):not(.ov-confetti-canvas):not(svg):not(#ovHypeLevelUp):not(.ov-banner){animation:ovShake .55s cubic-bezier(.36,.07,.19,.97) both}
+
+/* ── Confetti ────────────────────────────────────────────────── */
+.ov-confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:250}
+
+/* ── Activity color shift ─────────────────────────────────────
+   When chat or events come in we briefly tint the overlay surface
+   with the platform colour. The pulse decays quickly so the
+   overlay never stays loud unless activity is continuous. */
+@keyframes ovActivityPulse{
+  0%{box-shadow:inset 0 0 0 0 transparent}
+  20%{box-shadow:inset 0 0 60px 6px var(--pulse-col,rgba(255,255,255,.18))}
+  100%{box-shadow:inset 0 0 0 0 transparent}
+}
+@keyframes ovActivityBorder{
+  0%{border-color:var(--bdr)}
+  25%{border-color:var(--pulse-col,rgba(255,255,255,.4))}
+  100%{border-color:var(--bdr)}
+}
+body{position:relative;--pulse-col:rgba(255,255,255,.18)}
+/* Activity pulse glow stops above the bottom event area (72px reserve). The
+   event toast has its own pop animation; we don't want the chat-pulse halo
+   bleeding down behind it. */
+body::before{
+  content:'';
+  position:fixed;
+  top:0;left:0;right:0;bottom:72px;
+  pointer-events:none;
+  z-index:180;
+  border-radius:8px;
+  box-shadow:inset 0 0 0 0 transparent;
+  transition:box-shadow .25s ease;
+}
+body.activity-pulse::before{
+  animation:ovActivityPulse 1.1s cubic-bezier(.16,1,.3,1) forwards;
+}
+body.activity-pulse .ov-drag,
+body.activity-pulse .ov-live,
+body.activity-pulse .ov-stats,
+body.activity-pulse .ov-chat-bar{
+  animation:ovActivityBorder 1.1s ease forwards;
+}
+body.pulse-tw{--pulse-col:rgba(145,71,255,.35)}
+body.pulse-yt{--pulse-col:rgba(255,0,0,.35)}
+body.pulse-tt{--pulse-col:rgba(0,242,234,.35)}
+body.pulse-kk{--pulse-col:rgba(83,252,24,.35)}
+body.pulse-se{--pulse-col:rgba(124,223,33,.4)}
+body.pulse-ev{--pulse-col:rgba(255,215,0,.45)}
+
+/* New chat row pop — replaces the old fade so messages feel alive */
+@keyframes ovMsgInPop{
+  0%{opacity:0;transform:translateY(14px) scale(.96);filter:blur(2px)}
+  60%{opacity:1;transform:translateY(-2px) scale(1.01);filter:blur(0)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Reduced motion fallback */
+@media (prefers-reduced-motion:reduce){
+  .ov-banner.show,.ov-banner.out,.ov-event,.ov-event.out,
+  .ov-banner::before,.ov-banner::after,.ov-event::after,
+  body.activity-pulse::before,
+  body.activity-pulse .ov-drag,body.activity-pulse .ov-live,
+  body.activity-pulse .ov-stats,body.activity-pulse .ov-chat-bar{
+    animation-duration:.001s!important;
+    animation-iteration-count:1!important;
+  }
+}
+
+/* (stats bar styles consolidated above) */
+
+/* ── PROMO-SPECIFIC ADDITIONS ──────────────────────────────────
+   The promo is a 1:1 copy of the pop-out — same DOM, same JS — with
+   two differences: the revenue chip is stripped from renderStatsBar
+   (done in the JS below) and this fixed CTA strip is added at the
+   very bottom of the window. Event toasts are pushed up by exactly
+   the CTA's height so they never clip. */
+.pr-cta{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  background:linear-gradient(90deg,#3A86FF 0%,#9147ff 50%,#ff66cc 100%);
+  background-size:200% 100%;
+  animation:prCtaShift 7s ease-in-out infinite;
+  box-shadow:0 -4px 18px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.18);
+  z-index:205;
+  overflow:hidden;
+  font-weight:900;
+  color:#fff;
+  text-shadow:0 1px 4px rgba(0,0,0,.6);
+  letter-spacing:.5px;
+  user-select:none;
+  -webkit-app-region:no-drag;
+  border-radius:0 0 8px 8px;
+}
+@keyframes prCtaShift{
+  0%,100%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+}
+/* Diagonal shine sweep — same trick as the event toast, just slower */
+.pr-cta::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);
+  animation:prCtaSweep 3.4s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes prCtaSweep{
+  0%{transform:translateX(-120%) skewX(-18deg);opacity:0}
+  20%{opacity:1}
+  80%{opacity:1}
+  100%{transform:translateX(220%) skewX(-18deg);opacity:0}
+}
+.pr-cta-logo{
+  font-size:15px;
+  font-weight:900;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  z-index:1;
+}
+.pr-cta-logo svg{filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.pr-cta-msg{
+  font-size:15px;
+  font-weight:800;
+  z-index:1;
+}
+.pr-cta-pill{
+  background:rgba(0,0,0,.35);
+  border:1.5px solid rgba(255,255,255,.55);
+  padding:4px 12px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:.8px;
+  z-index:1;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  animation:prCtaPulse 1.9s ease-in-out infinite;
+}
+@keyframes prCtaPulse{
+  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,.35)}
+  50%{transform:scale(1.05);box-shadow:0 0 0 6px rgba(255,255,255,0)}
+}
+.pr-cta-arrow{
+  display:inline-block;
+  font-size:17px;
+  animation:prCtaArrow 1.4s ease-in-out infinite;
+}
+@keyframes prCtaArrow{
+  0%,100%{transform:translateX(0)}
+  50%{transform:translateX(5px)}
+}
+
+/* Push the event-toast anchor up by the CTA height so toasts never clip.
+   The overlay anchors event-area at bottom:0 — we bump it to bottom:56px
+   (matching .pr-cta height). Everything else in the event-area rule
+   (min-height, padding, z-index, pointer-events) is inherited from the
+   shared rule above. */
+.ov-event-area{bottom:56px}
+
+/* The activity-pulse glow reserves 72px at the bottom by default so the
+   event toast pop-up isn't covered. On the promo we need to reserve an
+   extra 56px (the CTA) so the glow also stops above the CTA. Without
+   this override the pulse would bleed down behind the aquilo banner. */
+body::before{bottom:128px}
+</style>
+</head>
+<body>
+
+<div class="ov-drag" id="ovDrag">
+  <span class="ov-drag-title">&#9889; StreamFusion</span>
+  <span class="ov-ctrl-hint" id="ovCtrlHint">Hold Ctrl to interact</span>
+  <button class="ov-drag-btn" id="ovLockBtn" title="Lock overlay (mouse passes through)">&#128275;</button>
+  <button class="ov-drag-btn close" id="ovCloseBtn" title="Close overlay">&#10005;</button>
+</div>
+
+<div class="ov-live" id="ovLive">
+  <span class="ov-live-dot"></span>
+  <span class="ov-live-lbl">Live on</span>
+  <span class="ov-live-chip tw" id="ovLiveTw"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M4.3 1 2 4.7v15.6h5.3V23h3.4l3.3-2.7h4.7L23 16V1H4.3zm16 13.7-3.4 3.3h-5.3L8.3 21.3v-3.3H4.7V3.7h15.6v11zM15.3 7v5.3h-2.6V7h2.6zm-5.6 0v5.3H7V7h2.7z"/></svg></span>
+  <span class="ov-live-chip yt" id="ovLiveYt"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M23 7s-.2-1.7-1-2.4c-1-1-2.2-1-2.7-1.1C16.2 3.3 12 3.3 12 3.3s-4.2 0-7.3.2c-.5.1-1.7.1-2.7 1.1C1.2 5.3 1 7 1 7S.8 9 .8 11v1.8c0 2.1.2 4.1.2 4.1s.2 1.7 1 2.4c1 1 2.2 1 2.7 1.1 2 .2 8.3.2 8.3.2s4.2 0 7.3-.2c.5-.1 1.7-.1 2.7-1.1.8-.7 1-2.4 1-2.4s.2-2.1.2-4.1V11c0-2.1-.2-4-.2-4zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg></span>
+  <span class="ov-live-chip tt" id="ovLiveTt"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19.3 6.4a4.8 4.8 0 0 1-3.1-2.8A4.7 4.7 0 0 1 15.8 2h-3.5v13.7a2.9 2.9 0 0 1-2.9 2.7 2.9 2.9 0 0 1-2.9-2.9 2.9 2.9 0 0 1 2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 0 0-.9-.1A6.4 6.4 0 0 0 3 15.5a6.4 6.4 0 0 0 6.4 6.4 6.4 6.4 0 0 0 6.4-6.4v-7a8.3 8.3 0 0 0 4.9 1.6V6.5c-.5 0-1-.1-1.4-.1z"/></svg></span>
+  <span class="ov-live-chip kk" id="ovLiveKk"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 4h3v6.5L14.7 4H18l-5.8 7.5L18 20h-3.3L9 13.5V20H6V4z"/></svg></span>
+  <span class="ov-live-timer off" id="ovLiveTimer">00:00:00</span>
+</div>
+<div class="ov-stats" id="ovStats"></div>
+<div class="ov-goals" id="ovGoals"></div>
+<div class="ov-hype" id="ovHype">
+  <div class="ov-hype-hd"><span>&#128642; HYPE <span class="ov-hype-lv" id="ovHypeLv">1</span></span><span class="ov-hype-timer" id="ovHypeTimer"></span></div>
+  <div class="ov-hype-track"><div class="ov-hype-fill" id="ovHypeFill" style="width:0%"></div></div>
+</div>
+<div class="ov-poll hidden" id="ovPoll">
+  <div class="ov-poll-hd"><span id="ovPollIcon">&#128202;</span> <span id="ovPollTitle">Poll</span><span class="ov-poll-status" id="ovPollStatus">ACTIVE</span></div>
+  <div class="ov-poll-choices" id="ovPollChoices"></div>
+</div>
+<div class="ov-pred hidden" id="ovPred">
+  <div class="ov-pred-hd"><span>&#127919;</span> <span id="ovPredTitle">Prediction</span><span class="ov-pred-status" id="ovPredStatus">ACTIVE</span></div>
+  <div class="ov-pred-outcomes" id="ovPredOutcomes"></div>
+</div>
+<div class="ov-feed" id="ovFeed"></div>
+<div class="ov-chat-bar" id="ovChatBar">
+  <textarea class="ov-chat-input" id="ovChatInput" rows="1" placeholder="Send to chat…"></textarea>
+  <button class="ov-chat-send" id="ovChatSend" type="button">Send</button>
+</div>
+<div class="ov-hotbar hidden" id="ovHotbar">
+  <span class="ov-hotbar-lbl">Actions</span>
+  <div id="ovHotbarBtns" style="display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0"></div>
+</div>
+<div class="ov-event-area" id="ovEventArea"></div>
+
+<!-- aquilo.gg CTA strip — fixed at the very bottom, below the whole app.
+     This is the reason the promo window exists: streamer captures this
+     window in OBS as a Window Capture source, and the audience sees the
+     download pitch alongside live chat. Event toasts are pushed up by
+     the CTA's height (see .ov-event-area override in the stylesheet)
+     so they never clip this banner. -->
+<div class="pr-cta" aria-label="Download StreamFusion at aquilo.gg">
+  <span class="pr-cta-logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></svg>
+    StreamFusion
+  </span>
+  <span class="pr-cta-msg">Download for Free at</span>
+  <span class="pr-cta-pill">aquilo.gg <span class="pr-cta-arrow">&#8594;</span></span>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></symbol>
+    <symbol id="i-party" viewBox="0 0 24 24"><path fill="currentColor" d="M2 22l3.5-10 6.5 6.5L2 22zm5.5-12.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5S6 11.83 6 11s.67-1.5 1.5-1.5zM14 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zm6 4l.7 1.4 1.4.6-1.4.6L20 12l-.7-1.4-1.4-.6 1.4-.6L20 8zm-6 5l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm0-14a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></symbol>
+    <symbol id="i-train" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2h3.54l2 2H18v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-4-4-8-4zM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></symbol>
+    <symbol id="i-money" viewBox="0 0 24 24"><path fill="currentColor" d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm.88 14.5v1.5h-1.75v-1.46c-1.4-.27-2.5-1.18-2.6-2.84h1.69c.07.95.65 1.55 1.84 1.55.99 0 1.79-.41 1.79-1.27 0-.62-.5-1.05-1.84-1.4-1.86-.46-3.13-1.05-3.13-2.65 0-1.32 1.04-2.06 2.25-2.32V6h1.75v1.62c1.45.28 2.18 1.27 2.23 2.46h-1.7c-.05-.86-.5-1.42-1.6-1.42-.99 0-1.59.45-1.59 1.08 0 .55.42.91 1.84 1.27 1.42.36 3.13.96 3.13 2.81 0 1.41-1.05 2.18-2.31 2.41z"/></symbol>
+    <symbol id="i-bit-gray"   viewBox="0 0 24 24"><g><path fill="#979797" d="M12 2 3 9l9 13 9-13z"/><path fill="#c8c8c8" d="M12 2 3 9h18z"/><path fill="#6f6f6f" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-purple" viewBox="0 0 24 24"><g><path fill="#9147ff" d="M12 2 3 9l9 13 9-13z"/><path fill="#c39dff" d="M12 2 3 9h18z"/><path fill="#5c1fb8" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-green"  viewBox="0 0 24 24"><g><path fill="#1fbf55" d="M12 2 3 9l9 13 9-13z"/><path fill="#7af2a1" d="M12 2 3 9h18z"/><path fill="#0c7a32" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-blue"   viewBox="0 0 24 24"><g><path fill="#2b9bff" d="M12 2 3 9l9 13 9-13z"/><path fill="#9ed2ff" d="M12 2 3 9h18z"/><path fill="#0b5ba8" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-red"    viewBox="0 0 24 24"><g><path fill="#ff3355" d="M12 2 3 9l9 13 9-13z"/><path fill="#ff9aa8" d="M12 2 3 9h18z"/><path fill="#9a0e29" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-orange" viewBox="0 0 24 24"><g><path fill="#ff8a1f" d="M12 2 3 9l9 13 9-13z"/><path fill="#ffd195" d="M12 2 3 9h18z"/><path fill="#a84a00" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+  </defs>
+</svg>
+
+<!-- Banners and raid splash are rendered in the external banner window -->
+<!-- (separate transparent window adjacent to the pop-out) -->
+
+<!-- Hype Train LEVEL UP fullscreen fanfare for the pop-out overlay -->
+<div id="ovHypeLevelUp"><div class="ov-hlu-rays" id="ovHluRays"></div><div class="ov-hlu-card"><div class="ov-hlu-label">Hype Train</div><div class="ov-hlu-title">LEVEL UP!</div><div class="ov-hlu-level">Level <b id="ovHluLvNum">1</b></div></div></div>
+
+<canvas class="ov-confetti-canvas" id="ovConfetti"></canvas>
+
+<script>
+"use strict";
+var api = window.electronAPI || {};
+
+// ── State ──────────────────────────────────────────────────────
+// All settings are owned by the main app and pushed via the 'config' IPC
+// message. The overlay is a pure renderer of pushed config + stream data.
+var cfg = {
+  showChat: true, showViewers: true, showRevenue: true, showHype: true, showEvents: true,
+  showAvatars: true, showBadges: true, showHotbar: true, hideAnimations: false,
+  platTw: true, platYt: true, platTt: true, platKk: true,
+  bgOpacity: 0.80, winOpacity: 1.00, textSize: 13, maxMsgs: 40, clickThrough: false,
+  hotbar: []
+};
+var feed = document.getElementById('ovFeed');
+var eventArea = document.getElementById('ovEventArea');
+var _evTimer = null, _evQueue = [];
+
+// ── Activity pulse — briefly tints the overlay surface when chat
+// or events arrive. Single shared timer so rapid messages don't
+// stack and the pulse never gets stuck on. The "kind" param picks
+// which colour the pulse uses (platform key or 'ev' / 'se').
+var _pulseTimer = null;
+var PULSE_CLASSES = ['pulse-tw','pulse-yt','pulse-tt','pulse-kk','pulse-se','pulse-ev'];
+function triggerActivityPulse(kind) {
+  var body = document.body;
+  PULSE_CLASSES.forEach(function(c) { body.classList.remove(c); });
+  if (kind && PULSE_CLASSES.indexOf('pulse-' + kind) !== -1) {
+    body.classList.add('pulse-' + kind);
+  }
+  body.classList.remove('activity-pulse');
+  // force reflow so the animation re-fires
+  void body.offsetWidth;
+  body.classList.add('activity-pulse');
+  if (_pulseTimer) clearTimeout(_pulseTimer);
+  _pulseTimer = setTimeout(function() {
+    body.classList.remove('activity-pulse');
+    PULSE_CLASSES.forEach(function(c) { body.classList.remove(c); });
+  }, 1150);
+}
+
+// ── Load saved overlay settings ──────────────────────────────
+function loadCfg() {
+  try {
+    var d = JSON.parse(localStorage.getItem('sf_overlay_cfg') || '{}');
+    Object.keys(cfg).forEach(function(k) { if (d[k] !== undefined) cfg[k] = d[k]; });
+  } catch(e) {}
+}
+function saveCfg() {
+  localStorage.setItem('sf_overlay_cfg', JSON.stringify(cfg));
+}
+loadCfg();
+// Always open the pop-out in a clickable state. If the user previously saved
+// clickThrough:true, we still start unlocked so they can interact with the
+// window immediately. They can re-lock via the header lock button or the
+// main app lock icon.
+cfg.clickThrough = false;
+
+// ── Opacity helper — sets CSS custom properties for surface backgrounds ──
+function applyBgOpacity() {
+  var a = cfg.bgOpacity;
+  document.documentElement.style.setProperty('--surf', 'rgba(14,14,16,' + a + ')');
+  document.documentElement.style.setProperty('--surf2', 'rgba(14,14,16,' + (a * 0.8) + ')');
+}
+
+// ── Apply config to UI ──────────────────────────────────────
+function applyConfig() {
+  document.documentElement.style.setProperty('--chat-size', cfg.textSize + 'px');
+  applyBgOpacity();
+  applyWinOpacity();
+  applyClickThrough(cfg.clickThrough);
+  renderHotbar();
+}
+
+// ── Quick-action hotbar ─────────────────────────────────────
+// Buttons mirror the main app's SB actions hotbar. Clicks send the index
+// back to main via IPC, which routes to fireHotbarAction(idx) in the main
+// renderer. Overlay never touches the SB websocket directly.
+function renderHotbar() {
+  var bar = document.getElementById('ovHotbar');
+  var btns = document.getElementById('ovHotbarBtns');
+  if (!bar || !btns) return;
+  var list = Array.isArray(cfg.hotbar) ? cfg.hotbar : [];
+  if (!cfg.showHotbar || !list.length) {
+    bar.classList.add('hidden');
+    btns.innerHTML = '';
+    return;
+  }
+  bar.classList.remove('hidden');
+  btns.innerHTML = list.map(function(a, i) {
+    var label = esc(a.label || a.name || ('Action ' + (i + 1)));
+    var title = 'Run SB action: ' + esc(a.name || label);
+    return '<button class="ov-hbtn" data-idx="' + i + '" title="' + title + '">' + label + '</button>';
+  }).join('');
+  // Delegate clicks so we don't need to rewire on every render
+  btns.querySelectorAll('.ov-hbtn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var idx = parseInt(b.getAttribute('data-idx'), 10);
+      if (isNaN(idx)) return;
+      b.classList.add('ov-hbtn-firing');
+      setTimeout(function() { b.classList.remove('ov-hbtn-firing'); }, 600);
+      if (api.overlayFireHotbar) api.overlayFireHotbar(idx);
+    });
+  });
+}
+
+// ── Window-level opacity (Electron setOpacity via IPC) ──────
+function applyWinOpacity() {
+  if (api.overlaySetOpacity) api.overlaySetOpacity(cfg.winOpacity);
+}
+
+applyConfig();
+
+// ── Click-through mode ─────────────────────────────────────
+function applyClickThrough(enabled) {
+  document.body.classList.toggle('clickthrough', enabled);
+  if (enabled) document.body.classList.remove('interactive');
+  if (api.overlayClickThrough) api.overlayClickThrough(enabled);
+  var btn = document.getElementById('ovLockBtn');
+  if (btn) {
+    btn.classList.toggle('lock-on', enabled);
+    btn.innerHTML = enabled ? '&#128274;' : '&#128275;';
+    btn.title = enabled ? 'Locked — click to unlock' : 'Lock overlay (mouse passes through)';
+  }
+  // Notify main process so the main app header lock icon stays in sync
+  if (api.overlayLockChanged) api.overlayLockChanged(enabled);
+}
+
+if (api.onOverlayToggleInteract) {
+  api.onOverlayToggleInteract(function() {
+    // Full lock/unlock toggle so the hotkey is a true escape hatch
+    cfg.clickThrough = !cfg.clickThrough;
+    applyClickThrough(cfg.clickThrough);
+    saveCfg();
+  });
+}
+
+// Hold-Ctrl-to-interact: while the overlay is locked (click-through),
+// holding the global Ctrl key temporarily makes the overlay interactive.
+// Releasing Ctrl returns it to click-through. The Ctrl state is detected
+// by a PowerShell child process in the main process — this works even
+// when the overlay window has no focus (fullscreen game scenario).
+var _holdActive = false;
+if (api.onOverlayHoldKey) {
+  api.onOverlayHoldKey(function(down) {
+    if (!cfg.clickThrough) return; // Only meaningful while locked
+    if (down && !_holdActive) {
+      _holdActive = true;
+      document.body.classList.add('interactive');
+      if (api.overlayClickThrough) api.overlayClickThrough(false);
+    } else if (!down && _holdActive) {
+      _holdActive = false;
+      document.body.classList.remove('interactive');
+      if (api.overlayClickThrough) api.overlayClickThrough(true);
+    }
+  });
+}
+
+// ── Window controls ─────────────────────────────────────────
+document.getElementById('ovCloseBtn').addEventListener('click', function() {
+  if (api.closeOverlay) api.closeOverlay();
+  else window.close();
+});
+document.getElementById('ovLockBtn').addEventListener('click', function() {
+  cfg.clickThrough = !cfg.clickThrough;
+  applyClickThrough(cfg.clickThrough);
+  saveCfg();
+});
+
+// ── Chat send ───────────────────────────────────────────────
+// The overlay never owns platform credentials. We hand the text off to the
+// main app via IPC and it routes through whichever platforms the user has
+// enabled in the in-app composer.
+(function() {
+  var input = document.getElementById('ovChatInput');
+  var btn = document.getElementById('ovChatSend');
+  if (!input || !btn) return;
+  function autosize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 90) + 'px';
+  }
+  function doSend() {
+    var text = (input.value || '').trim();
+    if (!text) return;
+    if (api.sendOverlayChat) api.sendOverlayChat({ text: text });
+    input.value = '';
+    autosize();
+    input.focus();
+  }
+  input.addEventListener('input', autosize);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      doSend();
+    }
+  });
+  btn.addEventListener('click', doSend);
+})();
+
+// ── Helpers ──────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function platAllowed(p) {
+  var m = {tw:'platTw',yt:'platYt',tt:'platTt',kk:'platKk'};
+  return m[p] ? cfg[m[p]] : true;
+}
+
+// ── Chat messages ───────────────────────────────────────────
+function addMsg(d) {
+  if (!cfg.showChat) return;
+  if (!platAllowed(d.plat)) return;
+  var el = document.createElement('div');
+  var fc = d.isFirstMsg ? ' first-msg' : (d.isFirstWords ? ' first-words' : '');
+  el.className = 'ov-msg ' + (d.plat || '') + fc;
+
+  var parts = '';
+  var _pSvg = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>'};
+  var _picoIcon = _pSvg[d.plat] || '';
+  if (cfg.showAvatars && d.avatar) {
+    // Render both the img and a hidden pico fallback. If the image fails to
+    // load (unavatar.io hiccup, stale login, etc.) the onerror handler hides
+    // the img and reveals the sibling pico, so the avatar slot is never empty.
+    parts += '<img class="ov-avatar" src="' + esc(d.avatar) + '" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display=\'none\';var n=this.nextElementSibling;if(n)n.style.display=\'flex\'">';
+    if (_picoIcon) parts += '<div class="ov-pico ' + d.plat + '" style="display:none">' + _picoIcon + '</div>';
+  } else if (_picoIcon) {
+    parts += '<div class="ov-pico ' + d.plat + '">' + _picoIcon + '</div>';
+  }
+  // Body column: head row (badges + username) → badge-row if first-msg/words → text
+  var head = '';
+  if (cfg.showBadges && d.badges && d.badges.length) {
+    d.badges.forEach(function(b) {
+      if (b.img) head += '<img class="ov-badge" src="' + esc(b.img) + '" title="' + esc(b.lbl || '') + '">';
+    });
+  }
+  var nameStyle = d.color ? ' style="color:' + d.color + '"' : '';
+  head += '<span class="ov-user ' + d.plat + '"' + nameStyle + '>' + esc(d.user) + '</span>';
+  var badgeRow = '';
+  if (d.isFirstMsg) badgeRow = '<div class="ov-fbadge-row"><span class="ov-fmsg-badge">NEW VIEWER!</span></div>';
+  else if (d.isFirstWords) badgeRow = '<div class="ov-fbadge-row"><span class="ov-fwords-badge">FIRST WORDS</span></div>';
+  parts += '<div class="ov-mbody">'
+    + '<div class="ov-mhead">' + head + '</div>'
+    + badgeRow
+    + '<span class="ov-text">' + (d.html || esc(d.text || '')) + '</span>'
+    + '</div>';
+  // Mod menu: Twitch only. Buttons stash the user/msgId in data-* attrs and
+  // the click handler below reads them and fires sendOverlayModAction so the
+  // main app's SB websocket does the actual /timeout, /ban or /delete.
+  if (d.plat === 'tw' && d.user) {
+    var u = esc(d.user);
+    var mid = esc(d.msgId || '');
+    parts += '<div class="ov-mod-wrap">'
+      + '<button class="ov-mod-btn" data-mod="toggle" title="Mod actions">'
+      + '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>'
+      + '</button>'
+      + '<div class="ov-mod-menu">'
+      + '<div class="ov-mod-item" data-mod="timeout" data-dur="30"  data-user="' + u + '" data-mid="' + mid + '">Timeout 30s</div>'
+      + '<div class="ov-mod-item" data-mod="timeout" data-dur="600" data-user="' + u + '" data-mid="' + mid + '">Timeout 10m</div>'
+      + '<div class="ov-mod-item" data-mod="timeout" data-dur="3600" data-user="' + u + '" data-mid="' + mid + '">Timeout 1h</div>'
+      + '<div class="ov-mod-item danger" data-mod="ban" data-user="' + u + '">Ban</div>'
+      + (mid ? '<div class="ov-mod-item" data-mod="delete" data-user="' + u + '" data-mid="' + mid + '">Delete msg</div>' : '')
+      + '</div></div>';
+  }
+  el.innerHTML = parts;
+  // column-reverse: prepend so newest is first DOM child = visual bottom
+  feed.insertBefore(el, feed.firstChild);
+  while (feed.children.length > cfg.maxMsgs) feed.removeChild(feed.lastChild);
+  // column-reverse pins scroll naturally, no manual scrollTop needed
+  triggerActivityPulse(d.plat);
+}
+
+// ── Mod menu wiring (delegated click on the feed) ───────────
+var _ovModOpen = null;
+(function() {
+  var feed = document.getElementById('ovFeed');
+  if (!feed) return;
+  feed.addEventListener('click', function(e) {
+    var toggleBtn = e.target.closest('[data-mod="toggle"]');
+    if (toggleBtn) {
+      e.stopPropagation();
+      var wrap = toggleBtn.parentNode;
+      var menu = wrap.querySelector('.ov-mod-menu');
+      if (_ovModOpen && _ovModOpen !== menu) {
+        _ovModOpen.classList.remove('show');
+        if (_ovModOpen.parentNode) _ovModOpen.parentNode.classList.remove('open');
+      }
+      var isOpen = menu.classList.toggle('show');
+      wrap.classList.toggle('open', isOpen);
+      _ovModOpen = isOpen ? menu : null;
+      return;
+    }
+    var item = e.target.closest('.ov-mod-item');
+    if (item) {
+      e.stopPropagation();
+      var action = item.getAttribute('data-mod');
+      var user = item.getAttribute('data-user') || '';
+      var dur = parseInt(item.getAttribute('data-dur') || '0', 10) || 0;
+      var mid = item.getAttribute('data-mid') || '';
+      if (action && user && api.sendOverlayModAction) {
+        api.sendOverlayModAction({ action: action, user: user, duration: dur, msgId: mid });
+      }
+      if (_ovModOpen) {
+        _ovModOpen.classList.remove('show');
+        if (_ovModOpen.parentNode) _ovModOpen.parentNode.classList.remove('open');
+        _ovModOpen = null;
+      }
+    }
+  });
+  // Click outside closes any open mod menu
+  document.addEventListener('click', function() {
+    if (_ovModOpen) {
+      _ovModOpen.classList.remove('show');
+      if (_ovModOpen.parentNode) _ovModOpen.parentNode.classList.remove('open');
+      _ovModOpen = null;
+    }
+  });
+})();
+
+// ── Events (one at a time, fades) ───────────────────────────
+function showEvent(d) {
+  if (!cfg.showEvents) return;
+  if (!platAllowed(d.plat)) return;
+  // Immediately replace — no queueing, no stacking
+  if (_evTimer) { clearTimeout(_evTimer); _evTimer = null; }
+  while (eventArea.firstChild) eventArea.removeChild(eventArea.firstChild);
+  var el = document.createElement('div');
+  el.className = 'ov-event ' + (d.plat || '');
+  var evText = d.text || '';
+  if (d.user && evText.toLowerCase().indexOf(d.user.toLowerCase()) === 0) {
+    evText = evText.slice(d.user.length).replace(/^\s+/, '');
+  }
+  var msgHtml = d.evMessage ? '<div class="ov-ev-msg">' + esc(d.evMessage) + '</div>' : '';
+  var giftBlock = d.giftHtml ? '<div class="ov-ev-gift">' + d.giftHtml + '</div>' : '';
+  el.innerHTML = '<div class="ov-ev-head"><span class="ov-ev-user">' + esc(d.user || 'Event') + '</span> ' + esc(evText) + '</div>' + msgHtml + giftBlock;
+  eventArea.appendChild(el);
+  triggerActivityPulse(d.plat || 'ev');
+  var dwell = (d.evMessage || d.giftHtml) ? 6500 : 4200;
+  _evTimer = setTimeout(function() {
+    el.classList.add('out');
+    setTimeout(function() {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 400);
+    _evTimer = null;
+  }, dwell);
+}
+
+// ── Stats bar ───────────────────────────────────────────────
+var _lastStats = null;
+function updateStats(d) {
+  _lastStats = d || {};
+  renderStatsBar();
+}
+function _fmtNum(n) {
+  var v = Number(n) || 0;
+  return v >= 1000 ? v.toLocaleString() : String(v);
+}
+var _ovPrevLikes = 0;
+var _ovHeartColors = ['#ff4d6d','#ff6b8a','#ff85a1','#ff3366','#e0245e','#ff69b4'];
+function _ovSpawnHearts(wrap, count) {
+  if (!wrap) return;
+  for (var i = 0; i < count; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        var h = document.createElement('span');
+        h.className = 'ov-fly-heart';
+        h.textContent = '\u2764';
+        h.style.color = _ovHeartColors[Math.floor(Math.random() * _ovHeartColors.length)];
+        h.style.setProperty('--hx', (Math.random() * 26 - 13) + 'px');
+        h.style.setProperty('--hy', (Math.random() * -14) + 'px');
+        h.style.fontSize = (11 + Math.random() * 7) + 'px';
+        wrap.appendChild(h);
+        setTimeout(function() { if (h.parentNode) h.parentNode.removeChild(h); }, 1300);
+      }, idx * 80);
+    })(i);
+  }
+}
+function renderStatsBar() {
+  var d = _lastStats || {};
+  var statsEl = document.getElementById('ovStats');
+  if (!statsEl) return;
+  // Stats bar is always rendered so the streamer always sees their totals,
+  // even before any event fires. Individual sections still honour platform
+  // toggles below.
+  statsEl.classList.remove('hidden');
+
+  var v = d.viewers || {tw:0, yt:0, tt:0, kk:0};
+  var f = d.follows || {tw:0, yt:0, tt:0, kk:0};
+  var s = d.subs || {tw:0, kk:0};
+  var bits = d.bits || 0;
+  var coins = d.ttCoins || 0;
+  var rev = (d.revenue != null) ? Number(d.revenue).toFixed(2) : '0.00';
+
+  var html = '';
+
+  // VIEWERS section — live viewer counts per platform
+  if (cfg.showViewers !== false) {
+    html += '<span class="ov-stats-lbl">Viewers</span>';
+    if (cfg.platTw) html += '<span class="ov-st tw">TW<span class="ov-st-num">' + _fmtNum(v.tw) + '</span></span>';
+    if (cfg.platYt) html += '<span class="ov-st yt">YT<span class="ov-st-num">' + _fmtNum(v.yt) + '</span></span>';
+    if (cfg.platTt) html += '<span class="ov-st tt">TT<span class="ov-st-num">' + _fmtNum(v.tt) + '</span></span>';
+    if (cfg.platKk) html += '<span class="ov-st kk">KK<span class="ov-st-num">' + _fmtNum(v.kk) + '</span></span>';
+    html += '<span class="ov-stats-div"></span>';
+  }
+
+  // FOLLOWS section
+  html += '<span class="ov-stats-lbl">Follows</span>';
+  if (cfg.platTw) html += '<span class="ov-st tw">TW<span class="ov-st-num">' + (f.tw || 0) + '</span></span>';
+  if (cfg.platYt) html += '<span class="ov-st yt">YT<span class="ov-st-num">' + (f.yt || 0) + '</span></span>';
+  if (cfg.platTt) html += '<span class="ov-st tt">TT<span class="ov-st-num">' + (f.tt || 0) + '</span></span>';
+  if (cfg.platKk) html += '<span class="ov-st kk">KK<span class="ov-st-num">' + (f.kk || 0) + '</span></span>';
+
+  html += '<span class="ov-stats-div"></span>';
+
+  // SUBS section
+  html += '<span class="ov-stats-lbl">Subs</span>';
+  if (cfg.platTw) html += '<span class="ov-st tw">TW<span class="ov-st-num">' + (s.tw || 0) + '</span></span>';
+  if (cfg.platKk) html += '<span class="ov-st kk">KK<span class="ov-st-num">' + (s.kk || 0) + '</span></span>';
+
+  html += '<span class="ov-stats-div"></span>';
+
+  // Bits / Coins / Likes
+  if (cfg.platTw) html += '<span class="ov-st bits">\u2665 Bits<span class="ov-st-num">' + bits.toLocaleString() + '</span></span>';
+  if (cfg.platTt) html += '<span class="ov-st coins">\uD83E\uDE99 Coins<span class="ov-st-num">' + coins.toLocaleString() + '</span></span>';
+  if (cfg.platTt) { var likes = d.ttLikes || 0; html += '<span class="ov-st likes" id="ovLikesEl">\u2764 Likes<span class="ov-st-num">' + Number(likes).toLocaleString() + '</span></span>'; }
+
+  // Revenue chip is intentionally omitted on the promo overlay. Streamers
+  // using this as an OBS capture source to advertise StreamFusion don't
+  // want their real-money numbers on-stream. The `rev` value is still
+  // computed above in case any future addition wants it, but it's never
+  // displayed on this window.
+  void rev;
+
+  statsEl.innerHTML = html;
+  statsEl.classList.add('show');
+
+  // Spawn flying hearts when likes increase
+  if (cfg.platTt) {
+    var newLikes = d.ttLikes || 0;
+    var diff = newLikes - _ovPrevLikes;
+    if (diff > 0 && _ovPrevLikes > 0) {
+      var wrap = document.getElementById('ovLikesEl');
+      if (wrap) _ovSpawnHearts(wrap, Math.min(diff, 8));
+    }
+    _ovPrevLikes = newLikes;
+  }
+}
+
+// Render empty defaults at startup so the bar is always visible
+renderStatsBar();
+
+// ── Live-on bar ─────────────────────────────────────────────
+var _liveState = { tw:false, yt:false, tt:false, kk:false, startTime: 0, active: false };
+function _fmtDur(ms) {
+  if (!ms || ms < 0) ms = 0;
+  var s = Math.floor(ms / 1000);
+  var h = Math.floor(s / 3600);
+  var m = Math.floor((s % 3600) / 60);
+  var sec = s % 60;
+  function pad(n){return n < 10 ? '0'+n : ''+n;}
+  return pad(h) + ':' + pad(m) + ':' + pad(sec);
+}
+function renderLiveBar() {
+  var platKey = { tw:'platTw', yt:'platYt', tt:'platTt', kk:'platKk' };
+  ['tw','yt','tt','kk'].forEach(function(p) {
+    var el = document.getElementById('ovLive' + p.charAt(0).toUpperCase() + p.slice(1));
+    if (!el) return;
+    el.style.display = cfg[platKey[p]] ? '' : 'none';
+    el.classList.toggle('on', !!_liveState[p]);
+  });
+  var t = document.getElementById('ovLiveTimer');
+  if (!t) return;
+  if (_liveState.active && _liveState.startTime) {
+    t.classList.remove('off');
+    t.textContent = _fmtDur(Date.now() - _liveState.startTime);
+  } else {
+    t.classList.add('off');
+    t.textContent = '00:00:00';
+  }
+}
+function updateLive(d) {
+  _liveState.tw = !!d.tw;
+  _liveState.yt = !!d.yt;
+  _liveState.tt = !!d.tt;
+  _liveState.kk = !!d.kk;
+  _liveState.active = !!d.active;
+  _liveState.startTime = d.startTime || 0;
+  renderLiveBar();
+}
+setInterval(renderLiveBar, 1000);
+renderLiveBar();
+
+// External lock toggle from main app header lock icon
+if (api.onOverlayExternalLock) {
+  api.onOverlayExternalLock(function(e, locked) {
+    var next = (typeof locked === 'boolean') ? locked : !cfg.clickThrough;
+    cfg.clickThrough = next;
+    applyClickThrough(next);
+    saveCfg();
+  });
+}
+
+// ── Big Banner (subs, gifts, cheers) ─────────────────────────
+// Banners and raids are now rendered in the external banner window
+// (separate Electron window adjacent to the pop-out). The overlay just
+// forwards the data via IPC and applies local feedback (pulse, shake).
+var _shakeTimer = null;
+// CSS shake on the overlay body contents. The main process ALSO physically
+// shakes the window via setPosition (triggered from the main renderer), but
+// the CSS shake runs in parallel so the effect feels cohesive even if the
+// OS is slow to repaint the window at its new position.
+function shakeOverlayContents() {
+  if (cfg.hideAnimations) return;
+  var body = document.body;
+  body.classList.remove('ov-shake');
+  void body.offsetWidth;
+  body.classList.add('ov-shake');
+  if (_shakeTimer) clearTimeout(_shakeTimer);
+  _shakeTimer = setTimeout(function() {
+    body.classList.remove('ov-shake');
+  }, 600);
+}
+function showBigBanner(d) {
+  if (!platAllowed(d.plat)) return;
+  if (cfg.hideAnimations) return;
+  // Route to external banner window (outside the pop-out) so it never
+  // gets clipped by the monitor edge.
+  if (api.showExternalBanner) {
+    api.showExternalBanner({ type: 'banner', icon: d.icon, title: d.title, sub: d.sub, amt: d.amt, plat: d.plat, cheer: d.cheer, tierCls: d.tierCls, tierColor: d.tierColor, shake: d.shake });
+  }
+  // Still pulse and shake the overlay itself for feedback
+  triggerActivityPulse(d.plat || 'ev');
+  if (d.shake) shakeOverlayContents();
+}
+
+// ── Raid Splash ──────────────────────────────────────────────
+function showRaidSplash(d) {
+  if (cfg.hideAnimations) return;
+  if (!platAllowed(d.plat)) return;
+  // Route to external banner window (outside the pop-out)
+  if (api.showExternalBanner) {
+    api.showExternalBanner({ type: 'raid', name: d.name, count: d.count, plat: d.plat });
+  }
+  triggerActivityPulse(d.plat || 'tw');
+  shakeOverlayContents();
+}
+
+// ── Confetti renderer ────────────────────────────────────────
+var _confCanvas = document.getElementById('ovConfetti');
+var _confCtx = _confCanvas.getContext('2d');
+var _confParticles = [];
+var _confRaf = null;
+function _resizeConf() {
+  _confCanvas.width = window.innerWidth;
+  _confCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', _resizeConf);
+_resizeConf();
+
+function fireConfetti(count) {
+  if (cfg.hideAnimations) return;
+  var colors = ['#3A86FF','#ff0000','#00E5A0','#53fc18','#ffd700','#ff66cc','#ffffff'];
+  var w = _confCanvas.width;
+  for (var i = 0; i < count; i++) {
+    _confParticles.push({
+      x: w / 2 + (Math.random() - 0.5) * 80,
+      y: 60,
+      vx: (Math.random() - 0.5) * 10,
+      vy: -Math.random() * 12 - 4,
+      g: 0.35,
+      size: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.3,
+      life: 0,
+      max: 180 + Math.random() * 80
+    });
+  }
+  if (!_confRaf) _confRaf = requestAnimationFrame(_confTick);
+}
+function _confTick() {
+  _confCtx.clearRect(0, 0, _confCanvas.width, _confCanvas.height);
+  for (var i = _confParticles.length - 1; i >= 0; i--) {
+    var p = _confParticles[i];
+    p.vy += p.g;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.vr;
+    p.life++;
+    if (p.life > p.max || p.y > _confCanvas.height + 20) {
+      _confParticles.splice(i, 1);
+      continue;
+    }
+    _confCtx.save();
+    _confCtx.translate(p.x, p.y);
+    _confCtx.rotate(p.rot);
+    _confCtx.globalAlpha = Math.max(0, 1 - p.life / p.max);
+    _confCtx.fillStyle = p.color;
+    _confCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+    _confCtx.restore();
+  }
+  if (_confParticles.length) {
+    _confRaf = requestAnimationFrame(_confTick);
+  } else {
+    _confRaf = null;
+  }
+}
+
+// ── Goals ────────────────────────────────────────────────────
+function updateGoals(d) {
+  var el = document.getElementById('ovGoals');
+  if (!el) return;
+  var g = d.goals, v = d.values;
+  if (!g || !v) { el.classList.remove('show'); return; }
+  var any = (g.follow && g.follow.on) || (g.sub && g.sub.on) || (g.bits && g.bits.on) || (g.rev && g.rev.on);
+  if (!any) { el.classList.remove('show'); el.innerHTML = ''; return; }
+  el.classList.add('show');
+  var h = '';
+  if (g.follow && g.follow.on) h += _ovGoalHtml('Follows', v.follows, g.follow.target, 'followers');
+  if (g.sub && g.sub.on) h += _ovGoalHtml('Subs', v.subs, g.sub.target, 'subs');
+  if (g.bits && g.bits.on) h += _ovGoalHtml('Bits', v.bits, g.bits.target, 'bits');
+  if (g.rev && g.rev.on) h += _ovGoalHtml('$', '$' + (v.rev || 0).toFixed(2), g.rev.target, 'revenue', v.rev);
+  el.innerHTML = h;
+}
+function _ovGoalHtml(label, current, target, cls, numericVal) {
+  var num = (numericVal !== undefined) ? numericVal : (typeof current === 'number' ? current : parseFloat(current) || 0);
+  var pct = Math.min(100, Math.max(0, (num / target) * 100));
+  var done = num >= target;
+  return '<div class="ov-goal' + (done ? ' done' : '') + '"><div class="ov-goal-hd"><span>' + label + '</span><span class="ov-goal-ct">' + current + '/' + target + '</span></div><div class="ov-goal-track"><div class="ov-goal-fill ' + cls + '" style="width:' + pct.toFixed(1) + '%"></div></div></div>';
+}
+
+// ── Hype train ──────────────────────────────────────────────
+function updateHype(d) {
+  var el = document.getElementById('ovHype');
+  if (!cfg.showHype || !d || !d.active) { el.classList.remove('show'); return; }
+  el.classList.add('show');
+  document.getElementById('ovHypeLv').textContent = d.level || 1;
+  var pct = d.goal > 0 ? Math.min(100, Math.round(d.total / d.goal * 100)) : 0;
+  document.getElementById('ovHypeFill').style.width = pct + '%';
+  document.getElementById('ovHypeTimer').textContent = d.timer || '';
+}
+function triggerHypeAnim() {
+  var track = document.querySelector('.ov-hype-track');
+  if (track) {
+    var div = document.createElement('div');
+    div.className = 'ov-hype-text';
+    div.textContent = 'HYYYYYPPPPPEEEE';
+    track.appendChild(div);
+    setTimeout(function() { if (div.parentNode) div.parentNode.removeChild(div); }, 2100);
+  }
+}
+// ── Full-overlay LEVEL UP fanfare (mirrors the main app version) ──
+var _hluOvTimer = null;
+function triggerHypeLevelUpOverlay(level) {
+  if (cfg.hideAnimations) return;
+  var el = document.getElementById('ovHypeLevelUp');
+  if (!el) return;
+  var numEl = document.getElementById('ovHluLvNum');
+  if (numEl) numEl.textContent = level || 1;
+  var rays = document.getElementById('ovHluRays');
+  if (rays) {
+    rays.innerHTML = '';
+    var N = 12;
+    for (var i = 0; i < N; i++) {
+      var r = document.createElement('i');
+      r.style.setProperty('--a', (i * (360 / N)) + 'deg');
+      r.style.animationDelay = (i * 0.03) + 's';
+      rays.appendChild(r);
+    }
+  }
+  el.classList.remove('out');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  _ovPlayHypeFanfare();
+  fireConfetti(90);
+  if (_hluOvTimer) clearTimeout(_hluOvTimer);
+  _hluOvTimer = setTimeout(function() {
+    el.classList.remove('show');
+    el.classList.add('out');
+    setTimeout(function() { el.classList.remove('out'); }, 450);
+  }, 3400);
+}
+var _ovHypeAC = null;
+function _ovPlayHypeFanfare() {
+  try {
+    if (!_ovHypeAC) _ovHypeAC = new (window.AudioContext || window.webkitAudioContext)();
+    var ac = _ovHypeAC;
+    if (ac.state === 'suspended') ac.resume();
+    var now = ac.currentTime;
+    var notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+    var start = now + 0.02;
+    notes.forEach(function(f, i) {
+      var t0 = start + i * 0.12;
+      var t1 = t0 + (i === notes.length - 1 ? 0.9 : 0.16);
+      var o = ac.createOscillator();
+      var g = ac.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f, t0);
+      o.frequency.exponentialRampToValueAtTime(f * 1.01, t1);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.15, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t1);
+      var bp = ac.createBiquadFilter();
+      bp.type = 'lowpass';
+      bp.frequency.setValueAtTime(2400, t0);
+      bp.Q.value = 0.7;
+      o.connect(bp).connect(g).connect(ac.destination);
+      o.start(t0);
+      o.stop(t1 + 0.02);
+    });
+    var sub = ac.createOscillator();
+    var subG = ac.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(82.41, start);
+    sub.frequency.exponentialRampToValueAtTime(130.81, start + 0.7);
+    subG.gain.setValueAtTime(0.0001, start);
+    subG.gain.exponentialRampToValueAtTime(0.2, start + 0.08);
+    subG.gain.exponentialRampToValueAtTime(0.0001, start + 1.4);
+    sub.connect(subG).connect(ac.destination);
+    sub.start(start);
+    sub.stop(start + 1.45);
+  } catch (e) {}
+}
+
+// ── Poll display ────────────────────────────────────────────
+var _pollTimer = null;
+function updatePoll(d) {
+  var el = document.getElementById('ovPoll');
+  if (!d || d.status === 'ended') {
+    // show winner briefly then hide
+    if (d && d.winner) {
+      _renderPollChoices(d.choices || [], d.winner);
+      var st = document.getElementById('ovPollStatus');
+      st.textContent = 'ENDED'; st.className = 'ov-poll-status ended';
+      document.getElementById('ovPollTitle').textContent = d.title || 'Poll';
+      el.classList.remove('hidden');
+      if (_pollTimer) clearTimeout(_pollTimer);
+      _pollTimer = setTimeout(function() { el.classList.add('hidden'); }, 8000);
+    } else { el.classList.add('hidden'); }
+    return;
+  }
+  if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+  el.classList.remove('hidden');
+  document.getElementById('ovPollTitle').textContent = d.title || 'Poll';
+  var st = document.getElementById('ovPollStatus');
+  st.textContent = 'ACTIVE'; st.className = 'ov-poll-status';
+  _renderPollChoices(d.choices || [], '');
+}
+function _renderPollChoices(choices, winner) {
+  var box = document.getElementById('ovPollChoices'); box.innerHTML = '';
+  var total = 0;
+  for (var i = 0; i < choices.length; i++) total += (choices[i].votes || 0);
+  for (var i = 0; i < choices.length; i++) {
+    var c = choices[i], pct = total > 0 ? Math.round((c.votes || 0) / total * 100) : 0;
+    var row = document.createElement('div'); row.className = 'ov-poll-choice';
+    if (winner && (c.title || '').toLowerCase() === winner.toLowerCase()) row.classList.add('winner');
+    var bar = document.createElement('div'); bar.className = 'ov-poll-choice-bar'; bar.style.width = pct + '%';
+    var name = document.createElement('span'); name.className = 'ov-poll-choice-name'; name.textContent = c.title || '?';
+    var val = document.createElement('span'); val.className = 'ov-poll-choice-val'; val.textContent = (c.votes || 0) + ' (' + pct + '%)';
+    row.appendChild(bar); row.appendChild(name); row.appendChild(val);
+    box.appendChild(row);
+  }
+}
+
+// ── Prediction display ──────────────────────────────────────
+var _predTimer = null;
+function updatePrediction(d) {
+  var el = document.getElementById('ovPred');
+  if (!d || d.status === 'ended') {
+    el.classList.add('hidden'); return;
+  }
+  if (_predTimer) { clearTimeout(_predTimer); _predTimer = null; }
+  el.classList.remove('hidden');
+  document.getElementById('ovPredTitle').textContent = d.title || 'Prediction';
+  var st = document.getElementById('ovPredStatus');
+  if (d.status === 'locked') { st.textContent = 'LOCKED'; st.className = 'ov-pred-status locked'; }
+  else if (d.status === 'resolved') {
+    st.textContent = 'RESOLVED'; st.className = 'ov-pred-status resolved';
+    _predTimer = setTimeout(function() { el.classList.add('hidden'); }, 8000);
+  } else { st.textContent = 'ACTIVE'; st.className = 'ov-pred-status'; }
+  _renderPredOutcomes(d.outcomes || [], d.winner || '');
+}
+function _renderPredOutcomes(outcomes, winner) {
+  var box = document.getElementById('ovPredOutcomes'); box.innerHTML = '';
+  var totalPts = 0;
+  for (var i = 0; i < outcomes.length; i++) totalPts += (outcomes[i].points || 0);
+  for (var i = 0; i < outcomes.length; i++) {
+    var o = outcomes[i], pct = totalPts > 0 ? Math.round((o.points || 0) / totalPts * 100) : 0;
+    var row = document.createElement('div'); row.className = 'ov-pred-outcome';
+    if (winner && (o.title || '').toLowerCase() === winner.toLowerCase()) row.classList.add('winner');
+    var bar = document.createElement('div'); bar.className = 'ov-pred-outcome-bar';
+    if (o.color) bar.style.background = o.color;
+    bar.style.width = pct + '%';
+    var name = document.createElement('span'); name.className = 'ov-pred-outcome-name'; name.textContent = o.title || '?';
+    var val = document.createElement('span'); val.className = 'ov-pred-outcome-val';
+    val.textContent = (o.users || 0) + ' \u00B7 ' + _fmtPts(o.points || 0) + (totalPts > 0 ? ' (' + pct + '%)' : '');
+    row.appendChild(bar); row.appendChild(name); row.appendChild(val);
+    box.appendChild(row);
+  }
+}
+function _fmtPts(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K' : String(n); }
+
+// ── Receive data from main window (promo-data IPC channel) ──
+// Runs on the dedicated promo-data channel so opening/closing the promo
+// never interferes with the pop-out overlay's own data stream. The main
+// renderer fires the same chat/event/stats/live packets at both windows
+// — the promo gets the packet WITHOUT `revenue` so the revenue chip
+// doesn't render even if the conditional below were changed.
+if (api.onPromoData) {
+  api.onPromoData(function(d) {
+    if (!d || !d.type) return;
+    if (d.type === 'chat') addMsg(d);
+    else if (d.type === 'event') showEvent(d);
+    else if (d.type === 'stats') updateStats(d);
+    else if (d.type === 'goals') updateGoals(d);
+    else if (d.type === 'live') updateLive(d);
+    else if (d.type === 'hype') updateHype(d);
+    else if (d.type === 'hype-level-up') { triggerHypeAnim(); triggerHypeLevelUpOverlay(d.level); }
+    else if (d.type === 'banner') showBigBanner(d);
+    else if (d.type === 'raid') showRaidSplash(d);
+    else if (d.type === 'poll') updatePoll(d);
+    else if (d.type === 'prediction') updatePrediction(d);
+    else if (d.type === 'config' && d.cfg) {
+      // Config pushed from main app — merge & re-apply.
+      // The 'clickThrough' lock state is owned by the lock button + main app
+      // lock toggle, NOT by the pushed config (so toggling the lock from the
+      // overlay header isn't immediately overwritten).
+      Object.keys(d.cfg).forEach(function(k) {
+        if (k === 'clickThrough') return;
+        if (cfg.hasOwnProperty(k)) cfg[k] = d.cfg[k];
+      });
+      saveCfg();
+      applyConfig();
+      // Re-render anything that depends on platform/show toggles
+      renderStatsBar();
+      renderHotbar();
+    }
+    else if (d.type === 'shake') {
+      shakeOverlayContents();
+    }
+  });
+}
+
+// Tell main window we're ready for the initial stats/live snapshot
+if (api.promoReady) api.promoReady();
+</script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>StreamFusion Banner</title>
+<style>
+:root{
+  --tw:#9147ff;--yt:#ff0000;--tt:#00f2ea;--kk:#53fc18;--ev:#f0b429;--se:#7cdf21;--cc:#f5a524;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:transparent}
+body{font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+
+/* ── Banner slide animations ─────────────────────────────────── */
+@keyframes bnrSlideInRight{
+  0%{opacity:0;transform:translateX(-60px) scale(.7);filter:blur(6px)}
+  50%{opacity:1;transform:translateX(8px) scale(1.06);filter:blur(0)}
+  70%{transform:translateX(-3px) scale(.98)}
+  100%{opacity:1;transform:translateX(0) scale(1)}
+}
+@keyframes bnrSlideInLeft{
+  0%{opacity:0;transform:translateX(60px) scale(.7);filter:blur(6px)}
+  50%{opacity:1;transform:translateX(-8px) scale(1.06);filter:blur(0)}
+  70%{transform:translateX(3px) scale(.98)}
+  100%{opacity:1;transform:translateX(0) scale(1)}
+}
+@keyframes bnrSlideOutRight{
+  0%{opacity:1;transform:translateX(0) scale(1)}
+  100%{opacity:0;transform:translateX(80px) scale(.75);filter:blur(6px)}
+}
+@keyframes bnrSlideOutLeft{
+  0%{opacity:1;transform:translateX(0) scale(1)}
+  100%{opacity:0;transform:translateX(-80px) scale(.75);filter:blur(6px)}
+}
+/* Glow halo cycling around the banner */
+@keyframes bnrGlow{
+  0%,100%{box-shadow:0 0 38px rgba(255,200,80,.65),0 0 80px rgba(255,200,80,.35),inset 0 0 22px rgba(255,200,80,.12)}
+  25%{box-shadow:0 0 46px rgba(58,134,255,.75),0 0 96px rgba(58,134,255,.45),inset 0 0 24px rgba(58,134,255,.16)}
+  50%{box-shadow:0 0 50px rgba(255,80,180,.78),0 0 100px rgba(255,80,180,.48),inset 0 0 26px rgba(255,80,180,.18)}
+  75%{box-shadow:0 0 46px rgba(80,200,255,.75),0 0 96px rgba(80,200,255,.45),inset 0 0 24px rgba(80,200,255,.16)}
+}
+/* Conic gradient ring rotating behind the banner */
+@keyframes bnrRing{to{transform:rotate(360deg)}}
+/* Diagonal shimmer sweep */
+@keyframes bnrSweep{
+  0%{transform:translateX(-150%) skewX(-22deg);opacity:0}
+  20%{opacity:.9}
+  80%{opacity:.9}
+  100%{transform:translateX(260%) skewX(-22deg);opacity:0}
+}
+/* Border color cycling */
+@keyframes bnrBorder{
+  0%,100%{border-color:#ffd700}
+  25%{border-color:#3A86FF}
+  50%{border-color:#ff66cc}
+  75%{border-color:#00E5A0}
+}
+/* Icon bounce */
+@keyframes bnrIcon{
+  0%,100%{transform:scale(1) rotate(0deg)}
+  20%{transform:scale(1.32) rotate(-12deg)}
+  40%{transform:scale(1.14) rotate(0deg)}
+  60%{transform:scale(1.28) rotate(12deg)}
+  80%{transform:scale(1.1) rotate(0deg)}
+}
+@keyframes bnrTextIn{
+  0%{opacity:0;transform:translateY(14px);filter:blur(4px)}
+  100%{opacity:1;transform:translateY(0);filter:blur(0)}
+}
+@keyframes bnrAmtPop{
+  0%{opacity:0;transform:scale(0) rotate(-200deg)}
+  55%{opacity:1;transform:scale(1.45) rotate(10deg)}
+  80%{transform:scale(.94) rotate(-3deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}
+}
+/* Bit sparkle */
+@keyframes bnrBitSpin{0%{transform:scale(0) rotate(-540deg);opacity:0}60%{transform:scale(1.25) rotate(20deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes bnrBitPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes bnrBitSparkle{0%{transform:translate(0,0) scale(.2);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+
+/* Raid animations */
+@keyframes raidIn{0%{opacity:0;transform:scale(.4) rotate(-12deg)}60%{transform:scale(1.1) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0deg)}}
+@keyframes raidGlow{0%,100%{box-shadow:0 0 40px rgba(145,71,255,.7),inset 0 0 40px rgba(145,71,255,.2)}50%{box-shadow:0 0 80px rgba(145,71,255,1),inset 0 0 60px rgba(145,71,255,.4)}}
+@keyframes raidShake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-3px)}20%,40%,60%,80%{transform:translateX(3px)}}
+
+/* Confetti */
+@keyframes confettiFall{
+  0%{transform:translateY(-20px) rotate(0deg);opacity:1}
+  100%{transform:translateY(500px) rotate(720deg);opacity:0}
+}
+
+.bnr{
+  /* Transparent banner: no dark card, just animation + glow + text.
+     Floats cleanly over the game. Border + conic ring still provide a
+     subtle frame so the content reads against busy gameplay. */
+  background:transparent;
+  border:none;
+  border-radius:18px;
+  padding:22px 30px;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  min-width:0;
+  width:clamp(240px,85%,420px);
+  max-width:95%;
+  pointer-events:none;
+  overflow:visible;
+  isolation:isolate;
+  position:relative;
+}
+.bnr::before{
+  content:'';
+  position:absolute;
+  inset:-4px;
+  border-radius:22px;
+  padding:3px;
+  background:conic-gradient(from 0deg,#ffd700,#3A86FF,#ff66cc,#00E5A0,#53fc18,#ffd700);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  animation:bnrRing 4s linear infinite;
+  pointer-events:none;
+  z-index:-1;
+  opacity:.85;
+}
+.bnr::after{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%);
+  border-radius:18px;
+  pointer-events:none;
+  animation:bnrSweep 2.6s ease-in-out infinite;
+  mix-blend-mode:overlay;
+}
+.bnr.show.slide-right{
+  display:flex;
+  animation:bnrSlideInRight .75s cubic-bezier(.34,1.56,.64,1) both,bnrGlow 3.2s ease-in-out .75s infinite,bnrBorder 4s ease-in-out .75s infinite;
+}
+.bnr.show.slide-left{
+  display:flex;
+  animation:bnrSlideInLeft .75s cubic-bezier(.34,1.56,.64,1) both,bnrGlow 3.2s ease-in-out .75s infinite,bnrBorder 4s ease-in-out .75s infinite;
+}
+.bnr.out.slide-right{animation:bnrSlideOutRight .45s cubic-bezier(.4,0,.6,1) forwards!important}
+.bnr.out.slide-left{animation:bnrSlideOutLeft .45s cubic-bezier(.4,0,.6,1) forwards!important}
+
+/* Platform tints: kept transparent — platform colour now comes from the icon
+   drop-shadow and any surrounding glow. Overriding with a card background
+   would re-introduce the grey box we intentionally removed. */
+.bnr.tw,.bnr.yt,.bnr.kk,.bnr.tt{background:transparent}
+
+.bn-icon{
+  width:clamp(50px,8vw,90px);
+  height:clamp(50px,8vw,90px);
+  line-height:1;
+  margin-bottom:10px;
+  color:#ffd700;
+  fill:currentColor;
+  animation:bnrIcon 1.5s ease-in-out infinite;
+  filter:drop-shadow(0 0 14px rgba(255,215,0,.75)) drop-shadow(0 0 26px rgba(255,200,80,.4));
+  transform-origin:center center;
+}
+.bnr.tw .bn-icon{color:#e2c4ff;filter:drop-shadow(0 0 14px rgba(145,71,255,.8)) drop-shadow(0 0 26px rgba(145,71,255,.4))}
+.bnr.yt .bn-icon{color:#ffb3b3;filter:drop-shadow(0 0 14px rgba(255,0,0,.8)) drop-shadow(0 0 26px rgba(255,0,0,.4))}
+.bnr.tt .bn-icon{color:#b3faf6;filter:drop-shadow(0 0 14px rgba(0,242,234,.8)) drop-shadow(0 0 26px rgba(0,242,234,.4))}
+.bnr.kk .bn-icon{color:#cff7b3;filter:drop-shadow(0 0 14px rgba(83,252,24,.8)) drop-shadow(0 0 26px rgba(83,252,24,.4))}
+
+/* Bit cheer overrides */
+.bnr.cheer .bn-icon{animation:bnrBitSpin .75s cubic-bezier(.34,1.56,.64,1) both,bnrBitPulse 1.2s ease-in-out .75s infinite}
+.bnr.bit-tier-gray .bn-icon{color:#c8c8c8;filter:drop-shadow(0 0 14px rgba(200,200,200,.9)) drop-shadow(0 0 28px rgba(200,200,200,.5))!important}
+.bnr.bit-tier-purple .bn-icon{color:#c39dff;filter:drop-shadow(0 0 14px rgba(145,71,255,.95)) drop-shadow(0 0 28px rgba(145,71,255,.5))!important}
+.bnr.bit-tier-green .bn-icon{color:#7af2a1;filter:drop-shadow(0 0 14px rgba(31,191,85,.95)) drop-shadow(0 0 28px rgba(31,191,85,.5))!important}
+.bnr.bit-tier-blue .bn-icon{color:#9ed2ff;filter:drop-shadow(0 0 14px rgba(43,155,255,.95)) drop-shadow(0 0 28px rgba(43,155,255,.5))!important}
+.bnr.bit-tier-red .bn-icon{color:#ff9aa8;filter:drop-shadow(0 0 14px rgba(255,51,85,.95)) drop-shadow(0 0 28px rgba(255,51,85,.5))!important}
+.bnr.bit-tier-orange .bn-icon{color:#ffd195;filter:drop-shadow(0 0 14px rgba(255,138,31,.95)) drop-shadow(0 0 28px rgba(255,138,31,.5))!important}
+
+.bn-sparkles{position:absolute;top:50px;left:50%;width:0;height:0;pointer-events:none;z-index:5}
+.bn-sparkles i{position:absolute;top:0;left:0;width:7px;height:7px;margin:-3px 0 0 -3px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor,0 0 16px currentColor;animation:bnrBitSparkle .85s cubic-bezier(.2,.8,.4,1) both}
+
+.bn-title{
+  font-size:clamp(22px,3.5vw,38px);
+  font-weight:900;
+  color:#fff;
+  text-shadow:0 2px 12px rgba(0,0,0,.8),0 0 18px rgba(255,215,0,.45);
+  text-align:center;
+  letter-spacing:.5px;
+  animation:bnrTextIn .55s .2s ease-out both;
+}
+.bn-sub{
+  font-size:clamp(14px,2vw,22px);
+  font-weight:600;
+  color:rgba(255,255,255,.92);
+  margin-top:4px;
+  text-align:center;
+  animation:bnrTextIn .55s .3s ease-out both;
+}
+.bn-amt{
+  font-size:clamp(20px,3vw,34px);
+  font-weight:900;
+  color:#ffd700;
+  margin-top:8px;
+  text-shadow:0 0 14px rgba(255,215,0,.85),0 0 28px rgba(255,215,0,.4);
+  animation:bnrAmtPop .65s .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+/* ── Raid Splash ─────────────────────────────────────────────── */
+.raid{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  position:fixed;
+  inset:0;
+  background:transparent;
+  pointer-events:none;
+}
+.raid.show{display:flex}
+.raid-card{
+  /* Transparent raid splash: matches the banner policy — no grey card,
+     text + glow float over the game. */
+  background:transparent;
+  border:none;
+  border-radius:18px;
+  padding:22px 32px;
+  text-align:center;
+  animation:raidIn .8s cubic-bezier(.34,1.56,.64,1) both,raidGlow 1.8s ease-in-out .8s infinite;
+  max-width:90%;
+}
+.raid.kk .raid-card{background:transparent}
+.raid-icon{font-size:48px;line-height:1;margin-bottom:8px;animation:raidShake .5s ease-in-out infinite}
+.raid-title{font-size:12px;font-weight:900;color:var(--tw);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px}
+.raid.kk .raid-title{color:var(--kk)}
+.raid-name{font-size:24px;font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(145,71,255,.7);margin-bottom:4px;word-break:break-word}
+.raid.kk .raid-name{text-shadow:0 2px 12px rgba(83,252,24,.7)}
+.raid-cnt{font-size:15px;font-weight:700;color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,.5);margin-top:4px}
+
+/* ── Confetti ─────────────────────────────────────────────────── */
+.confetti-piece{position:fixed;top:-10px;pointer-events:none;animation:confettiFall var(--dur,3s) linear forwards;opacity:.9}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></symbol>
+    <symbol id="i-party" viewBox="0 0 24 24"><path fill="currentColor" d="M2 22l3.5-10 6.5 6.5L2 22zm5.5-12.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5S6 11.83 6 11s.67-1.5 1.5-1.5zM14 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zm6 4l.7 1.4 1.4.6-1.4.6L20 12l-.7-1.4-1.4-.6 1.4-.6L20 8zm-6 5l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm0-14a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></symbol>
+    <symbol id="i-train" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2h3.54l2 2H18v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-4-4-8-4zM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></symbol>
+    <symbol id="i-money" viewBox="0 0 24 24"><path fill="currentColor" d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm.88 14.5v1.5h-1.75v-1.46c-1.4-.27-2.5-1.18-2.6-2.84h1.69c.07.95.65 1.55 1.84 1.55.99 0 1.79-.41 1.79-1.27 0-.62-.5-1.05-1.84-1.4-1.86-.46-3.13-1.05-3.13-2.65 0-1.32 1.04-2.06 2.25-2.32V6h1.75v1.62c1.45.28 2.18 1.27 2.23 2.46h-1.7c-.05-.86-.5-1.42-1.6-1.42-.99 0-1.59.45-1.59 1.08 0 .55.42.91 1.84 1.27 1.42.36 3.13.96 3.13 2.81 0 1.41-1.05 2.18-2.31 2.41z"/></symbol>
+    <symbol id="i-bit-gray"   viewBox="0 0 24 24"><g><path fill="#979797" d="M12 2 3 9l9 13 9-13z"/><path fill="#c8c8c8" d="M12 2 3 9h18z"/><path fill="#6f6f6f" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-purple" viewBox="0 0 24 24"><g><path fill="#9147ff" d="M12 2 3 9l9 13 9-13z"/><path fill="#c39dff" d="M12 2 3 9h18z"/><path fill="#5c1fb8" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-green"  viewBox="0 0 24 24"><g><path fill="#1fbf55" d="M12 2 3 9l9 13 9-13z"/><path fill="#7af2a1" d="M12 2 3 9h18z"/><path fill="#0c7a32" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-blue"   viewBox="0 0 24 24"><g><path fill="#2b9bff" d="M12 2 3 9l9 13 9-13z"/><path fill="#9ed2ff" d="M12 2 3 9h18z"/><path fill="#0b5ba8" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-red"    viewBox="0 0 24 24"><g><path fill="#ff3355" d="M12 2 3 9l9 13 9-13z"/><path fill="#ff9aa8" d="M12 2 3 9h18z"/><path fill="#9a0e29" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+    <symbol id="i-bit-orange" viewBox="0 0 24 24"><g><path fill="#ff8a1f" d="M12 2 3 9l9 13 9-13z"/><path fill="#ffd195" d="M12 2 3 9h18z"/><path fill="#a84a00" d="m3 9 9 13V9zm18 0-9 13V9z" opacity=".55"/></g></symbol>
+  </defs>
+</svg>
+
+<div class="bnr" id="bnr">
+  <svg class="bn-icon" id="bnIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-party"/></svg>
+  <div class="bn-title" id="bnTitle"></div>
+  <div class="bn-sub" id="bnSub"></div>
+  <div class="bn-amt" id="bnAmt"></div>
+</div>
+
+<div class="raid" id="raid">
+  <div class="raid-card">
+    <div class="raid-icon">&#128680;</div>
+    <div class="raid-title">RAID INCOMING</div>
+    <div class="raid-name" id="raidName"></div>
+    <div class="raid-cnt"><span id="raidCnt">0</span> viewers</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+var api = window.electronAPI || {};
+var _bnTimer = null;
+var _autoCloseTimer = null;
+var _slideDir = 'slide-right';
+
+// ── Event queue ──────────────────────────────────────────────
+// Banners and raid splashes share the same Electron window. If we don't
+// queue them, a paid event that fires while another is still on screen
+// (gift sub bomb during a raid, two big tips back-to-back, etc.) ends up
+// overlapping the previous one mid-animation. Queue everything and play
+// each event end-to-end so the streamer sees one beat at a time.
+var _bnQueue = [];
+var _bnBusy = false;
+function _enqueueBn(d) {
+  _bnQueue.push(d);
+  if (!_bnBusy) _drainBn();
+}
+function _drainBn() {
+  if (_bnQueue.length === 0) { _bnBusy = false; return; }
+  _bnBusy = true;
+  var d = _bnQueue.shift();
+  if (d.type === 'banner') _renderBanner(d);
+  else if (d.type === 'raid') _renderRaid(d);
+  else _drainBn();
+}
+
+// Receive banner/raid data from the main process
+if (api.onBannerData) {
+  api.onBannerData(function(d) {
+    if (!d) return;
+    if (d.side) _slideDir = d.side === 'left' ? 'slide-left' : 'slide-right';
+    _enqueueBn(d);
+  });
+}
+
+function showBanner(d) { _enqueueBn(Object.assign({ type: 'banner' }, d)); }
+function showRaid(d) { _enqueueBn(Object.assign({ type: 'raid' }, d)); }
+
+function _renderBanner(d) {
+  var el = document.getElementById('bnr');
+  // Set icon
+  var iconRef = (d.icon && typeof d.icon === 'string' && d.icon.indexOf('i-') === 0) ? d.icon : 'i-party';
+  var iconSvg = document.getElementById('bnIcon');
+  var useEl = iconSvg && iconSvg.querySelector('use');
+  if (useEl) useEl.setAttribute('href', '#' + iconRef);
+  document.getElementById('bnTitle').textContent = d.title || '';
+  document.getElementById('bnSub').textContent = d.sub || '';
+  document.getElementById('bnAmt').textContent = d.amt || '';
+  var cls = 'bnr ' + (d.plat || '') + ' ' + _slideDir;
+  if (d.cheer) cls += ' cheer';
+  if (d.tierCls) cls += ' ' + d.tierCls;
+  el.className = cls;
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (d.cheer) spawnSparkles(d.tierColor);
+  fireConfetti(50);
+  if (_bnTimer) clearTimeout(_bnTimer);
+  _bnTimer = setTimeout(function() {
+    el.classList.add('out');
+    // Wait for the slide-out animation, then clear and pull the next event
+    setTimeout(function() {
+      el.className = 'bnr';
+      // Only schedule the window-close if nothing else is queued — otherwise
+      // the next render keeps the window alive for the follow-on event.
+      if (_bnQueue.length === 0) scheduleAutoClose(400);
+      _drainBn();
+    }, 500);
+  }, 4500);
+}
+
+function _renderRaid(d) {
+  var el = document.getElementById('raid');
+  document.getElementById('raidName').textContent = d.name || 'Unknown';
+  document.getElementById('raidCnt').textContent = d.count || 0;
+  el.className = 'raid ' + (d.plat || '');
+  el.style.opacity = '';
+  el.style.transition = '';
+  void el.offsetWidth;
+  el.classList.add('show');
+  fireConfetti(80);
+  setTimeout(function() {
+    el.style.transition = 'opacity .4s';
+    el.style.opacity = '0';
+    setTimeout(function() {
+      el.classList.remove('show');
+      el.style.opacity = '';
+      el.style.transition = '';
+      if (_bnQueue.length === 0) scheduleAutoClose(400);
+      _drainBn();
+    }, 450);
+  }, 5000);
+}
+
+function spawnSparkles(color) {
+  var banner = document.getElementById('bnr');
+  if (!banner) return;
+  var host = banner.querySelector('.bn-sparkles');
+  if (!host) {
+    host = document.createElement('div');
+    host.className = 'bn-sparkles';
+    banner.appendChild(host);
+  }
+  host.innerHTML = '';
+  host.style.color = color || '#ffd700';
+  var n = 14;
+  for (var i = 0; i < n; i++) {
+    var ang = (Math.PI * 2 * i) / n + (Math.random() * .4 - .2);
+    var dist = 48 + Math.random() * 36;
+    var dx = Math.cos(ang) * dist;
+    var dy = Math.sin(ang) * dist;
+    var s = document.createElement('i');
+    s.style.setProperty('--dx', dx.toFixed(1) + 'px');
+    s.style.setProperty('--dy', dy.toFixed(1) + 'px');
+    s.style.animationDelay = (i * 0.012) + 's';
+    host.appendChild(s);
+  }
+  setTimeout(function() { if (host && host.parentNode) host.innerHTML = ''; }, 1000);
+}
+
+function fireConfetti(count) {
+  var colors = ['#ffd700','#3A86FF','#ff66cc','#00E5A0','#53fc18','#ff3355','#2b9bff','#f0883e'];
+  for (var i = 0; i < count; i++) {
+    var p = document.createElement('div');
+    p.className = 'confetti-piece';
+    var sz = 4 + Math.random() * 8;
+    var isCircle = Math.random() > 0.5;
+    p.style.width = sz + 'px';
+    p.style.height = isCircle ? sz + 'px' : (sz * 0.5) + 'px';
+    p.style.borderRadius = isCircle ? '50%' : '2px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.left = (10 + Math.random() * 80) + '%';
+    p.style.setProperty('--dur', (2 + Math.random() * 2.5) + 's');
+    p.style.animationDelay = (Math.random() * 0.8) + 's';
+    document.body.appendChild(p);
+    setTimeout(function(el) { if (el.parentNode) el.parentNode.removeChild(el); }, 5000, p);
+  }
+}
+
+function scheduleAutoClose(delay) {
+  if (_autoCloseTimer) clearTimeout(_autoCloseTimer);
+  _autoCloseTimer = setTimeout(function() {
+    // Tell main process to hide this window
+    if (api.bannerDone) api.bannerDone();
+  }, delay || 500);
+}
+
+// Signal ready
+if (api.bannerReady) api.bannerReady();
+</script>
+</body>
+</html>

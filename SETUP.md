@@ -1,0 +1,185 @@
+# StreamFusion — Setup Guide
+
+Made by **aquilo_plays**
+
+StreamFusion is a desktop chat aggregator for Twitch, YouTube, and TikTok LIVE. It connects to **Streamer.bot** (for Twitch & YouTube) and **Tikfinity** (for TikTok) and brings all your chats into one clean window.
+
+---
+
+## Prerequisites
+
+Before opening StreamFusion, make sure you have the following installed and running:
+
+| Tool | Used for | Download |
+|---|---|---|
+| **Streamer.bot** | Twitch & YouTube chat, events, sending messages | streamer.bot |
+| **Tikfinity** | TikTok LIVE chat & events | tikfinity.com |
+
+You only need the tools for the platforms you stream on. Tikfinity is not required if you don't use TikTok.
+
+---
+
+## Step 1 — Install StreamFusion
+
+Run `StreamFusion Setup 1.0.0.exe` and follow the installer. After it finishes, launch the app from your Desktop or Start Menu.
+
+The first time you open it you'll see a welcome screen. Click **Let's go** to proceed. Check **Don't show again** if you want to skip it next time.
+
+---
+
+## Step 2 — Set Up Streamer.bot (Twitch & YouTube)
+
+StreamFusion talks to Streamer.bot over its built-in WebSocket server.
+
+### 2a. Enable the WebSocket server in Streamer.bot
+
+1. Open **Streamer.bot**
+2. Go to **Servers/Clients** → **WebSocket Server**
+3. Make sure **Auto Start** is checked and click **Start Server**
+4. Note the **Host** (usually `127.0.0.1`) and **Port** (usually `8080`)
+5. If you set a **Password**, note it down — you'll need it in StreamFusion
+
+### 2b. Connect in StreamFusion
+
+1. In the sidebar on the left, click **Connect** next to **Streamer.bot**
+2. Enter the Host and Port from above (defaults are already filled in)
+3. If your WebSocket server has a password set, enter it in the **Password** field
+4. Click **Connect**
+
+The dot next to Streamer.bot will turn green when connected. Twitch and YouTube viewer counts and events will start appearing automatically.
+
+> **Note:** Viewer count shows as `–` until Streamer.bot sends its first update, which can take up to a few minutes. It then refreshes every 2 minutes.
+
+---
+
+## Step 3 — Set Up Tikfinity (TikTok)
+
+Tikfinity bridges your TikTok LIVE stream to StreamFusion via a local WebSocket.
+
+### 3a. Configure Tikfinity
+
+1. Open **Tikfinity** and log in with your TikTok account
+2. Go to **Settings** → note the **WebSocket port** (default is `21213`)
+3. Make sure the WebSocket server is enabled
+
+### 3b. Connect in StreamFusion
+
+1. In the sidebar, click **Connect** next to **Tikfinity**
+2. The port will be pre-filled to `21213` — change it if you set a different port
+3. Click **Connect**
+
+The dot next to Tikfinity will turn green when connected.
+
+---
+
+## The Interface
+
+### Top Bar
+
+| Button | What it does |
+|---|---|
+| **Settings** | Toggles the left sidebar open/closed |
+| **Pause** | Pauses incoming messages (useful during fast chat) |
+| **Clear** | Clears the chat feed |
+| **Chat** | Opens the message input bar at the bottom |
+| **Quick** | Opens/closes your quick-send message buttons |
+| **Events** | Opens/closes the Events panel on the right |
+| **Raid** | Opens the Raid Finder panel |
+
+The viewer count badges (TW / YT / TT) appear in the top bar once data is received.
+
+### Left Sidebar
+
+- **Connections** — Connect/disconnect Streamer.bot and Tikfinity
+- **Show Platforms** — Toggle Twitch, YouTube, or TikTok messages on/off in the feed
+- **Event Filters** — Choose which event types show in the Events panel (follows, subs, gifts, etc.)
+- **Chat Size** — Adjust the font size of the chat feed
+- **Sound Alerts** — Enable sounds for specific events; adjust the volume
+- **Keyword Highlight** — Words you add here get highlighted in gold whenever anyone types them
+- **Block List** — Messages from blocked usernames are silently filtered out
+- **Emotes** — Shows emote load status; Twitch emotes (7TV, BTTV, FFZ, channel) load automatically after connecting
+
+### Events Panel
+
+Click **Events** in the top bar to slide it open. All follows, subs, cheers, gifts, raids, and other events appear here in real time, newest at the top.
+
+Important events (subs, gift subs, cheers, TikTok gifts over 1,000 coins) are displayed larger and bolder so they stand out at a glance.
+
+---
+
+## Sending Chat Messages
+
+1. Click **Chat** in the top bar to show the input bar
+2. Select which platform(s) to send to using the **TW / YT / TT** toggle buttons in the bar
+3. Type your message and press **Enter** (or click the send arrow)
+
+> Sending messages requires Streamer.bot to be connected for Twitch/YouTube, and Tikfinity for TikTok.
+
+### Quick Messages
+
+Click **Quick** to open the quick-send bar. Click any button to send that message instantly. Right-click a button to edit or delete it. Use the **+** button to add new ones.
+
+---
+
+## Moderation (Twitch)
+
+Each Twitch chat message has a small shield icon on the right. Click it to open a mod menu with options to:
+
+- **Timeout** a user (30 seconds, 10 minutes, or 1 hour)
+- **Ban** a user
+- **Delete** the specific message
+
+> Mod actions require Streamer.bot to be connected and your Twitch account to have moderator or broadcaster permissions.
+
+---
+
+## Raid Finder
+
+The Raid Finder helps you find streamers playing the same game with a similar viewer count to raid when you end your stream.
+
+### How it works
+
+1. Click **Raid** in the top bar
+2. If Streamer.bot is already connected and your stream is live, StreamFusion will automatically detect your game and viewer count — no extra setup needed
+3. If your game hasn't been detected yet, expand **Setup & Settings** and enter your **Twitch Client ID** and **OAuth Token** (needed to search other streamers)
+4. Click **Connect & Find Targets**
+5. Browse the results and click **Raid →** on the channel you want to raid
+6. Pick a **Streamer.bot action** that executes the actual Twitch raid command
+
+### Getting Twitch credentials (for target search)
+
+The search for other streamers requires read access to the Twitch API. Your credentials never leave your computer.
+
+1. Register a free app at `dev.twitch.tv/console` to get a **Client ID**
+2. Get an OAuth token at `twitchtokengenerator.com` (use the same Client ID)
+3. Paste both into the Raid Finder setup section
+
+### Setting up the Streamer.bot raid action
+
+1. In Streamer.bot, create a new **Action**
+2. Add a **Start Raid** sub-action
+3. In the User Login field, enter `%raidTarget%`
+4. Save the action — it will appear in the Raid Finder's action dropdown
+
+---
+
+## Tips
+
+- **Close to tray:** Clicking X minimises StreamFusion to the system tray rather than closing it. Right-click the tray icon to fully quit.
+- **Reconnection:** If Streamer.bot or Tikfinity disconnects, StreamFusion will automatically retry every 5 seconds.
+- **Settings are saved:** Your connection details, filters, sounds, and keywords are all saved automatically and restored on next launch.
+- **Viewer count:** Twitch and Kick viewer counts refresh automatically every minute via public APIs. Streamer.bot also pushes Twitch `PresentViewers` events whenever they arrive.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| Streamer.bot won't connect | Make sure the WebSocket server is started in Streamer.bot under Servers/Clients → WebSocket Server |
+| "Authentication required" when sending chat | Streamer.bot has a password set — enter it in the connection dialog |
+| "Auth failed" | Double-check the password in Streamer.bot matches what you entered |
+| No Twitch viewer count | Wait up to 5 minutes after connecting, or trigger a stream update (change title/game) to speed it up |
+| Tikfinity won't connect | Confirm the port number matches the one shown in Tikfinity's settings |
+| Events show "Someone" instead of a username | Update Streamer.bot to the latest version; older versions send event data in a different format |
+| Emotes not loading | Connect Streamer.bot first — emotes are fetched using your Twitch channel ID from Streamer.bot |
