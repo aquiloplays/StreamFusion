@@ -31,8 +31,22 @@ let autoUpdater = null;
 try {
   autoUpdater = require('electron-updater').autoUpdater;
   autoUpdater.autoDownload = false;
-  autoUpdater.logger = { info: function(m) { logToFile('UPDATE', m); }, warn: function(m) { logToFile('UPDATE-WARN', m); }, error: function(m) { logToFile('UPDATE-ERR', m); } };
-} catch (e) { /* electron-updater not available in dev */ }
+  // electron-updater's electron-log dependency expects a full logger interface.
+  // Missing methods (debug/verbose/silly) throw "X is not a function" and kill
+  // the update flow silently. Provide all methods to be safe.
+  autoUpdater.logger = {
+    info:    function(m) { logToFile('UPDATE',       m); },
+    warn:    function(m) { logToFile('UPDATE-WARN',  m); },
+    error:   function(m) { logToFile('UPDATE-ERR',   m); },
+    debug:   function(m) { logToFile('UPDATE-DEBUG', m); },
+    verbose: function(m) { logToFile('UPDATE-VERB',  m); },
+    silly:   function(m) { /* too noisy — drop */ }
+  };
+  logToFile('UPDATE', 'electron-updater loaded ok');
+} catch (e) {
+  // electron-updater not available (dev mode, or wasn't bundled)
+  logToFile('UPDATE-ERR', 'electron-updater require failed: ' + (e && e.message ? e.message : e));
+}
 
 // ── StreamFusion icon generator (pure JS, no dependencies) ───────────────────
 function buildSFIcon() {
