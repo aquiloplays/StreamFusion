@@ -9,6 +9,13 @@ const { spawn } = require('child_process');
 // supporters unlock Early Access (EA) features live. See patreon-auth.js.
 const patreonAuth = require('./patreon-auth');
 
+// ── OBS overlay server (EA-only) ────────────────────────────────────────────
+// Local HTTP + SSE server that powers browser-source overlays (chat feed,
+// alerts, shoutouts) for OBS. Starts on app launch and stays up regardless
+// of entitlement so URLs are always reachable, but serves the "Early Access
+// required" page for non-entitled users. See obs-server.js.
+const obsServer = require('./obs-server');
+
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
   try { return path.join(app.getPath('userData'), 'streamfusion-crash.log'); }
@@ -630,6 +637,24 @@ app.whenReady().then(() => {
   // hourly re-verification loop too.
   patreonAuth.setMainWindow(mainWindow);
   patreonAuth.registerIpcHandlers();
+
+  // OBS overlay server comes up alongside the main window. It always
+  // listens (so the streamer can bookmark the URLs without worrying about
+  // whether SF is "ready"), but it returns the gated page if the user
+  // isn't an active Tier 2/3 supporter.
+  obsServer.startServer().then(function(ok) {
+    if (!ok) logToFile('OBS-SERVER', 'failed to start on default port');
+  }).catch(function(e) {
+    logToFile('OBS-SERVER-ERR', 'start threw: ' + (e && e.message));
+  });
+
+  // Entitlement flips update the server's gate flag so overlays show /
+  // hide without an OBS-side refresh. Subscribing here ensures this is
+  // wired up before the first getEntitlement() call below returns.
+  patreonAuth.onEntitlementChange(function(state) {
+    obsServer.setEntitled(!!(state && state.entitled));
+  });
+
   setTimeout(function() {
     patreonAuth.getEntitlement().then(function(state) {
       if (state && state.signedIn) patreonAuth.startRuntimeChecks();
@@ -667,10 +692,41 @@ app.on('before-quit', () => {
   try { globalShortcut.unregisterAll(); } catch (e) {}
   stopCtrlPoller();
   try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
+  try { obsServer.stopServer(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
 ipcMain.handle('app-version', () => app.getVersion());
+
+// ── OBS overlay IPC ─────────────────────────────────────────────────────────
+// The renderer is the single source of truth for chat/events/shoutouts —
+// it owns the Streamer.bot + Tikfinity WebSockets. When it receives a
+// message or the streamer clicks a shoutout, it forwards the payload
+// here, and we fan it out to every connected OBS browser source.
+ipcMain.on('obs-broadcast-chat', function(event, data) {
+  try { obsServer.broadcast('chat', data, 'chat'); } catch (e) {}
+});
+ipcMain.on('obs-broadcast-alert', function(event, data) {
+  try { obsServer.broadcast('alert', data, 'alerts'); } catch (e) {}
+});
+ipcMain.on('obs-broadcast-shoutout', function(event, data) {
+  try { obsServer.broadcast('shoutout', data, 'shoutout'); } catch (e) {}
+});
+// Per-overlay config (what to show, transparency, durations, etc.) — the
+// settings panel in the renderer drives this. The server remembers the
+// last config so new OBS connections render with it immediately.
+ipcMain.on('obs-set-config', function(event, payload) {
+  if (!payload || !payload.overlay || !payload.cfg) return;
+  try { obsServer.setConfig(payload.overlay, payload.cfg); } catch (e) {}
+});
+// URLs + status for the settings panel to render.
+ipcMain.handle('obs-get-status', function() {
+  return {
+    running: obsServer.isRunning(),
+    clients: obsServer.connectedClients(),
+    urls:    obsServer.getUrls()
+  };
+});
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();

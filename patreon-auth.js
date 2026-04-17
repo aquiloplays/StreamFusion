@@ -89,6 +89,13 @@ let runtimeCheckTimer = null;
 let mainWindowRef = null;        // set by main.js via setMainWindow()
 let lastEmittedEntitlement = null;
 
+// Main-process subscribers to entitlement changes. Used by obs-server to
+// start / stop itself when a user's supporter status flips. Anything in
+// the main process that cares about live entitlement can push a callback
+// here — callbacks receive the same public state shape as the renderer's
+// 'patreon-entitlement-changed' IPC event.
+let entitlementCallbacks = [];
+
 // ── Persistence (safeStorage-encrypted) ──────────────────────────────────────
 function statePath() { return path.join(app.getPath('userData'), 'patreon-auth.json'); }
 
@@ -364,7 +371,26 @@ function emitEntitlement(publicState) {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       mainWindowRef.webContents.send('patreon-entitlement-changed', publicState);
     }
+    // Main-process subscribers (e.g. obs-server start/stop). Errors in any
+    // callback must not stop the renderer notification above.
+    for (var i = 0; i < entitlementCallbacks.length; i++) {
+      try { entitlementCallbacks[i](publicState); } catch (cbErr) {
+        console.error('[patreon-auth] entitlement callback threw:', cbErr);
+      }
+    }
   } catch (e) { /* non-fatal */ }
+}
+
+// Subscribe to entitlement changes from the main process. Returns an
+// unsubscribe function. Callbacks fire synchronously after emitEntitlement
+// dedupes — they only see changes, not repeated emissions of the same state.
+function onEntitlementChange(cb) {
+  if (typeof cb !== 'function') return function() {};
+  entitlementCallbacks.push(cb);
+  return function unsubscribe() {
+    var i = entitlementCallbacks.indexOf(cb);
+    if (i !== -1) entitlementCallbacks.splice(i, 1);
+  };
 }
 
 // ── Public flow ──────────────────────────────────────────────────────────────
@@ -532,11 +558,12 @@ function registerIpcHandlers() {
 }
 
 module.exports = {
-  registerIpcHandlers: registerIpcHandlers,
-  setMainWindow:       setMainWindow,
-  getEntitlement:      getEntitlement,
-  beginAuth:           beginAuth,
-  signOut:             signOut,
-  startRuntimeChecks:  startRuntimeChecks,
-  stopRuntimeChecks:   stopRuntimeChecks
+  registerIpcHandlers:  registerIpcHandlers,
+  setMainWindow:        setMainWindow,
+  getEntitlement:       getEntitlement,
+  beginAuth:            beginAuth,
+  signOut:              signOut,
+  startRuntimeChecks:   startRuntimeChecks,
+  stopRuntimeChecks:    stopRuntimeChecks,
+  onEntitlementChange:  onEntitlementChange
 };

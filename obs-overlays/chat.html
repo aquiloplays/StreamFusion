@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StreamFusion — Chat Overlay</title>
+<style>
+  /* ───────────────────────────────────────────────────────────────────────
+     StreamFusion OBS chat overlay — transparent-background browser source.
+     Connects to /events?type=chat via SSE. Receives 'chat' messages for
+     each chat line and 'config' messages when the streamer changes
+     settings in StreamFusion's Settings → OBS Overlays tab. Also listens
+     to 'entitlement' to hide itself instantly if the user's Patreon
+     membership lapses mid-stream.
+
+     Default look is a gamer-HUD style: bottom-up message flow, fade+slide
+     in, subtle text shadow, platform-colored vertical bar on the left
+     edge of each message. Small enough to read across an HD canvas.
+     ─────────────────────────────────────────────────────────────────── */
+
+  :root {
+    --bg-op: 0;          /* 0 = fully transparent; 0.6 = semi-dark chip */
+    --font-size: 18px;
+    --msg-max: 20;       /* rendered as JS limit, here for reference */
+    --accent: #3A86FF;
+    --text: #ffffff;
+    --mut: #cfd2dc;
+    --tw: #a970ff;
+    --yt: #ff4545;
+    --tt: #fe2c55;
+    --kk: #53fc18;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+    color: var(--text);
+  }
+
+  /* Messages stack upward from the bottom — newest at bottom, oldest fade
+     off the top. This is how most on-stream chat overlays render because
+     the streamer's eye tracks "what just came in" which stays near the
+     bottom edge of the source. */
+  #feed {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    max-height: 100vh;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 10px 6px 12px;
+    margin-top: 4px;
+    border-radius: 6px;
+    background: rgba(14, 14, 16, calc(var(--bg-op) * 1));
+    position: relative;
+    font-size: var(--font-size);
+    line-height: 1.35;
+    word-break: break-word;
+    opacity: 0;
+    transform: translateX(-20px);
+    animation: msgIn .38s cubic-bezier(.22,.9,.32,1) forwards;
+    text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.65);
+  }
+
+  /* Left-edge accent: colored bar per platform. Gives an instant-read
+     of which service the message is from without a badge icon. */
+  .msg::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 4px; bottom: 4px;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: var(--accent);
+    box-shadow: 0 0 8px currentColor;
+  }
+  .msg.tw::before { background: var(--tw); color: var(--tw); }
+  .msg.yt::before { background: var(--yt); color: var(--yt); }
+  .msg.tt::before { background: var(--tt); color: var(--tt); }
+  .msg.kk::before { background: var(--kk); color: var(--kk); }
+
+  /* Messages fading out as they scroll up past the top edge. Handled via
+     a staggered class set when the feed is over capacity. */
+  .msg.leaving {
+    animation: msgOut .25s cubic-bezier(.42,0,1,1) forwards;
+  }
+
+  @keyframes msgIn {
+    0%   { opacity: 0; transform: translateX(-20px) scale(.98); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes msgOut {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-6px); }
+  }
+
+  .u {
+    font-weight: 800;
+    color: var(--accent);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .u.tw { color: var(--tw); }
+  .u.yt { color: var(--yt); }
+  .u.tt { color: var(--tt); }
+  .u.kk { color: var(--kk); }
+
+  .sep {
+    color: var(--mut);
+    opacity: .7;
+    margin: 0 2px;
+    flex-shrink: 0;
+  }
+
+  .m {
+    color: var(--text);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* Platform badge — inline icon before username. Keeps compatibility
+     when user disables the left bar but still wants a platform marker. */
+  .pb {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 3px;
+    color: #0e0e10;
+    text-shadow: none;
+    margin-right: 4px;
+  }
+  .pb.tw { background: var(--tw); color: #fff; }
+  .pb.yt { background: var(--yt); color: #fff; }
+  .pb.tt { background: var(--tt); color: #fff; }
+  .pb.kk { background: var(--kk); color: #0e0e10; }
+
+  /* Inline user badges (sub/mod/vip). Rendered as compact letter chips
+     since we can't always get the full badge images across platforms. */
+  .ub {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 4px;
+    vertical-align: 2px;
+    text-shadow: none;
+  }
+  .ub.mod { background: #00ad03; color: #fff; }
+  .ub.vip { background: #e00b8a; color: #fff; }
+  .ub.sub { background: #8205b4; color: #fff; }
+  .ub.broadcaster { background: #e91916; color: #fff; }
+
+  /* Emote inline image sizing */
+  .m img.emote { height: 1.15em; width: auto; vertical-align: middle; margin: 0 1px; }
+
+  /* "Gated" banner shown if Patreon entitlement drops mid-stream. Hidden
+     by default — the server-side gating returns a different page in the
+     first place. This one is for live revocation without refresh. */
+  #gated {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14,14,16,.9);
+    color: #ff424d;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 20px;
+  }
+  #gated.show { display: flex; }
+
+  /* "Setup hint" shown only in the browser preview (not in OBS) if no
+     messages have arrived yet AFTER ~10 seconds. Helps the streamer
+     confirm the SSE pipe is alive. Hidden automatically once the first
+     message renders. */
+  #hint {
+    position: absolute;
+    left: 14px; bottom: 14px;
+    font-size: 11px;
+    color: rgba(207,210,220,.55);
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+    opacity: 0;
+    transition: opacity .3s ease;
+    pointer-events: none;
+  }
+  #hint.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="feed"></div>
+<div id="gated">Patreon Early Access required<br><span style="font-size:11px;color:#adadb8;letter-spacing:.04em;text-transform:none;font-weight:600">Connect in StreamFusion → Settings → Early Access</span></div>
+<div id="hint">StreamFusion chat overlay — waiting for messages…</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ──────────────────────────────────────────────────────────────────
+  // State
+  // ──────────────────────────────────────────────────────────────────
+  var CFG = {
+    maxMessages: 20,
+    fontSize:    18,
+    bgOpacity:   0,             // 0 = fully transparent
+    showPlatformBadge: false,   // left-edge accent bar is on by default
+    showUserBadges:    true,    // sub/mod/vip chips
+    showEmotes:        true,
+    showPlatforms: { tw: true, yt: true, tt: true, kk: true },
+    fadeOutAfterMs: 0           // 0 = don't auto-remove; only trim on overflow
+  };
+
+  var feed = document.getElementById('feed');
+  var gated = document.getElementById('gated');
+  var hint = document.getElementById('hint');
+  var messageCount = 0;
+
+  // ──────────────────────────────────────────────────────────────────
+  // Render a chat message
+  // ──────────────────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  // Expand emotes by tokenizing the message. If an emote's name appears
+  // as a whole word, swap it for an <img>. Graceful fallback to plain
+  // text if no emotes array is supplied.
+  function renderMessage(text, emotes) {
+    if (!CFG.showEmotes || !emotes || !emotes.length) {
+      return escapeHtml(text);
+    }
+    var byName = Object.create(null);
+    emotes.forEach(function(e) { if (e && e.name && e.url) byName[e.name] = e.url; });
+    return String(text || '').split(/(\s+)/).map(function(tok) {
+      if (byName[tok]) {
+        return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
+      }
+      return escapeHtml(tok);
+    }).join('');
+  }
+
+  function renderBadges(badges) {
+    if (!CFG.showUserBadges || !badges || !badges.length) return '';
+    return badges.map(function(b) {
+      var cls = String(b).toLowerCase();
+      if (!/^(mod|vip|sub|broadcaster)$/.test(cls)) return '';
+      var label = cls === 'broadcaster' ? 'HOST' : cls.toUpperCase();
+      return '<span class="ub ' + cls + '">' + label + '</span>';
+    }).join('');
+  }
+
+  function addMessage(m) {
+    if (!m) return;
+    var plat = (m.platform || '').toLowerCase();
+    if (!CFG.showPlatforms[plat] && plat) return;   // filter by platform
+    if (hint) hint.classList.remove('show');
+
+    var div = document.createElement('div');
+    div.className = 'msg ' + plat;
+
+    var platBadge = CFG.showPlatformBadge && plat
+      ? '<span class="pb ' + plat + '">' + plat.toUpperCase() + '</span>'
+      : '';
+
+    var userColor = m.userColor ? ('color:' + m.userColor + ';') : '';
+    var uCls = 'u ' + plat;
+
+    div.innerHTML =
+      platBadge +
+      renderBadges(m.badges) +
+      '<span class="' + uCls + '" style="' + userColor + '">' + escapeHtml(m.user || 'anon') + '</span>' +
+      '<span class="sep">:</span>' +
+      '<span class="m">' + renderMessage(m.message || '', m.emotes) + '</span>';
+
+    feed.appendChild(div);
+    messageCount++;
+
+    // Trim old messages off the top, animating their exit. We keep the
+    // DOM slightly larger than max during the animation so the slide
+    // doesn't collapse visually.
+    while (feed.children.length > CFG.maxMessages) {
+      var stale = feed.children[0];
+      if (stale.classList.contains('leaving')) break;  // already animating
+      stale.classList.add('leaving');
+      setTimeout(function(node) {
+        return function() { if (node && node.parentNode) node.parentNode.removeChild(node); };
+      }(stale), 260);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Config application
+  // ──────────────────────────────────────────────────────────────────
+  function applyConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return;
+    Object.keys(cfg).forEach(function(k) { CFG[k] = cfg[k]; });
+    document.documentElement.style.setProperty('--bg-op', String(CFG.bgOpacity || 0));
+    document.documentElement.style.setProperty('--font-size', (CFG.fontSize || 18) + 'px');
+  }
+
+  function setEntitled(v) {
+    gated.classList.toggle('show', !v);
+    feed.style.display = v ? '' : 'none';
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // SSE wiring. EventSource auto-reconnects with exponential backoff
+  // built into the browser, so we don't need to handle retry ourselves.
+  // ──────────────────────────────────────────────────────────────────
+  var es = new EventSource('/events?type=chat');
+
+  es.addEventListener('hello', function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      if (d.cfg) applyConfig(d.cfg);
+      setEntitled(!!d.entitled);
+    } catch (err) {}
+  });
+
+  es.addEventListener('chat', function(e) {
+    try { addMessage(JSON.parse(e.data)); } catch (err) {}
+  });
+
+  es.addEventListener('config', function(e) {
+    try { applyConfig(JSON.parse(e.data)); } catch (err) {}
+  });
+
+  es.addEventListener('entitlement', function(e) {
+    try { setEntitled(!!JSON.parse(e.data).entitled); } catch (err) {}
+  });
+
+  es.addEventListener('shutdown', function() { es.close(); });
+
+  // Preview hint — only shows after 10s of silence so it doesn't flash
+  // onto OBS when the stream is mid-quiet-moment.
+  setTimeout(function() {
+    if (messageCount === 0 && !gated.classList.contains('show')) hint.classList.add('show');
+  }, 10000);
+})();
+</script>
+</body>
+</html>

@@ -1368,6 +1368,15 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
         <div class="settings-tab tab-patreon" data-tab="earlyaccess" onclick="switchSettingsTab('earlyaccess')">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Early Access
         </div>
+        <!-- OBS overlays — EA-only. Same red-dot convention as Early Access
+             so supporter-gated features stay visually grouped. -->
+        <div class="settings-tab tab-patreon" data-tab="obsoverlays" onclick="switchSettingsTab('obsoverlays')">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>OBS Overlays
+        </div>
+        <!-- Theme customization — EA-only. -->
+        <div class="settings-tab tab-patreon" data-tab="theme" onclick="switchSettingsTab('theme')">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Theme
+        </div>
         <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
         <div class="settings-tab" data-tab="events" onclick="switchSettingsTab('events')">Events</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
@@ -1731,6 +1740,144 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
           </div>
         </div>
 
+        <!-- ═══ OBS OVERLAYS TAB (EA-only) ═══ -->
+        <div class="settings-pane" id="pane-obsoverlays">
+          <!-- EA gate banner — shown when the user isn't entitled. Uses
+               display:none by default; shown via renderObsOverlaysTab(). -->
+          <div class="sec" id="obsEaGate" style="display:none">
+            <div class="sec-hd" style="color:#ff424d">Early Access required</div>
+            <div style="font-size:12px;color:var(--mut);line-height:1.6">
+              OBS browser-source overlays are an Early Access feature for <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> Patreon supporters.<br><br>
+              Connect your Patreon in <a onclick="switchSettingsTab('earlyaccess')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings &rarr; Early Access</a> to unlock.
+            </div>
+          </div>
+          <!-- Content — shown when entitled. -->
+          <div id="obsContent">
+            <div class="sec">
+              <div class="sec-hd">Browser Source URLs</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
+                Paste these URLs into OBS &rarr; Sources &rarr; <strong style="color:var(--txt)">+ Browser Source</strong>. Overlays render live from StreamFusion &mdash; no files, no refreshes. They update instantly when you change settings below.
+              </div>
+              <!-- Chat overlay row -->
+              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Chat Feed</span>
+                  <span style="font-size:10px;color:var(--mut)">Transparent background, recent messages, fade-in</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input id="obsUrlChat" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                  <button class="cbtn tw" onclick="copyObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  <button class="cbtn" onclick="previewObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
+                </div>
+                <!-- Per-overlay config: chat -->
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="18" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <label class="frow" style="font-size:11px"><span>Max messages</span><input type="number" id="obsChatMaxMessages" min="3" max="60" value="20" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <label class="frow" style="font-size:11px"><span>Background opacity</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="0" onchange="updateObsConfig('chat')" style="width:80px"></label>
+                  <label class="frow" style="font-size:11px"><span>Platform badges</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>User badges (mod/sub/vip)</span><input type="checkbox" id="obsChatShowUserBadges" checked onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Render emotes</span><input type="checkbox" id="obsChatShowEmotes" checked onchange="updateObsConfig('chat')"></label>
+                </div>
+              </div>
+              <!-- Alerts overlay row -->
+              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Alerts Banner</span>
+                  <span style="font-size:10px;color:var(--mut)">Slide-in event alerts with confetti for big paid events</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input id="obsUrlAlerts" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                  <button class="cbtn tw" onclick="copyObsUrl('alerts')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  <button class="cbtn" onclick="previewObsUrl('alerts')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
+                </div>
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
+                  <div style="font-size:11px;color:var(--mut);margin-bottom:6px">Trigger on:</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                    <label class="frow" style="font-size:11px"><span>Follows</span><input type="checkbox" id="obsAlertsFollow" checked onchange="updateObsConfig('alerts')"></label>
+                    <label class="frow" style="font-size:11px"><span>Subs &amp; Resubs</span><input type="checkbox" id="obsAlertsSub" checked onchange="updateObsConfig('alerts')"></label>
+                    <label class="frow" style="font-size:11px"><span>Gift subs</span><input type="checkbox" id="obsAlertsGift" checked onchange="updateObsConfig('alerts')"></label>
+                    <label class="frow" style="font-size:11px"><span>Cheers / Bits</span><input type="checkbox" id="obsAlertsCheer" checked onchange="updateObsConfig('alerts')"></label>
+                    <label class="frow" style="font-size:11px"><span>Raids / Hosts</span><input type="checkbox" id="obsAlertsRaid" checked onchange="updateObsConfig('alerts')"></label>
+                    <label class="frow" style="font-size:11px"><span>Tips</span><input type="checkbox" id="obsAlertsTip" checked onchange="updateObsConfig('alerts')"></label>
+                  </div>
+                  <label class="frow" style="font-size:11px;margin-top:6px"><span>Display duration (seconds)</span><input type="number" id="obsAlertsDuration" min="2" max="30" value="6" onchange="updateObsConfig('alerts')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                </div>
+              </div>
+              <!-- Shoutout overlay row -->
+              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Shoutout Card</span>
+                  <span style="font-size:10px;color:var(--mut)">Pops in when you click Shoutout on an event</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input id="obsUrlShoutout" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                  <button class="cbtn tw" onclick="copyObsUrl('shoutout')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  <button class="cbtn" onclick="previewObsUrl('shoutout')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
+                </div>
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:6px">
+                  <label class="frow" style="font-size:11px"><span>Auto-detect recent event</span><input type="checkbox" id="obsShoutoutShowRecentEvent" checked onchange="updateObsConfig('shoutout')"></label>
+                  <label class="frow" style="font-size:11px"><span>Display duration (seconds)</span><input type="number" id="obsShoutoutDuration" min="3" max="30" value="8" onchange="updateObsConfig('shoutout')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <label style="font-size:11px;color:var(--mut);display:block">Thank-you message:<br>
+                    <input type="text" id="obsShoutoutThankMessage" value="Thanks so much for supporting the stream!" onchange="updateObsConfig('shoutout')" style="width:100%;margin-top:4px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:6px 8px;border-radius:4px;font-size:11px">
+                  </label>
+                </div>
+                <div style="margin-top:8px">
+                  <button class="cbtn" onclick="testShoutout()" style="font-size:11px;height:26px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);width:100%">Test shoutout</button>
+                </div>
+              </div>
+            </div>
+            <div class="sec">
+              <div class="sec-hd">Server Status</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.5" id="obsServerStatus">
+                Checking&hellip;
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ THEME TAB (EA-only) ═══ -->
+        <div class="settings-pane" id="pane-theme">
+          <div class="sec" id="themeEaGate" style="display:none">
+            <div class="sec-hd" style="color:#ff424d">Early Access required</div>
+            <div style="font-size:12px;color:var(--mut);line-height:1.6">
+              Theme customization is an Early Access feature for <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> Patreon supporters.<br><br>
+              Connect your Patreon in <a onclick="switchSettingsTab('earlyaccess')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings &rarr; Early Access</a> to unlock.
+            </div>
+          </div>
+          <div id="themeContent">
+            <div class="sec">
+              <div class="sec-hd">Accent &amp; Background</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:12px">
+                Customize StreamFusion's look. Changes apply instantly and persist across sessions.
+              </div>
+              <label class="frow" style="font-size:12px"><span>Accent color</span><input type="color" id="themeAccent" value="#3A86FF" onchange="applyTheme()" style="width:36px;height:26px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf3);cursor:pointer"></label>
+              <label class="frow" style="font-size:12px"><span>Secondary accent</span><input type="color" id="themeAccent2" value="#2AD4B9" onchange="applyTheme()" style="width:36px;height:26px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf3);cursor:pointer"></label>
+              <label class="frow" style="font-size:12px"><span>Background depth</span>
+                <select id="themeBgDepth" onchange="applyTheme()" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 8px;border-radius:4px;font-size:11px">
+                  <option value="default">Default</option>
+                  <option value="darker">Darker</option>
+                  <option value="pure-black">Pure black (OLED)</option>
+                </select>
+              </label>
+              <div style="margin-top:10px;display:flex;gap:6px">
+                <button class="cbtn" onclick="resetTheme()" style="font-size:11px;height:28px;padding:0 12px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Reset to defaults</button>
+              </div>
+            </div>
+            <div class="sec">
+              <div class="sec-hd">Pop-out Layout</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
+                Choose how the pop-out overlay renders. Applies to the transparent chat overlay (not the OBS browser sources).
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="default" checked onchange="applyPopoutLayout()"><span>Default</span></label>
+                <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="compact" onchange="applyPopoutLayout()"><span>Compact</span></label>
+                <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="minimal" onchange="applyPopoutLayout()"><span>Minimal</span></label>
+                <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="hud" onchange="applyPopoutLayout()"><span>Gamer HUD</span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ═══ ABOUT TAB ═══ -->
         <div class="settings-pane" id="pane-about">
           <div class="sec" style="text-align:center;padding:20px 14px">
@@ -1972,6 +2119,16 @@ function applyPatreonState(state) {
   S.hasEarlyAccess = !!state.entitled;
   renderEaOnboarding();
   renderEaSettings();
+  // Refresh EA-gated tabs so their gate banners flip live when the user
+  // signs in or their membership lapses. No-ops if those panes aren't
+  // yet mounted (e.g. before Settings has ever been opened).
+  try { renderObsOverlaysTab(); } catch (e) {}
+  try { renderThemeTab(); } catch (e) {}
+  // On first entitlement, re-apply saved theme so the user sees their
+  // customization immediately rather than only after opening Settings.
+  if (S.hasEarlyAccess && typeof applyTheme === 'function') {
+    try { applyTheme(); } catch (e) {}
+  }
 }
 
 // Map an entitlement state to a human message, used on both the onboarding
@@ -2088,6 +2245,18 @@ var S = {
   // Early Access features on this boolean.
   patreon: { signedIn: false, entitled: false, tier: 'none', patronStatus: null, reason: 'not_signed_in', userName: '', verifiedAt: null },
   hasEarlyAccess: false,
+  // Theme customization (EA-only). Serialized with the rest of S so it
+  // survives restarts like every other setting.
+  theme: { accent: '#3A86FF', accent2: '#2AD4B9', bgDepth: 'default' },
+  popoutLayout: 'default',
+  // Per-OBS-overlay config. Single source of truth on the renderer side;
+  // pushed to the obs-server whenever the streamer tweaks a setting so
+  // connected browser sources re-render live.
+  obsCfg: {
+    chat:     { fontSize: 18, maxMessages: 20, bgOpacity: 0, showPlatformBadge: false, showUserBadges: true, showEmotes: true },
+    alerts:   { enabled: { follow: true, sub: true, resub: true, gift: true, cheer: true, raid: true, host: true, tip: true }, duration: 6000 },
+    shoutout: { duration: 8000, thankMessage: 'Thanks so much for supporting the stream!', showRecentEvent: true }
+  },
   // Raid Finder state — actions are re-queried from SB each time the panel opens
   raidFinder: {
     actions: { find: null, startRaid: null },
@@ -2585,6 +2754,36 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
   feed.insertBefore(el, feed.firstChild);
   while (feed.children.length > 100) feed.removeChild(feed.lastChild);
   sendOverlayEvent(plat, user, text, evMessage, giftHtml);
+
+  // OBS alerts overlay (EA-only). Only big events get an alert banner —
+  // routine follows are noisy and would flood the stream. We derive the
+  // event type from the text for now; when addEvHistory grows a proper
+  // typed shape we'll pass it through directly.
+  if (big && user && user !== 'StreamFusion' && user !== 'Moderation' && user !== 'System') {
+    try {
+      var lower = String(text || '').toLowerCase();
+      var eventType = null;
+      var amount = null;
+      if      (/gifted\s+(\d+)/.test(lower)) { eventType = 'gift'; amount = parseInt(RegExp.$1, 10); }
+      else if (lower.indexOf('resub') >= 0)  { eventType = 'resub'; }
+      else if (lower.indexOf('subscrib') >= 0) { eventType = 'sub'; }
+      else if (/cheered\s+(\d+)/.test(lower) || /(\d+)\s*bits/.test(lower)) {
+        eventType = 'cheer'; amount = parseInt(RegExp.$1, 10);
+      }
+      else if (/raided.*?(\d+)/.test(lower)) { eventType = 'raid'; amount = parseInt(RegExp.$1, 10); }
+      else if (/\$(\d+(?:\.\d+)?)/.test(text || '')) { eventType = 'tip'; amount = parseFloat(RegExp.$1); }
+      else if (lower.indexOf('follow') >= 0) { eventType = 'follow'; }
+      if (eventType) {
+        sendObsAlert({
+          eventType: eventType,
+          platform:  plat || 'tw',
+          user:      user,
+          amount:    amount,
+          message:   evMessage || ''
+        });
+      }
+    } catch (err) { /* non-fatal; event still shows in the in-app feed */ }
+  }
 }
 function clearEvHistory() {
   evHistory.length = 0;
@@ -5198,6 +5397,10 @@ function quickShoutout(username) {
   _soCooldowns[key] = now;
   handleTwitchCommand('/shoutout ' + username);
   addEvHistory('StreamFusion', 'Shoutout sent for ' + username, 'tw', false);
+  // Also push to the EA-only OBS shoutout overlay. sendObsShoutout
+  // no-ops for non-entitled users and looks up the viewer's most recent
+  // event so the on-screen card reads "…just gifted 5 subs!" etc.
+  sendObsShoutout(username, 'tw');
   // Disable all shoutout buttons for this user briefly
   document.querySelectorAll('.ev-so-btn').forEach(function(btn) {
     if (btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf(username) >= 0) {
@@ -5401,6 +5604,217 @@ function switchSettingsTab(tab) {
   document.querySelectorAll('.settings-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.tab === tab); });
   document.querySelectorAll('.settings-pane').forEach(function(p) { p.classList.toggle('active', p.id === 'pane-' + tab); });
   closeHelpPopover();
+  // Per-tab lazy render. We only refresh server state / read inputs when
+  // the tab actually becomes visible to avoid doing extra work on app
+  // boot or when the user clicks a different settings section.
+  if (tab === 'obsoverlays') renderObsOverlaysTab();
+  if (tab === 'theme') renderThemeTab();
+}
+
+// ── OBS Overlays tab ───────────────────────────────────────────────────────
+// Renders the EA gate vs content based on entitlement, populates URLs from
+// the server, hydrates the per-overlay config inputs from S.obsCfg, and
+// fetches the current server status line.
+function renderObsOverlaysTab() {
+  var gate     = document.getElementById('obsEaGate');
+  var content  = document.getElementById('obsContent');
+  if (!gate || !content) return;
+  if (!S.hasEarlyAccess) {
+    gate.style.display = '';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = '';
+
+  // Populate URLs + status from the main process.
+  if (window.electronAPI && window.electronAPI.obsGetStatus) {
+    window.electronAPI.obsGetStatus().then(function(s) {
+      if (!s) return;
+      var u = s.urls || {};
+      var setVal = function(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
+      setVal('obsUrlChat',     u.chat);
+      setVal('obsUrlAlerts',   u.alerts);
+      setVal('obsUrlShoutout', u.shoutout);
+      var st = document.getElementById('obsServerStatus');
+      if (st) {
+        if (s.running) {
+          st.innerHTML = '<span style="color:var(--ok,#22c55e)">&#9679; Running</span> on <code style="color:var(--accent)">' + (u.root || '').replace(/\/$/, '') + '</code> &mdash; <strong>' + s.clients + '</strong> connected browser source' + (s.clients === 1 ? '' : 's');
+        } else {
+          st.innerHTML = '<span style="color:#ff424d">&#9679; Stopped</span> &mdash; restart StreamFusion if this persists.';
+        }
+      }
+    }).catch(function() {});
+  }
+
+  // Hydrate config inputs from S.obsCfg.
+  var c = S.obsCfg || {};
+  var get = function(id) { return document.getElementById(id); };
+  if (c.chat) {
+    if (get('obsChatFontSize'))           get('obsChatFontSize').value = c.chat.fontSize || 18;
+    if (get('obsChatMaxMessages'))        get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
+    if (get('obsChatBgOpacity'))          get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
+    if (get('obsChatShowPlatformBadge'))  get('obsChatShowPlatformBadge').checked = !!c.chat.showPlatformBadge;
+    if (get('obsChatShowUserBadges'))     get('obsChatShowUserBadges').checked = c.chat.showUserBadges !== false;
+    if (get('obsChatShowEmotes'))         get('obsChatShowEmotes').checked = c.chat.showEmotes !== false;
+  }
+  if (c.alerts) {
+    var en = c.alerts.enabled || {};
+    if (get('obsAlertsFollow')) get('obsAlertsFollow').checked = en.follow !== false;
+    if (get('obsAlertsSub'))    get('obsAlertsSub').checked    = en.sub !== false && en.resub !== false;
+    if (get('obsAlertsGift'))   get('obsAlertsGift').checked   = en.gift !== false;
+    if (get('obsAlertsCheer'))  get('obsAlertsCheer').checked  = en.cheer !== false;
+    if (get('obsAlertsRaid'))   get('obsAlertsRaid').checked   = en.raid !== false && en.host !== false;
+    if (get('obsAlertsTip'))    get('obsAlertsTip').checked    = en.tip !== false;
+    if (get('obsAlertsDuration')) get('obsAlertsDuration').value = Math.round((c.alerts.duration || 6000) / 1000);
+  }
+  if (c.shoutout) {
+    if (get('obsShoutoutShowRecentEvent')) get('obsShoutoutShowRecentEvent').checked = c.shoutout.showRecentEvent !== false;
+    if (get('obsShoutoutDuration'))        get('obsShoutoutDuration').value = Math.round((c.shoutout.duration || 8000) / 1000);
+    if (get('obsShoutoutThankMessage'))    get('obsShoutoutThankMessage').value = c.shoutout.thankMessage || 'Thanks so much for supporting the stream!';
+  }
+}
+
+function copyObsUrl(which) {
+  var el = document.getElementById('obsUrl' + which.charAt(0).toUpperCase() + which.slice(1));
+  if (!el) return;
+  navigator.clipboard.writeText(el.value).then(function() {
+    // Brief visual confirmation via the existing event history system.
+    addEvHistory('StreamFusion', 'Copied ' + which + ' overlay URL to clipboard', 'tw', false);
+  }).catch(function() {
+    // Fallback: select + execCommand('copy') for older Electron versions.
+    el.select();
+    try { document.execCommand('copy'); } catch (e) {}
+  });
+}
+
+function previewObsUrl(which) {
+  var el = document.getElementById('obsUrl' + which.charAt(0).toUpperCase() + which.slice(1));
+  if (!el || !el.value) return;
+  // Open in the system browser (Electron blocks navigation and forwards
+  // to shell.openExternal via will-navigate handler in main.js).
+  window.open(el.value, '_blank');
+}
+
+function updateObsConfig(which) {
+  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsSetConfig) return;
+  var get = function(id) { return document.getElementById(id); };
+  var cfg = {};
+  if (which === 'chat') {
+    cfg = {
+      fontSize:          parseInt((get('obsChatFontSize') || {}).value, 10) || 18,
+      maxMessages:       parseInt((get('obsChatMaxMessages') || {}).value, 10) || 20,
+      bgOpacity:         (parseInt((get('obsChatBgOpacity') || {}).value, 10) || 0) / 100,
+      showPlatformBadge: !!(get('obsChatShowPlatformBadge') && get('obsChatShowPlatformBadge').checked),
+      showUserBadges:    !!(get('obsChatShowUserBadges') && get('obsChatShowUserBadges').checked),
+      showEmotes:        !!(get('obsChatShowEmotes') && get('obsChatShowEmotes').checked),
+      showPlatforms:     S.show || { tw: true, yt: true, tt: true, kk: true }
+    };
+    S.obsCfg.chat = cfg;
+  } else if (which === 'alerts') {
+    var subOn  = !!(get('obsAlertsSub')  && get('obsAlertsSub').checked);
+    var raidOn = !!(get('obsAlertsRaid') && get('obsAlertsRaid').checked);
+    cfg = {
+      enabled: {
+        follow: !!(get('obsAlertsFollow') && get('obsAlertsFollow').checked),
+        sub:    subOn,
+        resub:  subOn,
+        gift:   !!(get('obsAlertsGift') && get('obsAlertsGift').checked),
+        cheer:  !!(get('obsAlertsCheer') && get('obsAlertsCheer').checked),
+        raid:   raidOn,
+        host:   raidOn,
+        tip:    !!(get('obsAlertsTip') && get('obsAlertsTip').checked)
+      },
+      duration: (parseInt((get('obsAlertsDuration') || {}).value, 10) || 6) * 1000
+    };
+    S.obsCfg.alerts = cfg;
+  } else if (which === 'shoutout') {
+    cfg = {
+      showRecentEvent: !!(get('obsShoutoutShowRecentEvent') && get('obsShoutoutShowRecentEvent').checked),
+      duration:        (parseInt((get('obsShoutoutDuration') || {}).value, 10) || 8) * 1000,
+      thankMessage:    (get('obsShoutoutThankMessage') || {}).value || 'Thanks so much for supporting the stream!'
+    };
+    S.obsCfg.shoutout = cfg;
+  }
+  window.electronAPI.obsSetConfig(which, cfg);
+  if (typeof saveSettings === 'function') saveSettings();
+}
+
+// Fake shoutout for UI testing — fires the overlay with placeholder data
+// so the streamer can see the card render without waiting for a real
+// event. Useful for positioning the browser source in OBS.
+function testShoutout() {
+  if (!S.hasEarlyAccess) return;
+  if (!window.electronAPI || !window.electronAPI.obsBroadcastShoutout) return;
+  window.electronAPI.obsBroadcastShoutout({
+    user: 'TestViewer',
+    platform: 'tw',
+    avatarUrl: '',
+    recentEvent: { type: 'gift', text: 'just gifted 5 subs!' },
+    thankMessage: (S.obsCfg.shoutout && S.obsCfg.shoutout.thankMessage) || 'Thanks for the support!',
+    duration: (S.obsCfg.shoutout && S.obsCfg.shoutout.duration) || 8000
+  });
+}
+
+// ── Theme tab ─────────────────────────────────────────────────────────────
+function renderThemeTab() {
+  var gate     = document.getElementById('themeEaGate');
+  var content  = document.getElementById('themeContent');
+  if (!gate || !content) return;
+  if (!S.hasEarlyAccess) {
+    gate.style.display = '';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = '';
+  var t = S.theme || {};
+  var a  = document.getElementById('themeAccent');
+  var a2 = document.getElementById('themeAccent2');
+  var bd = document.getElementById('themeBgDepth');
+  if (a)  a.value  = t.accent  || '#3A86FF';
+  if (a2) a2.value = t.accent2 || '#2AD4B9';
+  if (bd) bd.value = t.bgDepth || 'default';
+  document.querySelectorAll('input[name="popoutLayout"]').forEach(function(r) {
+    r.checked = (r.value === (S.popoutLayout || 'default'));
+  });
+}
+
+function applyTheme() {
+  if (!S.hasEarlyAccess) return;
+  var a  = (document.getElementById('themeAccent')  || {}).value || '#3A86FF';
+  var a2 = (document.getElementById('themeAccent2') || {}).value || '#2AD4B9';
+  var bd = (document.getElementById('themeBgDepth') || {}).value || 'default';
+  S.theme = { accent: a, accent2: a2, bgDepth: bd };
+  document.documentElement.style.setProperty('--accent', a);
+  document.documentElement.style.setProperty('--grn', a2);
+  // Depth presets — tweak the primary bg variable. Other surface
+  // variables derive from it in the existing CSS so changing just --bg
+  // shifts everything proportionally.
+  var bg = (bd === 'pure-black') ? '#000000'
+         : (bd === 'darker')     ? '#060608'
+         : '';  // empty string = remove inline override, let the CSS default win
+  if (bg) document.documentElement.style.setProperty('--bg', bg);
+  else    document.documentElement.style.removeProperty('--bg');
+  if (typeof saveSettings === 'function') saveSettings();
+}
+
+function resetTheme() {
+  S.theme = { accent: '#3A86FF', accent2: '#2AD4B9', bgDepth: 'default' };
+  renderThemeTab();
+  applyTheme();
+}
+
+function applyPopoutLayout() {
+  if (!S.hasEarlyAccess) return;
+  var picked = document.querySelector('input[name="popoutLayout"]:checked');
+  var layout = picked ? picked.value : 'default';
+  S.popoutLayout = layout;
+  // Forward to the pop-out overlay so it can swap its body class. The
+  // overlay side adds/removes layout-* classes to shift styling without
+  // a reload.
+  sendToOverlay({ type: 'popout-layout', layout: layout });
+  if (typeof saveSettings === 'function') saveSettings();
 }
 
 // ── Settings help popovers ───────────────────────────────────────────────────
@@ -7154,6 +7568,86 @@ function sendToPromo(data) {
 }
 function sendOverlayChat(m) {
   sendToOverlay({ type: 'chat', plat: m.plat, user: m.user, text: m.text || '', html: m.html || null, color: m.color || null, badges: m.badges || [], avatar: m.avatar || null, isFirstMsg: !!m.isFirstMsg, isFirstWords: !!m.isFirstWords, msgId: m.msgId || '' });
+  sendObsChat(m);
+}
+
+// ── OBS browser-source overlays (EA-only) ─────────────────────────────────
+// The obs-server running in the main process serves browser sources for
+// OBS (chat feed, alerts banner, shoutout card). These helpers broadcast
+// renderer-side events out to the server, which fans out to every
+// connected browser source via SSE. All three early-exit unless the user
+// is an active Tier 2/3 supporter so non-EA users incur zero cost.
+function sendObsChat(m) {
+  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastChat) return;
+  if (!m || !m.plat) return;
+  // Filter by the renderer's existing per-platform toggle so the OBS
+  // overlay respects "Show Platforms" from the sidebar without needing
+  // its own redundant toggle.
+  if (S.show && S.show[m.plat] === false) return;
+  window.electronAPI.obsBroadcastChat({
+    platform:  m.plat,
+    user:      m.user,
+    message:   m.text || '',
+    userColor: m.color || null,
+    badges:    m.badges || [],
+    emotes:    m.emotes || [],
+    ts:        Date.now()
+  });
+}
+function sendObsAlert(obj) {
+  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastAlert) return;
+  if (!obj || !obj.eventType) return;
+  // Check against user's configured alert-type toggles before sending —
+  // saves a no-op round-trip for disabled event types.
+  var ev = obj.eventType;
+  if (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.enabled) {
+    if (S.obsCfg.alerts.enabled[ev] === false) return;
+  }
+  window.electronAPI.obsBroadcastAlert(Object.assign({ duration: (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.duration) || 6000 }, obj));
+}
+function sendObsShoutout(user, plat) {
+  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastShoutout) return;
+  if (!user) return;
+  var userLc = String(user).toLowerCase();
+  // Find the most recent meaningful event for this user from the shared
+  // event history. We stop at the first match because evHistory is
+  // ordered newest-first (see addEvHistory). Translating the text line
+  // back into a structured type is a rough heuristic — the alerts path
+  // above would be cleaner if we stored event types natively, but this
+  // gets v1 shipping without an evHistory schema change.
+  var recentEvent = null;
+  try {
+    for (var i = 0; i < (evHistory ? evHistory.length : 0) && i < 50; i++) {
+      var e = evHistory[i];
+      if ((e.user || '').toLowerCase() !== userLc) continue;
+      var t = String(e.text || '').toLowerCase();
+      if      (t.indexOf('gifted') >= 0)       recentEvent = { type: 'gift',   text: e.text };
+      else if (t.indexOf('resubscribed') >= 0) recentEvent = { type: 'resub',  text: e.text };
+      else if (t.indexOf('subscribed') >= 0)   recentEvent = { type: 'sub',    text: e.text };
+      else if (t.indexOf('cheered') >= 0 || t.indexOf('bits') >= 0) recentEvent = { type: 'cheer', text: e.text };
+      else if (t.indexOf('raid') >= 0)         recentEvent = { type: 'raid',   text: e.text };
+      else if (t.indexOf('tip') >= 0 || /\$\d/.test(t)) recentEvent = { type: 'tip', text: e.text };
+      else if (t.indexOf('follow') >= 0)       recentEvent = { type: 'follow', text: e.text };
+      if (recentEvent) break;
+    }
+  } catch (err) { /* non-fatal */ }
+
+  // Avatar: renderer cache first, then unavatar.io for Twitch (same
+  // fallback pattern the event feed uses for its avatar column). For
+  // non-Twitch platforms without a cached URL we let the overlay fall
+  // back to the initial-letter placeholder.
+  var avatar = (typeof _avatarCache === 'object' && _avatarCache[userLc]) || '';
+  if (!avatar && plat === 'tw') avatar = 'https://unavatar.io/twitch/' + encodeURIComponent(userLc);
+
+  var cfg = S.obsCfg && S.obsCfg.shoutout || {};
+  window.electronAPI.obsBroadcastShoutout({
+    user:         user,
+    platform:     plat || 'tw',
+    avatarUrl:    avatar,
+    recentEvent:  cfg.showRecentEvent === false ? null : recentEvent,
+    thankMessage: cfg.thankMessage || 'Thanks so much for supporting the stream!',
+    duration:     cfg.duration || 8000
+  });
 }
 function sendOverlayEvent(plat, user, text, evMessage, giftHtml) {
   sendToOverlay({ type: 'event', plat: plat, user: user, text: text, evMessage: evMessage || '', giftHtml: giftHtml || '' });

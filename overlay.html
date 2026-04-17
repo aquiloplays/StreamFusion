@@ -574,6 +574,52 @@ body.pulse-ev{--pulse-col:rgba(255,215,0,.45)}
 }
 
 /* (stats bar styles consolidated above) */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Pop-out layout presets (EA-only) — applied via body class switches from
+   the 'popout-layout' IPC handler. Each preset makes targeted tweaks to
+   spacing / chrome / typography; nothing restructures the DOM, so any
+   feature that works in Default works in every preset.
+
+   .layout-compact — denser text, thinner padding, stats bar collapsed.
+                     For streamers who want more chat history on screen.
+   .layout-minimal — strips borders, avatars shrink, stats bar hidden.
+                     Lean "pure chat" feel.
+   .layout-hud     — tightens chrome, brightens accents, adds scan-line
+                     noise. Reads as a gamer HUD without feeling busy.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+body.layout-compact .msg { padding: 2px 4px; font-size: 12px; gap: 4px; }
+body.layout-compact .msg .mavatar { width: 18px; height: 18px; }
+body.layout-compact .mbody { gap: 0; }
+body.layout-compact .mmeta { font-size: 10px; }
+body.layout-compact .ov-stats { padding: 4px 8px; font-size: 10px; }
+
+body.layout-minimal .msg { background: transparent !important; border: 0 !important; padding: 3px 6px; }
+body.layout-minimal .mavatar { display: none; }
+body.layout-minimal .ov-stats { display: none; }
+body.layout-minimal .ov-header { opacity: .5; }
+body.layout-minimal .mbody .mmeta .mtime { display: none; }
+
+body.layout-hud { background: transparent; }
+body.layout-hud .msg {
+  border-left: 2px solid currentColor;
+  padding-left: 8px;
+  background: linear-gradient(90deg, rgba(58,134,255,.08), transparent 60%) !important;
+}
+body.layout-hud .msg.tw { color: #a970ff; }
+body.layout-hud .msg.yt { color: #ff4545; }
+body.layout-hud .msg.tt { color: #fe2c55; }
+body.layout-hud .msg.kk { color: #53fc18; }
+body.layout-hud .msg .mname { text-transform: uppercase; letter-spacing: .04em; font-size: .95em; }
+body.layout-hud::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 3px);
+  z-index: 9998;
+}
 </style>
 </head>
 <body>
@@ -1477,8 +1523,27 @@ if (api.onOverlayData) {
     else if (d.type === 'shake') {
       shakeOverlayContents();
     }
+    else if (d.type === 'popout-layout') {
+      // EA-only layout preset. Swap body class; CSS below the current
+      // styles defines .layout-compact / .layout-minimal / .layout-hud
+      // variants. Falls back to default if an unknown value arrives.
+      var valid = { 'default': 1, 'compact': 1, 'minimal': 1, 'hud': 1 };
+      var layout = valid[d.layout] ? d.layout : 'default';
+      document.body.classList.remove('layout-compact', 'layout-minimal', 'layout-hud');
+      if (layout !== 'default') document.body.classList.add('layout-' + layout);
+      try { localStorage.setItem('sf_popout_layout', layout); } catch (e) {}
+    }
   });
 }
+
+// Restore last layout on load so the pop-out opens with the streamer's
+// preference instead of flashing the default first.
+(function() {
+  try {
+    var saved = localStorage.getItem('sf_popout_layout');
+    if (saved && saved !== 'default') document.body.classList.add('layout-' + saved);
+  } catch (e) {}
+})();
 
 // Tell main window we're ready
 if (api.overlayReady) api.overlayReady();

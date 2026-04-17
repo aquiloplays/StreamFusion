@@ -127,4 +127,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // re-verification, membership revocation). Handler receives the public
   // entitlement shape documented above.
   onPatreonEntitlementChanged:   (fn) => ipcRenderer.on('patreon-entitlement-changed', (e, state) => fn(state)),
+
+  // ── OBS overlays (EA-only — broadcasts are no-ops until entitled) ───────
+  // Renderer-side fan-out: anything the main app learns (chat msg, event,
+  // shoutout click) goes to the OBS overlay server, which forwards to
+  // every connected browser source via SSE. All three functions take a
+  // payload object; see obs-overlays/*.html for the data contracts.
+  obsBroadcastChat:     (data)        => ipcRenderer.send('obs-broadcast-chat',     data || {}),
+  obsBroadcastAlert:    (data)        => ipcRenderer.send('obs-broadcast-alert',    data || {}),
+  obsBroadcastShoutout: (data)        => ipcRenderer.send('obs-broadcast-shoutout', data || {}),
+  // Update per-overlay config (chat/alerts/shoutout). Server remembers
+  // the last config and replays it to new clients so OBS sources pick up
+  // the streamer's settings even after an OBS restart.
+  //   obsSetConfig('chat', { fontSize: 20, bgOpacity: 0.4, ... })
+  obsSetConfig:         (overlay, cfg) => ipcRenderer.send('obs-set-config',        { overlay: overlay, cfg: cfg || {} }),
+  // Get server status + URLs for the Settings panel. Returns:
+  //   { running: bool, clients: number, urls: { root, chat, alerts, shoutout } }
+  obsGetStatus:         ()            => ipcRenderer.invoke('obs-get-status'),
 });
