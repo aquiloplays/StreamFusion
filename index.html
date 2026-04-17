@@ -723,6 +723,108 @@ body:not(.is-electron) .titlebar{display:none}
 .settings-pane.active{display:block}
 .settings-pane .sec{padding:0 0 14px;border-bottom:1px solid var(--bdr);margin-bottom:14px}
 .settings-pane .sec:last-child{border-bottom:none;margin-bottom:0}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Early Access blur-gate pattern. Applied to settings panes whose
+   features are supporter-only (OBS Overlays, Theme). When the user
+   isn't entitled, the REAL feature UI is still rendered beneath but
+   blurred + click-blocked; a lock card hovers above it with the
+   upgrade CTA. Renders the paywall as marketing instead of hiding
+   features entirely, so every free user sees exactly what they'd
+   unlock at Tier 2/3.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The pane itself acts as positioning context for the overlay. */
+.settings-pane.ea-gate{position:relative;min-height:260px}
+
+/* Content stays in the DOM always so layout doesn't jump when the
+   user signs in; we just lose interactivity when locked. */
+.settings-pane.ea-gate:not(.ea-unlocked) .ea-content{
+  filter:blur(4px) saturate(.7);
+  pointer-events:none;
+  user-select:none;
+  opacity:.55;
+  transition:filter .25s ease,opacity .25s ease;
+}
+.settings-pane.ea-gate.ea-unlocked .ea-content{filter:none;opacity:1;pointer-events:auto}
+
+/* Lock overlay — centered card with the upsell. display:flex instead of
+   block so the card stays centered as the pane scrolls. */
+.ea-lock-overlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:linear-gradient(135deg,rgba(14,14,16,.55),rgba(14,14,16,.75));
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+  z-index:5;
+  animation:eaLockIn .3s ease;
+  pointer-events:auto;
+}
+.settings-pane.ea-gate.ea-unlocked .ea-lock-overlay{display:none}
+
+@keyframes eaLockIn{from{opacity:0}to{opacity:1}}
+
+.ea-lock-card{
+  max-width:360px;
+  background:linear-gradient(135deg,rgba(24,24,27,.98),rgba(18,18,21,.98));
+  border:1px solid rgba(255,66,77,.4);
+  border-radius:14px;
+  padding:22px 24px 20px;
+  text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 40px rgba(255,66,77,.2);
+}
+.ea-lock-icon{
+  font-size:32px;
+  margin-bottom:8px;
+  filter:drop-shadow(0 2px 6px rgba(255,66,77,.4));
+}
+.ea-lock-title{
+  font-size:15px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-0.01em;
+  margin-bottom:6px;
+}
+.ea-lock-desc{
+  font-size:12px;
+  color:var(--mut);
+  line-height:1.55;
+  margin-bottom:14px;
+}
+.ea-lock-desc strong{color:#fff;font-weight:700}
+.ea-lock-cta{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:100%;
+  padding:9px 14px;
+  border:0;
+  border-radius:8px;
+  background:#ff424d;
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  transition:filter .12s,transform .08s;
+}
+.ea-lock-cta:hover{filter:brightness(1.1)}
+.ea-lock-cta:active{transform:translateY(1px)}
+.ea-lock-cta svg{width:12px;height:12px;fill:currentColor}
+.ea-lock-pledge{
+  display:inline-block;
+  margin-top:10px;
+  font-size:11px;
+  color:var(--mut);
+  text-decoration:none;
+  cursor:pointer;
+}
+.ea-lock-pledge:hover{color:var(--txt);text-decoration:underline}
+.ea-lock-pledge strong{color:#ff424d}
 /* Clickable (?) help icon injected next to each section header */
 .sec-help-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:6px;border:none;background:transparent;color:var(--mut);cursor:pointer;padding:0;border-radius:50%;transition:color .15s,background .15s;vertical-align:middle}
 .sec-help-btn:hover{color:var(--accent);background:rgba(58,134,255,.15)}
@@ -1741,18 +1843,24 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
         </div>
 
         <!-- ═══ OBS OVERLAYS TAB (EA-only) ═══ -->
-        <div class="settings-pane" id="pane-obsoverlays">
-          <!-- EA gate banner — shown when the user isn't entitled. Uses
-               display:none by default; shown via renderObsOverlaysTab(). -->
-          <div class="sec" id="obsEaGate" style="display:none">
-            <div class="sec-hd" style="color:#ff424d">Early Access required</div>
-            <div style="font-size:12px;color:var(--mut);line-height:1.6">
-              OBS browser-source overlays are an Early Access feature for <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> Patreon supporters.<br><br>
-              Connect your Patreon in <a onclick="switchSettingsTab('earlyaccess')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings &rarr; Early Access</a> to unlock.
+        <!-- Pane uses the ea-gate pattern: real feature UI always rendered
+             below (blurred + click-blocked when not entitled), lock card
+             hovers above with the upgrade CTA. renderObsOverlaysTab()
+             toggles .ea-unlocked based on S.hasEarlyAccess. -->
+        <div class="settings-pane ea-gate" id="pane-obsoverlays">
+          <div class="ea-lock-overlay" id="obsLockOverlay">
+            <div class="ea-lock-card">
+              <div class="ea-lock-icon">&#128274;</div>
+              <div class="ea-lock-title">This feature is coming soon!</div>
+              <div class="ea-lock-desc">Become a <strong>Tier 2</strong> or <strong>Tier 3</strong> Patron on Patreon to access now.<br><br>Get browser-source overlays for OBS &mdash; chat feed, alerts banner, shoutout card.</div>
+              <button class="ea-lock-cta" onclick="connectPatreon()">
+                <svg viewBox="0 0 569 546" xmlns="http://www.w3.org/2000/svg"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg>
+                Connect Patreon
+              </button>
+              <a class="ea-lock-pledge" onclick="window.open('https://www.patreon.com/cw/aquilo','_blank');return false">Not a supporter yet? <strong>Join on Patreon &rarr;</strong></a>
             </div>
           </div>
-          <!-- Content — shown when entitled. -->
-          <div id="obsContent">
+          <div class="ea-content" id="obsContent">
             <div class="sec">
               <div class="sec-hd">Browser Source URLs</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
@@ -1836,15 +1944,23 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
         </div>
 
         <!-- ═══ THEME TAB (EA-only) ═══ -->
-        <div class="settings-pane" id="pane-theme">
-          <div class="sec" id="themeEaGate" style="display:none">
-            <div class="sec-hd" style="color:#ff424d">Early Access required</div>
-            <div style="font-size:12px;color:var(--mut);line-height:1.6">
-              Theme customization is an Early Access feature for <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> Patreon supporters.<br><br>
-              Connect your Patreon in <a onclick="switchSettingsTab('earlyaccess')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings &rarr; Early Access</a> to unlock.
+        <!-- Same blur-gate pattern as OBS Overlays — free users see the
+             color pickers and layout options teased through the blur,
+             with the lock card prompting them to upgrade. -->
+        <div class="settings-pane ea-gate" id="pane-theme">
+          <div class="ea-lock-overlay" id="themeLockOverlay">
+            <div class="ea-lock-card">
+              <div class="ea-lock-icon">&#127912;</div>
+              <div class="ea-lock-title">This feature is coming soon!</div>
+              <div class="ea-lock-desc">Become a <strong>Tier 2</strong> or <strong>Tier 3</strong> Patron on Patreon to access now.<br><br>Customize accent colors, background depth, and pop-out layout presets.</div>
+              <button class="ea-lock-cta" onclick="connectPatreon()">
+                <svg viewBox="0 0 569 546" xmlns="http://www.w3.org/2000/svg"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg>
+                Connect Patreon
+              </button>
+              <a class="ea-lock-pledge" onclick="window.open('https://www.patreon.com/cw/aquilo','_blank');return false">Not a supporter yet? <strong>Join on Patreon &rarr;</strong></a>
             </div>
           </div>
-          <div id="themeContent">
+          <div class="ea-content" id="themeContent">
             <div class="sec">
               <div class="sec-hd">Accent &amp; Background</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:12px">
@@ -5612,20 +5728,20 @@ function switchSettingsTab(tab) {
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
-// Renders the EA gate vs content based on entitlement, populates URLs from
-// the server, hydrates the per-overlay config inputs from S.obsCfg, and
-// fetches the current server status line.
+// The pane uses the .ea-gate blur pattern: content is always rendered so
+// free users see exactly what they'd unlock, but blurred + click-blocked.
+// We toggle .ea-unlocked based on entitlement, which flips the overlay
+// off and un-blurs the content in one CSS transition.
 function renderObsOverlaysTab() {
-  var gate     = document.getElementById('obsEaGate');
-  var content  = document.getElementById('obsContent');
-  if (!gate || !content) return;
-  if (!S.hasEarlyAccess) {
-    gate.style.display = '';
-    content.style.display = 'none';
-    return;
-  }
-  gate.style.display = 'none';
-  content.style.display = '';
+  var pane = document.getElementById('pane-obsoverlays');
+  if (!pane) return;
+  pane.classList.toggle('ea-unlocked', !!S.hasEarlyAccess);
+
+  // Even when gated, we still populate the underlying content so the
+  // blurred tease looks real (not a bunch of empty placeholders).
+  // Skipping the server-status fetch for non-entitled users saves a
+  // pointless round-trip though.
+  if (!S.hasEarlyAccess) return;
 
   // Populate URLs + status from the main process.
   if (window.electronAPI && window.electronAPI.obsGetStatus) {
@@ -5758,16 +5874,10 @@ function testShoutout() {
 
 // ── Theme tab ─────────────────────────────────────────────────────────────
 function renderThemeTab() {
-  var gate     = document.getElementById('themeEaGate');
-  var content  = document.getElementById('themeContent');
-  if (!gate || !content) return;
-  if (!S.hasEarlyAccess) {
-    gate.style.display = '';
-    content.style.display = 'none';
-    return;
-  }
-  gate.style.display = 'none';
-  content.style.display = '';
+  var pane = document.getElementById('pane-theme');
+  if (!pane) return;
+  pane.classList.toggle('ea-unlocked', !!S.hasEarlyAccess);
+  if (!S.hasEarlyAccess) return;
   var t = S.theme || {};
   var a  = document.getElementById('themeAccent');
   var a2 = document.getElementById('themeAccent2');
