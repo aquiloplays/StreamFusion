@@ -2077,22 +2077,43 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               </div>
             </div>
 
-            <!-- Section 3: Bot Gateway connection — observes Discord events
-                 and pipes them into SF's Events panel so the streamer can
-                 thank people joining their Discord without alt-tabbing. -->
+            <!-- Section 3: Shared StreamFusion bot — one bot, invited by
+                 supporters to their own servers. No dev-portal registration
+                 needed on the supporter's end. -->
             <div class="sec">
               <div class="sec-hd">Discord Bot (Community Join Events)</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When set up, server joins and voice-channel joins show up in your StreamFusion Events panel. <a onclick="openDiscordSetupGuide()" style="color:var(--accent);cursor:pointer;text-decoration:underline">How to set up the bot &rarr;</a></div>
-              <input class="minput" id="dcBotTokenInput" type="password" placeholder="Bot token..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotToken=this.value.trim();saveDiscordSettings()" onchange="dcBotToken=this.value.trim();saveDiscordSettings()">
-              <input class="minput" id="dcBotGuildInput" type="text" placeholder="Server (guild) ID — right-click your server name with Developer Mode on" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
-              <input class="minput" id="dcBotChannelInput" type="text" placeholder="Text channel ID (optional — for message events)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcBotChannelId=this.value.trim();saveDiscordSettings()" onchange="dcBotChannelId=this.value.trim();saveDiscordSettings()">
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Invite the <strong style="color:var(--txt)">StreamFusion bot</strong> to your Discord server and paste your server ID below. Member joins, voice-channel joins, and (optionally) messages from a specific channel will show up in StreamFusion's Events panel so you can thank people without alt-tabbing.</div>
+              <div style="display:flex;gap:6px;margin-bottom:8px">
+                <button class="cbtn tw" onclick="inviteSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px"><svg class="ic"><use href="#i-bolt"/></svg> Invite StreamFusion bot</button>
+              </div>
+              <input class="minput" id="dcBotGuildInput" type="text" placeholder="Server (guild) ID \u2014 right-click your server name with Developer Mode on" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
+              <input class="minput" id="dcBotChannelInput" type="text" placeholder="Text channel ID (optional \u2014 for message events)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcBotChannelId=this.value.trim();saveDiscordSettings()" onchange="dcBotChannelId=this.value.trim();saveDiscordSettings()">
               <label class="frow" style="font-size:11px"><span>Member joins server &rarr; Events panel</span><input type="checkbox" id="dcBotEvtMember" checked onchange="saveDiscordSettings()"></label>
               <label class="frow" style="font-size:11px"><span>Voice channel joins &rarr; Events panel</span><input type="checkbox" id="dcBotEvtVoice" checked onchange="saveDiscordSettings()"></label>
               <label class="frow" style="font-size:11px"><span>Messages in configured channel &rarr; Events panel</span><input type="checkbox" id="dcBotEvtMessage" onchange="saveDiscordSettings()"></label>
               <div style="margin-top:8px;display:flex;gap:6px">
-                <button id="dcBotConnectBtn" class="cbtn tw" onclick="toggleDiscordBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Connect bot</button>
+                <button id="dcBotConnectBtn" class="cbtn tw" onclick="toggleSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Connect</button>
               </div>
               <div id="dcBotStatus" style="font-size:11px;color:var(--mut);margin-top:6px;line-height:1.5">Not connected.</div>
+              <details style="margin-top:10px">
+                <summary style="cursor:pointer;font-size:11px;color:var(--mut)">Advanced: use your own bot instead</summary>
+                <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:6px">Prefer to run your own Discord application? Paste a bot token here and SF will use it instead of the shared StreamFusion bot. Requires enabling the SERVER MEMBERS privileged intent in your Discord dev portal.</div>
+                <input class="minput" id="dcBotTokenInput" type="password" placeholder="Custom bot token..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-top:6px" oninput="dcBotToken=this.value.trim();saveDiscordSettings()" onchange="dcBotToken=this.value.trim();saveDiscordSettings()">
+              </details>
+            </div>
+
+            <!-- Section 3b: Community recap sharing — opt-in repost of the
+                 streamer's recap to the aquilo.gg community Discord. The
+                 webhook URL stays on the Cloudflare Worker so it can't be
+                 scraped from the repo + spammed. -->
+            <div class="sec">
+              <div class="sec-hd">Community Sharing</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">
+                Share your stream recap to the <strong style="color:var(--txt)">aquilo.gg community Discord</strong> in a dedicated channel. Great for connecting with other StreamFusion streamers and finding raid targets.
+                <a onclick="window.open('https://discord.gg/ybbm32yQR7','_blank');return false" style="color:var(--accent);cursor:pointer;text-decoration:underline;margin-left:4px">Join the Discord &rarr;</a>
+              </div>
+              <label class="frow" style="font-size:11px"><span>Share my stream recaps to the aquilo.gg community Discord</span><input type="checkbox" id="dcCommunityRecap" onchange="saveDiscordSettings()"></label>
+              <div style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Only the recap embed is sent; no chat history, tokens, or private data. Your Twitch / YouTube / TikTok handles are included so the community can find and support you back.</div>
             </div>
 
             <!-- Section 4: Extra platforms pulled from Streamer.bot. These
@@ -7146,6 +7167,31 @@ function sendDiscordRecap(manual) {
       var warn = 'Failed to reach Discord webhook: ' + ((e && e.message) || 'network error') + '.';
       if (manual) sysMsg('tw', warn); else addEvHistory('StreamFusion', warn, 'tw', false);
     });
+
+  // Community sharing (EA-only) — fire the same recap embed to the
+  // aquilo.gg community Discord via the Cloudflare Worker proxy. This
+  // runs in parallel with the user's own webhook post above; failures
+  // are silent (a community-post hiccup shouldn't spam the streamer's
+  // event feed with warnings about somebody else's server).
+  if (S.hasEarlyAccess && dcCommunityRecap && payload.embeds && payload.embeds[0]) {
+    var twHandle = S.twLogin || '';
+    var ytHandle = S.ytBroadcastId || '';
+    var kkHandle = S.kkLogin || '';
+    var streamerName = twHandle || (S.patreon && S.patreon.userName) || 'anon';
+    var channelUrl = twHandle ? ('https://twitch.tv/' + twHandle) : '';
+    fetch(COMMUNITY_RECAP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embed:           payload.embeds[0],
+        streamerName:    streamerName,
+        streamerChannel: channelUrl,
+        handles:         { tw: twHandle, yt: ytHandle, kk: kkHandle }
+      })
+    }).then(function(r) {
+      if (r.ok) addEvHistory('StreamFusion', 'Recap also shared to the aquilo.gg community.', 'tw', false);
+    }).catch(function() {});
+  }
 }
 function testDiscordWebhook() {
   if (!discordWebhook) { sysMsg('tw', 'Enter a Discord webhook URL first.'); return; }
@@ -7959,6 +8005,17 @@ var dcSb   = { patreon: true, fourthwall: true, kofi: true, se: true };
 var dcBot  = { enabled: false, evtMember: true, evtVoice: true, evtMessage: false };
 var dcGiftThreshold = 5;
 var dcRecordsAuto = true;
+// Opt-in: repost stream recap to the aquilo.gg community Discord via the
+// Cloudflare Worker's /community-recap route. The community webhook URL
+// lives on the Worker; SF never sees it.
+var dcCommunityRecap = false;
+var COMMUNITY_RECAP_URL = 'https://streamfusion-patreon-proxy.bisherclay.workers.dev/community-recap';
+// Shared StreamFusion bot service (hosted on Railway). One bot for all
+// EA supporters — they invite it to their server, paste the guild ID
+// here, and SF opens an SSE stream so Discord events flow back in.
+// Override in dev by setting window.__SF_BOT_SERVICE_URL before this
+// file runs.
+var BOT_SERVICE_URL = (window.__SF_BOT_SERVICE_URL || 'https://streamfusion-bot.up.railway.app').replace(/\/$/, '');
 // All-time cumulative records. Persisted separately so they survive
 // installs + reset-stats actions. Each entry: { user, amount, ts }.
 var dcRecords = {
@@ -7987,6 +8044,7 @@ function loadDiscordSettings() {
     if (d.recordsAuto != null) dcRecordsAuto = d.recordsAuto;
     if (d.records) dcRecords = Object.assign(dcRecords, d.records);
     if (d.recordsMessageId) dcRecordsMessageId = d.recordsMessageId;
+    if (d.communityRecap != null) dcCommunityRecap = d.communityRecap;
   } catch (e) {}
 }
 
@@ -8002,6 +8060,7 @@ function saveDiscordSettings() {
   if (get('dcPostHype'))   dcPost.hype   = get('dcPostHype').checked;
   if (get('dcGiftThreshold')) dcGiftThreshold = parseInt(get('dcGiftThreshold').value, 10) || 5;
   if (get('dcRecordsAuto'))   dcRecordsAuto = get('dcRecordsAuto').checked;
+  if (get('dcCommunityRecap')) dcCommunityRecap = get('dcCommunityRecap').checked;
   if (get('dcSbPatreon'))    dcSb.patreon    = get('dcSbPatreon').checked;
   if (get('dcSbFourthwall')) dcSb.fourthwall = get('dcSbFourthwall').checked;
   if (get('dcSbKofi'))       dcSb.kofi       = get('dcSbKofi').checked;
@@ -8015,7 +8074,8 @@ function saveDiscordSettings() {
       botToken: dcBotToken, botGuildId: dcBotGuildId, botChannelId: dcBotChannelId,
       post: dcPost, sb: dcSb, bot: dcBot,
       giftThreshold: dcGiftThreshold, recordsAuto: dcRecordsAuto,
-      records: dcRecords, recordsMessageId: dcRecordsMessageId
+      records: dcRecords, recordsMessageId: dcRecordsMessageId,
+      communityRecap: dcCommunityRecap
     }));
   } catch (e) {}
 }
@@ -8240,29 +8300,93 @@ function openDiscordSetupGuide() {
 }
 
 // ── Discord Bot Gateway wiring ────────────────────────────────────────────
-function toggleDiscordBot() {
-  if (!S.hasEarlyAccess) return;
-  if (dcBot.enabled) {
-    window.electronAPI.discordBotDisconnect().then(function() {
-      dcBot.enabled = false;
-      saveDiscordSettings();
-      renderDiscordBotStatus();
+// Two paths:
+//   1. Shared bot  (default) — SSE to BOT_SERVICE_URL/events, auth via
+//      the user's Patreon access token. One hosted bot in many servers.
+//   2. Custom bot  (fallback) — a bot token the user provides. Runs
+//      through the main-process Gateway WS in discord-bot.js.
+// If dcBotToken is set we assume the user wants custom; otherwise shared.
+
+var _sharedBotSource = null;   // EventSource instance for the SSE stream
+
+function inviteSharedBot() {
+  // Fetch the current invite URL from the bot service so the invite always
+  // reflects the permissions the bot was built with. Falls back to a
+  // sensible Discord URL pattern if the service is unreachable.
+  fetch(BOT_SERVICE_URL + '/bot-invite')
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (j && j.url) { window.open(j.url, '_blank'); return; }
+      addEvHistory('StreamFusion', 'Bot invite URL not configured on the service yet.', 'tw', false);
+    })
+    .catch(function() {
+      addEvHistory('StreamFusion', 'Could not reach StreamFusion bot service.', 'tw', false);
     });
-  } else {
-    if (!dcBotToken) { addEvHistory('StreamFusion', 'Enter a bot token first.', 'tw', false); return; }
+}
+
+function toggleSharedBot() {
+  if (!S.hasEarlyAccess) return;
+  if (dcBot.enabled) { disconnectSharedBot(); return; }
+  if (dcBotToken) {
+    // Custom-bot mode — delegate to the main-process Gateway WS.
     window.electronAPI.discordBotConnect({
       token:     dcBotToken,
       guildId:   dcBotGuildId || null,
       channelId: dcBotChannelId || null
     }).then(function(res) {
-      if (res && res.ok) {
-        dcBot.enabled = true;
-        saveDiscordSettings();
-        renderDiscordBotStatus();
-      }
+      if (res && res.ok) { dcBot.enabled = true; saveDiscordSettings(); renderDiscordBotStatus(); }
+    });
+    return;
+  }
+  connectSharedBot();
+}
+
+function connectSharedBot() {
+  if (_sharedBotSource) { try { _sharedBotSource.close(); } catch (e) {} _sharedBotSource = null; }
+  var pt = S.patreon && S.patreon.accessToken;   // Not directly exposed; see note below
+  // NOTE: the renderer only has the public entitlement shape (no raw
+  // Patreon token). The bot service accepts the token in a URL query
+  // param, but we don't want to expose that token to the renderer. So
+  // we route the connection through an IPC handler in the main process
+  // which has access to the cached Patreon auth state.
+  if (!window.electronAPI || !window.electronAPI.sharedBotConnect) {
+    addEvHistory('StreamFusion', 'Shared bot connection not available in this build.', 'tw', false);
+    return;
+  }
+  window.electronAPI.sharedBotConnect({
+    botServiceUrl: BOT_SERVICE_URL,
+    guildId:       dcBotGuildId || null
+  }).then(function(res) {
+    if (res && res.ok) {
+      dcBot.enabled = true;
+      saveDiscordSettings();
+      renderDiscordBotStatus();
+    } else {
+      addEvHistory('StreamFusion', 'Could not connect to StreamFusion bot: ' + (res && res.reason || 'unknown'), 'tw', false);
+    }
+  });
+}
+
+function disconnectSharedBot() {
+  if (dcBotToken && window.electronAPI && window.electronAPI.discordBotDisconnect) {
+    window.electronAPI.discordBotDisconnect().then(function() {
+      dcBot.enabled = false;
+      saveDiscordSettings();
+      renderDiscordBotStatus();
+    });
+    return;
+  }
+  if (window.electronAPI && window.electronAPI.sharedBotDisconnect) {
+    window.electronAPI.sharedBotDisconnect().then(function() {
+      dcBot.enabled = false;
+      saveDiscordSettings();
+      renderDiscordBotStatus();
     });
   }
 }
+
+// Old function name still used in some legacy paths — alias to the new one.
+function toggleDiscordBot() { toggleSharedBot(); }
 
 function renderDiscordBotStatus() {
   var btn = document.getElementById('dcBotConnectBtn');
@@ -8314,6 +8438,7 @@ function renderDiscordTab() {
     var el = get('dcPost' + k); if (el) el.checked = !!dcPost[k.toLowerCase()];
   });
   if (get('dcRecordsAuto')) get('dcRecordsAuto').checked = !!dcRecordsAuto;
+  if (get('dcCommunityRecap')) get('dcCommunityRecap').checked = !!dcCommunityRecap;
   if (get('dcSbPatreon'))    get('dcSbPatreon').checked    = !!dcSb.patreon;
   if (get('dcSbFourthwall')) get('dcSbFourthwall').checked = !!dcSb.fourthwall;
   if (get('dcSbKofi'))       get('dcSbKofi').checked       = !!dcSb.kofi;

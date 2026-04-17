@@ -557,6 +557,15 @@ function registerIpcHandlers() {
   });
 }
 
+// Exposes the raw stored access token for main-process consumers (e.g. the
+// shared-bot SSE client needs to authenticate as the logged-in Patreon
+// user against the bot service). Renderer code NEVER has access to this —
+// the preload only expresses the public entitlement shape.
+function getRawAccessToken() {
+  var state = readState();
+  return state && state.access_token ? state.access_token : null;
+}
+
 module.exports = {
   registerIpcHandlers:  registerIpcHandlers,
   setMainWindow:        setMainWindow,
@@ -565,5 +574,6 @@ module.exports = {
   signOut:              signOut,
   startRuntimeChecks:   startRuntimeChecks,
   stopRuntimeChecks:    stopRuntimeChecks,
-  onEntitlementChange:  onEntitlementChange
+  onEntitlementChange:  onEntitlementChange,
+  getRawAccessToken:    getRawAccessToken
 };

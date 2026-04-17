@@ -28,7 +28,10 @@
       "**/*",
       "!patreon-proxy.worker.js",
       "!SETUP-PATREON.md",
-      "!.env*"
+      "!.env*",
+      "!bot-service/**",
+      "!preview-icon.js",
+      "!icon-preview.png"
     ],
     "asarUnpack": [],
     "publish": [

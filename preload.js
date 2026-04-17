@@ -163,4 +163,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   discordBotDisconnect: ()            => ipcRenderer.invoke('discord-bot-disconnect'),
   discordBotStatus:     ()            => ipcRenderer.invoke('discord-bot-status'),
   onDiscordEvent:       (fn)          => ipcRenderer.on('discord-event', (e, payload) => fn(payload)),
+  // Shared StreamFusion bot — SSE connection to the hosted bot service
+  // (aquilo.gg-run). The main process attaches the user's Patreon
+  // access token from its own store; the renderer never sees it.
+  sharedBotConnect:     (cfg)         => ipcRenderer.invoke('shared-bot-connect',    cfg || {}),
+  sharedBotDisconnect:  ()            => ipcRenderer.invoke('shared-bot-disconnect'),
 });

@@ -1,0 +1,15 @@
+{
+  "name": "streamfusion-bot-service",
+  "version": "1.0.0",
+  "description": "Shared Discord bot + SSE push service for StreamFusion EA",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  }
+}

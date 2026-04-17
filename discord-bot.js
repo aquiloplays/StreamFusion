@@ -385,6 +385,177 @@ function getBotStatus() {
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// Shared-bot SSE client
+// ══════════════════════════════════════════════════════════════════════
+//
+// The alternate path — connect to the aquilo.gg-hosted Discord bot
+// service (bot-service/ in this repo) instead of running a Gateway WS
+// locally. The service authenticates us via Patreon access token, keeps
+// the ONE bot token connected to Discord, and pushes events back to us
+// over Server-Sent Events.
+//
+// We pick between local-gateway (custom bot token) and SSE (shared bot)
+// based on which the user configured. The renderer picks; this module
+// just exposes both start/stop paths.
+
+let sseReq = null;
+let sseBuffer = '';
+let sseReconnectTimer = null;
+let sseClosing = false;
+let sharedCfg = null;   // { botServiceUrl, guildId, accessToken }
+
+function sseParseFrames(buf, onEvent) {
+  // SSE frames are separated by blank lines. Each frame is a series of
+  // "field: value\n" lines. We care about `event:` and `data:`; spec-
+  // defined fields like id / retry are ignored.
+  var frames = buf.split('\n\n');
+  // The last element is an in-progress frame (or empty string) — return
+  // it for the caller to prepend to the next chunk.
+  var tail = frames.pop();
+  frames.forEach(function(frame) {
+    if (!frame) return;
+    var ev = 'message';
+    var dataLines = [];
+    frame.split('\n').forEach(function(line) {
+      if (line.indexOf('event:') === 0) ev = line.slice(6).trim();
+      else if (line.indexOf('data:') === 0) dataLines.push(line.slice(5).trim());
+      // ':' prefix = comment / heartbeat; skip
+    });
+    if (dataLines.length) {
+      try { onEvent(ev, JSON.parse(dataLines.join('\n'))); } catch (e) { onEvent(ev, null); }
+    }
+  });
+  return tail;
+}
+
+function sharedBotConnect(cfg) {
+  if (!cfg || !cfg.botServiceUrl || !cfg.accessToken) {
+    return Promise.resolve({ ok: false, reason: 'missing_config' });
+  }
+  sharedBotDisconnect();
+  sharedCfg = cfg;
+  sseClosing = false;
+  openSse();
+  // If the user configured a guild, register the association too. This
+  // fires in parallel with the SSE open; the bot service will have the
+  // subscription in place before any events actually arrive.
+  if (cfg.guildId) registerAssociation(cfg);
+  return Promise.resolve({ ok: true });
+}
+
+function sharedBotDisconnect() {
+  sseClosing = true;
+  if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null; }
+  if (sseReq) { try { sseReq.destroy(); } catch (e) {} sseReq = null; }
+  sseBuffer = '';
+  if (sharedCfg && sharedCfg.guildId) {
+    // Best-effort cleanup on the service side.
+    removeAssociation(sharedCfg).catch(function() {});
+  }
+  sharedCfg = null;
+  return Promise.resolve({ ok: true });
+}
+
+function openSse() {
+  if (!sharedCfg) return;
+  var u;
+  try { u = new URL(sharedCfg.botServiceUrl + '/events?token=' + encodeURIComponent(sharedCfg.accessToken)); }
+  catch (e) { console.error('[shared-bot] bad URL:', e.message); return; }
+
+  var mod = u.protocol === 'http:' ? require('http') : https;
+  sseReq = mod.request({
+    method: 'GET',
+    hostname: u.hostname,
+    path: u.pathname + u.search,
+    port: u.port || (u.protocol === 'http:' ? 80 : 443),
+    headers: { 'Accept': 'text/event-stream', 'User-Agent': 'StreamFusion-desktop' }
+  }, function(res) {
+    if (res.statusCode !== 200) {
+      console.error('[shared-bot] server returned', res.statusCode);
+      emitEvent('fatal', { code: res.statusCode, reason: 'bot_service_rejected' });
+      scheduleSseReconnect();
+      return;
+    }
+    res.setEncoding('utf8');
+    res.on('data', function(chunk) {
+      sseBuffer += chunk;
+      sseBuffer = sseParseFrames(sseBuffer, function(ev, data) {
+        if (ev === 'hello') emitEvent('ready', data);
+        else if (ev === 'discord' && data && data.kind) emitEvent(data.kind, data);
+      });
+    });
+    res.on('end', function() { if (!sseClosing) scheduleSseReconnect(); });
+    res.on('error', function() { if (!sseClosing) scheduleSseReconnect(); });
+  });
+  sseReq.on('error', function(err) {
+    console.error('[shared-bot] request error:', err.message);
+    if (!sseClosing) scheduleSseReconnect();
+  });
+  sseReq.setTimeout(0); // no timeout — this is a long-lived connection
+  sseReq.end();
+}
+
+function scheduleSseReconnect() {
+  if (sseReconnectTimer || sseClosing) return;
+  sseReconnectTimer = setTimeout(function() {
+    sseReconnectTimer = null;
+    openSse();
+  }, 5000 + Math.random() * 5000);
+}
+
+function registerAssociation(cfg) {
+  return postJson(cfg.botServiceUrl + '/associate', {
+    patreonAccessToken: cfg.accessToken,
+    guildId:            cfg.guildId
+  });
+}
+function removeAssociation(cfg) {
+  return new Promise(function(resolve) {
+    var u;
+    try { u = new URL(cfg.botServiceUrl + '/associate'); } catch (e) { return resolve({ ok: false }); }
+    var body = JSON.stringify({ patreonAccessToken: cfg.accessToken, guildId: cfg.guildId });
+    var req = https.request({
+      method: 'DELETE',
+      hostname: u.hostname,
+      path: u.pathname + u.search,
+      port: u.port || 443,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, function(res) { res.on('data', function() {}); res.on('end', function() { resolve({ ok: res.statusCode >= 200 && res.statusCode < 300 }); }); });
+    req.on('error', function() { resolve({ ok: false }); });
+    req.write(body); req.end();
+  });
+}
+
+// Helper: POST JSON to an HTTPS URL and return { ok, status, body }.
+function postJson(url, body) {
+  return new Promise(function(resolve) {
+    var u;
+    try { u = new URL(url); } catch (e) { return resolve({ ok: false, error: 'invalid_url' }); }
+    var data = JSON.stringify(body || {});
+    var mod = u.protocol === 'http:' ? require('http') : https;
+    var req = mod.request({
+      method: 'POST',
+      hostname: u.hostname,
+      path: u.pathname + u.search,
+      port: u.port || (u.protocol === 'http:' ? 80 : 443),
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, function(res) {
+      var chunks = [];
+      res.on('data', function(c) { chunks.push(c); });
+      res.on('end', function() {
+        var txt = Buffer.concat(chunks).toString('utf8');
+        var json = null; try { json = JSON.parse(txt); } catch (e) {}
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body: json || txt });
+      });
+    });
+    req.on('error', function(err) { resolve({ ok: false, error: err.message }); });
+    req.setTimeout(15000, function() { req.destroy(new Error('timeout')); });
+    req.write(data);
+    req.end();
+  });
+}
+
 module.exports = {
   postWebhook:          postWebhook,
   deleteWebhookMessage: deleteWebhookMessage,
@@ -392,5 +563,7 @@ module.exports = {
   disconnectBot:        disconnectBot,
   getBotStatus:         getBotStatus,
   setMainWindow:        setMainWindow,
+  sharedBotConnect:     sharedBotConnect,
+  sharedBotDisconnect:  sharedBotDisconnect,
   INTENTS:              INTENTS
 };

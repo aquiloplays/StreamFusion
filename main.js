@@ -773,6 +773,23 @@ ipcMain.handle('discord-bot-disconnect', function() {
 ipcMain.handle('discord-bot-status', function() {
   return discordBot.getBotStatus();
 });
+// Shared-bot (SSE to hosted bot service). We look up the user's Patreon
+// access token here rather than let the renderer hand us one — the token
+// is intentionally kept out of the renderer for the same reason the
+// refresh token is.
+ipcMain.handle('shared-bot-connect', function(event, cfg) {
+  cfg = cfg || {};
+  var token = patreonAuth.getRawAccessToken();
+  if (!token) return Promise.resolve({ ok: false, reason: 'not_signed_in' });
+  return discordBot.sharedBotConnect({
+    botServiceUrl: cfg.botServiceUrl,
+    guildId:       cfg.guildId,
+    accessToken:   token
+  });
+});
+ipcMain.handle('shared-bot-disconnect', function() {
+  return discordBot.sharedBotDisconnect();
+});
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();

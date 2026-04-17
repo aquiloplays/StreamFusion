@@ -173,7 +173,103 @@ Delete the check. That's it.
 Patreon-related files:
 
 - [`patreon-auth.js`](patreon-auth.js) — OAuth flow, tier-aware membership verification, encrypted token cache, periodic re-check
-- [`patreon-proxy.worker.js`](patreon-proxy.worker.js) — Cloudflare Worker (deploy separately; **not** bundled into the app)
+- [`patreon-proxy.worker.js`](patreon-proxy.worker.js) — Cloudflare Worker (Patreon token proxy + community-recap forwarder; deploy separately; **not** bundled into the app)
 - [`preload.js`](preload.js) — exposes the entitlement API to the renderer
 - [`main.js`](main.js) — wires entitlement service to app lifecycle
 - [`index.html`](index.html) — onboarding Page 9 + Settings → Early Access + `S.hasEarlyAccess` state flag
+
+---
+
+## Community recap sharing (optional)
+
+EA supporters can opt into sharing their stream recap to your aquilo.gg community Discord. SF posts the recap embed to your Cloudflare Worker at `/community-recap`; the Worker adds your webhook URL server-side and forwards to Discord. The webhook URL is never exposed to the app or the repo.
+
+To enable:
+
+1. Go to **your Discord server** → Server Settings → Integrations → Webhooks → **New Webhook**
+2. Name it `StreamFusion Recaps`, pick a channel (e.g. `#stream-recaps`)
+3. **Copy Webhook URL**
+4. On your Cloudflare Worker → Settings → Variables and Secrets → add:
+   - `COMMUNITY_RECAP_WEBHOOK` = the URL you copied (encrypted secret)
+5. Deploy the Worker
+
+Supporters will see the toggle in **Settings → Discord+ → Community Sharing**. When on, every stream recap posts to both their own webhook AND the community channel.
+
+---
+
+## Shared StreamFusion bot (Railway)
+
+For the Discord bot that surfaces member/voice/message joins into supporters' Events panels, you host **one bot** that every EA supporter invites. The bot lives in [`bot-service/`](bot-service/) and deploys to Railway.
+
+### 1. Register the Discord application
+
+1. https://discord.com/developers/applications → **New Application** → name it `StreamFusion`
+2. **Bot** tab → **Add Bot** → copy the **Token** (shown once)
+3. Scroll down → enable **SERVER MEMBERS INTENT** (required for join events)
+4. **General Information** tab → copy the **Application ID** (this is the Client ID)
+
+### 2. Deploy to Railway
+
+```bash
+# From the StreamFusion repo root
+cd bot-service
+npm install wrangler  # or use Railway dashboard
+
+# Option A — Railway CLI
+railway login
+railway init
+railway up
+
+# Option B — Railway dashboard
+# Create a new project → Deploy from GitHub → point at the bot-service folder
+```
+
+### 3. Set Railway environment variables
+
+Open your Railway project → Variables tab → add:
+
+```
+DISCORD_BOT_TOKEN         = <from step 1>
+DISCORD_BOT_CLIENT_ID     = <from step 1>
+PATREON_CAMPAIGN_ID       = <same value as patreon-auth.js>
+PATREON_TIER2_ID          = <same value as patreon-auth.js>
+PATREON_TIER3_ID          = <same value as patreon-auth.js>
+```
+
+Redeploy after saving. Railway gives you a public URL like `https://streamfusion-bot-production.up.railway.app`.
+
+### 4. Point StreamFusion at the deployed service
+
+In [`index.html`](index.html) around the top of the Discord+ JS block, update the default value of `BOT_SERVICE_URL`:
+
+```js
+var BOT_SERVICE_URL = (window.__SF_BOT_SERVICE_URL || 'https://your-railway-url.up.railway.app').replace(/\/$/, '');
+```
+
+Or set a custom domain (e.g. `bot.aquilo.gg`) in Railway and use that.
+
+### 5. Health check
+
+Visit `https://your-railway-url.up.railway.app/health` — you should see:
+
+```json
+{ "ok": true, "gateway": true, "guildCount": 0, "userCount": 0, "botInvite": "https://discord.com/api/oauth2/authorize?client_id=..." }
+```
+
+If `gateway: false`, the bot couldn't connect to Discord. Check the Railway logs for which close code came back — most commonly you need to toggle on the SERVER MEMBERS intent (step 1.3).
+
+### How supporters use it
+
+1. In StreamFusion → Settings → **Discord+**
+2. Click **Invite StreamFusion bot** — opens Discord, they pick their server, click Authorize
+3. Back in StreamFusion, paste their **server ID** (Discord settings → enable Developer Mode, right-click server name → Copy Server ID)
+4. Click **Connect** — SF opens an SSE stream to your Railway service, authenticated by the user's Patreon access token
+5. From then on, member/voice/message joins in their server appear in SF's Events panel
+
+**No dev-portal setup on the supporter's end.** They just invite a button and paste an ID.
+
+### Scale notes
+
+- **In-memory storage.** The service keeps `guildId → users` and `userId → SSE connections` in RAM. A restart drops associations; SF clients re-POST `/associate` on reconnect, so the system self-heals within seconds. For multi-instance deployments swap in Redis or Railway Postgres.
+- **Pre-verification only.** Discord requires bot verification at 100 servers and limits new invites to unverified bots at 75. For EA supporter scale this is plenty of headroom. When you approach that ceiling, apply for verification — Discord has an EU-based team and the process takes 2–4 weeks.
+- **Cost.** Free tier on Railway gives $5/month of usage credit; a single always-on Node service runs well under that. Upgrade if you exceed it.
