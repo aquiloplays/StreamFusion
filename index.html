@@ -8040,7 +8040,7 @@ var COMMUNITY_RECAP_URL = 'https://streamfusion-patreon-proxy.bisherclay.workers
 // here, and SF opens an SSE stream so Discord events flow back in.
 // Override in dev by setting window.__SF_BOT_SERVICE_URL before this
 // file runs.
-var BOT_SERVICE_URL = (window.__SF_BOT_SERVICE_URL || 'https://streamfusion-bot.up.railway.app').replace(/\/$/, '');
+var BOT_SERVICE_URL = (window.__SF_BOT_SERVICE_URL || 'https://streamfusion-production-0bdd.up.railway.app').replace(/\/$/, '');
 // All-time cumulative records. Persisted separately so they survive
 // installs + reset-stats actions. Each entry: { user, amount, ts }.
 var dcRecords = {
