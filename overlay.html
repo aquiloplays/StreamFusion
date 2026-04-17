@@ -576,49 +576,91 @@ body.pulse-ev{--pulse-col:rgba(255,215,0,.45)}
 /* (stats bar styles consolidated above) */
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Pop-out layout presets (EA-only) — applied via body class switches from
-   the 'popout-layout' IPC handler. Each preset makes targeted tweaks to
-   spacing / chrome / typography; nothing restructures the DOM, so any
-   feature that works in Default works in every preset.
+   Pop-out layout presets (EA-only) — applied via body class switches
+   from the 'popout-layout' IPC handler. These target the real overlay
+   class names (.ov-msg, .ov-avatar, .ov-user, .ov-text, .ov-stats,
+   .ov-drag, .ov-hype, .ov-goals, .ov-live). Each preset makes targeted
+   tweaks to spacing / chrome / typography; nothing restructures the DOM
+   so every feature works in every preset.
 
-   .layout-compact — denser text, thinner padding, stats bar collapsed.
+   .layout-compact — denser chat, smaller avatars, tighter stats bar.
                      For streamers who want more chat history on screen.
-   .layout-minimal — strips borders, avatars shrink, stats bar hidden.
-                     Lean "pure chat" feel.
-   .layout-hud     — tightens chrome, brightens accents, adds scan-line
-                     noise. Reads as a gamer HUD without feeling busy.
+   .layout-minimal — strips avatars, borders, stats, goals, and hype
+                     chrome. Just a transparent chat stream.
+   .layout-hud     — brighter platform tints, chipped usernames, scan-
+                     line overlay. Reads as a gamer HUD on top of gameplay.
    ═══════════════════════════════════════════════════════════════════════ */
 
-body.layout-compact .msg { padding: 2px 4px; font-size: 12px; gap: 4px; }
-body.layout-compact .msg .mavatar { width: 18px; height: 18px; }
-body.layout-compact .mbody { gap: 0; }
-body.layout-compact .mmeta { font-size: 10px; }
-body.layout-compact .ov-stats { padding: 4px 8px; font-size: 10px; }
+/* ── Compact ─────────────────────────────────────────────────────────── */
+body.layout-compact .ov-msg { padding: 1px 5px; gap: 4px; line-height: 1.25; font-size: calc(var(--chat-size) - 1px); }
+body.layout-compact .ov-avatar { width: 14px; height: 14px; margin-top: 0; }
+body.layout-compact .ov-badge { width: 11px; height: 11px; }
+body.layout-compact .ov-user { font-size: calc(var(--chat-size) - 2px); }
+body.layout-compact .ov-stats { padding: 3px 6px; font-size: 10px; gap: 4px; }
+body.layout-compact .ov-drag { height: 22px; padding: 0 6px; }
+body.layout-compact .ov-drag-title { font-size: 9px; }
+body.layout-compact .ov-live { padding: 2px 6px; }
 
-body.layout-minimal .msg { background: transparent !important; border: 0 !important; padding: 3px 6px; }
-body.layout-minimal .mavatar { display: none; }
-body.layout-minimal .ov-stats { display: none; }
-body.layout-minimal .ov-header { opacity: .5; }
-body.layout-minimal .mbody .mmeta .mtime { display: none; }
+/* ── Minimal ─────────────────────────────────────────────────────────── */
+body.layout-minimal .ov-msg { border-left: 0 !important; padding: 2px 6px; }
+body.layout-minimal .ov-msg:hover { background: transparent; }
+body.layout-minimal .ov-avatar { display: none; }
+body.layout-minimal .ov-badge { display: none; }
+body.layout-minimal .ov-stats { display: none !important; }
+body.layout-minimal .ov-goals { display: none !important; }
+body.layout-minimal .ov-hype  { display: none !important; }
+body.layout-minimal .ov-live  { display: none !important; }
+body.layout-minimal .ov-poll  { display: none !important; }
+body.layout-minimal .ov-pred  { display: none !important; }
+body.layout-minimal .ov-drag  { background: transparent; border-bottom: 0; opacity: .35; transition: opacity .2s ease; }
+body.layout-minimal .ov-drag:hover { opacity: 1; }
 
-body.layout-hud { background: transparent; }
-body.layout-hud .msg {
-  border-left: 2px solid currentColor;
+/* ── Gamer HUD ───────────────────────────────────────────────────────── */
+body.layout-hud .ov-msg {
+  border-left-width: 3px;
   padding-left: 8px;
-  background: linear-gradient(90deg, rgba(58,134,255,.08), transparent 60%) !important;
+  background: linear-gradient(90deg, rgba(255,255,255,.04), transparent 70%);
 }
-body.layout-hud .msg.tw { color: #a970ff; }
-body.layout-hud .msg.yt { color: #ff4545; }
-body.layout-hud .msg.tt { color: #fe2c55; }
-body.layout-hud .msg.kk { color: #53fc18; }
-body.layout-hud .msg .mname { text-transform: uppercase; letter-spacing: .04em; font-size: .95em; }
+body.layout-hud .ov-msg.tw { background: linear-gradient(90deg, rgba(145,71,255,.18), transparent 70%); }
+body.layout-hud .ov-msg.yt { background: linear-gradient(90deg, rgba(255,0,0,.18),   transparent 70%); }
+body.layout-hud .ov-msg.tt { background: linear-gradient(90deg, rgba(0,242,234,.18), transparent 70%); }
+body.layout-hud .ov-msg.kk { background: linear-gradient(90deg, rgba(83,252,24,.18), transparent 70%); }
+body.layout-hud .ov-user {
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: calc(var(--chat-size) - 2px);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(0,0,0,.3);
+  border: 1px solid currentColor;
+}
+body.layout-hud .ov-text {
+  text-shadow: 0 0 4px rgba(0,0,0,.6);
+}
+body.layout-hud .ov-drag {
+  background: linear-gradient(90deg, rgba(58,134,255,.25), rgba(42,212,185,.25));
+  border-bottom: 1px solid rgba(58,134,255,.4);
+}
+body.layout-hud .ov-drag-title {
+  color: #fff;
+  text-shadow: 0 0 8px rgba(58,134,255,.8);
+}
+body.layout-hud .ov-stats {
+  background: rgba(14,14,16,.6);
+  border-top: 1px solid rgba(58,134,255,.3);
+  border-bottom: 1px solid rgba(58,134,255,.3);
+}
+/* Scanline overlay — tiny striped gradient sitting on top of everything
+   non-interactive. pointer-events:none + z-index just under the drag
+   handle so it never steals clicks. */
 body.layout-hud::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 3px);
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.06) 2px, rgba(0,0,0,.06) 3px);
   z-index: 9998;
+  mix-blend-mode: multiply;
 }
 </style>
 </head>

@@ -7582,6 +7582,13 @@ if (window.electronAPI && window.electronAPI.onOverlayReady) {
     _pushOverlayHotkey(_overlayHotkey);
     sendOverlayStats();
     sendOverlayHype();
+    // Push the saved EA-only layout preset so the overlay opens with
+    // the streamer's pick even before they touch the Theme settings
+    // tab. Without this, a fresh overlay launch always shows the
+    // Default layout until applyPopoutLayout fires.
+    if (S.hasEarlyAccess && S.popoutLayout && S.popoutLayout !== 'default') {
+      sendToOverlay({ type: 'popout-layout', layout: S.popoutLayout });
+    }
   });
 }
 
