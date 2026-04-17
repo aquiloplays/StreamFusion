@@ -236,14 +236,25 @@
     if (item._kind === 'alert') {
       var kicker = kickerFor(item.eventType);
       var primary;
-      if (item.eventType === 'gift')  primary = (item.user || 'someone') + ' gifted ' + (item.amount || 1) + ' subs!';
+      // TikTok gifts get the named-gift + coins treatment; every other
+      // "gift" event is subs.
+      if (item.eventType === 'gift' && item.platform === 'tt') {
+        primary = (item.user || 'someone') + ' sent ' + (item.giftName ? item.giftName + ' ' : '') + '(' + (item.amount || 0) + ' coins)';
+      } else if (item.eventType === 'gift')  primary = (item.user || 'someone') + ' gifted ' + (item.amount || 1) + ' subs!';
       else if (item.eventType === 'cheer') primary = (item.user || 'someone') + ' cheered ' + (item.amount || 0) + ' bits!';
       else if (item.eventType === 'raid')  primary = (item.user || 'someone') + ' raided with ' + (item.amount || 0) + ' viewers';
       else if (item.eventType === 'tip')   primary = (item.user || 'someone') + ' tipped $' + (item.amount || 0);
       else if (item.eventType === 'follow') primary = (item.user || 'someone') + ' followed';
       else primary = (item.user || 'someone') + ' ' + (item.eventType || 'event');
-      inner = '<span class="kicker">' + escapeHtml(kicker) + '</span>' +
-              '<span class="text">' + escapeHtml(primary) + '</span>';
+
+      // If the event carries an image (TT gift artwork), show a small
+      // thumbnail in the kicker slot. The bar still reads as the same
+      // length so the slide-up animation doesn't change timing.
+      var kickerHtml = item.giftImage
+        ? '<span class="kicker" style="padding:0;background:transparent;box-shadow:none"><img src="' + escapeHtml(item.giftImage) + '" alt="" style="height:28px;width:28px;object-fit:contain;vertical-align:middle" onerror="this.replaceWith(Object.assign(document.createElement(&quot;span&quot;),{textContent:&quot;' + escapeHtml(kicker) + '&quot;,className:&quot;kicker&quot;}))"></span>'
+        : '<span class="kicker">' + escapeHtml(kicker) + '</span>';
+
+      inner = kickerHtml + '<span class="text">' + escapeHtml(primary) + '</span>';
     } else {
       inner = '<span class="user">' + escapeHtml(item.user || 'anon') + '</span>' +
               '<span class="sep">\u00b7</span>' +

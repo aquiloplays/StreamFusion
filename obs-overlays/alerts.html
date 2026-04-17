@@ -219,6 +219,27 @@
   .amt.tip { background: linear-gradient(135deg, #00e573, #2AD4B9); color: #0e0e10; box-shadow: 0 2px 8px rgba(42,212,185,.5); }
   .amt.bits { background: linear-gradient(135deg, #9146ff, #c398ff); color: #fff; box-shadow: 0 2px 8px rgba(145,70,255,.5); }
 
+  /* Named gift chip — sits inline in the primary line for TikTok gifts
+     (e.g. "sent [Galaxy] 1,000 coins"). Subtle pink tint so it reads as
+     a gift-specific label without stealing attention from the amount. */
+  .primary .giftname {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 100px;
+    background: rgba(254,44,85,.18);
+    color: #ff8fae;
+    font-size: 15px;
+    font-weight: 800;
+    border: 1px solid rgba(254,44,85,.35);
+  }
+
+  /* When the icon chip holds an <img> (TikTok gift artwork), drop the
+     default gradient background so the real gift art shows through
+     with its own transparent PNG. */
+  .icon img {
+    background: transparent;
+  }
+
   /* Confetti burst container — only populated for "big" paid events. */
   .confetti {
     position: absolute;
@@ -302,7 +323,15 @@
       case 'follow':      return u + ' followed!';
       case 'sub':         return u + ' subscribed';
       case 'resub':       return u + ' resubscribed' + (ev.months ? ' (' + ev.months + ' mo)' : '');
-      case 'gift':        return u + ' gifted <span class="amt ' + (meta.amtClass||'') + '">' + (ev.amount || 1) + '</span>';
+      case 'gift':
+        // TikTok gifts speak in coins + a named gift ("Galaxy", "Rose");
+        // Twitch/Kick gifts speak in "N subs". Detect by platform so the
+        // primary line reads naturally for each.
+        if (ev.platform === 'tt') {
+          var giftName = ev.giftName ? ' <span class="giftname">' + escapeHtml(ev.giftName) + '</span>' : '';
+          return u + ' sent' + giftName + ' <span class="amt bits">' + (ev.amount || 0) + ' coins</span>';
+        }
+        return u + ' gifted <span class="amt ' + (meta.amtClass||'') + '">' + (ev.amount || 1) + '</span>';
       case 'cheer':       return u + ' cheered <span class="amt bits">' + (ev.amount || 0) + '</span>';
       case 'raid':        return u + ' raided with <span class="amt">' + (ev.amount || 0) + '</span>';
       case 'tip':         return u + ' tipped <span class="amt tip">$' + (ev.amount || 0) + '</span>';
@@ -354,12 +383,18 @@
     card.className = 'alert ' + (ev.platform || '');
 
     var iconCls = 'icon' + (meta.pulse || isBig(ev) ? ' pulse' : '');
+    // If the event carries a gift image (TikTok gifts do), render the
+    // actual artwork inside the icon chip. Falls back to the emoji meta
+    // icon if the CDN URL fails to load.
+    var iconInner = ev.giftImage
+      ? '<img src="' + escapeHtml(ev.giftImage) + '" alt="" style="width:70%;height:70%;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))" onerror="this.outerHTML=' + JSON.stringify(meta.icon) + '">'
+      : meta.icon;
     var secondary = ev.message
       ? '<div class="secondary"><span class="msg">"' + escapeHtml(ev.message) + '"</span></div>'
       : (ev.tier ? '<div class="secondary">' + escapeHtml(ev.tier) + '</div>' : '');
 
     card.innerHTML =
-      '<div class="' + iconCls + '">' + meta.icon + '</div>' +
+      '<div class="' + iconCls + '">' + iconInner + '</div>' +
       '<div class="body">' +
         '<div class="kicker">' + meta.kicker + '</div>' +
         '<div class="primary">' + formatPrimary(ev, meta) + '</div>' +
