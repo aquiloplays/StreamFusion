@@ -115,90 +115,91 @@ function buildSFIcon() {
     }
   }
 
-  const cx = W/2, cy = H/2, cr = 114;
+  // Banner palette (aquilo.gg Discord Nitro banner, discord-profile-banner.html).
+  // Keep the icon visually consistent with that branding:
+  //   BLUE  #3A86FF — primary accent
+  //   TEAL  #2AD4B9 — secondary accent
+  //   WHITE #efeff1 — bolt highlight (top of gradient)
+  //   DARK  #0e0e10 — interior fill (matches app background)
+  const BLUE  = [ 58, 134, 255];
+  const TEAL  = [ 42, 212, 185];
+  const WHITE = [239, 239, 241];
+  const DARK  = [ 14,  14,  16];
 
-  // === 1. Outer glow ===
-  for (let r = cr + 22; r >= cr + 2; r--) {
-    const glow = Math.round(((cr + 22 - r) / 20) * 28);
-    drawCircle(cx, cy, r, 58, 134, 255, glow);
+  const cx = W/2, cy = H/2;
+
+  // === 1. Subtle blue glow (mirrors the banner's CSS drop-shadow) ===
+  // Peak ~5% opacity just outside the ring, fading to 0 over 12px. Lower
+  // intensity than a CSS drop-shadow would give you because the tray /
+  // taskbar renders the icon at 16-32px — a big halo there looks like
+  // rendering noise, not polish.
+  for (let r = 140; r >= 128; r--) {
+    const glow = Math.round(((140 - r) / 12) * 14);
+    drawCircle(cx, cy, r, BLUE[0], BLUE[1], BLUE[2], glow);
   }
 
-  // === 2. Dark background circle ===
-  drawCircle(cx, cy, cr, 8, 14, 28, 255);
+  // === 2. Dark interior fill ===
+  // Filled solid to r=119 so the thick ring stroke sits cleanly on the edge
+  // without any transparent gap (unlike the banner, we render against any
+  // background — taskbar, title bar, tray — so the fill must be opaque).
+  drawCircle(cx, cy, 119, DARK[0], DARK[1], DARK[2], 255);
 
-  // === 3. Gradient border ring ===
-  drawRing(cx, cy, cr - 6, cr, function(x, y) {
-    const angle = Math.atan2(y - cy, x - cx) / (2 * Math.PI) + 0.5;
-    const r = Math.round(58 * (1-angle));
-    const g = Math.round(134 * (1-angle) + 229 * angle);
-    const b = Math.round(255 * (1-angle) + 160 * angle);
-    return [r, g, b];
+  // === 3. Main ring — diagonal blue→teal gradient ===
+  // Matches banner's linearGradient from top-left to bottom-right.
+  drawRing(cx, cy, 119, 127, function(x, y) {
+    const t = Math.max(0, Math.min(1, (x + y) / (W + H)));
+    return [
+      Math.round(BLUE[0] + (TEAL[0] - BLUE[0]) * t),
+      Math.round(BLUE[1] + (TEAL[1] - BLUE[1]) * t),
+      Math.round(BLUE[2] + (TEAL[2] - BLUE[2]) * t)
+    ];
   });
 
-  // === 4. Subtle inner radial vignette on background ===
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const d = Math.hypot(x - cx, y - cy);
-    if (d >= cr - 6) continue;
-    const glow = Math.max(0, 1 - d / (cr * 0.9));
-    if (glow > 0) sp(x, y, 15, 25, 50, Math.round(glow * 35));
-  }
-
-  // === 5. Lightning bolt — large, centered, clean ===
-  // Blue → emerald gradient top to bottom
-  function boltColor(y) {
-    const t = Math.max(0, Math.min(1, (y - 56) / 140));
+  // === 4. Subtle inner ring (40% opacity over dark fill) ===
+  // Banner has `<circle r="45" stroke-width="1" opacity="0.4">` just inside
+  // the main ring — a whisper-thin accent. drawRing only returns RGB, so
+  // we simulate the 40% opacity by blending toward the dark interior.
+  drawRing(cx, cy, 113, 115, function(x, y) {
+    const t = Math.max(0, Math.min(1, (x + y) / (W + H)));
+    const r = BLUE[0] + (TEAL[0] - BLUE[0]) * t;
+    const g = BLUE[1] + (TEAL[1] - BLUE[1]) * t;
+    const b = BLUE[2] + (TEAL[2] - BLUE[2]) * t;
     return [
-      Math.round(58 - 58*t),
-      Math.round(134 + 95*t),
-      Math.round(255 - 95*t)
+      Math.round(r * 0.4 + DARK[0] * 0.6),
+      Math.round(g * 0.4 + DARK[1] * 0.6),
+      Math.round(b * 0.4 + DARK[2] * 0.6)
+    ];
+  });
+
+  // === 5. Lightning bolt — banner path, vertical 3-stop gradient ===
+  // Banner path (100x100 viewBox):
+  //   M 55 20 L 32 52 L 46 52 L 42 80 L 66 46 L 52 46 Z
+  // Scaled to 256x256 by *2.56 and rounded to integer pixels.
+  // Gradient stops match banner's `bolt-grad`:
+  //   y=51  (top)     → white
+  //   y=105 (~35%)    → blue
+  //   y=205 (bottom)  → teal
+  function boltColor(y) {
+    if (y <= 105) {
+      const t = Math.max(0, Math.min(1, (y - 51) / 54));
+      return [
+        Math.round(WHITE[0] + (BLUE[0] - WHITE[0]) * t),
+        Math.round(WHITE[1] + (BLUE[1] - WHITE[1]) * t),
+        Math.round(WHITE[2] + (BLUE[2] - WHITE[2]) * t)
+      ];
+    }
+    const t = Math.max(0, Math.min(1, (y - 105) / 100));
+    return [
+      Math.round(BLUE[0] + (TEAL[0] - BLUE[0]) * t),
+      Math.round(BLUE[1] + (TEAL[1] - BLUE[1]) * t),
+      Math.round(BLUE[2] + (TEAL[2] - BLUE[2]) * t)
     ];
   }
 
-  // Upper arm of bolt
   fillPoly([
-    [168, 56], [100, 56], [74, 136], [136, 136]
+    [141,  51], [ 82, 133], [118, 133],
+    [108, 205], [169, 118], [133, 118]
   ], boltColor);
-
-  // Lower arm of bolt
-  fillPoly([
-    [120, 124], [184, 124], [156, 200], [92, 200]
-  ], boltColor);
-
-  // === 6. Bolt inner highlight (white sheen on upper-left edge) ===
-  fillPoly([
-    [160, 62], [104, 62], [88, 102], [130, 102]
-  ], function(y) {
-    const t = Math.max(0, Math.min(1, (y - 62) / 40));
-    const a = Math.round(50 * (1 - t));
-    return [255, 255, 255]; // will tint with alpha hack below
-  });
-  // Re-draw as transparent white
-  function fillPolyAlpha(verts, a) {
-    const ys = verts.map(v=>v[1]);
-    const y0 = Math.floor(Math.min(...ys)), y1 = Math.ceil(Math.max(...ys));
-    for (let y = y0; y <= y1; y++) {
-      const xs = [];
-      for (let i = 0; i < verts.length; i++) {
-        const [ax,ay] = verts[i], [bx,by] = verts[(i+1)%verts.length];
-        if ((ay <= y && by > y) || (by <= y && ay > y))
-          xs.push(ax + (y-ay)*(bx-ax)/(by-ay));
-      }
-      xs.sort((x1,x2) => x1-x2);
-      for (let j = 0; j < xs.length-1; j += 2) {
-        const fade = 1 - (y - y0) / (y1 - y0 + 1);
-        for (let x = Math.ceil(xs[j]); x <= Math.floor(xs[j+1]); x++) sp(x, y, 255, 255, 255, Math.round(a * fade));
-      }
-    }
-  }
-  fillPolyAlpha([[160,62],[104,62],[88,102],[130,102]], 55);
-
-  // === 7. Subtle scan-line texture for depth ===
-  for (let y = 0; y < H; y += 4) {
-    for (let x = 0; x < W; x++) {
-      const d = Math.hypot(x - cx, y - cy);
-      if (d < cr - 7) sp(x, y, 0, 0, 0, 12);
-    }
-  }
 
   return encodePNG(W, H, px);
 }

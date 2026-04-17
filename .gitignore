@@ -6,6 +6,10 @@ dist/
 out/
 build/
 
+# Local icon preview helper (not shipped)
+preview-icon.js
+icon-preview.png
+
 # Electron-builder
 app-builds/
 release/
