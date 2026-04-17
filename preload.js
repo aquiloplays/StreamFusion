@@ -144,4 +144,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Get server status + URLs for the Settings panel. Returns:
   //   { running: bool, clients: number, urls: { root, chat, alerts, shoutout } }
   obsGetStatus:         ()            => ipcRenderer.invoke('obs-get-status'),
+
+  // ── Discord integration (EA-only) ────────────────────────────────────────
+  // Webhook POST — fires a stylized embed to a Discord webhook URL. The
+  // caller passes a full Discord webhook payload (usually { embeds: [...] }).
+  // Returns { ok, status, id } — id is the Discord message id, which the
+  // records feature remembers so it can delete-and-repost.
+  discordWebhookPost:   (url, body)   => ipcRenderer.invoke('discord-webhook-post',   { url: url, body: body }),
+  // Webhook DELETE by message id. Used to wipe the previous records
+  // message before posting the new one.
+  discordWebhookDelete: (url, msgId)  => ipcRenderer.invoke('discord-webhook-delete', { url: url, messageId: msgId }),
+  // Bot Gateway lifecycle. Call discordBotConnect with a bot token and
+  // optional guild/channel IDs to start observing Discord events; call
+  // discordBotDisconnect to stop. discord-event IPC fires with the shape
+  //   { kind: 'member_add'|'voice_join'|'message'|'ready'|...,
+  //     data: { username, userId, guildId, channelId, content? } }
+  discordBotConnect:    (cfg)         => ipcRenderer.invoke('discord-bot-connect',    cfg || {}),
+  discordBotDisconnect: ()            => ipcRenderer.invoke('discord-bot-disconnect'),
+  discordBotStatus:     ()            => ipcRenderer.invoke('discord-bot-status'),
+  onDiscordEvent:       (fn)          => ipcRenderer.on('discord-event', (e, payload) => fn(payload)),
 });

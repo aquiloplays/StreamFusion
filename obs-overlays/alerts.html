@@ -25,6 +25,10 @@
     --yt: #ff4545;
     --tt: #fe2c55;
     --kk: #53fc18;
+    --se: #7cdf21;
+    --pa: #ff424d;
+    --fw: #f0b429;
+    --kf: #29abe0;
     --accent: #3A86FF;
     --accent2: #2AD4B9;
     --gold: #f0b429;
@@ -91,6 +95,10 @@
   .alert.yt::before { background: linear-gradient(90deg, var(--yt), #ff7373); }
   .alert.tt::before { background: linear-gradient(90deg, var(--tt), #25f4ee); }
   .alert.kk::before { background: linear-gradient(90deg, var(--kk), #00e573); }
+  .alert.se::before { background: linear-gradient(90deg, var(--se), #a0ff8b); }
+  .alert.pa::before { background: linear-gradient(90deg, var(--pa), #ff8a95); }
+  .alert.fw::before { background: linear-gradient(90deg, var(--fw), #f5c860); }
+  .alert.kf::before { background: linear-gradient(90deg, var(--kf), #5bd0ff); }
 
   /* Ambient glow matching the platform. Mixed softly into the card. */
   .alert.tw { box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 40px rgba(169,112,255,.35); }
@@ -265,14 +273,21 @@
   // Mapping of event types to display details. `amtClass` selects the
   // color pill (gold for subs/gifts, teal for tips, purple for bits).
   var EVENT_META = {
-    follow: { kicker: 'NEW FOLLOW',   icon: '♥',  pulse: false, confetti: false },
-    sub:    { kicker: 'NEW SUB',      icon: '★',  pulse: false, confetti: true,  amtClass: '' },
-    resub:  { kicker: 'RE-SUB',       icon: '★',  pulse: false, confetti: true,  amtClass: '' },
-    gift:   { kicker: 'GIFT SUBS',    icon: '🎁', pulse: true,  confetti: true,  amtClass: '' },
-    cheer:  { kicker: 'BITS',         icon: '💎', pulse: false, confetti: true,  amtClass: 'bits' },
-    raid:   { kicker: 'INCOMING RAID',icon: '⚔️', pulse: true,  confetti: true,  amtClass: '' },
-    tip:    { kicker: 'TIP RECEIVED', icon: '💰', pulse: true,  confetti: true,  amtClass: 'tip' },
-    host:   { kicker: 'HOST',         icon: '📡', pulse: false, confetti: false }
+    follow:      { kicker: 'NEW FOLLOW',   icon: '♥',  pulse: false, confetti: false },
+    sub:         { kicker: 'NEW SUB',      icon: '★',  pulse: false, confetti: true,  amtClass: '' },
+    resub:       { kicker: 'RE-SUB',       icon: '★',  pulse: false, confetti: true,  amtClass: '' },
+    gift:        { kicker: 'GIFT SUBS',    icon: '🎁', pulse: true,  confetti: true,  amtClass: '' },
+    cheer:       { kicker: 'BITS',         icon: '💎', pulse: false, confetti: true,  amtClass: 'bits' },
+    raid:        { kicker: 'INCOMING RAID',icon: '⚔️', pulse: true,  confetti: true,  amtClass: '' },
+    tip:         { kicker: 'TIP RECEIVED', icon: '💰', pulse: true,  confetti: true,  amtClass: 'tip' },
+    host:        { kicker: 'HOST',         icon: '📡', pulse: false, confetti: false },
+    // SB integration event types (EA only — fire only when the streamer
+    // has the matching toggle on in Settings → Discord+)
+    pledge:      { kicker: 'PATREON',      icon: 'P',  pulse: true,  confetti: true,  amtClass: 'tip' },
+    tier_change: { kicker: 'TIER UP',      icon: '↑',  pulse: true,  confetti: true,  amtClass: 'tip' },
+    pledge_end:  { kicker: 'PLEDGE ENDED', icon: '·',  pulse: false, confetti: false },
+    order:       { kicker: 'MERCH ORDER',  icon: '🛍️', pulse: true,  confetti: true,  amtClass: 'tip' },
+    donation:    { kicker: 'DONATION',     icon: '💰', pulse: true,  confetti: true,  amtClass: 'tip' }
   };
 
   function escapeHtml(s) {
@@ -284,15 +299,20 @@
   function formatPrimary(ev, meta) {
     var u = '<span class="u">' + escapeHtml(ev.user || 'someone') + '</span>';
     switch (ev.eventType) {
-      case 'follow': return u + ' followed!';
-      case 'sub':    return u + ' subscribed';
-      case 'resub':  return u + ' resubscribed' + (ev.months ? ' (' + ev.months + ' mo)' : '');
-      case 'gift':   return u + ' gifted <span class="amt ' + (meta.amtClass||'') + '">' + (ev.amount || 1) + '</span>';
-      case 'cheer':  return u + ' cheered <span class="amt bits">' + (ev.amount || 0) + '</span>';
-      case 'raid':   return u + ' raided with <span class="amt">' + (ev.amount || 0) + '</span>';
-      case 'tip':    return u + ' tipped <span class="amt tip">$' + (ev.amount || 0) + '</span>';
-      case 'host':   return u + ' hosted!';
-      default:       return u;
+      case 'follow':      return u + ' followed!';
+      case 'sub':         return u + ' subscribed';
+      case 'resub':       return u + ' resubscribed' + (ev.months ? ' (' + ev.months + ' mo)' : '');
+      case 'gift':        return u + ' gifted <span class="amt ' + (meta.amtClass||'') + '">' + (ev.amount || 1) + '</span>';
+      case 'cheer':       return u + ' cheered <span class="amt bits">' + (ev.amount || 0) + '</span>';
+      case 'raid':        return u + ' raided with <span class="amt">' + (ev.amount || 0) + '</span>';
+      case 'tip':         return u + ' tipped <span class="amt tip">$' + (ev.amount || 0) + '</span>';
+      case 'host':        return u + ' hosted!';
+      case 'pledge':      return u + ' pledged on Patreon' + (ev.amount ? ' <span class="amt tip">$' + ev.amount + '</span>' : '!');
+      case 'tier_change': return u + ' upgraded their tier!';
+      case 'pledge_end':  return u + ' ended their pledge';
+      case 'order':       return u + ' ordered' + (ev.message ? ' ' + escapeHtml(ev.message) : ' merch') + (ev.amount ? ' <span class="amt tip">$' + ev.amount + '</span>' : '!');
+      case 'donation':    return u + ' donated <span class="amt tip">$' + (ev.amount || 0) + '</span>';
+      default:            return u;
     }
   }
 

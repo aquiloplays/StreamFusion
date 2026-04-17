@@ -34,7 +34,7 @@ let heartbeatTimer = null;
 // Last-known state per overlay — replayed to new clients so OBS browser
 // sources render immediately on (re)connect without waiting for the next
 // live event. Covers the "streamer reloads OBS scene" case gracefully.
-let lastConfig   = { chat: {}, alerts: {}, shoutout: {} };
+let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {} };
 
 // Read an overlay file from disk each request. File reads are cheap and
 // reading fresh means dev-mode hot-editing of the HTML works without an
@@ -131,9 +131,12 @@ function handleRequest(req, res) {
 
   // Gating: overlays return a branded "requires EA" page if not entitled.
   // Keeps the streamer from wondering why their OBS is blank.
-  if (p === '/chat' || p === '/alerts' || p === '/shoutout') {
+  if (p === '/chat' || p === '/alerts' || p === '/shoutout' || p === '/vertical') {
     if (!isEntitled) { serveHtml(res, gatedPage()); return; }
-    var file = (p === '/chat') ? 'chat.html' : (p === '/alerts') ? 'alerts.html' : 'shoutout.html';
+    var file = (p === '/chat')      ? 'chat.html'
+             : (p === '/alerts')    ? 'alerts.html'
+             : (p === '/shoutout')  ? 'shoutout.html'
+             : 'vertical.html';
     serveHtml(res, readOverlayFile(file));
     return;
   }
@@ -189,14 +192,24 @@ function stopServer() {
 // Broadcast a message to all overlay clients, optionally filtered by type.
 // `type` is 'chat' | 'alert' | 'shoutout' | 'config' — the overlay HTMLs
 // listen for the matching `event:` SSE event name.
+//
+// targetOverlay can be:
+//   - a single string ('chat', 'alerts', 'shoutout', 'vertical')
+//   - an array of strings (e.g. ['chat', 'vertical']) to fan out to more
+//     than one overlay type (chat messages go to both the chat overlay
+//     AND the vertical bar, for instance)
+//   - omitted / null — broadcast to every connected client
 function broadcast(type, data, targetOverlay) {
   if (!isEntitled) return;
   var payload = 'event: ' + type + '\ndata: ' + JSON.stringify(data || {}) + '\n\n';
+  var targets = targetOverlay
+    ? (Array.isArray(targetOverlay) ? targetOverlay : [targetOverlay])
+    : null;
   sseClients.forEach(function(c) {
     // overlayType === 'all' (landing page case) sees everything; otherwise
-    // only forward events that match the client's overlay type OR are
-    // config pushes (which everyone wants).
-    if (targetOverlay && c.overlayType !== 'all' && c.overlayType !== targetOverlay) return;
+    // only forward events that match one of the client's allowed overlay
+    // types OR are config pushes (which everyone wants).
+    if (targets && c.overlayType !== 'all' && targets.indexOf(c.overlayType) === -1) return;
     try { c.res.write(payload); } catch (e) { sseClients.delete(c); }
   });
 }
@@ -228,7 +241,8 @@ function getUrls() {
     root:     base + '/',
     chat:     base + '/chat',
     alerts:   base + '/alerts',
-    shoutout: base + '/shoutout'
+    shoutout: base + '/shoutout',
+    vertical: base + '/vertical'
   };
 }
 

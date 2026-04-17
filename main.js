@@ -16,6 +16,12 @@ const patreonAuth = require('./patreon-auth');
 // required" page for non-entitled users. See obs-server.js.
 const obsServer = require('./obs-server');
 
+// ── Discord integration (EA-only) ───────────────────────────────────────────
+// Webhook helpers for stylized event posts + bot Gateway connection for
+// observing Discord-side events (member/voice joins, messages in a channel).
+// Gated behind the EA entitlement check in main.js's setup path.
+const discordBot = require('./discord-bot');
+
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
   try { return path.join(app.getPath('userData'), 'streamfusion-crash.log'); }
@@ -652,8 +658,16 @@ app.whenReady().then(() => {
   // hide without an OBS-side refresh. Subscribing here ensures this is
   // wired up before the first getEntitlement() call below returns.
   patreonAuth.onEntitlementChange(function(state) {
-    obsServer.setEntitled(!!(state && state.entitled));
+    var entitled = !!(state && state.entitled);
+    obsServer.setEntitled(entitled);
+    // If a Discord bot connection is active and the user loses EA access,
+    // drop the connection. When they re-authenticate at Tier 2/3 the
+    // renderer re-issues the connect command.
+    if (!entitled) {
+      try { discordBot.disconnectBot(); } catch (e) {}
+    }
   });
+  discordBot.setMainWindow(mainWindow);
 
   setTimeout(function() {
     patreonAuth.getEntitlement().then(function(state) {
@@ -693,6 +707,7 @@ app.on('before-quit', () => {
   stopCtrlPoller();
   try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
   try { obsServer.stopServer(); } catch (e) {}
+  try { discordBot.disconnectBot(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
@@ -704,10 +719,15 @@ ipcMain.handle('app-version', () => app.getVersion());
 // message or the streamer clicks a shoutout, it forwards the payload
 // here, and we fan it out to every connected OBS browser source.
 ipcMain.on('obs-broadcast-chat', function(event, data) {
-  try { obsServer.broadcast('chat', data, 'chat'); } catch (e) {}
+  // Chat messages fan out to BOTH the horizontal chat overlay AND the
+  // vertical bar overlay. Vertical decides for itself (via its config)
+  // whether chat rows should display; no harm in forwarding always.
+  try { obsServer.broadcast('chat', data, ['chat', 'vertical']); } catch (e) {}
 });
 ipcMain.on('obs-broadcast-alert', function(event, data) {
-  try { obsServer.broadcast('alert', data, 'alerts'); } catch (e) {}
+  // Same for alerts: the alerts banner AND the vertical bar both render
+  // alert-type events (shoutouts still go to /shoutout only).
+  try { obsServer.broadcast('alert', data, ['alerts', 'vertical']); } catch (e) {}
 });
 ipcMain.on('obs-broadcast-shoutout', function(event, data) {
   try { obsServer.broadcast('shoutout', data, 'shoutout'); } catch (e) {}
@@ -726,6 +746,32 @@ ipcMain.handle('obs-get-status', function() {
     clients: obsServer.connectedClients(),
     urls:    obsServer.getUrls()
   };
+});
+
+// ── Discord IPC ─────────────────────────────────────────────────────────────
+// Webhook POST — used for stylized event embeds, records, and recap. Returns
+// { ok, status, id } so the caller can remember the message id for later
+// delete-and-repost flows (the records feature does this).
+ipcMain.handle('discord-webhook-post', function(event, payload) {
+  if (!payload || !payload.url) return Promise.resolve({ ok: false, error: 'no_url' });
+  return discordBot.postWebhook(payload.url, payload.body || {});
+});
+// Webhook DELETE — removes a previously posted message by id. Records use
+// this to wipe the old record embed before posting the new one.
+ipcMain.handle('discord-webhook-delete', function(event, payload) {
+  if (!payload || !payload.url || !payload.messageId) return Promise.resolve({ ok: false, error: 'missing' });
+  return discordBot.deleteWebhookMessage(payload.url, payload.messageId);
+});
+// Bot lifecycle. The renderer calls connect whenever the token changes or
+// the user toggles the bot on; disconnect when they toggle off or lose EA.
+ipcMain.handle('discord-bot-connect', function(event, cfg) {
+  return discordBot.connectBot(cfg || {});
+});
+ipcMain.handle('discord-bot-disconnect', function() {
+  return discordBot.disconnectBot();
+});
+ipcMain.handle('discord-bot-status', function() {
+  return discordBot.getBotStatus();
 });
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => {

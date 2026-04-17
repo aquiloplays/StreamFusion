@@ -1479,6 +1479,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
         <div class="settings-tab tab-patreon" data-tab="theme" onclick="switchSettingsTab('theme')">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Theme
         </div>
+        <!-- Discord+ (event posts, records, bot gateway) — EA-only. -->
+        <div class="settings-tab tab-patreon" data-tab="discordea" onclick="switchSettingsTab('discordea')">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Discord+
+        </div>
         <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
         <div class="settings-tab" data-tab="events" onclick="switchSettingsTab('events')">Events</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
@@ -1911,6 +1915,25 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                   <label class="frow" style="font-size:11px;margin-top:6px"><span>Display duration (seconds)</span><input type="number" id="obsAlertsDuration" min="2" max="30" value="6" onchange="updateObsConfig('alerts')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                 </div>
               </div>
+              <!-- Vertical overlay row — for phone-portrait streams -->
+              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Vertical Chat Bar</span>
+                  <span style="font-size:10px;color:var(--mut)">One-line bar that slides up messages &amp; alerts, built for vertical streams</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input id="obsUrlVertical" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                  <button class="cbtn tw" onclick="copyObsUrl('vertical')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  <button class="cbtn" onclick="previewObsUrl('vertical')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
+                </div>
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsVerticalFontSize" min="12" max="40" value="20" onchange="updateObsConfig('vertical')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <label class="frow" style="font-size:11px"><span>Hold time (seconds)</span><input type="number" id="obsVerticalHold" min="1" max="15" value="4" onchange="updateObsConfig('vertical')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <label class="frow" style="font-size:11px"><span>Background opacity</span><input type="range" id="obsVerticalBgOpacity" min="0" max="100" value="55" onchange="updateObsConfig('vertical')" style="width:80px"></label>
+                  <label class="frow" style="font-size:11px"><span>Show chat messages</span><input type="checkbox" id="obsVerticalShowChat" checked onchange="updateObsConfig('vertical')"></label>
+                  <label class="frow" style="font-size:11px"><span>Show events / alerts</span><input type="checkbox" id="obsVerticalShowEvents" checked onchange="updateObsConfig('vertical')"></label>
+                </div>
+              </div>
               <!-- Shoutout overlay row -->
               <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -1989,6 +2012,101 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                 <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="compact" onchange="applyPopoutLayout()"><span>Compact</span></label>
                 <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="minimal" onchange="applyPopoutLayout()"><span>Minimal</span></label>
                 <label class="frow" style="font-size:12px;cursor:pointer"><input type="radio" name="popoutLayout" value="hud" onchange="applyPopoutLayout()"><span>Gamer HUD</span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ DISCORD+ TAB (EA-only) ═══ -->
+        <!-- Expanded Discord integration: live event posts (stylized embeds),
+             all-time records with delete-and-repost, plus an optional bot
+             Gateway connection so member/voice joins in your Discord surface
+             in StreamFusion's Events panel. Uses the .ea-gate blur pattern
+             so free users see what they'd unlock. -->
+        <div class="settings-pane ea-gate" id="pane-discordea">
+          <div class="ea-lock-overlay">
+            <div class="ea-lock-card">
+              <div class="ea-lock-icon">&#128274;</div>
+              <div class="ea-lock-title">This feature is coming soon!</div>
+              <div class="ea-lock-desc">Become a <strong>Tier 2</strong> or <strong>Tier 3</strong> Patron on Patreon to access now.<br><br>Stylized Discord event posts, all-time stream records, and a bot that surfaces your Discord community joins inside StreamFusion.</div>
+              <button class="ea-lock-cta" onclick="connectPatreon()">
+                <svg viewBox="0 0 569 546" xmlns="http://www.w3.org/2000/svg"><circle cx="363" cy="204" r="204"/><rect x="0" y="0" width="100" height="546"/></svg>
+                Connect Patreon
+              </button>
+              <a class="ea-lock-pledge" onclick="window.open('https://www.patreon.com/cw/aquilo','_blank');return false">Not a supporter yet? <strong>Join on Patreon &rarr;</strong></a>
+            </div>
+          </div>
+          <div class="ea-content">
+            <!-- Section 1: Event feed webhook — fires a stylized embed for
+                 each configured event type. Can share the same webhook as
+                 the recap or point at a dedicated #stream-alerts channel. -->
+            <div class="sec">
+              <div class="sec-hd">Live Event Posts</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Send a stylized Discord embed whenever one of these happens on stream. Share the recap webhook or use a separate channel like <code style="background:var(--surf3);padding:1px 4px;border-radius:3px">#stream-alerts</code>.</div>
+              <input class="minput" id="dcEventWebhookInput" type="text" placeholder="Webhook URL (optional — leave blank to disable)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcEventWebhook=this.value.trim();saveDiscordSettings()" onchange="dcEventWebhook=this.value.trim();saveDiscordSettings()">
+              <div style="font-size:11px;color:var(--mut);margin-bottom:4px">Post when:</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                <label class="frow" style="font-size:11px"><span>Follows</span><input type="checkbox" id="dcPostFollow" onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Subs &amp; Resubs</span><input type="checkbox" id="dcPostSub" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Cheers / Bits</span><input type="checkbox" id="dcPostCheer" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Kick subs</span><input type="checkbox" id="dcPostKick" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Large gifts (5+)</span><input type="checkbox" id="dcPostGift" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Hype Train updates</span><input type="checkbox" id="dcPostHype" checked onchange="saveDiscordSettings()"></label>
+              </div>
+              <div style="font-size:11px;color:var(--mut);margin-top:10px;margin-bottom:4px">Large gift threshold:</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="number" id="dcGiftThreshold" min="1" max="100" value="5" onchange="saveDiscordSettings()" style="width:64px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 8px;border-radius:4px;font-size:11px">
+                <span style="font-size:11px;color:var(--mut)">or more gifted subs in one drop fires a post.</span>
+              </div>
+            </div>
+
+            <!-- Section 2: Records — persistent message that's edited to
+                 reflect all-time highs. Uses delete-and-repost to bump it
+                 to the bottom of the channel each time something improves. -->
+            <div class="sec">
+              <div class="sec-hd">Stream Records</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Keeps a single message in a Discord channel updated with your all-time bests. Categories with no events yet are hidden from the post until they happen. Dedicated channel recommended (e.g. <code style="background:var(--surf3);padding:1px 4px;border-radius:3px">#records</code>).</div>
+              <input class="minput" id="dcRecordsWebhookInput" type="text" placeholder="Records webhook URL..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcRecordsWebhook=this.value.trim();saveDiscordSettings()" onchange="dcRecordsWebhook=this.value.trim();saveDiscordSettings()">
+              <label class="frow" style="font-size:11px"><span>Update records message automatically when a record is broken</span><input type="checkbox" id="dcRecordsAuto" checked onchange="saveDiscordSettings()"></label>
+              <div style="margin-top:8px;display:flex;gap:6px">
+                <button class="cbtn tw" onclick="postRecordsNow()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Post records now</button>
+                <button class="cbtn" onclick="resetRecords()" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Reset records</button>
+              </div>
+              <div id="dcRecordsSummary" style="font-size:10px;color:var(--mut);margin-top:8px;line-height:1.6">
+                <!-- Populated by renderDiscordTab() with current record values. -->
+              </div>
+            </div>
+
+            <!-- Section 3: Bot Gateway connection — observes Discord events
+                 and pipes them into SF's Events panel so the streamer can
+                 thank people joining their Discord without alt-tabbing. -->
+            <div class="sec">
+              <div class="sec-hd">Discord Bot (Community Join Events)</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When set up, server joins and voice-channel joins show up in your StreamFusion Events panel. <a onclick="openDiscordSetupGuide()" style="color:var(--accent);cursor:pointer;text-decoration:underline">How to set up the bot &rarr;</a></div>
+              <input class="minput" id="dcBotTokenInput" type="password" placeholder="Bot token..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotToken=this.value.trim();saveDiscordSettings()" onchange="dcBotToken=this.value.trim();saveDiscordSettings()">
+              <input class="minput" id="dcBotGuildInput" type="text" placeholder="Server (guild) ID — right-click your server name with Developer Mode on" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
+              <input class="minput" id="dcBotChannelInput" type="text" placeholder="Text channel ID (optional — for message events)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcBotChannelId=this.value.trim();saveDiscordSettings()" onchange="dcBotChannelId=this.value.trim();saveDiscordSettings()">
+              <label class="frow" style="font-size:11px"><span>Member joins server &rarr; Events panel</span><input type="checkbox" id="dcBotEvtMember" checked onchange="saveDiscordSettings()"></label>
+              <label class="frow" style="font-size:11px"><span>Voice channel joins &rarr; Events panel</span><input type="checkbox" id="dcBotEvtVoice" checked onchange="saveDiscordSettings()"></label>
+              <label class="frow" style="font-size:11px"><span>Messages in configured channel &rarr; Events panel</span><input type="checkbox" id="dcBotEvtMessage" onchange="saveDiscordSettings()"></label>
+              <div style="margin-top:8px;display:flex;gap:6px">
+                <button id="dcBotConnectBtn" class="cbtn tw" onclick="toggleDiscordBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Connect bot</button>
+              </div>
+              <div id="dcBotStatus" style="font-size:11px;color:var(--mut);margin-top:6px;line-height:1.5">Not connected.</div>
+            </div>
+
+            <!-- Section 4: Extra platforms pulled from Streamer.bot. These
+                 integrations already flow through SB's event bus; the
+                 toggles here route them into the in-app Events panel AND
+                 the OBS alerts overlay. -->
+            <div class="sec">
+              <div class="sec-hd">Streamer.bot Integration Events</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When Streamer.bot sends events from these services, show them in the Events panel and fire the OBS alerts overlay.</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                <label class="frow" style="font-size:11px"><span>Patreon (pledges, tiers)</span><input type="checkbox" id="dcSbPatreon" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Fourthwall (orders, tips)</span><input type="checkbox" id="dcSbFourthwall" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>Ko-fi (donations)</span><input type="checkbox" id="dcSbKofi" checked onchange="saveDiscordSettings()"></label>
+                <label class="frow" style="font-size:11px"><span>StreamElements (tips)</span><input type="checkbox" id="dcSbSE" checked onchange="saveDiscordSettings()"></label>
               </div>
             </div>
           </div>
@@ -2240,6 +2358,7 @@ function applyPatreonState(state) {
   // yet mounted (e.g. before Settings has ever been opened).
   try { renderObsOverlaysTab(); } catch (e) {}
   try { renderThemeTab(); } catch (e) {}
+  try { renderDiscordTab(); } catch (e) {}
   // On first entitlement, re-apply saved theme so the user sees their
   // customization immediately rather than only after opening Settings.
   if (S.hasEarlyAccess && typeof applyTheme === 'function') {
@@ -2371,7 +2490,8 @@ var S = {
   obsCfg: {
     chat:     { fontSize: 18, maxMessages: 20, bgOpacity: 0, showPlatformBadge: false, showUserBadges: true, showEmotes: true },
     alerts:   { enabled: { follow: true, sub: true, resub: true, gift: true, cheer: true, raid: true, host: true, tip: true }, duration: 6000 },
-    shoutout: { duration: 8000, thankMessage: 'Thanks so much for supporting the stream!', showRecentEvent: true }
+    shoutout: { duration: 8000, thankMessage: 'Thanks so much for supporting the stream!', showRecentEvent: true },
+    vertical: { fontSize: 20, holdMs: 4500, bgOpacity: 0.55, showChat: true, showEvents: true }
   },
   // Raid Finder state — actions are re-queried from SB each time the panel opens
   raidFinder: {
@@ -4511,6 +4631,7 @@ function handleSBEvent(event, data) {
   } else if (key === 'Twitch.Follow' || key === 'Twitch.Followed' || key === 'Twitch.ChannelFollow') {
     if (chk('ev-tw-follow')) return;
     var fn = gu(data); maybeSound('snd-tw-follow', 'follow'); pushMsg({ plat: 'tw', isEv: true, evType: 'follow', user: fn, text: fn + ' just followed!', avatar: _resolveEvAvatar('tw', data.user || data.follower, fn) }); S.stats.follows.tw++; updateStreamStats();
+    discordPostFollow(fn, 'tw');
   } else if (key === 'Twitch.Sub' || key === 'Twitch.Subscribe' || key === 'Twitch.Subscription') {
     if (chk('ev-tw-sub')) return;
     var sn = gu(data); var _subTierRaw = data.subTier || data.tier || data.sub_tier; var _subTierNm = _tierName(_subTierRaw);
@@ -4520,6 +4641,7 @@ function handleSBEvent(event, data) {
     maybeSound('snd-tw-sub', 'sub'); showBanner('i-bolt', sn + ' subscribed!', _subTierNm, null, 'tw'); fireBurstConfetti('tw');
     pushMsg({ plat: 'tw', isEv: true, evType: 'sub', big: true, user: sn, text: snText, evMessage: _subMsg, avatar: _subAv });
     setPinnedEvent(sn, snText, 'tw'); S.stats.twSubs++; S.stats.twSubRev += twSubRevenue(_subTierRaw); updateStreamStats(); trackContributor('tw', sn, twSubRevenue(_subTierRaw));
+    discordPostSub(sn, 'tw', _subTierNm, false);
   } else if (key === 'Twitch.ReSub' || key === 'Twitch.Resub' || key === 'Twitch.ReSubscribe') {
     if (chk('ev-tw-sub')) return;
     var rn = gu(data); var _resubMonths = data.cumulativeMonths || data.cumMonths || data.months || data.totalMonths || '?';
@@ -4532,6 +4654,7 @@ function handleSBEvent(event, data) {
     fireBurstConfetti('tw');
     pushMsg({ plat: 'tw', isEv: true, evType: 'sub', big: true, user: rn, text: rnText, evMessage: _resubMsg, avatar: _resubAv });
     setPinnedEvent(rn, rnText, 'tw'); S.stats.twSubs++; S.stats.twSubRev += twSubRevenue(_resubTierRaw); updateStreamStats(); trackContributor('tw', rn, twSubRevenue(_resubTierRaw));
+    discordPostSub(rn, 'tw', _resubTierNm, true, _resubMonths);
   } else if (key === 'Twitch.GiftSub' || key === 'Twitch.SubGift' || key === 'Twitch.GiftSubscription') {
     if (chk('ev-tw-gift')) return;
     var _gs = data.gifter || {};
@@ -4549,6 +4672,8 @@ function handleSBEvent(event, data) {
     var _bombRecipSuffix = _bombRecips.length ? ' \u2014 to ' + _formatRecipientList(_bombRecips) : '';
     var _bombAv = _resolveEvAvatar('tw', _gbs, gb);
     var gbText = gb + ' gifted ' + gc + ' subs!' + _bombRecipSuffix; playGiftSubSound(gc); showBanner('i-party', gb + ' gifted ' + gc + ' subs!', 'on Twitch', null, 'tw'); fireBurstConfetti('tw'); pushMsg({ plat: 'tw', isEv: true, evType: 'gift', big: true, user: gb, text: gbText, avatar: _bombAv }); setPinnedEvent(gb, gbText, 'tw'); var gbNum = parseInt(gc) || 0; S.stats.twSubs += gbNum; S.stats.twSubRev += gbNum * twSubRevenue(data.tier || data.subTier); updateStreamStats(); trackContributor('tw', gb, gbNum * twSubRevenue(data.tier || data.subTier));
+    discordPostGift(gb, gbNum, 'tw');
+    updateRecord('twGift', gb, gbNum);
   } else if (key === 'Twitch.Cheer' || key === 'Twitch.Bits') {
     if (chk('ev-tw-cheer')) return;
     var cn = gu(data); var _cbits = Number(data.bits || data.amount || 0);
@@ -4560,6 +4685,8 @@ function handleSBEvent(event, data) {
     if (_cbits >= 100) { showBanner(_ctier.icon, cn + ' cheered!', _cbits + ' bits', '$' + (_cbits * 0.01).toFixed(2), 'tw', { cheer: true, tierCls: _ctier.cls, tierColor: _ctier.color }); fireBurstConfetti('tw'); }
     pushMsg({ plat: 'tw', isEv: true, evType: 'cheer', big: true, user: cn, text: cnText, evMessage: _cheerMsg, avatar: _cheerAv });
     if (_cbits >= 500) setPinnedEvent(cn, cnText, 'tw'); S.stats.bits += _cbits; updateStreamStats(); trackContributor('tw', cn, _cbits * 0.01);
+    discordPostCheer(cn, _cbits, 'tw');
+    updateRecord('cheer', cn, _cbits);
   } else if (key === 'Twitch.Raid' || key === 'Twitch.Raided' || key === 'Twitch.IncomingRaid' || key === 'Twitch.RaidReceived' || key === 'Twitch.OnRaid') {
     if (chk('ev-tw-raid')) return;
     // Raider info arrives in three shapes across SB versions:
@@ -4711,6 +4838,7 @@ function handleSBEvent(event, data) {
     var ksn = gu(data); var ksnText = ksn + ' subscribed on Kick!';
     var _ksnAv = _resolveEvAvatar('kk', data.user || data.subscriber, ksn);
     maybeSound('snd-kk-sub', 'sub'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'sub', big: true, user: ksn, text: ksnText, avatar: _ksnAv }); setPinnedEvent(ksn, ksnText, 'kk'); S.stats.kkSubs++; S.stats.kkSubRev += 4.74; updateStreamStats(); trackContributor('kk', ksn, 4.74);
+    discordPostKickSub(ksn);
   } else if (key === 'Kick.GiftSub') {
     if (chk('ev-kk-gift')) return;
     var _kgo = data.gifter || {};
@@ -4727,6 +4855,8 @@ function handleSBEvent(event, data) {
     var _kgbRecipSuffix = _kgbRecips.length ? ' \u2014 to ' + _formatRecipientList(_kgbRecips) : '';
     var _kgbAv = _resolveEvAvatar('kk', _kgbo, kgb);
     var kgbText = kgb + ' gifted ' + kgc + ' subs on Kick!' + _kgbRecipSuffix; maybeSound('snd-kk-sub', 'gift'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'gift', big: true, user: kgb, text: kgbText, avatar: _kgbAv }); setPinnedEvent(kgb, kgbText, 'kk'); var kkgbNum = parseInt(kgc) || 0; S.stats.kkSubs += kkgbNum; S.stats.kkSubRev += kkgbNum * 4.74; updateStreamStats(); trackContributor('kk', kgb, kkgbNum * 4.74);
+    discordPostGift(kgb, kkgbNum, 'kk');
+    updateRecord('kkGift', kgb, kkgbNum);
   } else if (key === 'Kick.Raid') {
     if (chk('ev-kk-raid')) return;
     var krn = gu(data);
@@ -4745,7 +4875,58 @@ function handleSBEvent(event, data) {
     pushMsg({ plat: 'kk', isEv: true, big: true, user: kkipUser, text: kkipText, avatar: _kkipAv }); setPinnedEvent(kkipUser, kkipText, 'kk');
   } else if (key === 'StreamElements.Donation' || key === 'StreamElements.Tip' || key === 'SE.Tip' || key === 'SE.Donation' || key === 'StreamElements.Latest') {
     handleSETip(data, false);
-  } else if (key === 'General.Custom' && data && data.source === 'sf_raid_finder') {
+  }
+  // ── SB integration events (EA-only) — Patreon, Fourthwall, Ko-fi ───────
+  // These surface in the in-app Events panel AND broadcast to the OBS
+  // alerts + vertical overlays when enabled. Each section is guarded on
+  // both the user's S.hasEarlyAccess + their per-integration toggle so
+  // non-EA users and opt-outs skip silently.
+  else if (S.hasEarlyAccess && dcSb.patreon && /^Patreon\./.test(key)) {
+    var pU = gu(data) || data.patronFullName || data.patronName || 'Supporter';
+    var pAmt = Number(data.pledgeAmount || data.amount || 0);
+    var pText, pType;
+    if (/Pledge(Create|Start)/i.test(key))      { pText = pU + ' pledged on Patreon' + (pAmt ? ' ($' + pAmt.toFixed(2) + ')' : '') + '!'; pType = 'pledge'; }
+    else if (/Pledge(Update|TierChange)/i.test(key)) { pText = pU + ' upgraded their Patreon tier' + (pAmt ? ' ($' + pAmt.toFixed(2) + ')' : '') + '!'; pType = 'tier_change'; }
+    else if (/Pledge(Delete|End)/i.test(key))   { pText = pU + ' ended their Patreon pledge'; pType = 'pledge_end'; }
+    else if (/Follow/i.test(key))                { pText = pU + ' is following on Patreon'; pType = 'follow'; }
+    else { pText = pU + ' \u2014 Patreon event'; pType = 'pledge'; }
+    addEvHistory(pU, pText, 'pa', true);
+    sendObsAlert({ eventType: pType, platform: 'pa', user: pU, amount: pAmt, message: pText });
+  }
+  else if (S.hasEarlyAccess && dcSb.fourthwall && /^Fourthwall\./.test(key)) {
+    var fwU = gu(data) || data.buyerName || data.customerName || 'Customer';
+    var fwAmt = Number(data.amount || data.orderTotal || data.total || 0);
+    var fwProduct = data.productName || data.product || data.itemName || '';
+    var fwText, fwType;
+    if (/Order|Subscription|Gift/i.test(key)) {
+      fwText = fwU + ' ordered ' + (fwProduct ? fwProduct + ' ' : '') + 'on Fourthwall' + (fwAmt ? ' ($' + fwAmt.toFixed(2) + ')' : '') + '!';
+      fwType = 'order';
+    } else if (/Donation|TipJar|Tip/i.test(key)) {
+      fwText = fwU + ' tipped on Fourthwall' + (fwAmt ? ' ($' + fwAmt.toFixed(2) + ')' : '');
+      fwType = 'tip';
+    } else {
+      fwText = fwU + ' \u2014 Fourthwall event';
+      fwType = 'order';
+    }
+    addEvHistory(fwU, fwText, 'fw', true);
+    sendObsAlert({ eventType: fwType, platform: 'fw', user: fwU, amount: fwAmt, message: fwProduct });
+  }
+  else if (S.hasEarlyAccess && dcSb.kofi && /^Kofi\./.test(key)) {
+    var kfU = gu(data) || data.fromName || data.donorName || 'Supporter';
+    var kfAmt = Number(data.amount || 0);
+    var kfMsg = data.message || '';
+    var kfText, kfType;
+    if (/Subscription|Commission|ShopOrder/i.test(key)) {
+      kfText = kfU + ' supported via Ko-fi' + (kfAmt ? ' ($' + kfAmt.toFixed(2) + ')' : '') + '!';
+      kfType = 'order';
+    } else {
+      kfText = kfU + ' tipped on Ko-fi' + (kfAmt ? ' ($' + kfAmt.toFixed(2) + ')' : '');
+      kfType = 'tip';
+    }
+    addEvHistory(kfU, kfText + (kfMsg ? ' \u2014 "' + kfMsg + '"' : ''), 'kf', true);
+    sendObsAlert({ eventType: kfType, platform: 'kf', user: kfU, amount: kfAmt, message: kfMsg });
+  }
+  else if (key === 'General.Custom' && data && data.source === 'sf_raid_finder') {
     _handleRaidFinderResponse(data);
     return;
   } else if (key === 'General.Custom' && (data.name === 'PayPal' || data.name === 'PayPalDonation' || (data.source || '').toLowerCase().includes('paypal'))) {
@@ -4964,6 +5145,7 @@ function handleTFEvent(d) {
     if (chk('ev-tt-gift')) return;
     if (_isMidStreak) return;
     maybeSound('snd-tt-gift', 'gift'); var bigGift = _gCoins >= 1000 || _perGift >= 1000; if (bigGift) { triggerCoinBurst(Math.min(10, Math.floor(_gCoins/200)), _gCoins); showBanner('i-coin', user + ' sent a gift!', data.giftName || 'TikTok Gift', _gCoins.toLocaleString() + ' coins', 'tt'); } var ttGiftHtml = buildGiftHTML(data); pushMsg({ plat: 'tt', isEv: true, evType: 'gift', big: bigGift, user: user, giftHtml: ttGiftHtml, text: user + ' sent a gift!', coinAmount: _gCoins, avatar: _ttAvatar }); if (_gCoins >= 1000) setPinnedEvent(user, user + ' sent ' + (data.giftName || 'a gift') + '!', 'tt', ttGiftHtml);
+    if (bigGift) updateRecord('ttGift', user, _gCoins, { giftName: data.giftName || '' });
   }
   else if (ev === 'follow') { if (chk('ev-tt-follow')) return; maybeSound('snd-tt-follow', 'follow'); pushMsg({ plat: 'tt', isEv: true, evType: 'follow', user: user, text: user + ' followed on TikTok!', avatar: _ttAvatar }); S.stats.follows.tt++; updateStreamStats(); }
   else if (ev === 'subscribe' || ev === 'subscription') { if (chk('ev-tt-sub')) return; pushMsg({ plat: 'tt', isEv: true, evType: 'sub', user: user, text: user + ' subscribed on TikTok!', avatar: _ttAvatar }); }
@@ -5725,6 +5907,7 @@ function switchSettingsTab(tab) {
   // boot or when the user clicks a different settings section.
   if (tab === 'obsoverlays') renderObsOverlaysTab();
   if (tab === 'theme') renderThemeTab();
+  if (tab === 'discordea') renderDiscordTab();
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
@@ -5752,6 +5935,7 @@ function renderObsOverlaysTab() {
       setVal('obsUrlChat',     u.chat);
       setVal('obsUrlAlerts',   u.alerts);
       setVal('obsUrlShoutout', u.shoutout);
+      setVal('obsUrlVertical', u.vertical);
       var st = document.getElementById('obsServerStatus');
       if (st) {
         if (s.running) {
@@ -5788,6 +5972,13 @@ function renderObsOverlaysTab() {
     if (get('obsShoutoutShowRecentEvent')) get('obsShoutoutShowRecentEvent').checked = c.shoutout.showRecentEvent !== false;
     if (get('obsShoutoutDuration'))        get('obsShoutoutDuration').value = Math.round((c.shoutout.duration || 8000) / 1000);
     if (get('obsShoutoutThankMessage'))    get('obsShoutoutThankMessage').value = c.shoutout.thankMessage || 'Thanks so much for supporting the stream!';
+  }
+  if (c.vertical) {
+    if (get('obsVerticalFontSize'))   get('obsVerticalFontSize').value = c.vertical.fontSize || 20;
+    if (get('obsVerticalHold'))       get('obsVerticalHold').value = Math.round((c.vertical.holdMs || 4500) / 1000);
+    if (get('obsVerticalBgOpacity'))  get('obsVerticalBgOpacity').value = Math.round((c.vertical.bgOpacity != null ? c.vertical.bgOpacity : 0.55) * 100);
+    if (get('obsVerticalShowChat'))   get('obsVerticalShowChat').checked = c.vertical.showChat !== false;
+    if (get('obsVerticalShowEvents')) get('obsVerticalShowEvents').checked = c.vertical.showEvents !== false;
   }
 }
 
@@ -5851,6 +6042,16 @@ function updateObsConfig(which) {
       thankMessage:    (get('obsShoutoutThankMessage') || {}).value || 'Thanks so much for supporting the stream!'
     };
     S.obsCfg.shoutout = cfg;
+  } else if (which === 'vertical') {
+    cfg = {
+      fontSize:     parseInt((get('obsVerticalFontSize') || {}).value, 10) || 20,
+      holdMs:       (parseInt((get('obsVerticalHold') || {}).value, 10) || 4) * 1000,
+      bgOpacity:    (parseInt((get('obsVerticalBgOpacity') || {}).value, 10) || 55) / 100,
+      showChat:     !!(get('obsVerticalShowChat')   && get('obsVerticalShowChat').checked),
+      showEvents:   !!(get('obsVerticalShowEvents') && get('obsVerticalShowEvents').checked),
+      showPlatforms: S.show || { tw: true, yt: true, tt: true, kk: true }
+    };
+    S.obsCfg.vertical = cfg;
   }
   window.electronAPI.obsSetConfig(which, cfg);
   if (typeof saveSettings === 'function') saveSettings();
@@ -6524,12 +6725,18 @@ function startHypeTrain(data) {
   showBanner('i-train', 'HYPE TRAIN!', 'Level ' + _htState.level + ' \u2022 ' + _htState.goal + ' goal', null, 'org');
 }
 function updateHypeTrainProgress(data) {
+  var prevLevel = _htState.level;
   _htState.total = data.total || _htState.total;
   _htState.level = data.level || _htState.level;
   _htState.goal = data.goal || data.goalTotal || _htState.goal;
   if (data.topContributors || data.contributors) _htState.top = data.topContributors || data.contributors;
   if (data.countdown || data.expiresIn) _htState.expires = Date.now() + ((data.countdown || data.expiresIn) * 1000);
   updateHypeTrain();
+  // Discord+ hype-train updates: post only on level-up transitions so a
+  // channel doesn't get a progress update every few seconds.
+  if (_htState.level > prevLevel) {
+    try { discordPostHype(_htState.level, _htState.total, _htState.goal); } catch (e) {}
+  }
 }
 function endHypeTrain() {
   _htState.active = false;
@@ -6672,6 +6879,7 @@ function handleSETip(data, isPayPal) {
     fireBurstConfetti('se');
     pushMsg({ plat: 'se', isEv: true, big: true, user: user, text: tipText, avatar: _tipAv });
   }
+  updateRecord('seTip', user, amount);
 }
 
 // ═══ STREAM RECAP ═══════════════════════════════════════════════════════════
@@ -6910,11 +7118,18 @@ function buildDiscordRecapPayload(d) {
 // `manual` false (default) → invoked by stream-end auto-fire (uses snapshot
 // stored in window._lastRecapData, gated by discordEnabled, fails silently).
 function sendDiscordRecap(manual) {
+  // Diagnostic paths for why auto-post might silently skip. Surface these
+  // in the Events panel so the streamer doesn't have to guess what went
+  // wrong at stream-end.
   if (!discordWebhook) {
     if (manual) sysMsg('tw', 'Enter a Discord webhook URL first.');
+    else addEvHistory('StreamFusion', 'Recap auto-post skipped: no Discord webhook URL set (Settings \u2192 Integrations).', 'tw', false);
     return;
   }
-  if (!manual && !discordEnabled) return;
+  if (!manual && !discordEnabled) {
+    addEvHistory('StreamFusion', 'Recap auto-post skipped: auto-send is OFF. Toggle it in Settings \u2192 Integrations.', 'tw', false);
+    return;
+  }
   var d = manual ? buildRecapSnapshot() : (window._lastRecapData || buildRecapSnapshot());
   var payload = buildDiscordRecapPayload(d);
   fetch(discordWebhook, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
@@ -6923,12 +7138,12 @@ function sendDiscordRecap(manual) {
         if (manual) sysMsg('tw', 'Stream recap sent to Discord!');
         else addEvHistory('StreamFusion', 'Discord recap sent.', 'tw', false);
       } else {
-        var warn = 'Discord recap failed (HTTP ' + r.status + ').';
+        var warn = 'Discord recap failed (HTTP ' + r.status + '). Check that the webhook URL is correct.';
         if (manual) sysMsg('tw', warn); else addEvHistory('StreamFusion', warn, 'tw', false);
       }
     })
-    .catch(function() {
-      var warn = 'Failed to reach Discord webhook.';
+    .catch(function(e) {
+      var warn = 'Failed to reach Discord webhook: ' + ((e && e.message) || 'network error') + '.';
       if (manual) sysMsg('tw', warn); else addEvHistory('StreamFusion', warn, 'tw', false);
     });
 }
@@ -7722,6 +7937,407 @@ function sendObsAlert(obj) {
   }
   window.electronAPI.obsBroadcastAlert(Object.assign({ duration: (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.duration) || 6000 }, obj));
 }
+// ── Discord+ (EA-only): live events, records, bot ─────────────────────────
+// Expanded Discord integration that goes beyond the free-tier stream recap:
+//   - Stylized embeds fired on individual events (follow/sub/cheer/gift/hype)
+//   - All-time stream records kept in a single message, delete-and-reposted
+//     whenever something improves so the channel stays clean
+//   - Bot Gateway connection for observing Discord-side events (member
+//     joins, voice joins, optional message posts) and surfacing them in
+//     the in-app Events panel
+// State lives in dedicated globals persisted via saveDiscordSettings()
+// rather than the main saveSettings() because the payload is bulky and
+// this section has its own independent lifecycle.
+
+var dcEventWebhook   = '';
+var dcRecordsWebhook = '';
+var dcBotToken       = '';
+var dcBotGuildId     = '';
+var dcBotChannelId   = '';
+var dcPost = { follow: false, sub: true, cheer: true, kick: true, gift: true, hype: true };
+var dcSb   = { patreon: true, fourthwall: true, kofi: true, se: true };
+var dcBot  = { enabled: false, evtMember: true, evtVoice: true, evtMessage: false };
+var dcGiftThreshold = 5;
+var dcRecordsAuto = true;
+// All-time cumulative records. Persisted separately so they survive
+// installs + reset-stats actions. Each entry: { user, amount, ts }.
+var dcRecords = {
+  twGift:   null,   // most Twitch subs gifted in a single event
+  kkGift:   null,   // most Kick subs gifted in a single event
+  cheer:    null,   // biggest bits cheer
+  ttGift:   null,   // biggest TikTok gift (by coin value)
+  seTip:    null    // highest StreamElements tip
+};
+var dcRecordsMessageId = '';   // last known Discord message id for delete-and-repost
+
+function loadDiscordSettings() {
+  try {
+    var raw = localStorage.getItem('sf_discord_ea');
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    if (d.eventWebhook != null)   dcEventWebhook   = d.eventWebhook;
+    if (d.recordsWebhook != null) dcRecordsWebhook = d.recordsWebhook;
+    if (d.botToken != null)       dcBotToken       = d.botToken;
+    if (d.botGuildId != null)     dcBotGuildId     = d.botGuildId;
+    if (d.botChannelId != null)   dcBotChannelId   = d.botChannelId;
+    if (d.post) Object.assign(dcPost, d.post);
+    if (d.sb)   Object.assign(dcSb,   d.sb);
+    if (d.bot)  Object.assign(dcBot,  d.bot);
+    if (d.giftThreshold) dcGiftThreshold = d.giftThreshold;
+    if (d.recordsAuto != null) dcRecordsAuto = d.recordsAuto;
+    if (d.records) dcRecords = Object.assign(dcRecords, d.records);
+    if (d.recordsMessageId) dcRecordsMessageId = d.recordsMessageId;
+  } catch (e) {}
+}
+
+function saveDiscordSettings() {
+  // Pick up live form values before saving so the checkboxes/inputs and the
+  // in-memory state never drift apart.
+  var get = function(id) { return document.getElementById(id); };
+  if (get('dcPostFollow')) dcPost.follow = get('dcPostFollow').checked;
+  if (get('dcPostSub'))    dcPost.sub    = get('dcPostSub').checked;
+  if (get('dcPostCheer'))  dcPost.cheer  = get('dcPostCheer').checked;
+  if (get('dcPostKick'))   dcPost.kick   = get('dcPostKick').checked;
+  if (get('dcPostGift'))   dcPost.gift   = get('dcPostGift').checked;
+  if (get('dcPostHype'))   dcPost.hype   = get('dcPostHype').checked;
+  if (get('dcGiftThreshold')) dcGiftThreshold = parseInt(get('dcGiftThreshold').value, 10) || 5;
+  if (get('dcRecordsAuto'))   dcRecordsAuto = get('dcRecordsAuto').checked;
+  if (get('dcSbPatreon'))    dcSb.patreon    = get('dcSbPatreon').checked;
+  if (get('dcSbFourthwall')) dcSb.fourthwall = get('dcSbFourthwall').checked;
+  if (get('dcSbKofi'))       dcSb.kofi       = get('dcSbKofi').checked;
+  if (get('dcSbSE'))         dcSb.se         = get('dcSbSE').checked;
+  if (get('dcBotEvtMember'))  dcBot.evtMember  = get('dcBotEvtMember').checked;
+  if (get('dcBotEvtVoice'))   dcBot.evtVoice   = get('dcBotEvtVoice').checked;
+  if (get('dcBotEvtMessage')) dcBot.evtMessage = get('dcBotEvtMessage').checked;
+  try {
+    localStorage.setItem('sf_discord_ea', JSON.stringify({
+      eventWebhook: dcEventWebhook, recordsWebhook: dcRecordsWebhook,
+      botToken: dcBotToken, botGuildId: dcBotGuildId, botChannelId: dcBotChannelId,
+      post: dcPost, sb: dcSb, bot: dcBot,
+      giftThreshold: dcGiftThreshold, recordsAuto: dcRecordsAuto,
+      records: dcRecords, recordsMessageId: dcRecordsMessageId
+    }));
+  } catch (e) {}
+}
+
+// ── Stylized embed factory ────────────────────────────────────────────────
+// Every event post routes through one of these helpers so the brand stays
+// consistent. Each returns a Discord webhook payload ({ embeds: [...] })
+// that postDiscordEvent() hands to the main process.
+
+var DC_PLAT_COLORS = { tw: 0x9146ff, yt: 0xff0000, tt: 0xfe2c55, kk: 0x53fc18, se: 0x7cdf21 };
+var DC_FOOTER = { text: 'StreamFusion \u26a1  Powered by aquilo.gg', icon_url: '' };
+
+function dcEmbed(opts) {
+  // opts: { platform, kicker, title, description, color, fields, thumbnail, user, amount, icon }
+  var color = opts.color || (DC_PLAT_COLORS[opts.platform] != null ? DC_PLAT_COLORS[opts.platform] : 0x3A86FF);
+  var embed = {
+    color: color,
+    title: opts.title,
+    description: opts.description || '',
+    timestamp: new Date().toISOString(),
+    footer: DC_FOOTER
+  };
+  if (opts.kicker) embed.author = { name: opts.kicker };
+  if (opts.fields) embed.fields = opts.fields;
+  if (opts.thumbnail) embed.thumbnail = { url: opts.thumbnail };
+  return { embeds: [embed] };
+}
+
+// Fire an event embed through the configured webhook. Silently no-ops if
+// no webhook URL is set OR the user disabled this event type.
+function postDiscordEvent(typeKey, payload) {
+  if (!S.hasEarlyAccess) return;
+  if (!dcEventWebhook) return;
+  if (!dcPost[typeKey]) return;
+  if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
+  window.electronAPI.discordWebhookPost(dcEventWebhook, payload).catch(function() {});
+}
+
+function discordPostFollow(user, plat) {
+  postDiscordEvent('follow', dcEmbed({
+    platform: plat,
+    kicker: '\u2764\ufe0f New Follower',
+    title: user + ' followed!',
+    description: 'Give them a warm welcome on stream \uD83C\uDF89'
+  }));
+}
+function discordPostSub(user, plat, tier, isResub, months) {
+  var title = user + (isResub ? ' resubscribed!' : ' subscribed!');
+  var parts = [];
+  if (tier)  parts.push('Tier ' + tier);
+  if (months) parts.push(months + ' months');
+  postDiscordEvent('sub', dcEmbed({
+    platform: plat,
+    kicker: '\u2B50 ' + (isResub ? 'Re-sub' : 'New sub'),
+    title: title,
+    description: parts.length ? parts.join(' \u00b7 ') : ''
+  }));
+}
+function discordPostKickSub(user, tier) {
+  postDiscordEvent('kick', dcEmbed({
+    platform: 'kk',
+    kicker: '\uD83D\uDFE2 Kick Sub',
+    title: user + ' subscribed on Kick!',
+    description: tier ? 'Tier ' + tier : ''
+  }));
+}
+function discordPostCheer(user, bits, plat) {
+  postDiscordEvent('cheer', dcEmbed({
+    platform: plat || 'tw',
+    kicker: '\uD83D\uDC8E Bits',
+    title: user + ' cheered ' + bits + ' bits!',
+    description: ''
+  }));
+}
+function discordPostGift(gifter, count, plat) {
+  if ((count || 0) < dcGiftThreshold) return;
+  postDiscordEvent('gift', dcEmbed({
+    platform: plat || 'tw',
+    kicker: '\uD83C\uDF81 Gift Bomb',
+    title: gifter + ' gifted ' + count + ' subs!',
+    description: 'That\u2019s ' + count + ' new members of the community \uD83D\uDE80'
+  }));
+}
+function discordPostHype(level, total, goal) {
+  postDiscordEvent('hype', dcEmbed({
+    platform: 'tw',
+    kicker: '\uD83D\uDE82 Hype Train',
+    title: 'Level ' + level + ' reached!',
+    description: 'Progress: ' + total + ' / ' + goal,
+    color: 0x9146ff
+  }));
+}
+
+// ── All-time records ─────────────────────────────────────────────────────
+// Check each new event against the stored max; if it beats the record,
+// update state + trigger a Discord delete-and-repost of the records msg.
+function updateRecord(key, user, amount, meta) {
+  if (!S.hasEarlyAccess) return false;
+  var prev = dcRecords[key];
+  var a = Number(amount) || 0;
+  if (a <= 0) return false;
+  if (prev && prev.amount >= a) return false;
+  dcRecords[key] = Object.assign({ user: user || 'Anon', amount: a, ts: Date.now() }, meta || {});
+  saveDiscordSettings();
+  // Fire the Discord repost if user has it enabled + configured.
+  if (dcRecordsWebhook && dcRecordsAuto) {
+    postRecordsNow();
+  }
+  // Surface in the Events panel so the streamer sees the milestone.
+  addEvHistory('StreamFusion', 'New record: ' + user + ' \u2014 ' + recordLabel(key, a), 'se', true);
+  return true;
+}
+
+function recordLabel(key, amount) {
+  switch (key) {
+    case 'twGift': return amount + ' gifted subs on Twitch';
+    case 'kkGift': return amount + ' gifted subs on Kick';
+    case 'cheer':  return amount + ' bits cheered';
+    case 'ttGift': return amount + ' TikTok coins gifted';
+    case 'seTip':  return '$' + amount.toFixed(2) + ' tip';
+    default: return String(amount);
+  }
+}
+
+// Build the records embed. Uses Discord CDN-hosted Twitch bit icons + a
+// TikTok gift icon lookup so the post uses real icons, not emoji.
+// (Discord embeds can't inline arbitrary images; we show icons as tier
+// markers in field names using Unicode + the message description.)
+function buildRecordsPayload() {
+  var fields = [];
+  // Twitch sub icon via emoji markdown fallback (Discord doesn't allow
+  // per-field images, so Unicode + label gets us close to "not just emoji").
+  if (dcRecords.twGift) fields.push({
+    name: 'Most Twitch Gifted Subs',
+    value: '**' + dcRecords.twGift.user + '** \u2014 ' + dcRecords.twGift.amount + ' subs',
+    inline: true
+  });
+  if (dcRecords.kkGift) fields.push({
+    name: 'Most Kick Gifted Subs',
+    value: '**' + dcRecords.kkGift.user + '** \u2014 ' + dcRecords.kkGift.amount + ' subs',
+    inline: true
+  });
+  if (dcRecords.cheer) fields.push({
+    name: 'Highest Cheer',
+    value: '**' + dcRecords.cheer.user + '** \u2014 ' + dcRecords.cheer.amount + ' bits',
+    inline: true
+  });
+  if (dcRecords.ttGift) {
+    // TikTok gifts carry a name on them — show the gift name if we've got it
+    var g = dcRecords.ttGift;
+    var gname = g.giftName ? (' (' + g.giftName + ')') : '';
+    fields.push({
+      name: 'Biggest TikTok Gift',
+      value: '**' + g.user + '** \u2014 ' + g.amount + ' coins' + gname,
+      inline: true
+    });
+  }
+  if (dcRecords.seTip) fields.push({
+    name: 'Highest Tip',
+    value: '**' + dcRecords.seTip.user + '** \u2014 $' + dcRecords.seTip.amount.toFixed(2),
+    inline: true
+  });
+  // No records yet — provide a friendly placeholder so the channel doesn't
+  // show an empty embed.
+  if (fields.length === 0) {
+    fields.push({
+      name: 'No records yet!',
+      value: 'The board updates automatically once your first event lands.',
+      inline: false
+    });
+  }
+  return {
+    embeds: [{
+      color: 0xf0b429,
+      title: '\uD83C\uDFC6 Stream Records',
+      description: '*All-time community bests.*',
+      fields: fields,
+      timestamp: new Date().toISOString(),
+      footer: DC_FOOTER
+    }]
+  };
+}
+
+// Delete the previous records message, then post the new one. Stores the
+// new message id so the next update can find and delete it again. The
+// delete happens before the post so, in the rare race condition where
+// two records break back-to-back, we never end up with two live embeds.
+function postRecordsNow() {
+  if (!S.hasEarlyAccess) return;
+  if (!dcRecordsWebhook) { addEvHistory('StreamFusion', 'Records webhook URL not set.', 'tw', false); return; }
+  if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
+  var payload = buildRecordsPayload();
+  var doPost = function() {
+    window.electronAPI.discordWebhookPost(dcRecordsWebhook, payload).then(function(res) {
+      if (res && res.ok && res.id) {
+        dcRecordsMessageId = res.id;
+        saveDiscordSettings();
+      }
+    }).catch(function() {});
+  };
+  if (dcRecordsMessageId) {
+    window.electronAPI.discordWebhookDelete(dcRecordsWebhook, dcRecordsMessageId).then(function() {
+      dcRecordsMessageId = '';
+      doPost();
+    }).catch(doPost);
+  } else {
+    doPost();
+  }
+}
+
+function resetRecords() {
+  if (!confirm('Reset all-time records? This cannot be undone.')) return;
+  dcRecords = { twGift: null, kkGift: null, cheer: null, ttGift: null, seTip: null };
+  dcRecordsMessageId = '';
+  saveDiscordSettings();
+  renderDiscordTab();
+  addEvHistory('StreamFusion', 'Records reset.', 'tw', false);
+}
+
+function openDiscordSetupGuide() {
+  window.open('https://github.com/aquiloplays/StreamFusion/blob/main/SETUP-PATREON.md', '_blank');
+}
+
+// ── Discord Bot Gateway wiring ────────────────────────────────────────────
+function toggleDiscordBot() {
+  if (!S.hasEarlyAccess) return;
+  if (dcBot.enabled) {
+    window.electronAPI.discordBotDisconnect().then(function() {
+      dcBot.enabled = false;
+      saveDiscordSettings();
+      renderDiscordBotStatus();
+    });
+  } else {
+    if (!dcBotToken) { addEvHistory('StreamFusion', 'Enter a bot token first.', 'tw', false); return; }
+    window.electronAPI.discordBotConnect({
+      token:     dcBotToken,
+      guildId:   dcBotGuildId || null,
+      channelId: dcBotChannelId || null
+    }).then(function(res) {
+      if (res && res.ok) {
+        dcBot.enabled = true;
+        saveDiscordSettings();
+        renderDiscordBotStatus();
+      }
+    });
+  }
+}
+
+function renderDiscordBotStatus() {
+  var btn = document.getElementById('dcBotConnectBtn');
+  var st  = document.getElementById('dcBotStatus');
+  if (btn) btn.textContent = dcBot.enabled ? 'Disconnect bot' : 'Connect bot';
+  if (!window.electronAPI || !window.electronAPI.discordBotStatus) return;
+  window.electronAPI.discordBotStatus().then(function(s) {
+    if (!st) return;
+    if (s && s.connected) st.innerHTML = '<span style="color:var(--ok,#22c55e)">&#9679; Connected</span> \u2014 watching for events.';
+    else if (dcBot.enabled) st.innerHTML = '<span style="color:#f0b429">&#9679; Connecting\u2026</span>';
+    else st.innerHTML = 'Not connected.';
+  });
+}
+
+// Receive bot events from main process → Events panel.
+if (window.electronAPI && window.electronAPI.onDiscordEvent) {
+  window.electronAPI.onDiscordEvent(function(e) {
+    if (!e || !S.hasEarlyAccess) return;
+    var kind = e.kind, data = e.data || {};
+    if (kind === 'ready')        renderDiscordBotStatus();
+    if (kind === 'gateway_connected') renderDiscordBotStatus();
+    if (kind === 'gateway_closed')    renderDiscordBotStatus();
+    if (kind === 'fatal') { addEvHistory('StreamFusion', 'Discord bot: ' + (data.reason || 'fatal error') + ' (check bot token + privileged intents).', 'tw', false); return; }
+    if (kind === 'member_add' && dcBot.evtMember) {
+      addEvHistory(data.username || 'Unknown', 'joined the Discord server', 'se', false);
+    } else if (kind === 'voice_join' && dcBot.evtVoice) {
+      addEvHistory(data.username || 'Unknown', 'joined a Discord voice channel', 'se', false);
+    } else if (kind === 'message' && dcBot.evtMessage) {
+      var preview = (data.content || '').slice(0, 120);
+      addEvHistory(data.username || 'Unknown', preview || '(empty message)', 'se', false);
+    }
+  });
+}
+
+// ── Discord+ tab rendering ────────────────────────────────────────────────
+function renderDiscordTab() {
+  var pane = document.getElementById('pane-discordea');
+  if (!pane) return;
+  pane.classList.toggle('ea-unlocked', !!S.hasEarlyAccess);
+  if (!S.hasEarlyAccess) return;
+  var get = function(id) { return document.getElementById(id); };
+  if (get('dcEventWebhookInput'))   get('dcEventWebhookInput').value   = dcEventWebhook;
+  if (get('dcRecordsWebhookInput')) get('dcRecordsWebhookInput').value = dcRecordsWebhook;
+  if (get('dcBotTokenInput'))       get('dcBotTokenInput').value       = dcBotToken;
+  if (get('dcBotGuildInput'))       get('dcBotGuildInput').value       = dcBotGuildId;
+  if (get('dcBotChannelInput'))     get('dcBotChannelInput').value     = dcBotChannelId;
+  if (get('dcGiftThreshold'))       get('dcGiftThreshold').value       = dcGiftThreshold;
+  ['Follow','Sub','Cheer','Kick','Gift','Hype'].forEach(function(k) {
+    var el = get('dcPost' + k); if (el) el.checked = !!dcPost[k.toLowerCase()];
+  });
+  if (get('dcRecordsAuto')) get('dcRecordsAuto').checked = !!dcRecordsAuto;
+  if (get('dcSbPatreon'))    get('dcSbPatreon').checked    = !!dcSb.patreon;
+  if (get('dcSbFourthwall')) get('dcSbFourthwall').checked = !!dcSb.fourthwall;
+  if (get('dcSbKofi'))       get('dcSbKofi').checked       = !!dcSb.kofi;
+  if (get('dcSbSE'))         get('dcSbSE').checked         = !!dcSb.se;
+  if (get('dcBotEvtMember'))  get('dcBotEvtMember').checked  = !!dcBot.evtMember;
+  if (get('dcBotEvtVoice'))   get('dcBotEvtVoice').checked   = !!dcBot.evtVoice;
+  if (get('dcBotEvtMessage')) get('dcBotEvtMessage').checked = !!dcBot.evtMessage;
+  // Records summary
+  var summary = get('dcRecordsSummary');
+  if (summary) {
+    var lines = [];
+    if (dcRecords.twGift) lines.push('Most TW gifted subs: <strong>' + dcRecords.twGift.user + '</strong> (' + dcRecords.twGift.amount + ')');
+    if (dcRecords.kkGift) lines.push('Most KK gifted subs: <strong>' + dcRecords.kkGift.user + '</strong> (' + dcRecords.kkGift.amount + ')');
+    if (dcRecords.cheer)  lines.push('Highest cheer: <strong>' + dcRecords.cheer.user + '</strong> (' + dcRecords.cheer.amount + ' bits)');
+    if (dcRecords.ttGift) lines.push('Biggest TT gift: <strong>' + dcRecords.ttGift.user + '</strong> (' + dcRecords.ttGift.amount + ' coins)');
+    if (dcRecords.seTip)  lines.push('Highest tip: <strong>' + dcRecords.seTip.user + '</strong> ($' + dcRecords.seTip.amount.toFixed(2) + ')');
+    summary.innerHTML = lines.length ? ('Current records:<br>\u2022 ' + lines.join('<br>\u2022 ')) : 'No records yet.';
+  }
+  renderDiscordBotStatus();
+}
+
+// Initial load
+loadDiscordSettings();
+
 function sendObsShoutout(user, plat) {
   if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastShoutout) return;
   if (!user) return;
