@@ -74,6 +74,9 @@ const TOKEN_PROXY_URL     = process.env.SF_TOKEN_PROXY_URL     || 'https://strea
 const LOOPBACK_PORTS = [17823, 17824, 17825];
 const SCOPES = ['identity', 'identity.memberships'];
 
+// Owner account — always entitled regardless of Patreon membership state.
+const OWNER_EMAILS = ['bisherclay@gmail.com'];
+
 const REVERIFY_INTERVAL_MS =      24 * 60 * 60 * 1000;  // stale-cache threshold: reverify on next launch after 24h
 const OFFLINE_GRACE_MS     = 7 * 24 * 60 * 60 * 1000;   // honor cached "ok" for 7d if Patreon is unreachable
 const RUNTIME_CHECK_MS     =           60 * 60 * 1000;  // periodic reverify while running: every 1h
@@ -223,6 +226,12 @@ async function verifyMembership(accessToken) {
   var data = await getJson(url, accessToken);
 
   var userName = (data && data.data && data.data.attributes && data.data.attributes.full_name) || '';
+  var userEmail = (data && data.data && data.data.attributes && data.data.attributes.email) || '';
+
+  // Owner bypass — always grant full access
+  if (userEmail && OWNER_EMAILS.indexOf(userEmail.toLowerCase()) !== -1) {
+    return { active: true, entitled: true, tier: 'tier3', patronStatus: 'active_patron', reason: 'entitled', userName: userName };
+  }
 
   if (!data || !data.included) {
     return { active: false, entitled: false, tier: 'none', patronStatus: null, reason: 'no_memberships', userName: userName };

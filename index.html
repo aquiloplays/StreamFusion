@@ -481,6 +481,8 @@ body:not(.is-electron) .titlebar{display:none}
 #sfConfetti.show{display:block}
 
 /* ═══ RAID SPLASH ════════════════════════════════════════════════════════════ */
+@keyframes sfSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.spin{animation:sfSpin .8s linear infinite}
 @keyframes raidBg{0%{opacity:0}10%{opacity:1}75%{opacity:1}100%{opacity:0}}
 @keyframes raidTxt{0%{opacity:0;transform:scale(.3) translateY(40px)}28%{opacity:1;transform:scale(1.1) translateY(-10px)}42%{transform:scale(1) translateY(0)}100%{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes raidCnt{0%{opacity:0;transform:scale(.1)}32%{opacity:1;transform:scale(1.18)}46%{transform:scale(1)}100%{transform:scale(1)}}
@@ -1315,6 +1317,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
   <button class="tbtn" id="ttsToggleBtn" onclick="toggleTTS()"><svg class="ic"><use href="#i-mute"/></svg>TTS: OFF</button>
   <button class="tbtn" id="ttsPauseBtn" onclick="toggleTTSPause()" style="display:none"><svg class="ic"><use href="#i-pause"/></svg>Pause TTS</button>
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
+  <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
   <a class="tbtn tbtn-discord" href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" title="Join the StreamFusion Discord"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
@@ -2084,7 +2087,14 @@ var S = {
   // means the user is an active Tier 2 or Tier 3 supporter; gate any
   // Early Access features on this boolean.
   patreon: { signedIn: false, entitled: false, tier: 'none', patronStatus: null, reason: 'not_signed_in', userName: '', verifiedAt: null },
-  hasEarlyAccess: false
+  hasEarlyAccess: false,
+  // Raid Finder state — actions are re-queried from SB each time the panel opens
+  raidFinder: {
+    actions: { find: null, startRaid: null },
+    lastReqId: null, lastResults: null, searching: false,
+    rangeMode: 'percent', rangeLowPct: 0.5, rangeHighPct: 1.5,
+    rangeLowAbs: 0, rangeHighAbs: 1000, wantCount: 25
+  }
 };
 
 var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-ext-other','ev-se-tip','hideCmd'];
@@ -2189,6 +2199,13 @@ function loadSettings() {
     if (d.ttsInstant !== undefined) ttsInstant = !!d.ttsInstant;
     if (d.ttsGiftCoinMin !== undefined) ttsGiftCoinMin = Math.max(0, parseInt(d.ttsGiftCoinMin) || 0);
     if (d.hideMainAnimations !== undefined) hideMainAnimations = !!d.hideMainAnimations;
+    // Raid Finder persisted preferences
+    if (d.rfRangeMode) S.raidFinder.rangeMode = d.rfRangeMode;
+    if (d.rfRangeLowPct !== undefined) S.raidFinder.rangeLowPct = d.rfRangeLowPct;
+    if (d.rfRangeHighPct !== undefined) S.raidFinder.rangeHighPct = d.rfRangeHighPct;
+    if (d.rfRangeLowAbs !== undefined) S.raidFinder.rangeLowAbs = d.rfRangeLowAbs;
+    if (d.rfRangeHighAbs !== undefined) S.raidFinder.rangeHighAbs = d.rfRangeHighAbs;
+    if (d.rfWantCount !== undefined) S.raidFinder.wantCount = d.rfWantCount;
   } catch(e) {}
 }
 
@@ -2209,7 +2226,10 @@ function saveSettings() {
     ttsVolume: ttsVolume, ttsRate: ttsRate, ttsEventPlats: ttsEventPlats, showAvatars: showAvatars,
     discordWebhook: discordWebhook, discordEnabled: discordEnabled,
     ttsInstant: ttsInstant, ttsGiftCoinMin: ttsGiftCoinMin,
-    hideMainAnimations: hideMainAnimations
+    hideMainAnimations: hideMainAnimations,
+    rfRangeMode: S.raidFinder.rangeMode, rfRangeLowPct: S.raidFinder.rangeLowPct,
+    rfRangeHighPct: S.raidFinder.rangeHighPct, rfRangeLowAbs: S.raidFinder.rangeLowAbs,
+    rfRangeHighAbs: S.raidFinder.rangeHighAbs, rfWantCount: S.raidFinder.wantCount
   }));
 }
 
@@ -3291,6 +3311,329 @@ function renameHotbarAction(idx, label) {
   if (hotbarActions[idx]) { hotbarActions[idx].label = label.trim() || hotbarActions[idx].name; saveSettings(); renderHotbar(); pushPopCfg(); }
 }
 
+// ── Raid Finder (Early Access) ────────────────────────────────────────────────
+// Searches Twitch via Streamer.bot C# actions for live streamers playing the
+// same game at a similar viewer count. Uses the existing SB WebSocket — no
+// separate Twitch OAuth required from the user.
+var SF_RF_IMPORT = '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';
+var SF_RF_FIND_NAME = 'StreamFusion Raid Finder \u2014 Find Targets';
+var SF_RF_RAID_NAME = 'StreamFusion Raid Finder \u2014 Start Raid';
+
+function openRaidFinder() {
+  if (!S.hasEarlyAccess) { _rfShowUpsell(); return; }
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
+    sysMsg('tw', 'Connect to Streamer.bot to use the Raid Finder.');
+    return;
+  }
+  _rfCheckActions(function(haveBoth) {
+    if (!haveBoth) { _rfShowInstall(); return; }
+    _rfRenderPanel();
+  });
+}
+
+// ── Action detection ─────────────────────────────────────────────────────────
+function _rfCheckActions(done) {
+  var reqId = 'sf-rf-chk-' + Date.now();
+  sbPending[reqId] = function(resp) {
+    var actions = resp.actions || [];
+    var find = null, raid = null;
+    for (var i = 0; i < actions.length; i++) {
+      if (actions[i].name === SF_RF_FIND_NAME) find = { id: actions[i].id, name: actions[i].name };
+      if (actions[i].name === SF_RF_RAID_NAME) raid = { id: actions[i].id, name: actions[i].name };
+    }
+    S.raidFinder.actions.find = find;
+    S.raidFinder.actions.startRaid = raid;
+    done(!!(find && raid));
+  };
+  S.sbWS.send(JSON.stringify({ request: 'GetActions', id: reqId }));
+}
+
+// ── Non-patron upsell ────────────────────────────────────────────────────────
+function _rfShowUpsell() {
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  var msg = _eaMessages(S.patreon);
+  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder &mdash; Early Access</div>'
+    + '<p class="mp">Find streamers playing your game with a similar audience, and raid with one click.</p>'
+    + '<p class="mp" style="color:var(--mut);font-size:12px">Available for Patreon Tier 2+ supporters.</p>'
+    + '<div style="background:var(--surf2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">'
+    + '<div style="font-weight:600">' + esc(msg.title) + '</div>'
+    + (msg.sub ? '<div style="color:var(--mut);margin-top:4px">' + esc(msg.sub) + '</div>' : '')
+    + '</div>'
+    + '<div class="mbtns">'
+    + '<button class="btn-tw" onclick="connectPatreon();closeModal()"><svg class="ic"><use href="#i-bolt"/></svg> Connect Patreon</button>'
+    + '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
+    + '</div>';
+}
+
+// ── Install SB actions modal ─────────────────────────────────────────────────
+function _rfShowInstall() {
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder &mdash; Install Actions</div>'
+    + '<p class="mp">StreamFusion needs two small actions in Streamer.bot to search Twitch and start raids. Your existing SB Twitch login is used &mdash; no extra tokens needed.</p>'
+    + '<div style="margin-bottom:10px">'
+    + '<textarea id="rfImportStr" readonly onclick="this.select()" style="width:100%;height:60px;font-size:10px;font-family:monospace;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:8px;resize:none">' + SF_RF_IMPORT + '</textarea>'
+    + '</div>'
+    + '<button class="btn-tw" style="margin-bottom:10px;font-size:12px" onclick="_rfCopyImport()"><svg class="ic"><use href="#i-doc"/></svg> Copy to clipboard</button>'
+    + '<ol style="font-size:12px;color:var(--mut);margin:0 0 12px 16px;padding:0;line-height:1.8">'
+    + '<li>In Streamer.bot, click <strong style="color:var(--txt)">Import</strong> (top menu)</li>'
+    + '<li>Paste the string above and click <strong style="color:var(--txt)">Import</strong></li>'
+    + '<li>Come back here and click <em>I\'ve imported the actions</em></li>'
+    + '</ol>'
+    + '<div id="rfInstallStatus" style="font-size:11px;color:var(--mut);min-height:18px;margin-bottom:8px"></div>'
+    + '<div class="mbtns">'
+    + '<button class="btn-tw" onclick="_rfVerifyImport()"><svg class="ic"><use href="#i-check"/></svg> I\'ve imported the actions</button>'
+    + '<button class="btn-x" onclick="closeModal()">Cancel</button>'
+    + '</div>';
+}
+
+function _rfCopyImport() {
+  var ta = document.getElementById('rfImportStr');
+  if (ta) { ta.select(); navigator.clipboard.writeText(ta.value).then(function() { ta.style.borderColor = 'var(--grn)'; setTimeout(function() { ta.style.borderColor = ''; }, 1200); }); }
+}
+
+function _rfVerifyImport() {
+  var st = document.getElementById('rfInstallStatus');
+  if (st) st.innerHTML = '<span style="color:var(--txt)">Checking Streamer.bot...</span>';
+  _rfCheckActions(function(haveBoth) {
+    if (haveBoth) { closeModal(); _rfRenderPanel(); }
+    else {
+      if (st) st.innerHTML = '<span style="color:var(--err,#ef4444)"><svg class="ic" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-warn"/></svg> Actions not detected. Make sure you imported the string and both actions are enabled in Streamer.bot.</span>';
+    }
+  });
+}
+
+// ── Main panel ───────────────────────────────────────────────────────────────
+function _rfRenderPanel() {
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  var game = S.twGame || '(not detected)';
+  var gameId = S.twGameId || '';
+  var viewers = S.viewers.tw || 0;
+  var isLive = viewers > 0 || S.twViewersFetched;
+  var rf = S.raidFinder;
+
+  // Compute range display
+  var lowVal, highVal;
+  if (rf.rangeMode === 'percent') {
+    lowVal = Math.max(0, Math.floor((viewers || 1) * rf.rangeLowPct));
+    highVal = Math.max(lowVal, Math.ceil((viewers || 1) * rf.rangeHighPct));
+  } else {
+    lowVal = rf.rangeLowAbs;
+    highVal = rf.rangeHighAbs;
+  }
+
+  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder</div>'
+    // Game + viewers row
+    + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">'
+    + '<div style="flex:1;background:var(--surf2);border-radius:6px;padding:8px 12px">'
+    + '<div style="font-size:10px;color:var(--mut);margin-bottom:2px">Game</div>'
+    + '<div style="font-size:13px;font-weight:600" id="rfGameName">' + esc(game) + '</div>'
+    + '</div>'
+    + '<div style="background:var(--surf2);border-radius:6px;padding:8px 12px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--mut);margin-bottom:2px">Your viewers</div>'
+    + '<div style="font-size:13px;font-weight:600">' + (isLive ? viewers : '<span style="color:var(--mut)">offline</span>') + '</div>'
+    + '</div>'
+    + '<button class="cbtn" style="padding:6px 8px" onclick="_rfRefreshGame()" title="Refresh game info"><svg class="ic"><use href="#i-refresh"/></svg></button>'
+    + '</div>'
+    // Range controls
+    + '<div style="background:var(--surf2);border-radius:6px;padding:10px 14px;margin-bottom:10px">'
+    + '<div style="font-size:11px;font-weight:600;margin-bottom:6px">Target viewer range</div>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+    + '<label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="rfMode" value="percent"' + (rf.rangeMode === 'percent' ? ' checked' : '') + ' onchange="_rfSetMode(\'percent\')"> % of you</label>'
+    + '<label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="rfMode" value="absolute"' + (rf.rangeMode === 'absolute' ? ' checked' : '') + ' onchange="_rfSetMode(\'absolute\')"> Absolute</label>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    + '<label style="font-size:11px;color:var(--mut)">Low</label>'
+    + '<input id="rfLow" type="number" min="0" value="' + lowVal + '" style="width:70px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:4px 6px;font-size:12px" onchange="_rfUpdateRange()">'
+    + '<label style="font-size:11px;color:var(--mut)">High</label>'
+    + '<input id="rfHigh" type="number" min="0" value="' + highVal + '" style="width:70px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:4px 6px;font-size:12px" onchange="_rfUpdateRange()">'
+    + (rf.rangeMode === 'percent' ? '<span id="rfPctHint" style="font-size:10px;color:var(--mut)">' + Math.round(rf.rangeLowPct * 100) + '% \u2013 ' + Math.round(rf.rangeHighPct * 100) + '%</span>' : '')
+    + '</div>'
+    + '</div>'
+    // Search button + results
+    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
+    + '<button class="btn-tw" id="rfSearchBtn" onclick="_rfFindTargets()"' + (!gameId ? ' disabled title="Start streaming so SF can detect your game"' : '') + '><svg class="ic"><use href="#i-eye"/></svg> Find Targets</button>'
+    + (!gameId ? '<span style="font-size:11px;color:var(--mut)">Start streaming to detect your game, or click refresh</span>' : '')
+    + '</div>'
+    + '<div id="rfResults" style="max-height:300px;overflow-y:auto"></div>'
+    + '<div class="mbtns" style="margin-top:8px"><button class="btn-x" onclick="closeModal()">Close</button></div>';
+
+  // Show cached results if any
+  if (rf.lastResults) _rfRenderResults();
+}
+
+function _rfSetMode(mode) {
+  var rf = S.raidFinder;
+  rf.rangeMode = mode;
+  saveSettings();
+  _rfRenderPanel(); // re-render with new mode
+}
+
+function _rfUpdateRange() {
+  var rf = S.raidFinder;
+  var low = parseInt(document.getElementById('rfLow').value) || 0;
+  var high = parseInt(document.getElementById('rfHigh').value) || 0;
+  if (high < low) high = low;
+  if (rf.rangeMode === 'percent') {
+    var viewers = Math.max(1, S.viewers.tw || 1);
+    rf.rangeLowPct = Math.max(0, low / viewers);
+    rf.rangeHighPct = Math.max(rf.rangeLowPct, high / viewers);
+  } else {
+    rf.rangeLowAbs = low;
+    rf.rangeHighAbs = high;
+  }
+  saveSettings();
+}
+
+function _rfRefreshGame() {
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) return;
+  S.sbWS.send(JSON.stringify({ request: 'GetBroadcaster', id: 'sf-broadcaster' }));
+  var el = document.getElementById('rfGameName');
+  if (el) el.textContent = 'Refreshing...';
+  setTimeout(function() {
+    var el2 = document.getElementById('rfGameName');
+    if (el2 && el2.textContent === 'Refreshing...') {
+      el2.textContent = S.twGame || '(not detected)';
+      // Re-enable search button if game detected
+      var btn = document.getElementById('rfSearchBtn');
+      if (btn) btn.disabled = !S.twGameId;
+    }
+  }, 3000);
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+function _rfFindTargets() {
+  var rf = S.raidFinder;
+  if (!rf.actions.find) { sysMsg('tw', 'Raid Finder SB action not installed.'); return; }
+  var gameId = S.twGameId;
+  if (!gameId) return;
+
+  var viewers = Math.max(1, S.viewers.tw || 1);
+  var low, high;
+  if (rf.rangeMode === 'percent') {
+    low = Math.max(0, Math.floor(viewers * rf.rangeLowPct));
+    high = Math.max(low, Math.ceil(viewers * rf.rangeHighPct));
+  } else {
+    low = Math.max(0, rf.rangeLowAbs);
+    high = Math.max(low, rf.rangeHighAbs);
+  }
+
+  var reqId = 'sf-rf-find-' + Date.now();
+  rf.lastReqId = reqId;
+  rf.searching = true;
+  rf.lastResults = null;
+
+  var btn = document.getElementById('rfSearchBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Searching...'; }
+  var resEl = document.getElementById('rfResults');
+  if (resEl) resEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mut);font-size:12px">Searching Twitch for streamers...</div>';
+
+  S.sbWS.send(JSON.stringify({
+    request: 'DoAction',
+    id: reqId,
+    action: rf.actions.find,
+    args: {
+      gameId: String(gameId),
+      minViewers: String(low),
+      maxViewers: String(high),
+      wantCount: String(rf.wantCount),
+      sfReqId: reqId
+    }
+  }));
+
+  // Timeout fallback
+  setTimeout(function() {
+    if (rf.searching && rf.lastReqId === reqId) {
+      rf.searching = false;
+      rf.lastResults = { error: 'timeout' };
+      _rfRenderResults();
+      _rfResetSearchBtn();
+    }
+  }, 15000);
+}
+
+function _rfResetSearchBtn() {
+  var btn = document.getElementById('rfSearchBtn');
+  if (btn) { btn.disabled = !S.twGameId; btn.innerHTML = '<svg class="ic"><use href="#i-eye"/></svg> Find Targets'; }
+}
+
+// ── Response handler (called from handleSBEvent) ─────────────────────────────
+function _handleRaidFinderResponse(data) {
+  var rf = S.raidFinder;
+  if (!data.reqId || data.reqId !== rf.lastReqId) return;
+  rf.searching = false;
+  if (data.kind === 'error') {
+    rf.lastResults = { error: data.code || 'unknown' };
+  } else {
+    rf.lastResults = { streams: data.streams || [] };
+  }
+  _rfRenderResults();
+  _rfResetSearchBtn();
+}
+
+// ── Render results ───────────────────────────────────────────────────────────
+function _rfRenderResults() {
+  var el = document.getElementById('rfResults');
+  if (!el) return;
+  var rf = S.raidFinder;
+  var res = rf.lastResults;
+  if (!res) { el.innerHTML = ''; return; }
+
+  if (res.error) {
+    var errMsg = {
+      timeout: 'Search timed out. Make sure Streamer.bot is connected and the Raid Finder actions are enabled.',
+      twitch_not_connected: 'Twitch is not connected in Streamer.bot. Sign in to Twitch inside SB first.',
+      missing_gameId: 'No game detected. Make sure your stream is live.'
+    }[res.error] || 'Error: ' + res.error;
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--err,#ef4444);font-size:12px"><svg class="ic" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-warn"/></svg> ' + esc(errMsg) + '</div>';
+    return;
+  }
+
+  var streams = res.streams || [];
+  if (!streams.length) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--mut);font-size:12px">No streamers found in this range. Try widening it.</div>';
+    return;
+  }
+
+  el.innerHTML = streams.map(function(s, i) {
+    var avatar = s.profile_image_url || '';
+    var title = (s.title || '').length > 80 ? s.title.substring(0, 77) + '...' : (s.title || '');
+    var uptime = '';
+    if (s.started_at) {
+      var mins = Math.floor((Date.now() - new Date(s.started_at).getTime()) / 60000);
+      uptime = mins >= 60 ? Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm' : mins + 'm';
+    }
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surf2);border-radius:6px;margin-bottom:4px">'
+      + (avatar ? '<img src="' + esc(avatar) + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0" onerror="this.style.display=\'none\'">' : '<div style="width:36px;height:36px;border-radius:50%;background:var(--surf3);flex-shrink:0"></div>')
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(s.user_name || s.user_login || '') + '</div>'
+      + '<div style="font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(s.title || '') + '">' + esc(title) + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0">'
+      + '<div style="font-size:13px;font-weight:600">' + (s.viewer_count || 0) + ' <span style="font-size:10px;color:var(--mut);font-weight:400">viewers</span></div>'
+      + (uptime ? '<div style="font-size:10px;color:var(--mut)">' + uptime + '</div>' : '')
+      + '</div>'
+      + '<button class="btn-tw" style="flex-shrink:0;padding:5px 10px;font-size:11px" onclick="_rfStartRaid(\'' + escA(s.user_login || '') + '\',\'' + escA(s.user_name || s.user_login || '') + '\')">Raid &rarr;</button>'
+      + '</div>';
+  }).join('');
+}
+
+// ── Fire raid ────────────────────────────────────────────────────────────────
+function _rfStartRaid(login, displayName) {
+  if (!S.raidFinder.actions.startRaid) { sysMsg('tw', 'Raid action not installed.'); return; }
+  if (!confirm('Raid ' + (displayName || login) + ' now?')) return;
+  S.sbWS.send(JSON.stringify({
+    request: 'DoAction',
+    id: 'sf-rf-raid-' + Date.now(),
+    action: S.raidFinder.actions.startRaid,
+    args: { raidTarget: login }
+  }));
+  sysMsg('tw', 'Raiding ' + (displayName || login) + '\u2026 give Twitch a few seconds.');
+  closeModal();
+}
+
 // ── Demo Mode ────────────────────────────────────────────────────────────────
 // Feeds fake events through the real pipelines (pushMsg / showBanner /
 // trackContributor / etc.) so the streamer can preview how everything looks
@@ -4087,6 +4430,9 @@ function handleSBEvent(event, data) {
     pushMsg({ plat: 'kk', isEv: true, big: true, user: kkipUser, text: kkipText, avatar: _kkipAv }); setPinnedEvent(kkipUser, kkipText, 'kk');
   } else if (key === 'StreamElements.Donation' || key === 'StreamElements.Tip' || key === 'SE.Tip' || key === 'SE.Donation' || key === 'StreamElements.Latest') {
     handleSETip(data, false);
+  } else if (key === 'General.Custom' && data && data.source === 'sf_raid_finder') {
+    _handleRaidFinderResponse(data);
+    return;
   } else if (key === 'General.Custom' && (data.name === 'PayPal' || data.name === 'PayPalDonation' || (data.source || '').toLowerCase().includes('paypal'))) {
     handleSETip(data, true);
   } else if (key === 'Twitch.WatchStreak' || key === 'Twitch.ViewerWatchStreak') {

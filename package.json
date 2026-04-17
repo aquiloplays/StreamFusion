@@ -1,6 +1,6 @@
 {
   "name": "streamfusion",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Unified multi-platform stream chat viewer",
   "main": "main.js",
   "scripts": {

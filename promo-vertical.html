@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>StreamFusion — Promo Overlay (Vertical)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+
+.promo{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:18px 24px 16px;
+  width:280px;
+  background:rgba(14,14,16,.90);
+  border:1px solid rgba(58,134,255,.35);
+  border-radius:18px;
+  box-shadow:0 4px 30px rgba(0,0,0,.5),0 0 40px rgba(58,134,255,.12);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  animation:slideUp .6s cubic-bezier(.16,1,.3,1) forwards;
+  opacity:0;
+}
+@keyframes slideUp{
+  from{opacity:0;transform:translateX(-50%) translateY(20px)}
+  to{opacity:1;transform:translateX(-50%) translateY(0)}
+}
+
+.promo::before{
+  content:'';position:absolute;inset:-1px;border-radius:19px;
+  background:linear-gradient(135deg,rgba(58,134,255,.4),rgba(0,229,160,.3),rgba(145,71,255,.3));
+  z-index:-1;opacity:0;
+  animation:glowPulse 3s ease-in-out infinite;
+}
+@keyframes glowPulse{0%,100%{opacity:0}50%{opacity:.6}}
+
+/* Logo + brand row */
+.promo-brand{display:flex;align-items:center;gap:10px}
+.promo-icon{
+  width:36px;height:36px;flex-shrink:0;
+  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 20px rgba(58,134,255,.4);
+}
+.promo-icon svg{width:20px;height:20px;color:#fff;filter:drop-shadow(0 0 4px rgba(255,255,255,.5))}
+.promo-name{
+  font-size:20px;font-weight:900;letter-spacing:.3px;
+  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  filter:drop-shadow(0 0 8px rgba(58,134,255,.5));
+  line-height:1;
+}
+
+/* Tagline */
+.promo-tagline{
+  font-size:11px;color:rgba(255,255,255,.5);font-weight:500;letter-spacing:.2px;
+  text-align:center;
+}
+
+/* Separator */
+.promo-sep{
+  width:60%;height:1px;
+  background:linear-gradient(to right,transparent,rgba(255,255,255,.12),transparent);
+}
+
+/* Platform badges */
+.promo-plats{display:flex;gap:8px;align-items:center}
+.promo-plat{
+  width:28px;height:28px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+}
+.promo-plat svg{width:16px;height:16px}
+.promo-plat.tw{color:#9147ff;border-color:rgba(145,71,255,.35)}
+.promo-plat.yt{color:#ff0000;border-color:rgba(255,0,0,.3)}
+.promo-plat.tt{color:#00f2ea;border-color:rgba(0,242,234,.3)}
+.promo-plat.kk{color:#53fc18;border-color:rgba(83,252,24,.3)}
+
+/* CTA */
+.promo-cta{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 20px;
+  background:linear-gradient(135deg,rgba(58,134,255,.15),rgba(0,229,160,.1));
+  border:1px solid rgba(58,134,255,.3);
+  border-radius:12px;
+}
+.promo-url{font-size:16px;font-weight:800;color:#fff;letter-spacing:.5px}
+.promo-url span{
+  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.promo-arrow{
+  width:20px;height:20px;color:rgba(58,134,255,.8);
+  animation:arrowBounce 1.5s ease-in-out infinite;
+}
+@keyframes arrowBounce{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+</style>
+</head>
+<body>
+
+<div class="promo">
+  <!-- Brand -->
+  <div class="promo-brand">
+    <div class="promo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></svg>
+    </div>
+    <div class="promo-name">StreamFusion</div>
+  </div>
+
+  <div class="promo-tagline">All your chats. One screen.</div>
+
+  <div class="promo-sep"></div>
+
+  <!-- Platforms -->
+  <div class="promo-plats">
+    <div class="promo-plat tw"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4.3 1 2 4.7v15.6h5.3V23h3.4l3.3-2.7h4.7L23 16V1H4.3zm16 13.7-3.4 3.3h-5.3L8.3 21.3v-3.3H4.7V3.7h15.6v11zM15.3 7v5.3h-2.6V7h2.6zm-5.6 0v5.3H7V7h2.7z"/></svg></div>
+    <div class="promo-plat yt"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M23 7s-.2-1.7-1-2.4c-1-1-2.2-1-2.7-1.1C16.2 3.3 12 3.3 12 3.3s-4.2 0-7.3.2c-.5.1-1.7.1-2.7 1.1C1.2 5.3 1 7 1 7S.8 9 .8 11v1.8c0 2.1.2 4.1.2 4.1s.2 1.7 1 2.4c1 1 2.2 1 2.7 1.1 2 .2 8.3.2 8.3.2s4.2 0 7.3-.2c.5-.1 1.7-.1 2.7-1.1.8-.7 1-2.4 1-2.4s.2-2.1.2-4.1V11c0-2.1-.2-4-.2-4zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg></div>
+    <div class="promo-plat tt"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 6.4a4.8 4.8 0 0 1-3.1-2.8A4.7 4.7 0 0 1 15.8 2h-3.5v13.7a2.9 2.9 0 0 1-2.9 2.7 2.9 2.9 0 0 1-2.9-2.9 2.9 2.9 0 0 1 2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 0 0-.9-.1A6.4 6.4 0 0 0 3 15.5a6.4 6.4 0 0 0 6.4 6.4 6.4 6.4 0 0 0 6.4-6.4v-7a8.3 8.3 0 0 0 4.9 1.6V6.5c-.5 0-1-.1-1.4-.1z"/></svg></div>
+    <div class="promo-plat kk"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg></div>
+  </div>
+
+  <div class="promo-sep"></div>
+
+  <!-- CTA -->
+  <div class="promo-cta">
+    <div class="promo-url"><span>aquilo.gg</span></div>
+    <svg class="promo-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  </div>
+</div>
+
+</body>
+</html>

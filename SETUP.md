@@ -133,33 +133,30 @@ Each Twitch chat message has a small shield icon on the right. Click it to open 
 
 ---
 
-## Raid Finder
+## Raid Finder (Early Access)
 
-The Raid Finder helps you find streamers playing the same game with a similar viewer count to raid when you end your stream.
+The Raid Finder helps you find streamers playing the same game with a similar viewer count to raid when you end your stream. It uses your existing Streamer.bot Twitch login — no extra tokens or API keys needed.
+
+> **Early Access:** Raid Finder is available to Patreon Tier 2+ supporters. Connect your Patreon in **Settings → Early Access** to unlock it.
 
 ### How it works
 
 1. Click **Raid** in the top bar
-2. If Streamer.bot is already connected and your stream is live, StreamFusion will automatically detect your game and viewer count — no extra setup needed
-3. If your game hasn't been detected yet, expand **Setup & Settings** and enter your **Twitch Client ID** and **OAuth Token** (needed to search other streamers)
-4. Click **Connect & Find Targets**
-5. Browse the results and click **Raid →** on the channel you want to raid
-6. Pick a **Streamer.bot action** that executes the actual Twitch raid command
+2. The first time, StreamFusion will prompt you to import two small actions into Streamer.bot — just copy the string, paste it into SB's Import dialog, and confirm
+3. If your stream is live, StreamFusion automatically detects your game and viewer count
+4. Adjust the viewer range if needed (defaults to 50%–150% of your current viewers)
+5. Click **Find Targets** — StreamFusion searches Twitch for live streamers in the same game
+6. Browse the results and click **Raid →** on the channel you want to raid
 
-### Getting Twitch credentials (for target search)
+### Requirements
 
-The search for other streamers requires read access to the Twitch API. Your credentials never leave your computer.
+- Streamer.bot must be connected
+- Twitch must be signed in inside Streamer.bot (same as the rest of StreamFusion)
+- Your stream should be live so SF can detect your game and viewer count
 
-1. Register a free app at `dev.twitch.tv/console` to get a **Client ID**
-2. Get an OAuth token at `twitchtokengenerator.com` (use the same Client ID)
-3. Paste both into the Raid Finder setup section
+### Customising the raid action
 
-### Setting up the Streamer.bot raid action
-
-1. In Streamer.bot, create a new **Action**
-2. Add a **Start Raid** sub-action
-3. In the User Login field, enter `%raidTarget%`
-4. Save the action — it will appear in the Raid Finder's action dropdown
+The imported "Start Raid" action simply executes a Twitch raid. If you want to add a chat announcement, sound, or delay before the raid, open the action in Streamer.bot and add extra sub-actions above or below the existing one.
 
 ---
 
