@@ -39,6 +39,15 @@ const PATREON_TIER2_ID      = process.env.PATREON_TIER2_ID      || '';
 const PATREON_TIER3_ID      = process.env.PATREON_TIER3_ID      || '';
 const PORT                  = parseInt(process.env.PORT, 10) || 8080;
 
+// Comma-separated list of email addresses that always get Tier 3 access
+// regardless of actual Patreon membership. Needed so the creator (who
+// can't pledge to their own Patreon) can use the shared bot to test.
+// Mirrors the OWNER_EMAILS list in patreon-auth.js on the desktop side.
+const OWNER_EMAILS = (process.env.OWNER_EMAILS || '')
+  .split(',')
+  .map(function(s) { return s.trim().toLowerCase(); })
+  .filter(Boolean);
+
 // Permissions the bot needs when invited: View Channels (1024) +
 // Read Message History (65536) + Connect (1048576 — for voice state
 // events we need to be a guild member, which View Channels covers).
@@ -234,9 +243,13 @@ function verifyPatreon(accessToken) {
     const cached = patreonCache.get(accessToken);
     if (cached && cached.expiresAt > Date.now()) { resolve(cached); return; }
 
+    // Include the user's email so we can match against OWNER_EMAILS for
+    // the creator bypass. patron_status + currently_entitled_tiers is
+    // still the source of truth for actual Tier 2/3 supporters.
     const url = 'https://www.patreon.com/api/oauth2/v2/identity'
               + '?include=memberships,memberships.currently_entitled_tiers'
-              + '&fields%5Bmember%5D=patron_status';
+              + '&fields%5Bmember%5D=patron_status'
+              + '&fields%5Buser%5D=email,full_name';
     fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken, 'User-Agent': 'StreamFusion-bot' } })
       .then(function(r) { return r.json().then(function(j) { return { status: r.status, body: j }; }); })
       .then(function(r) {
@@ -247,6 +260,19 @@ function verifyPatreon(accessToken) {
           return;
         }
         const userId = r.body.data.id;
+        const attrs = r.body.data.attributes || {};
+        const email = (attrs.email || '').toLowerCase();
+
+        // Owner bypass — the creator signs in with their own Patreon
+        // account (not a patron of their own campaign) so they need
+        // explicit allow-listing to use the shared bot.
+        if (email && OWNER_EMAILS.indexOf(email) !== -1) {
+          const result = { userId: userId, entitled: true, tier: 'tier3', expiresAt: Date.now() + PATREON_CACHE_TTL };
+          patreonCache.set(accessToken, result);
+          resolve(result);
+          return;
+        }
+
         const included = r.body.included || [];
         let entitled = false, tier = 'none';
         for (let i = 0; i < included.length; i++) {

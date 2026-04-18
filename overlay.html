@@ -13,7 +13,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:transparent}
-body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;padding-bottom:72px;box-sizing:border-box}
+body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;padding-bottom:108px;box-sizing:border-box}
 
 /* ── Drag bar ─────────────────────────────────────────────────── */
 .ov-drag{height:28px;background:var(--surf);display:flex;align-items:center;padding:0 8px;flex-shrink:0;-webkit-app-region:drag;user-select:none;border-bottom:1px solid var(--bdr);gap:6px;border-radius:8px 8px 0 0}
@@ -210,29 +210,34 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 /* Event area is fixed at the bottom inside the reserved padding-bottom space
    so it never covers chat and never shifts the flex layout. Height auto-
    expands upward for tall events (e.g. gift+message toasts) so the bottom
-   row never gets clipped — min-height keeps the empty-state reservation. */
-.ov-event-area{position:fixed;bottom:0;left:0;right:0;min-height:64px;display:flex;align-items:flex-end;justify-content:center;z-index:180;pointer-events:none;padding:6px 10px 10px;box-sizing:border-box;overflow:visible}
+   row never gets clipped — min-height keeps the empty-state reservation.
+   NOTE: if you bump min-height here, also bump the body's padding-bottom
+   so chat can always scroll clear of the event zone. */
+.ov-event-area{position:fixed;bottom:0;left:0;right:0;min-height:96px;display:flex;align-items:flex-end;justify-content:center;z-index:180;pointer-events:none;padding:8px 10px 12px;box-sizing:border-box;overflow:visible}
 .ov-event-area .ov-event{pointer-events:auto}
+/* Larger, easier-to-read events — bigger type, taller card, bolder accents.
+   Was font-size:15, padding:10/18 → now 19, 14/24. Username jumps from
+   16 → 22 for the same reason. */
 .ov-event{
   position:relative;
-  padding:10px 18px;
-  border-radius:12px;
-  font-size:15px;
+  padding:14px 24px;
+  border-radius:14px;
+  font-size:19px;
   font-weight:700;
   line-height:1.35;
   animation:evToastIn .45s cubic-bezier(.34,1.56,.64,1) both;
   border:2px solid var(--ev);
-  border-left-width:5px;
+  border-left-width:6px;
   background:linear-gradient(135deg,rgba(240,180,41,.22),rgba(240,180,41,.08));
-  box-shadow:0 4px 20px rgba(0,0,0,.5),0 0 16px rgba(240,180,41,.35);
+  box-shadow:0 6px 28px rgba(0,0,0,.55),0 0 20px rgba(240,180,41,.4);
   text-align:center;
-  min-width:min(300px,92%);
+  min-width:min(340px,92%);
   max-width:97%;
   width:max-content;
   overflow:hidden;
   backdrop-filter:blur(10px);
   color:#fff;
-  text-shadow:0 1px 6px rgba(0,0,0,.7);
+  text-shadow:0 1px 6px rgba(0,0,0,.75);
 }
 .ov-event::after{
   content:'';
@@ -250,8 +255,8 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-event.cc{border-color:var(--cc);background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(245,165,36,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(245,165,36,.25)}
 .ov-event.out{animation:evToastOut .35s cubic-bezier(.4,0,.6,1) forwards}
 .ov-ev-head{display:block}
-.ov-ev-user{color:var(--ev);font-weight:900;font-size:16px;text-shadow:0 0 10px currentColor;margin-right:5px}
-.ov-ev-msg{margin-top:5px;padding:5px 10px;font-size:12px;font-style:italic;color:#e9e9ef;background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.35);border-radius:4px;line-height:1.4;word-break:break-word;animation:ovEvMsgIn .35s .1s ease-out both}
+.ov-ev-user{color:var(--ev);font-weight:900;font-size:22px;text-shadow:0 0 12px currentColor;margin-right:6px}
+.ov-ev-msg{margin-top:7px;padding:7px 12px;font-size:15px;font-style:italic;color:#e9e9ef;background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.35);border-radius:5px;line-height:1.45;word-break:break-word;animation:ovEvMsgIn .35s .1s ease-out both}
 .ov-ev-msg::before{content:'\201C';opacity:.55;margin-right:2px}
 .ov-ev-msg::after{content:'\201D';opacity:.55;margin-left:2px}
 @keyframes ovEvMsgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}

@@ -4737,11 +4737,25 @@ function handleSBEvent(event, data) {
   } else if (key === 'Twitch.RewardRedemption' || key === 'Twitch.ChannelPointRedemption' || key === 'Twitch.ChannelPointsRedemption' || key === 'Twitch.Reward.Redemption' || key === 'Twitch.PointsRedemption') {
     if (chk('ev-tw-redeem')) return;
     var ren = gu(data);
-    var rtitle = (data.reward && data.reward.title) || (data.redemption && data.redemption.reward && data.redemption.reward.title)
-      || data.rewardTitle || data.reward_title || data.title || '?';
+    // SB sends the reward name under several different shapes depending on
+    // the SB version / trigger path:
+    //   - data.rewardName         (most common in modern SB)
+    //   - data.reward.title       (EventSub-passthrough shape)
+    //   - data.redemption.reward.title (nested under `redemption`)
+    //   - data.args.rewardName    (action-arg shape)
+    //   - data.rewardTitle / data.reward_title / data.title (legacy fallbacks)
+    // Try them all; fall back to '?' only when every option truly empty.
+    var _a = data.args || {};
+    var rtitle = (data.reward && data.reward.title)
+      || (data.redemption && data.redemption.reward && data.redemption.reward.title)
+      || data.rewardName || data.reward_name
+      || _a.rewardName || _a.rewardTitle || _a.reward
+      || data.rewardTitle || data.reward_title || data.title
+      || (data.reward && data.reward.name)
+      || '?';
     var rcost = Number(
       (data.reward && data.reward.cost) || (data.redemption && data.redemption.reward && data.redemption.reward.cost)
-      || data.rewardCost || data.reward_cost || data.cost || 0
+      || data.rewardCost || data.reward_cost || _a.rewardCost || _a.cost || data.cost || 0
     ) || 0;
     var _redeemMsg = _extractUserMessage(data);
     if (_streamSession.active && rcost > 0) _streamSession.chPoints += rcost;
@@ -6772,15 +6786,22 @@ function startHypeTrain(data) {
 }
 function updateHypeTrainProgress(data) {
   var prevLevel = _htState.level;
-  _htState.total = data.total || _htState.total;
-  _htState.level = data.level || _htState.level;
-  _htState.goal = data.goal || data.goalTotal || _htState.goal;
+  // Use != null checks instead of ||-defaulting so that legitimate 0
+  // values from SB (e.g. total reset to 0 right after a level-up) take
+  // effect instead of keeping stale numbers. The old code made the
+  // progress bar look frozen at the previous level's final value.
+  if (data.total != null) _htState.total = Number(data.total) || 0;
+  if (data.level != null) _htState.level = Number(data.level) || _htState.level;
+  if (data.goal  != null) _htState.goal  = Number(data.goal)  || _htState.goal;
+  else if (data.goalTotal != null) _htState.goal = Number(data.goalTotal) || _htState.goal;
   if (data.topContributors || data.contributors) _htState.top = data.topContributors || data.contributors;
   if (data.countdown || data.expiresIn) _htState.expires = Date.now() + ((data.countdown || data.expiresIn) * 1000);
   updateHypeTrain();
-  // Discord+ hype-train updates: post only on level-up transitions so a
-  // channel doesn't get a progress update every few seconds.
-  if (_htState.level > prevLevel) {
+  // Discord+ hype-train posts: ONLY real level-up transitions
+  // (prevLevel >= 1 AND new level is strictly higher). Without the
+  // prevLevel guard, the first HypeTrainUpdate after a fresh start
+  // fires a bogus "level 1" post because prevLevel was 0.
+  if (prevLevel >= 1 && _htState.level > prevLevel) {
     try { discordPostHype(_htState.level, _htState.total, _htState.goal); } catch (e) {}
   }
 }
