@@ -239,13 +239,19 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
   color:#fff;
   text-shadow:0 1px 6px rgba(0,0,0,.75);
 }
+/* Shine sweep — was `infinite` which kept running on every visible
+   event for the entire life of the pop-out, burning compositor cycles
+   for no benefit. Now it plays twice right after the toast appears,
+   then stops. Eliminates a common source of "animations feel slow"
+   reports when multiple events are queued at once. */
 .ov-event::after{
   content:'';
   position:absolute;
   top:0;left:0;right:0;bottom:0;
   background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.2) 50%,transparent 65%);
   pointer-events:none;
-  animation:evToastShine 2.2s ease-in-out infinite;
+  animation:evToastShine 2.2s ease-in-out 2 both;
+  will-change:transform;
 }
 .ov-event.tw{border-color:var(--tw);background:linear-gradient(135deg,rgba(145,71,255,.2),rgba(145,71,255,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(145,71,255,.25)}
 .ov-event.yt{border-color:var(--yt);background:linear-gradient(135deg,rgba(255,0,0,.2),rgba(255,0,0,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(255,0,0,.25)}

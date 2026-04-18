@@ -1569,6 +1569,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <label class="frow"><span>Subscriptions</span><input type="checkbox" id="ev-kk-sub" onchange="saveSettings()"></label>
               <label class="frow"><span>Gift Subs</span><input type="checkbox" id="ev-kk-gift" onchange="saveSettings()"></label>
               <label class="frow"><span>Raids</span><input type="checkbox" id="ev-kk-raid" onchange="saveSettings()"></label>
+              <label class="frow"><span>Channel-Point Redemptions</span><input type="checkbox" id="ev-kk-redeem" onchange="saveSettings()"></label>
             </div>
             <div class="ev-group">
               <div class="ev-group-hd" style="color:#7cdf21">StreamElements / Tips</div>
@@ -1664,9 +1665,12 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
           <div class="sec">
             <div class="sec-hd">Discord Integration</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Send a full stream recap (stats + contributor thanks) to Discord when the stream ends.</div>
-            <input class="minput" id="discordWebhookInput" type="text" placeholder="Discord Webhook URL..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="discordWebhook=this.value.trim();saveSettings()" onchange="discordWebhook=this.value.trim();saveSettings()">
-            <label class="frow"><span>Auto-send stream recap to Discord when stream ends</span><input type="checkbox" id="discordEnabledChk" onchange="discordEnabled=this.checked;saveSettings()"></label>
-            <div style="display:flex;gap:5px;margin-top:4px">
+            <input class="minput" id="discordWebhookInput" type="text" placeholder="Discord Webhook URL..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="discordWebhook=this.value.trim();saveSettings();renderDiscordStatus()" onchange="discordWebhook=this.value.trim();saveSettings();renderDiscordStatus()">
+            <label class="frow"><span>Auto-send stream recap to Discord when stream ends</span><input type="checkbox" id="discordEnabledChk" onchange="discordEnabled=this.checked;saveSettings();renderDiscordStatus()"></label>
+            <!-- Live status indicator so users can confirm their setup works
+                 BEFORE stream-end. Updated by renderDiscordStatus(). -->
+            <div id="discordStatus" style="font-size:11px;margin-top:8px;padding:8px 10px;background:var(--surf3);border:1px solid var(--bdr);border-radius:6px;line-height:1.6"></div>
+            <div style="display:flex;gap:5px;margin-top:6px">
               <button onclick="testDiscordWebhook()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg class="ic"><use href="#i-plug"/></svg>Test Webhook</button>
               <button onclick="sendDiscordRecap(true)" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg class="ic"><use href="#i-send"/></svg>Send Recap Now</button>
             </div>
@@ -2043,7 +2047,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec">
               <div class="sec-hd">Live Event Posts</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Send a stylized Discord embed whenever one of these happens on stream. Share the recap webhook or use a separate channel like <code style="background:var(--surf3);padding:1px 4px;border-radius:3px">#stream-alerts</code>.</div>
-              <input class="minput" id="dcEventWebhookInput" type="text" placeholder="Webhook URL (optional — leave blank to disable)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcEventWebhook=this.value.trim();saveDiscordSettings()" onchange="dcEventWebhook=this.value.trim();saveDiscordSettings()">
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                <input class="minput" id="dcEventWebhookInput" type="text" placeholder="Webhook URL (optional — leave blank to disable)" style="font-size:11px;padding:5px 8px;background:var(--surf2);flex:1" oninput="dcEventWebhook=this.value.trim();saveDiscordSettings()" onchange="dcEventWebhook=this.value.trim();saveDiscordSettings()">
+                <button class="cbtn" onclick="testEventWebhook()" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);white-space:nowrap">Test</button>
+              </div>
               <div style="font-size:11px;color:var(--mut);margin-bottom:4px">Post when:</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
                 <label class="frow" style="font-size:11px"><span>Follows</span><input type="checkbox" id="dcPostFollow" onchange="saveDiscordSettings()"></label>
@@ -2066,7 +2073,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec">
               <div class="sec-hd">Stream Records</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Keeps a single message in a Discord channel updated with your all-time bests. Categories with no events yet are hidden from the post until they happen. Dedicated channel recommended (e.g. <code style="background:var(--surf3);padding:1px 4px;border-radius:3px">#records</code>).</div>
-              <input class="minput" id="dcRecordsWebhookInput" type="text" placeholder="Records webhook URL..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcRecordsWebhook=this.value.trim();saveDiscordSettings()" onchange="dcRecordsWebhook=this.value.trim();saveDiscordSettings()">
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                <input class="minput" id="dcRecordsWebhookInput" type="text" placeholder="Records webhook URL..." style="font-size:11px;padding:5px 8px;background:var(--surf2);flex:1" oninput="dcRecordsWebhook=this.value.trim();saveDiscordSettings()" onchange="dcRecordsWebhook=this.value.trim();saveDiscordSettings()">
+                <button class="cbtn" onclick="testRecordsWebhook()" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);white-space:nowrap">Test</button>
+              </div>
               <label class="frow" style="font-size:11px"><span>Update records message automatically when a record is broken</span><input type="checkbox" id="dcRecordsAuto" checked onchange="saveDiscordSettings()"></label>
               <div style="margin-top:8px;display:flex;gap:6px">
                 <button class="cbtn tw" onclick="postRecordsNow()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Post records now</button>
@@ -2519,11 +2529,20 @@ var S = {
     actions: { find: null, startRaid: null },
     lastReqId: null, lastResults: null, searching: false,
     rangeMode: 'percent', rangeLowPct: 0.5, rangeHighPct: 1.5,
-    rangeLowAbs: 0, rangeHighAbs: 1000, wantCount: 25
+    rangeLowAbs: 0, rangeHighAbs: 1000, wantCount: 25,
+    // Optional override the streamer sets when SB fails to report their
+    // current game/category. When these are populated they win over the
+    // values detected from GetBroadcaster.
+    gameOverride: '',
+    gameIdOverride: '',
+    // Message the streamer wants posted to THEIR OWN chat right before
+    // the raid fires, so viewers can copy-paste it into the target
+    // channel. Placeholders: {target}, {game}, {channel}.
+    preRaidMessage: 'Going to raid {target}! Copy & paste this into their chat: Hey {target} chat! {channel} sent us! 💜'
   }
 };
 
-var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-ext-other','ev-se-tip','hideCmd'];
+var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-ext-other','ev-se-tip','hideCmd'];
 var SOUND_IDS = ['snd-chat','snd-tw-follow','snd-tw-sub','snd-tw-gift','snd-tw-raid','snd-tw-cheer','snd-yt-sub','snd-yt-super','snd-tt-follow','snd-tt-gift','snd-kk-follow','snd-kk-sub','snd-ext','snd-se-tip','snd-kw'];
 
 var ttsEnabled = false;
@@ -2632,6 +2651,9 @@ function loadSettings() {
     if (d.rfRangeLowAbs !== undefined) S.raidFinder.rangeLowAbs = d.rfRangeLowAbs;
     if (d.rfRangeHighAbs !== undefined) S.raidFinder.rangeHighAbs = d.rfRangeHighAbs;
     if (d.rfWantCount !== undefined) S.raidFinder.wantCount = d.rfWantCount;
+    if (d.rfGameOverride !== undefined)   S.raidFinder.gameOverride   = d.rfGameOverride;
+    if (d.rfGameIdOverride !== undefined) S.raidFinder.gameIdOverride = d.rfGameIdOverride;
+    if (d.rfPreRaidMessage !== undefined) S.raidFinder.preRaidMessage = d.rfPreRaidMessage;
   } catch(e) {}
 }
 
@@ -2655,7 +2677,9 @@ function saveSettings() {
     hideMainAnimations: hideMainAnimations,
     rfRangeMode: S.raidFinder.rangeMode, rfRangeLowPct: S.raidFinder.rangeLowPct,
     rfRangeHighPct: S.raidFinder.rangeHighPct, rfRangeLowAbs: S.raidFinder.rangeLowAbs,
-    rfRangeHighAbs: S.raidFinder.rangeHighAbs, rfWantCount: S.raidFinder.wantCount
+    rfRangeHighAbs: S.raidFinder.rangeHighAbs, rfWantCount: S.raidFinder.wantCount,
+    rfGameOverride: S.raidFinder.gameOverride, rfGameIdOverride: S.raidFinder.gameIdOverride,
+    rfPreRaidMessage: S.raidFinder.preRaidMessage
   }));
 }
 
@@ -3586,8 +3610,17 @@ function connectSB(host, port, pass) {
         // can't be trusted to deliver Twitch.PresentViewers on every version,
         // so we poll directly as the ongoing source of truth.
         if (S.twLogin) startTwViewerPoll();
-        if (twp.game || twp.gameName) S.twGame = twp.game || twp.gameName;
-        if (twp.gameId) S.twGameId = twp.gameId;
+        // Game / category fields come back under ~five different shapes
+        // depending on SB version. Newer SB nests the category under
+        // `broadcast` or uses `categoryName`; older ones use flat `game`.
+        var _tgn = twp.game || twp.gameName || twp.categoryName || twp.category
+                || (twp.broadcast && (twp.broadcast.gameName || twp.broadcast.game || twp.broadcast.categoryName))
+                || '';
+        var _tgid = twp.gameId || twp.categoryId
+                 || (twp.broadcast && (twp.broadcast.gameId || twp.broadcast.categoryId))
+                 || '';
+        if (_tgn) S.twGame = _tgn;
+        if (_tgid) S.twGameId = String(_tgid);
       }
       var ytp = msg.platforms && msg.platforms.youtube;
       if (ytp) {
@@ -3864,8 +3897,11 @@ function _rfVerifyImport() {
 function _rfRenderPanel() {
   var m = document.getElementById('modal');
   document.getElementById('overlay').classList.add('show');
-  var game = S.twGame || '(not detected)';
-  var gameId = S.twGameId || '';
+  // Override wins when set — lets the user paste a game name + ID when
+  // SB's GetBroadcaster returns empty game fields (happens on some SB
+  // versions, or when the streamer goes live without the bot running).
+  var game = S.raidFinder.gameOverride || S.twGame || '(not detected)';
+  var gameId = S.raidFinder.gameIdOverride || S.twGameId || '';
   var viewers = S.viewers.tw || 0;
   var isLive = viewers > 0 || S.twViewersFetched;
   var rf = S.raidFinder;
@@ -3893,6 +3929,24 @@ function _rfRenderPanel() {
     + '</div>'
     + '<button class="cbtn" style="padding:6px 8px" onclick="_rfRefreshGame()" title="Refresh game info"><svg class="ic"><use href="#i-refresh"/></svg></button>'
     + '</div>'
+    // Game ID display + manual override + pre-raid message — hidden
+    // behind a <details> so the panel stays compact when nothing's wrong.
+    // The override is there because GetBroadcaster doesn't always report
+    // game info on every SB version / every Twitch account state.
+    + '<details style="margin-bottom:10px">'
+    +   '<summary style="cursor:pointer;font-size:11px;color:var(--mut);user-select:none">Advanced: manual override &amp; pre-raid message</summary>'
+    +   '<div style="background:var(--surf2);border-radius:6px;padding:10px 12px;margin-top:6px">'
+    +     '<div style="font-size:10px;color:var(--mut);margin-bottom:4px">Detected Game ID: <code style="color:var(--accent)">' + esc(gameId || '(none)') + '</code></div>'
+    +     '<div style="display:flex;gap:6px;margin-bottom:6px">'
+    +       '<input id="rfGameOverride" type="text" placeholder="Game name (display only)" value="' + esc(S.raidFinder.gameOverride || '') + '" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px" onchange="S.raidFinder.gameOverride=this.value.trim();saveSettings()">'
+    +       '<input id="rfGameIdOverride" type="text" placeholder="Game ID" value="' + esc(S.raidFinder.gameIdOverride || '') + '" style="width:110px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px;font-family:Consolas,monospace" onchange="S.raidFinder.gameIdOverride=this.value.trim();saveSettings();_rfRenderPanel()">'
+    +     '</div>'
+    +     '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:8px">Paste a Twitch Game ID if SF can&rsquo;t detect yours. Find it at <code style="color:var(--accent)">twitchtracker.com/games/{slug}</code> or via the Twitch API.</div>'
+    +     '<div style="font-size:10px;color:var(--mut);margin-bottom:4px">Pre-raid chat message (sent to your chat the moment you hit Raid):</div>'
+    +     '<textarea id="rfPreRaidMsg" placeholder="Placeholders: {target}, {game}, {channel}" style="width:100%;min-height:44px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:6px 8px;font-size:11px;resize:vertical" onchange="S.raidFinder.preRaidMessage=this.value;saveSettings()">' + esc(S.raidFinder.preRaidMessage || '') + '</textarea>'
+    +     '<div style="font-size:10px;color:var(--mut);margin-top:4px;line-height:1.5">Leave blank to skip. Viewers copy-paste this into the target channel.</div>'
+    +   '</div>'
+    + '</details>'
     // Range controls
     + '<div style="background:var(--surf2);border-radius:6px;padding:10px 14px;margin-bottom:10px">'
     + '<div style="font-size:11px;font-weight:600;margin-bottom:6px">Target viewer range</div>'
@@ -3963,7 +4017,9 @@ function _rfRefreshGame() {
 function _rfFindTargets() {
   var rf = S.raidFinder;
   if (!rf.actions.find) { sysMsg('tw', 'Raid Finder SB action not installed.'); return; }
-  var gameId = S.twGameId;
+  // Override wins so the user can search by a pasted Game ID even when
+  // SB didn't detect one.
+  var gameId = rf.gameIdOverride || S.twGameId;
   if (!gameId) return;
 
   var viewers = Math.max(1, S.viewers.tw || 1);
@@ -4080,6 +4136,23 @@ function _rfRenderResults() {
 function _rfStartRaid(login, displayName) {
   if (!S.raidFinder.actions.startRaid) { sysMsg('tw', 'Raid action not installed.'); return; }
   if (!confirm('Raid ' + (displayName || login) + ' now?')) return;
+
+  // Pre-raid message: post to streamer's own Twitch chat so viewers can
+  // copy + paste into the target channel's chat. Fires BEFORE the raid
+  // command so it lands while the raid countdown is still visible.
+  // Template placeholders: {target}, {game}, {channel}.
+  var tmpl = (S.raidFinder.preRaidMessage || '').trim();
+  if (tmpl) {
+    var msg = tmpl
+      .replace(/\{target\}/g,  displayName || login)
+      .replace(/\{game\}/g,    S.raidFinder.gameOverride || S.twGame || '')
+      .replace(/\{channel\}/g, S.twLogin || 'the team');
+    // SF already has handleTwitchCommand for sending chat via SB. Using
+    // that path means the message respects Twitch's chat rate-limits and
+    // whatever SB account is configured as the sender.
+    try { if (typeof handleTwitchCommand === 'function') handleTwitchCommand(msg); } catch (e) {}
+  }
+
   S.sbWS.send(JSON.stringify({
     request: 'DoAction',
     id: 'sf-rf-raid-' + Date.now(),
@@ -4901,6 +4974,25 @@ function handleSBEvent(event, data) {
   } else if (key === 'Kick.PresentViewers') {
     var kvc = data.viewers != null ? data.viewers : data.viewerCount != null ? data.viewerCount : null;
     if (kvc != null) { S.viewers.kk = kvc; S.kkViewersFetched = true; _lastViewerUpdate.kk = Date.now(); updateViewers(); sendOverlayStats(); }
+  } else if (key === 'Kick.RewardRedemption' || key === 'Kick.ChannelPointRedemption' || key === 'Kick.RewardRedeemed' || key === 'Kick.RewardsRedemption' || key === 'Kick.PointsRedeemed') {
+    // Kick channel-point redeems. SB sends these under a few names
+    // depending on version (the Kick integration is newer / more in
+    // flux than the Twitch one). Same shape-hunt pattern as the Twitch
+    // redeem handler above.
+    if (chk('ev-kk-redeem')) return;
+    var kren = gu(data);
+    var _kra = data.args || {};
+    var krtitle = (data.reward && (data.reward.title || data.reward.name))
+      || (data.redemption && data.redemption.reward && (data.redemption.reward.title || data.redemption.reward.name))
+      || data.rewardName || data.reward_name || data.rewardTitle || data.reward_title
+      || _kra.rewardName || _kra.rewardTitle || _kra.reward
+      || data.title || data.name || '?';
+    var krcost = Number(
+      (data.reward && data.reward.cost) || (data.redemption && data.redemption.reward && data.redemption.reward.cost)
+      || data.rewardCost || data.reward_cost || _kra.rewardCost || _kra.cost || data.cost || 0
+    ) || 0;
+    var _kredeemMsg = _extractUserMessage(data);
+    pushMsg({ plat: 'kk', isEv: true, evType: 'redeem', user: kren, text: kren + ' redeemed: ' + krtitle + (krcost ? ' (' + krcost.toLocaleString() + ' pts)' : ''), evMessage: _kredeemMsg, avatar: _resolveEvAvatar('kk', data.user || data.redeemer, kren) });
   } else if (key === 'Kick.Kick' || key === 'Kick.Donation' || key === 'Kick.Tip') {
     var kkipUser = gu(data); var kkipAmt = Number(data.amount || data.value || 0);
     S.stats.kicks++; S.stats.kkSubRev += kkipAmt * 0.95; updateStreamStats();
@@ -5959,6 +6051,7 @@ function switchSettingsTab(tab) {
   if (tab === 'obsoverlays') renderObsOverlaysTab();
   if (tab === 'theme') renderThemeTab();
   if (tab === 'discordea') renderDiscordTab();
+  if (tab === 'integrations') renderDiscordStatus();
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
@@ -6046,12 +6139,87 @@ function copyObsUrl(which) {
   });
 }
 
+// In-app preview of an OBS overlay. Opens a centered modal with an
+// iframe loading the localhost overlay URL, so the streamer can see
+// exactly what OBS will show while they position/configure. The
+// iframe works because the overlay server sends Access-Control-Allow-
+// Origin:* and Electron doesn't enforce same-origin on file://→http://
+// by default.
+//
+// `which` is 'chat' | 'alerts' | 'shoutout' | 'vertical'.
 function previewObsUrl(which) {
   var el = document.getElementById('obsUrl' + which.charAt(0).toUpperCase() + which.slice(1));
   if (!el || !el.value) return;
-  // Open in the system browser (Electron blocks navigation and forwards
-  // to shell.openExternal via will-navigate handler in main.js).
-  window.open(el.value, '_blank');
+  var url = el.value;
+  var ovEl = document.getElementById('overlay');
+  var m = document.getElementById('modal');
+  if (!ovEl || !m) { window.open(url, '_blank'); return; }  // fallback if modal DOM missing
+
+  // Different overlays prefer different preview dimensions so the layout
+  // looks right in a small window (vertical is narrow+tall, alerts is
+  // wide+short, etc). These are approximations of common OBS browser-
+  // source sizes streamers actually use.
+  var dims = {
+    chat:     { w: 360, h: 520 },
+    alerts:   { w: 720, h: 220 },
+    shoutout: { w: 720, h: 300 },
+    vertical: { w: 720, h: 140 }
+  }[which] || { w: 560, h: 400 };
+
+  m.innerHTML = ''
+    + '<div class="mh"><svg class="ic"><use href="#i-eye"/></svg> Preview: ' + esc(which) + ' overlay</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5">Live preview of what OBS sees at <code style="color:var(--accent);user-select:all">' + esc(url) + '</code>. Settings changes in the tab apply to this preview in real time.</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+    +   '<button class="btn-tw" onclick="fireObsDemo(\'' + which + '\')"><svg class="ic"><use href="#i-play"/></svg> Send demo events</button>'
+    +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)" onclick="window.open(\'' + escA(url) + '\',\'_blank\')"><svg class="ic"><use href="#i-arrow"/></svg> Open in browser</button>'
+    +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);margin-left:auto" onclick="closeModal()">Close</button>'
+    + '</div>'
+    + '<div style="background:linear-gradient(135deg,#1a1a2e 25%,#2a2a3e 25%,#2a2a3e 50%,#1a1a2e 50%,#1a1a2e 75%,#2a2a3e 75%);background-size:20px 20px;border:1px solid var(--bdr);border-radius:8px;padding:10px;overflow:auto">'
+    +   '<iframe src="' + esc(url) + '" style="width:' + dims.w + 'px;height:' + dims.h + 'px;border:0;display:block;margin:0 auto;background:transparent" sandbox="allow-scripts allow-same-origin" allowtransparency="true"></iframe>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Checkered background simulates a non-transparent background so you can see where the overlay edges are. In OBS on top of your real scene it&rsquo;ll be fully transparent.</div>';
+  ovEl.classList.add('show');
+}
+
+// Fire a burst of demo events at whichever OBS overlay is being previewed.
+// Uses the same broadcast pipes the real event handlers do, so the preview
+// exactly matches what a live stream would look like. Spreads the events
+// out over ~10 seconds so animations don't all overlap.
+function fireObsDemo(which) {
+  if (!S.hasEarlyAccess || !window.electronAPI) {
+    addEvHistory('StreamFusion', 'OBS demo requires Early Access.', 'tw', false);
+    return;
+  }
+  var queue;
+  if (which === 'shoutout') {
+    // Single rich shoutout — overlays only render one at a time.
+    queue = [ function() {
+      window.electronAPI.obsBroadcastShoutout({
+        user: 'TestViewer',
+        platform: 'tw',
+        avatarUrl: 'https://unavatar.io/twitch/twitch',
+        recentEvent: { type: 'gift', text: 'just gifted 5 subs!' },
+        thankMessage: 'Thanks so much for supporting the stream!',
+        duration: 8000
+      });
+    } ];
+  } else {
+    // Mixed demo for chat / alerts / vertical — send a believable stream
+    // of activity so the streamer sees all the major code paths render.
+    queue = [
+      function() { window.electronAPI.obsBroadcastChat({ platform:'tw', user:'mod_alice',    message:'Hyped for today!',       userColor:'#a970ff', badges:['mod'] }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'follow', platform:'tw', user:'new_viewer_99' }); },
+      function() { window.electronAPI.obsBroadcastChat({ platform:'yt',  user:'YT Pat',      message:'Love the new layout!',   userColor:'#ff4545' }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'sub', platform:'tw', user:'longtime_sub', tier:'Tier 1' }); },
+      function() { window.electronAPI.obsBroadcastChat({ platform:'tt',  user:'TikTokFan',   message:'sent a gift \uD83C\uDF39', userColor:'#fe2c55' }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'generous_tiktoker', amount:1000, giftName:'Galaxy', giftImage:'' }); },
+      function() { window.electronAPI.obsBroadcastChat({ platform:'kk',  user:'KickKid',     message:'What game is this?',       userColor:'#53fc18' }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'cheer', platform:'tw', user:'big_spender', amount:500 }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'raid', platform:'tw', user:'raider_bob', amount:42 }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'tip', platform:'se', user:'supporter', amount:10 }); }
+    ];
+  }
+  queue.forEach(function(fn, i) { setTimeout(fn, i * 1100); });
 }
 
 function updateObsConfig(which) {
@@ -7202,6 +7370,8 @@ function sendDiscordRecap(manual) {
   fetch(discordWebhook, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     .then(function(r) {
       if (r.ok) {
+        window._lastDiscordRecapSentAt = Date.now();
+        renderDiscordStatus();
         if (manual) sysMsg('tw', 'Stream recap sent to Discord!');
         else addEvHistory('StreamFusion', 'Discord recap sent.', 'tw', false);
       } else {
@@ -7239,6 +7409,33 @@ function sendDiscordRecap(manual) {
     }).catch(function() {});
   }
 }
+// Live diagnostic for the Discord recap setup — shown in the Integrations
+// tab so the streamer can confirm everything's wired up BEFORE trying to
+// go live. Reflects: webhook URL presence, auto-send toggle, last-post
+// timestamp, and what the auto-fire guards would do right now.
+function renderDiscordStatus() {
+  var el = document.getElementById('discordStatus');
+  if (!el) return;
+  var parts = [];
+  if (discordWebhook) parts.push('<span style="color:var(--ok,#22c55e)">&#9679;</span> Webhook URL saved');
+  else parts.push('<span style="color:#ef4444">&#9679;</span> No webhook URL \u2014 recap can\u2019t send');
+  if (discordEnabled) parts.push('<span style="color:var(--ok,#22c55e)">&#9679;</span> Auto-send enabled');
+  else parts.push('<span style="color:#f0b429">&#9679;</span> Auto-send off \u2014 only the <strong>Send Recap Now</strong> button will fire');
+  // What would happen RIGHT NOW if the stream ended?
+  var sess = (typeof _streamSession === 'object') ? _streamSession : {};
+  var pv = sess.peakViewers || {};
+  var any = (pv.tw||0) + (pv.yt||0) + (pv.kk||0) + (pv.tt||0) > 0 || (sess.totalMsgs||0) > 0;
+  if (sess.active) {
+    parts.push('<span style="color:var(--ok,#22c55e)">&#9679;</span> Stream session active \u2014 auto-recap will fire on end' + (any ? '' : ' <span style="color:#f0b429">(no viewer/msg activity yet \u2014 would be skipped)</span>'));
+  } else {
+    parts.push('<span style="color:var(--mut)">&#9679;</span> No stream session active yet \u2014 recap builds from session stats once you go live');
+  }
+  if (window._lastDiscordRecapSentAt) {
+    parts.push('<span style="color:var(--mut)">&#9679;</span> Last posted: ' + new Date(window._lastDiscordRecapSentAt).toLocaleTimeString());
+  }
+  el.innerHTML = parts.join('<br>');
+}
+
 function testDiscordWebhook() {
   if (!discordWebhook) { sysMsg('tw', 'Enter a Discord webhook URL first.'); return; }
   var payload = { embeds: [{ title: '\u26A1 StreamFusion — Webhook Test', description: 'Your Discord webhook is connected and working! A full stream recap will be sent here when your stream ends.', color: 0x3fb950, footer: { text: 'Powered by StreamFusion' }, timestamp: new Date().toISOString() }] };
@@ -8343,6 +8540,51 @@ function resetRecords() {
 
 function openDiscordSetupGuide() {
   window.open('https://github.com/aquiloplays/StreamFusion/blob/main/SETUP-PATREON.md', '_blank');
+}
+
+// One-click smoke test for the event webhook. Fires a sample "new sub"
+// embed so the streamer can confirm the URL is right + the bot has
+// channel permissions without waiting for a real event.
+function testEventWebhook() {
+  if (!S.hasEarlyAccess) { addEvHistory('StreamFusion', 'Early Access required.', 'tw', false); return; }
+  if (!dcEventWebhook) { addEvHistory('StreamFusion', 'Paste an event webhook URL first.', 'tw', false); return; }
+  if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
+  var payload = dcEmbed({
+    platform: 'tw',
+    kicker: '\u2B50 Test event',
+    title: 'StreamFusion Discord+ webhook test',
+    description: 'If you see this embed in your configured channel, your event-post webhook is wired up correctly. Safe to delete.'
+  });
+  window.electronAPI.discordWebhookPost(dcEventWebhook, payload).then(function(res) {
+    if (res && res.ok) addEvHistory('StreamFusion', 'Event webhook test sent \u2014 check Discord.', 'tw', false);
+    else addEvHistory('StreamFusion', 'Event webhook test failed (status ' + (res && res.status) + '). Double-check the URL.', 'tw', false);
+  });
+}
+
+// Same smoke test for the records webhook. Posts a dummy records embed
+// with fake numbers so the streamer can confirm the channel is set up
+// before a real record fires.
+function testRecordsWebhook() {
+  if (!S.hasEarlyAccess) { addEvHistory('StreamFusion', 'Early Access required.', 'tw', false); return; }
+  if (!dcRecordsWebhook) { addEvHistory('StreamFusion', 'Paste a records webhook URL first.', 'tw', false); return; }
+  if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
+  var payload = {
+    embeds: [{
+      color: 0xf0b429,
+      title: '\uD83C\uDFC6 Stream Records (test)',
+      description: '*Sample records for webhook verification. Real values will appear here as your stream breaks records.*',
+      fields: [
+        { name: 'Most Twitch Gifted Subs', value: '**example_viewer** \u2014 50 subs',  inline: true },
+        { name: 'Highest Cheer',           value: '**big_spender** \u2014 10000 bits',  inline: true }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: DC_FOOTER
+    }]
+  };
+  window.electronAPI.discordWebhookPost(dcRecordsWebhook, payload).then(function(res) {
+    if (res && res.ok) addEvHistory('StreamFusion', 'Records webhook test sent \u2014 check Discord.', 'tw', false);
+    else addEvHistory('StreamFusion', 'Records webhook test failed (status ' + (res && res.status) + '). Double-check the URL.', 'tw', false);
+  });
 }
 
 // ── Discord Bot Gateway wiring ────────────────────────────────────────────
