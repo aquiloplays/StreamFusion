@@ -228,6 +228,13 @@
     if (item._kind === 'chat' && !CFG.showChat) { nextInQueue(); return; }
     if (item._kind === 'alert' && !CFG.showEvents) { nextInQueue(); return; }
     if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) { nextInQueue(); return; }
+    // Suppress the vertical bar for small TT gifts for the same reason
+    // as alerts.html — spammy gift drops shouldn't flood a single-line
+    // bar. Chat overlay's floating animation still shows them.
+    if (item._kind === 'alert' && item.eventType === 'gift' && item.platform === 'tt' && item.isBig === false) {
+      nextInQueue();
+      return;
+    }
 
     var bar = document.createElement('div');
     bar.className = 'bar ' + plat + (item._kind === 'alert' ? ' is-alert' : '');

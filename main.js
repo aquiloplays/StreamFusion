@@ -725,9 +725,12 @@ ipcMain.on('obs-broadcast-chat', function(event, data) {
   try { obsServer.broadcast('chat', data, ['chat', 'vertical']); } catch (e) {}
 });
 ipcMain.on('obs-broadcast-alert', function(event, data) {
-  // Same for alerts: the alerts banner AND the vertical bar both render
-  // alert-type events (shoutouts still go to /shoutout only).
-  try { obsServer.broadcast('alert', data, ['alerts', 'vertical']); } catch (e) {}
+  // Alerts fan out to the alerts banner, the vertical bar, AND the chat
+  // overlay. The chat overlay decides for itself (via its showEvents +
+  // showGiftAnimations config flags) whether to render them as an
+  // inline events row, as a full-overlay floating gift animation, or
+  // ignore them entirely.
+  try { obsServer.broadcast('alert', data, ['alerts', 'vertical', 'chat']); } catch (e) {}
 });
 ipcMain.on('obs-broadcast-shoutout', function(event, data) {
   try { obsServer.broadcast('shoutout', data, 'shoutout'); } catch (e) {}

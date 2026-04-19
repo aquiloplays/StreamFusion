@@ -1893,6 +1893,8 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                   <label class="frow" style="font-size:11px"><span>Platform badges</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
                   <label class="frow" style="font-size:11px"><span>User badges (mod/sub/vip)</span><input type="checkbox" id="obsChatShowUserBadges" checked onchange="updateObsConfig('chat')"></label>
                   <label class="frow" style="font-size:11px"><span>Render emotes</span><input type="checkbox" id="obsChatShowEmotes" checked onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Show events below chat</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>TikTok gift animations</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
                 </div>
               </div>
               <!-- Alerts overlay row -->
@@ -2519,7 +2521,7 @@ var S = {
   // pushed to the obs-server whenever the streamer tweaks a setting so
   // connected browser sources re-render live.
   obsCfg: {
-    chat:     { fontSize: 18, maxMessages: 20, bgOpacity: 0, showPlatformBadge: false, showUserBadges: true, showEmotes: true },
+    chat:     { fontSize: 18, maxMessages: 20, bgOpacity: 0, showPlatformBadge: false, showUserBadges: true, showEmotes: true, showEvents: false, showGiftAnimations: false },
     alerts:   { enabled: { follow: true, sub: true, resub: true, gift: true, cheer: true, raid: true, host: true, tip: true }, duration: 6000 },
     shoutout: { duration: 8000, thankMessage: 'Thanks so much for supporting the stream!', showRecentEvent: true },
     vertical: { fontSize: 20, holdMs: 4500, bgOpacity: 0.55, showChat: true, showEvents: true }
@@ -5278,17 +5280,22 @@ function handleTFEvent(d) {
     // vertical overlays render the actual TikTok artwork, not the
     // generic "GIFT" icon. The regex-based detector in addEvHistory
     // can't see our "sent a gift!" phrasing, so we dispatch directly.
-    if (bigGift) {
-      sendObsAlert({
-        eventType: 'gift',
-        platform:  'tt',
-        user:      user,
-        amount:    _gCoins,
-        giftImage: _ttGiftImg,
-        giftName:  data.giftName || '',
-        message:   (data.giftName || 'TikTok gift') + ((data.repeatCount || 1) > 1 ? ' \u00d7 ' + (data.repeatCount || 1) : '')
-      });
-    }
+    // `count` carries the repeat count (e.g. 50 Roses) separately from
+    // `amount` (total coin value). `isBig` lets the alerts overlay
+    // suppress its banner for small gifts (so a stream getting 50 Rose
+    // drops doesn't get 50 banners), while the chat overlay's floating
+    // animation still fires on every single one.
+    sendObsAlert({
+      eventType: 'gift',
+      platform:  'tt',
+      user:      user,
+      amount:    _gCoins,
+      count:     data.repeatCount || 1,
+      giftImage: _ttGiftImg,
+      giftName:  data.giftName || '',
+      isBig:     bigGift,
+      message:   (data.giftName || 'TikTok gift') + ((data.repeatCount || 1) > 1 ? ' \u00d7 ' + (data.repeatCount || 1) : '')
+    });
   }
   else if (ev === 'follow') { if (chk('ev-tt-follow')) return; maybeSound('snd-tt-follow', 'follow'); pushMsg({ plat: 'tt', isEv: true, evType: 'follow', user: user, text: user + ' followed on TikTok!', avatar: _ttAvatar }); S.stats.follows.tt++; updateStreamStats(); }
   else if (ev === 'subscribe' || ev === 'subscription') { if (chk('ev-tt-sub')) return; pushMsg({ plat: 'tt', isEv: true, evType: 'sub', user: user, text: user + ' subscribed on TikTok!', avatar: _ttAvatar }); }
@@ -6095,12 +6102,14 @@ function renderObsOverlaysTab() {
   var c = S.obsCfg || {};
   var get = function(id) { return document.getElementById(id); };
   if (c.chat) {
-    if (get('obsChatFontSize'))           get('obsChatFontSize').value = c.chat.fontSize || 18;
-    if (get('obsChatMaxMessages'))        get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
-    if (get('obsChatBgOpacity'))          get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
-    if (get('obsChatShowPlatformBadge'))  get('obsChatShowPlatformBadge').checked = !!c.chat.showPlatformBadge;
-    if (get('obsChatShowUserBadges'))     get('obsChatShowUserBadges').checked = c.chat.showUserBadges !== false;
-    if (get('obsChatShowEmotes'))         get('obsChatShowEmotes').checked = c.chat.showEmotes !== false;
+    if (get('obsChatFontSize'))             get('obsChatFontSize').value = c.chat.fontSize || 18;
+    if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
+    if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
+    if (get('obsChatShowPlatformBadge'))    get('obsChatShowPlatformBadge').checked = !!c.chat.showPlatformBadge;
+    if (get('obsChatShowUserBadges'))       get('obsChatShowUserBadges').checked = c.chat.showUserBadges !== false;
+    if (get('obsChatShowEmotes'))           get('obsChatShowEmotes').checked = c.chat.showEmotes !== false;
+    if (get('obsChatShowEvents'))           get('obsChatShowEvents').checked = !!c.chat.showEvents;
+    if (get('obsChatShowGiftAnimations'))   get('obsChatShowGiftAnimations').checked = !!c.chat.showGiftAnimations;
   }
   if (c.alerts) {
     var en = c.alerts.enabled || {};
@@ -6228,13 +6237,15 @@ function updateObsConfig(which) {
   var cfg = {};
   if (which === 'chat') {
     cfg = {
-      fontSize:          parseInt((get('obsChatFontSize') || {}).value, 10) || 18,
-      maxMessages:       parseInt((get('obsChatMaxMessages') || {}).value, 10) || 20,
-      bgOpacity:         (parseInt((get('obsChatBgOpacity') || {}).value, 10) || 0) / 100,
-      showPlatformBadge: !!(get('obsChatShowPlatformBadge') && get('obsChatShowPlatformBadge').checked),
-      showUserBadges:    !!(get('obsChatShowUserBadges') && get('obsChatShowUserBadges').checked),
-      showEmotes:        !!(get('obsChatShowEmotes') && get('obsChatShowEmotes').checked),
-      showPlatforms:     S.show || { tw: true, yt: true, tt: true, kk: true }
+      fontSize:             parseInt((get('obsChatFontSize') || {}).value, 10) || 18,
+      maxMessages:          parseInt((get('obsChatMaxMessages') || {}).value, 10) || 20,
+      bgOpacity:            (parseInt((get('obsChatBgOpacity') || {}).value, 10) || 0) / 100,
+      showPlatformBadge:    !!(get('obsChatShowPlatformBadge')   && get('obsChatShowPlatformBadge').checked),
+      showUserBadges:       !!(get('obsChatShowUserBadges')      && get('obsChatShowUserBadges').checked),
+      showEmotes:           !!(get('obsChatShowEmotes')          && get('obsChatShowEmotes').checked),
+      showEvents:           !!(get('obsChatShowEvents')          && get('obsChatShowEvents').checked),
+      showGiftAnimations:   !!(get('obsChatShowGiftAnimations')  && get('obsChatShowGiftAnimations').checked),
+      showPlatforms:        S.show || { tw: true, yt: true, tt: true, kk: true }
     };
     S.obsCfg.chat = cfg;
   } else if (which === 'alerts') {

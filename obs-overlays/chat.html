@@ -209,11 +209,156 @@
     pointer-events: none;
   }
   #hint.show { opacity: 1; }
+
+  /* ──────────────────────────────────────────────────────────────────
+     Events strip (optional) — shown BELOW the chat feed when the
+     streamer enables `showEvents` in Settings → OBS Overlays. Hosts
+     compact event cards for subs / gifts / cheers / raids / tips /
+     follows. Stays at the bottom edge of the canvas; chat feed shifts
+     up to clear space when enabled.
+     ────────────────────────────────────────────────────────────────── */
+  body.has-events #feed { bottom: 60px; }
+
+  #events {
+    display: none;
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 6px 12px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  body.has-events #events { display: block; }
+
+  .ev-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(14,14,16,.9), rgba(24,24,27,.85));
+    border: 1px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(8px);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    opacity: 0;
+    transform: translateY(14px);
+    animation: evRowIn .45s cubic-bezier(.22,1.2,.36,1) forwards;
+    margin-top: 4px;
+    max-width: 94%;
+  }
+  .ev-row.leaving { animation: evRowOut .35s cubic-bezier(.55,0,.7,.2) forwards; }
+  @keyframes evRowIn  { 0%{opacity:0;transform:translateY(14px) scale(.96)} 60%{opacity:1;transform:translateY(-2px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} }
+  @keyframes evRowOut { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-6px) scale(.95)} }
+
+  .ev-row.tw { border-color: rgba(169,112,255,.55); }
+  .ev-row.yt { border-color: rgba(255,69,69,.55); }
+  .ev-row.tt { border-color: rgba(254,44,85,.55); }
+  .ev-row.kk { border-color: rgba(83,252,24,.55); }
+  .ev-row.se { border-color: rgba(124,223,33,.55); }
+
+  .ev-icon {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    background: linear-gradient(135deg, #3A86FF, #2AD4B9);
+    flex-shrink: 0;
+  }
+  .ev-row.tw .ev-icon { background: linear-gradient(135deg, #a970ff, #7d3fff); }
+  .ev-row.yt .ev-icon { background: linear-gradient(135deg, #ff4545, #ff7373); }
+  .ev-row.tt .ev-icon { background: linear-gradient(135deg, #fe2c55, #25f4ee); }
+  .ev-row.kk .ev-icon { background: linear-gradient(135deg, #53fc18, #00e573); color: #0e0e10; }
+  .ev-icon img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; }
+  .ev-u { font-weight: 900; }
+  .ev-u.tw { color: #c8a6ff; }
+  .ev-u.yt { color: #ffb5b5; }
+  .ev-u.tt { color: #ff8fae; }
+  .ev-u.kk { color: #a0ff8b; }
+  .ev-amt {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #f0b429;
+    color: #0e0e10;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  /* ──────────────────────────────────────────────────────────────────
+     TikTok gift floating animation — fires on EVERY TT gift alert when
+     the streamer has `showGiftAnimations` enabled. Gift image floats
+     up from the bottom-right, drifts leftward, fades out over ~4s.
+     Label underneath the image shows who sent it + how many.
+
+     The animation layer is position:fixed over the whole canvas so
+     gifts can land "outside the box" of the chat feed — the point is
+     they visually escape the chat confines.
+     ────────────────────────────────────────────────────────────────── */
+  #gifts {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .gift {
+    position: absolute;
+    bottom: -120px;
+    right: 0;
+    width: 92px;
+    text-align: center;
+    opacity: 0;
+    animation: giftFloat var(--gift-dur, 4.6s) cubic-bezier(.22,.8,.32,1) forwards;
+    filter: drop-shadow(0 4px 12px rgba(254,44,85,.5)) drop-shadow(0 0 20px rgba(254,44,85,.35));
+  }
+  .gift img {
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+    display: block;
+  }
+  .gift .g-count {
+    position: absolute;
+    top: -6px; right: -6px;
+    background: linear-gradient(135deg, #fe2c55, #f0b429);
+    color: #0e0e10;
+    font-weight: 900;
+    font-size: 18px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.5);
+    min-width: 28px;
+  }
+  .gift .g-user {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0,0,0,.9), 0 0 4px rgba(254,44,85,.7);
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @keyframes giftFloat {
+    0%   { opacity: 0; transform: translate(var(--start-x, 20px),   0) scale(.3) rotate(-8deg); }
+    12%  { opacity: 1; transform: translate(var(--start-x, 20px), -120px) scale(1.1) rotate(4deg); }
+    70%  { opacity: 1; transform: translate(var(--mid-x, -100px), -55vh) scale(1)   rotate(-6deg); }
+    100% { opacity: 0; transform: translate(var(--end-x, -220px), -80vh) scale(.85) rotate(8deg); }
+  }
 </style>
 </head>
 <body>
 
 <div id="feed"></div>
+<div id="events"></div>
+<div id="gifts"></div>
 <div id="gated">Patreon Early Access required<br><span style="font-size:11px;color:#adadb8;letter-spacing:.04em;text-transform:none;font-weight:600">Connect in StreamFusion → Settings → Early Access</span></div>
 <div id="hint">StreamFusion chat overlay — waiting for messages…</div>
 
@@ -232,10 +377,19 @@
     showUserBadges:    true,    // sub/mod/vip chips
     showEmotes:        true,
     showPlatforms: { tw: true, yt: true, tt: true, kk: true },
-    fadeOutAfterMs: 0           // 0 = don't auto-remove; only trim on overflow
+    fadeOutAfterMs: 0,          // 0 = don't auto-remove; only trim on overflow
+    // New for 1.4.3: alert-type events can render as an inline events
+    // strip beneath the chat feed, and TikTok gifts can spawn floating
+    // animations over the whole canvas. Both default OFF so existing
+    // streamers don't see behavior changes mid-stream.
+    showEvents:         false,
+    eventsHoldMs:       6000,
+    showGiftAnimations: false
   };
 
   var feed = document.getElementById('feed');
+  var events = document.getElementById('events');
+  var gifts = document.getElementById('gifts');
   var gated = document.getElementById('gated');
   var hint = document.getElementById('hint');
   var messageCount = 0;
@@ -316,6 +470,94 @@
   }
 
   // ──────────────────────────────────────────────────────────────────
+  // Events strip — one card per alert event, shown beneath the chat
+  // feed when the streamer enables `showEvents`. Each row auto-clears
+  // after `eventsHoldMs` so the strip never piles up.
+  // ──────────────────────────────────────────────────────────────────
+  function eventKicker(t) {
+    return {
+      follow:'FOLLOW', sub:'SUB', resub:'RE-SUB', gift:'GIFT',
+      cheer:'BITS',  raid:'RAID', tip:'TIP', host:'HOST',
+      pledge:'PATREON', tier_change:'TIER UP', pledge_end:'PLEDGE ENDED',
+      order:'ORDER', donation:'DONATION'
+    }[t] || 'EVENT';
+  }
+  function eventIcon(ev) {
+    if (ev.giftImage) return '<img src="' + ev.giftImage + '" alt="" onerror="this.outerHTML=\'\u2605\'">';
+    return {
+      follow:'\u2764', sub:'\u2605', resub:'\u2605', gift:'\uD83C\uDF81',
+      cheer:'\uD83D\uDC8E', raid:'\u2694\ufe0f', tip:'\uD83D\uDCB0', host:'\uD83D\uDCE1',
+      pledge:'P', tier_change:'\u2191', pledge_end:'\u00b7',
+      order:'\uD83D\uDECD\ufe0f', donation:'\uD83D\uDCB0'
+    }[ev.eventType] || '\u2605';
+  }
+  function eventText(ev) {
+    var u = '<span class="ev-u ' + (ev.platform||'') + '">' + escapeHtml(ev.user||'someone') + '</span>';
+    switch (ev.eventType) {
+      case 'follow': return u + ' followed!';
+      case 'sub':    return u + ' subscribed';
+      case 'resub':  return u + ' resubscribed' + (ev.months ? ' (' + ev.months + 'mo)' : '');
+      case 'gift':
+        if (ev.platform === 'tt') return u + ' sent ' + (ev.giftName ? escapeHtml(ev.giftName) + ' ' : '') + '<span class="ev-amt">\u00d7' + (ev.count || 1) + '</span>';
+        return u + ' gifted <span class="ev-amt">' + (ev.amount || 1) + '</span>';
+      case 'cheer':  return u + ' cheered <span class="ev-amt">' + (ev.amount || 0) + '</span>';
+      case 'raid':   return u + ' raided with <span class="ev-amt">' + (ev.amount || 0) + '</span>';
+      case 'tip':    return u + ' tipped <span class="ev-amt">$' + (ev.amount || 0) + '</span>';
+      default:       return u + ' ' + escapeHtml(ev.eventType || 'event');
+    }
+  }
+  function addEvent(ev) {
+    if (!CFG.showEvents) return;
+    var plat = (ev.platform || '').toLowerCase();
+    if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) return;
+    var row = document.createElement('div');
+    row.className = 'ev-row ' + plat;
+    row.innerHTML =
+      '<span class="ev-icon">' + eventIcon(ev) + '</span>' +
+      '<span>' + eventText(ev) + '</span>';
+    events.appendChild(row);
+    setTimeout(function() {
+      row.classList.add('leaving');
+      setTimeout(function() { if (row.parentNode) row.parentNode.removeChild(row); }, 360);
+    }, Math.max(2000, CFG.eventsHoldMs || 6000));
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // TikTok gift floating animation — full-canvas effect that lets the
+  // actual gift artwork physically travel up and to the left across
+  // the overlay. Fires on every TT gift (big or small), stacks so
+  // multiple gifts can be in flight at once.
+  // ──────────────────────────────────────────────────────────────────
+  function spawnGiftAnimation(ev) {
+    if (!CFG.showGiftAnimations) return;
+    if (ev.platform !== 'tt') return;
+    if (!ev.giftImage) return;                     // no image = nothing worth animating
+    var el = document.createElement('div');
+    el.className = 'gift';
+    // Randomize start/mid/end X so multiple gifts don't overlap perfectly.
+    // The whole thing travels from bottom-right to top-left so the feel
+    // matches TikTok's own gift-rain animation.
+    var startX = 20 + Math.random() * 60;          // small horizontal jitter near right edge
+    var midX   = -(window.innerWidth * (0.25 + Math.random() * 0.35));
+    var endX   = -(window.innerWidth * (0.55 + Math.random() * 0.25));
+    var dur    = (4.2 + Math.random() * 1.6).toFixed(2) + 's';
+    el.style.setProperty('--start-x', startX + 'px');
+    el.style.setProperty('--mid-x',   midX   + 'px');
+    el.style.setProperty('--end-x',   endX   + 'px');
+    el.style.setProperty('--gift-dur', dur);
+    var countBadge = (ev.count && ev.count > 1) ? '<div class="g-count">\u00d7' + ev.count + '</div>' : '';
+    el.innerHTML =
+      '<img src="' + escapeHtml(ev.giftImage) + '" alt="" onerror="this.parentNode.parentNode.removeChild(this.parentNode)">' +
+      countBadge +
+      '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>';
+    gifts.appendChild(el);
+    // Clean up after the animation finishes. 500ms buffer past the
+    // declared duration covers the exit fade.
+    var ms = parseFloat(dur) * 1000 + 500;
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, ms);
+  }
+
+  // ──────────────────────────────────────────────────────────────────
   // Config application
   // ──────────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
@@ -323,6 +565,9 @@
     Object.keys(cfg).forEach(function(k) { CFG[k] = cfg[k]; });
     document.documentElement.style.setProperty('--bg-op', String(CFG.bgOpacity || 0));
     document.documentElement.style.setProperty('--font-size', (CFG.fontSize || 18) + 'px');
+    // Toggle the has-events body class so the feed's bottom offset
+    // respects the events strip when it's enabled.
+    document.body.classList.toggle('has-events', !!CFG.showEvents);
   }
 
   function setEntitled(v) {
@@ -346,6 +591,19 @@
 
   es.addEventListener('chat', function(e) {
     try { addMessage(JSON.parse(e.data)); } catch (err) {}
+  });
+
+  // Alert events land here when main.js broadcasts to the 'chat' target
+  // (as of 1.4.3, alerts fan out to alerts / vertical / chat). We fork
+  // into two rendering paths: the events strip (for every kind of event
+  // the streamer enabled) and the TT gift floating animation (TT gift
+  // events only, when showGiftAnimations is on).
+  es.addEventListener('alert', function(e) {
+    var ev;
+    try { ev = JSON.parse(e.data); } catch (err) { return; }
+    if (!ev) return;
+    addEvent(ev);
+    spawnGiftAnimation(ev);
   });
 
   es.addEventListener('config', function(e) {

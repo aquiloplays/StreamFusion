@@ -378,6 +378,14 @@
     var meta = EVENT_META[ev.eventType];
     if (!meta) { nextInQueue(); return; }
     if (CFG.enabled[ev.eventType] === false) { nextInQueue(); return; }
+    // Small TikTok gifts are dispatched too so the chat overlay's
+    // floating animation can fire; skip the banner for those so a
+    // stream of 50 Roses doesn't produce 50 banners. The threshold
+    // lives on the client (renderer's `bigGift` = coins >= 1000).
+    if (ev.eventType === 'gift' && ev.platform === 'tt' && ev.isBig === false) {
+      nextInQueue();
+      return;
+    }
 
     var card = document.createElement('div');
     card.className = 'alert ' + (ev.platform || '');
