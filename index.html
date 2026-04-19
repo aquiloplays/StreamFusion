@@ -4545,6 +4545,24 @@ function startTwViewerPoll() {
         updateViewers();
       }
     }).catch(function() {});
+    // Parallel poll for the current game name. This is a belt-and-
+    // suspenders fallback for when Streamer.bot's GetBroadcaster doesn't
+    // report game info — decapi scrapes Twitch so it almost always has
+    // the name. Doesn't give us a game ID (the Helix category id), so
+    // the raid-finder search still needs the manual override for
+    // searching, but the Raid Finder panel + in-app display will at
+    // least show the real game name instead of "(not detected)".
+    if (window.electronAPI.fetchTwitchGame) {
+      window.electronAPI.fetchTwitchGame(login).then(function(gameName) {
+        if (gameName && gameName !== S.twGame) {
+          S.twGame = gameName;
+          // Re-render the raid finder panel if it's currently open, so the
+          // game display updates without a manual refresh click.
+          var rfPane = document.getElementById('modal');
+          if (rfPane && rfPane.innerHTML.indexOf('Raid Finder') !== -1) _rfRenderPanel();
+        }
+      }).catch(function() {});
+    }
   }
   doFetch();
   _twViewerPoll = setInterval(doFetch, 60000);
@@ -4809,28 +4827,47 @@ function handleSBEvent(event, data) {
       : '?';
     var _raidAv = _resolveEvAvatar('tw', _rdr, rn2);
     var raidText = rn2 + ' raided with ' + rc2 + ' viewers!'; maybeSound('snd-tw-raid', 'raid'); triggerRaid(rn2, rc2, 'tw'); pushMsg({ plat: 'tw', isEv: true, evType: 'raid', user: rn2, text: raidText, avatar: _raidAv }); setPinnedEvent(rn2, raidText, 'tw');
-  } else if (key === 'Twitch.RewardRedemption' || key === 'Twitch.ChannelPointRedemption' || key === 'Twitch.ChannelPointsRedemption' || key === 'Twitch.Reward.Redemption' || key === 'Twitch.PointsRedemption') {
+  } else if (key === 'Twitch.RewardRedemption' || key === 'Twitch.ChannelPointRedemption' || key === 'Twitch.ChannelPointsRedemption' || key === 'Twitch.Reward.Redemption' || key === 'Twitch.PointsRedemption' || key === 'Twitch.RewardRedeemed' || key === 'Twitch.ChannelRewardRedemption') {
     if (chk('ev-tw-redeem')) return;
     var ren = gu(data);
-    // SB sends the reward name under several different shapes depending on
-    // the SB version / trigger path:
-    //   - data.rewardName         (most common in modern SB)
-    //   - data.reward.title       (EventSub-passthrough shape)
-    //   - data.redemption.reward.title (nested under `redemption`)
-    //   - data.args.rewardName    (action-arg shape)
-    //   - data.rewardTitle / data.reward_title / data.title (legacy fallbacks)
-    // Try them all; fall back to '?' only when every option truly empty.
+    // Log the raw payload so the user can paste it into chat if we
+    // STILL miss the title field on their Streamer.bot version. The
+    // sheer number of field-shape variants here (see below) comes from
+    // SB having added + renamed the redemption event 4+ times.
+    try { console.log('[SF tw redeem]', key, JSON.stringify(data).slice(0, 800)); } catch (e) {}
     var _a = data.args || {};
-    var rtitle = (data.reward && data.reward.title)
-      || (data.redemption && data.redemption.reward && data.redemption.reward.title)
+    var _r = data.reward || (data.redemption && data.redemption.reward) || {};
+    // Title — try every documented SB field shape + a deep walk of
+    // data.args / data.data fallbacks for SB actions that bundle the
+    // event data under generic keys.
+    var rtitle = _r.title || _r.name || _r.reward_name || _r.rewardName
       || data.rewardName || data.reward_name
-      || _a.rewardName || _a.rewardTitle || _a.reward
       || data.rewardTitle || data.reward_title || data.title
-      || (data.reward && data.reward.name)
+      || _a.rewardName || _a.rewardTitle || _a.reward || _a.title
+      || (data.data && (data.data.rewardName || data.data.rewardTitle))
       || '?';
+    // Last-ditch: walk the full payload looking for any key whose
+    // NAME suggests it's a reward title. Better than '?' even if the
+    // heuristic catches the wrong field occasionally.
+    if (rtitle === '?') {
+      try {
+        var _scan = function(o, depth) {
+          if (!o || typeof o !== 'object' || depth > 3) return null;
+          for (var k in o) {
+            if (/reward.*(name|title)|reward_?title|reward_?name/i.test(k) && typeof o[k] === 'string' && o[k].length < 100) return o[k];
+          }
+          for (var k2 in o) {
+            if (typeof o[k2] === 'object') { var hit = _scan(o[k2], depth + 1); if (hit) return hit; }
+          }
+          return null;
+        };
+        rtitle = _scan(data, 0) || '?';
+      } catch (e) {}
+    }
     var rcost = Number(
-      (data.reward && data.reward.cost) || (data.redemption && data.redemption.reward && data.redemption.reward.cost)
-      || data.rewardCost || data.reward_cost || _a.rewardCost || _a.cost || data.cost || 0
+      _r.cost || _r.pointsCost || _r.points_cost
+      || data.rewardCost || data.reward_cost || data.pointsCost
+      || _a.rewardCost || _a.cost || data.cost || 0
     ) || 0;
     var _redeemMsg = _extractUserMessage(data);
     if (_streamSession.active && rcost > 0) _streamSession.chPoints += rcost;
@@ -5135,11 +5172,28 @@ function handleSBEvent(event, data) {
     pushMsg({ plat: 'tw', isEv: true, evType: 'prediction', user: 'Prediction', text: 'Prediction canceled: ' + pxTitle });
     sendOverlayPrediction({ status: 'ended', title: pxTitle, outcomes: [] });
 
-  } else if (key === 'Twitch.ExtensionTransaction' || key === 'Twitch.BitsTransaction' || key === 'Twitch.ExtensionBitsTransaction' || key === 'Twitch.BitsUsed' || key === 'Twitch.ExtensionBitsUsed' || (key === 'Twitch.Cheer' && data.product)) {
+  } else if (/^Twitch\.(Extension(Transaction|Bits|BitsUsed|BitsTransaction|Purchase)|BitsTransaction|BitsUsed|PowerupUsed|Powerup|BitsExtensionUsed)$/i.test(key) || (key === 'Twitch.Cheer' && data.product)) {
+    // Bits spent in a Twitch extension (emote powerup, extension
+    // purchase, channel-specific extension, etc). SB has shipped these
+    // under a bunch of names across versions — the regex above covers
+    // the known ones. Log the payload so we can add more variants if
+    // the streamer reports missing events.
+    try { console.log('[SF tw extension/powerup bits]', key, JSON.stringify(data).slice(0, 500)); } catch (e) {}
     if (chk('ev-tw-cheer')) return;
     var extUser = gu(data);
-    var extProduct = (data.product && data.product.displayName) || (data.product && data.product.name) || data.productName || data.extensionName || 'Extension Purchase';
-    var extBits = Number((data.product && data.product.cost && data.product.cost.amount) || data.bits || data.cost || data.amount || 0);
+    // Product name — every SB variant puts it somewhere different.
+    var extProduct = (data.product && (data.product.displayName || data.product.name))
+      || (data.product && data.product.sku)
+      || data.productName || data.extensionName || data.powerupType
+      || (data.args && (data.args.productName || data.args.product || data.args.displayName))
+      || 'Extension purchase';
+    var extBits = Number(
+      (data.product && data.product.cost && data.product.cost.amount)
+      || (data.product && data.product.cost)
+      || data.bits || data.bitsSpent || data.cost || data.amount
+      || (data.args && (data.args.bits || data.args.cost))
+      || 0
+    );
     var extText = extUser + ' used ' + extBits + ' bits on "' + extProduct + '"!';
     playCheerTiered(extBits);
     if (extBits >= 100) showBanner('i-bolt', extUser + ' \u2014 Extension', extProduct, extBits + ' bits', 'tw');
@@ -6946,12 +7000,18 @@ function triggerHypeExpiryAnimation() {
   setTimeout(function() { endHypeTrain(); }, 1700);
 }
 function startHypeTrain(data) {
+  try { console.log('[SF hype-start]', JSON.stringify(data).slice(0, 400)); } catch (e) {}
   _htState.active = true;
   _htState.expiring = false;
-  _htState.level = data.level || 1;
-  _htState.total = data.total || 0;
-  _htState.goal = data.goal || data.goalTotal || 1800;
-  _htState.expires = Date.now() + ((data.countdown || data.expiresIn || 300) * 1000);
+  // != null so legitimate 0/1 values from SB take effect (same defensive
+  // pattern as updateHypeTrainProgress — the || fallback was letting
+  // stale values through when SB sent 0s right at the start).
+  _htState.level = (data.level != null) ? (Number(data.level) || 1) : 1;
+  _htState.total = (data.total != null) ? (Number(data.total) || 0) : 0;
+  var _g = (data.goal != null) ? data.goal : (data.goalTotal != null ? data.goalTotal : 1800);
+  _htState.goal = Number(_g) || 1800;
+  var _cd = (data.countdown != null) ? data.countdown : (data.expiresIn != null ? data.expiresIn : 300);
+  _htState.expires = Date.now() + (Number(_cd) * 1000);
   _htState.top = data.topContributors || data.contributors || [];
   var el = document.getElementById('sfHypeTrain');
   if (el) el.classList.remove('expiring');
@@ -6964,6 +7024,7 @@ function startHypeTrain(data) {
   showBanner('i-train', 'HYPE TRAIN!', 'Level ' + _htState.level + ' \u2022 ' + _htState.goal + ' goal', null, 'org');
 }
 function updateHypeTrainProgress(data) {
+  try { console.log('[SF hype-progress]', JSON.stringify(data).slice(0, 400)); } catch (e) {}
   var prevLevel = _htState.level;
   // Use != null checks instead of ||-defaulting so that legitimate 0
   // values from SB (e.g. total reset to 0 right after a level-up) take
@@ -6975,6 +7036,10 @@ function updateHypeTrainProgress(data) {
   else if (data.goalTotal != null) _htState.goal = Number(data.goalTotal) || _htState.goal;
   if (data.topContributors || data.contributors) _htState.top = data.topContributors || data.contributors;
   if (data.countdown || data.expiresIn) _htState.expires = Date.now() + ((data.countdown || data.expiresIn) * 1000);
+  // If total ever exceeds goal (SB sends the pre-transition values), clamp
+  // so the bar can't render over 100% while we wait for the next
+  // HypeTrainLevelUp to bump level + reset total.
+  if (_htState.total > _htState.goal) _htState.total = _htState.goal;
   updateHypeTrain();
   // Discord+ hype-train posts: ONLY real level-up transitions
   // (prevLevel >= 1 AND new level is strictly higher). Without the
@@ -7665,11 +7730,38 @@ if (window.electronAPI && window.electronAPI.onOverlaySendChat) {
   window.electronAPI.onOverlaySendChat(function(d) {
     var text = (d && d.text) || '';
     if (!text) return;
-    // Honor Twitch /command interception just like the in-app composer
-    if (text.charAt(0) === '/' && SEND_PLATS.tw) {
-      if (handleTwitchCommand(text)) return;
+    // SEND_PLATS is driven by the main-app chat composer toggles. If
+    // the user never opened that composer (common — they went straight
+    // to the pop-out), every flag is false and sendChatText silently
+    // drops the message. Detect that state and temporarily enable
+    // every platform they're actually connected to so the pop-out
+    // "just works" without the user having to hunt for a hidden
+    // toggle. Restore whatever they had after.
+    var snapshot = null;
+    var anySel = SEND_PLATS.tw || SEND_PLATS.yt || SEND_PLATS.tt || SEND_PLATS.kk;
+    if (!anySel) {
+      snapshot = { tw: SEND_PLATS.tw, yt: SEND_PLATS.yt, tt: SEND_PLATS.tt, kk: SEND_PLATS.kk };
+      SEND_PLATS.tw = !!S.sbConnected;
+      SEND_PLATS.yt = !!S.sbConnected;
+      SEND_PLATS.kk = !!S.sbConnected;
+      SEND_PLATS.tt = !!S.tfConnected;
     }
-    sendChatText(text);
+    try {
+      // Twitch /command interception — only if Twitch is in the active
+      // plats set (either the user's selection or our auto-fallback).
+      if (text.charAt(0) === '/' && SEND_PLATS.tw) {
+        if (handleTwitchCommand(text)) return;
+      }
+      var ok = sendChatText(text);
+      if (!ok) {
+        // If we STILL couldn't send, surface why in the events panel
+        // so the streamer isn't staring at an empty pop-out wondering.
+        if (!S.sbConnected && !S.tfConnected) addEvHistory('StreamFusion', 'Pop-out send failed: no platform connected. Connect Streamer.bot or Tikfinity.', 'tw', false);
+        else addEvHistory('StreamFusion', 'Pop-out send failed: message was empty or exceeded platform length limits.', 'tw', false);
+      }
+    } finally {
+      if (snapshot) { SEND_PLATS.tw = snapshot.tw; SEND_PLATS.yt = snapshot.yt; SEND_PLATS.tt = snapshot.tt; SEND_PLATS.kk = snapshot.kk; }
+    }
   });
 }
 

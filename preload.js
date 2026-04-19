@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVersion: () => ipcRenderer.invoke('app-version'),
   fetchKickViewers: (slug)    => ipcRenderer.invoke('fetch-kick-viewers', slug),
   fetchTwitchViewers: (login) => ipcRenderer.invoke('fetch-twitch-viewers', login),
+  fetchTwitchGame: (login)    => ipcRenderer.invoke('fetch-twitch-game', login),
   // Overlay (pop-out chat)
   openOverlay:      (opts)    => ipcRenderer.invoke('open-overlay', opts || {}),
   closeOverlay:     ()        => ipcRenderer.send('close-overlay'),

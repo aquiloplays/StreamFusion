@@ -850,6 +850,38 @@ ipcMain.handle('fetch-twitch-viewers', async (event, login) => {
   });
 });
 
+// Twitch game name — fallback for when Streamer.bot's GetBroadcaster
+// response doesn't include game/category fields (happens on some SB
+// versions or when the streamer goes live *after* SB was already
+// connected). decapi returns plain text: the game name when the user
+// is live, "User is not live" or similar when offline. We parse
+// anything that doesn't look like one of those not-live strings as a
+// game name; noisy-string heuristics keep us from labelling offline
+// responses as a category.
+ipcMain.handle('fetch-twitch-game', async (event, login) => {
+  return new Promise((resolve) => {
+    const req = https.get({
+      hostname: 'decapi.me',
+      path: '/twitch/game/' + encodeURIComponent(login),
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StreamFusion)', 'Accept': 'text/plain' }
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        var txt = String(data).trim();
+        if (!txt) return resolve(null);
+        // decapi returns one of these when not live — skip them
+        if (/not (live|found|streaming)|^404|no stream|offline/i.test(txt)) return resolve(null);
+        // Typical live response is just the game name, e.g. "Palworld"
+        if (txt.length > 120) return resolve(null); // sanity cap
+        resolve(txt);
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(10000, () => { req.destroy(); resolve(null); });
+  });
+});
+
 // ── Overlay (pop-out chat) window ──────────────────────────────────────────
 function createOverlayWindow(opts) {
   console.log('[overlay] createOverlayWindow called', opts);
