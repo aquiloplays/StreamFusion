@@ -2100,9 +2100,9 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               </div>
               <input class="minput" id="dcBotGuildInput" type="text" placeholder="Server (guild) ID \u2014 right-click your server name with Developer Mode on" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
               <input class="minput" id="dcBotChannelInput" type="text" placeholder="Text channel ID (optional \u2014 for message events)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcBotChannelId=this.value.trim();saveDiscordSettings()" onchange="dcBotChannelId=this.value.trim();saveDiscordSettings()">
-              <label class="frow" style="font-size:11px"><span>Member joins server &rarr; Events panel</span><input type="checkbox" id="dcBotEvtMember" checked onchange="saveDiscordSettings()"></label>
-              <label class="frow" style="font-size:11px"><span>Voice channel joins &rarr; Events panel</span><input type="checkbox" id="dcBotEvtVoice" checked onchange="saveDiscordSettings()"></label>
-              <label class="frow" style="font-size:11px"><span>Messages in configured channel &rarr; Events panel</span><input type="checkbox" id="dcBotEvtMessage" onchange="saveDiscordSettings()"></label>
+              <label class="frow" style="font-size:11px"><span>New members joining your Discord server</span><input type="checkbox" id="dcBotEvtMember" checked onchange="saveDiscordSettings()"></label>
+              <label class="frow" style="font-size:11px;color:var(--mut)"><span>Voice channel joins <span style="font-weight:400">(noisy)</span></span><input type="checkbox" id="dcBotEvtVoice" onchange="saveDiscordSettings()"></label>
+              <label class="frow" style="font-size:11px;color:var(--mut)"><span>Messages in configured channel <span style="font-weight:400">(very noisy)</span></span><input type="checkbox" id="dcBotEvtMessage" onchange="saveDiscordSettings()"></label>
               <div style="margin-top:8px;display:flex;gap:6px">
                 <button id="dcBotConnectBtn" class="cbtn tw" onclick="toggleSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Connect</button>
               </div>
@@ -8256,7 +8256,11 @@ var dcBotGuildId     = '';
 var dcBotChannelId   = '';
 var dcPost = { follow: false, sub: true, cheer: true, kick: true, gift: true, hype: true };
 var dcSb   = { patreon: true, fourthwall: true, kofi: true, se: true };
-var dcBot  = { enabled: false, evtMember: true, evtVoice: true, evtMessage: false };
+// Voice + message event forwarding defaults OFF so the Events panel
+// stays focused on the one Discord moment that actually matters during
+// a stream: a brand-new member just joined the server. Streamers who
+// want the noisier events can flip them on manually.
+var dcBot  = { enabled: false, evtMember: true, evtVoice: false, evtMessage: false };
 var dcGiftThreshold = 5;
 var dcRecordsAuto = true;
 // Opt-in: repost stream recap to the aquilo.gg community Discord via the
@@ -8710,7 +8714,20 @@ if (window.electronAPI && window.electronAPI.onDiscordEvent) {
     if (kind === 'gateway_closed')    renderDiscordBotStatus();
     if (kind === 'fatal') { addEvHistory('StreamFusion', 'Discord bot: ' + (data.reason || 'fatal error') + ' (check bot token + privileged intents).', 'tw', false); return; }
     if (kind === 'member_add' && dcBot.evtMember) {
-      addEvHistory(data.username || 'Unknown', 'joined the Discord server', 'se', false);
+      // Render with avatar + big flag so the welcome lands as a pinned
+      // moment in the Events panel, not a silent one-line entry. Discord
+      // CDN avatar URL pattern — works for animated (.gif) avatars too
+      // when the hash is prefixed "a_" but .png is a safe default that
+      // Discord server-side upconverts.
+      var uname = data.displayName || data.username || 'New member';
+      var avatar = '';
+      if (data.userId && data.avatarHash) {
+        avatar = 'https://cdn.discordapp.com/avatars/' + data.userId + '/' + data.avatarHash + '.png?size=128';
+      } else if (data.userId) {
+        // Default avatar — Discord picks one of 5 based on user id
+        avatar = 'https://cdn.discordapp.com/embed/avatars/' + (parseInt(data.userId) % 5) + '.png';
+      }
+      addEvHistory(uname, 'just joined the Discord \uD83D\uDC4B', 'se', true, null, '', avatar);
     } else if (kind === 'voice_join' && dcBot.evtVoice) {
       addEvHistory(data.username || 'Unknown', 'joined a Discord voice channel', 'se', false);
     } else if (kind === 'message' && dcBot.evtMessage) {
