@@ -1887,14 +1887,43 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                 </div>
                 <!-- Per-overlay config: chat -->
                 <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <label class="frow" style="font-size:11px"><span>Theme</span>
+                    <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                      <option value="hud">Gamer HUD (per-msg cards)</option>
+                      <option value="box">Grey box (unified panel)</option>
+                    </select>
+                  </label>
                   <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="18" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                   <label class="frow" style="font-size:11px"><span>Max messages</span><input type="number" id="obsChatMaxMessages" min="3" max="60" value="20" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label class="frow" style="font-size:11px"><span>Background opacity</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="0" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                  <label class="frow" style="font-size:11px"><span>Platform badges</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Bubble opacity (HUD)</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="0" onchange="updateObsConfig('chat')" style="width:80px"></label>
+                  <label class="frow" style="font-size:11px"><span>Box opacity (grey box)</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
+                  <label class="frow" style="font-size:11px"><span>Profile pictures</span><input type="checkbox" id="obsChatShowProfilePics" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Platform icon inline</span><input type="checkbox" id="obsChatShowPlatformIcon" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Legacy platform bar</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
                   <label class="frow" style="font-size:11px"><span>User badges (mod/sub/vip)</span><input type="checkbox" id="obsChatShowUserBadges" checked onchange="updateObsConfig('chat')"></label>
                   <label class="frow" style="font-size:11px"><span>Render emotes</span><input type="checkbox" id="obsChatShowEmotes" checked onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>Show events below chat</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>Event placement</span>
+                    <select id="obsChatEventPlacement" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                      <option value="inline">Inline in chat</option>
+                      <option value="above">Popup above chat</option>
+                      <option value="below">Popup below chat</option>
+                      <option value="off">Off</option>
+                    </select>
+                  </label>
+                  <label class="frow" style="font-size:11px"><span>Event font size</span><input type="number" id="obsChatEventSize" min="10" max="22" value="13" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                   <label class="frow" style="font-size:11px"><span>TikTok gift animations</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
+                  <label class="frow" style="font-size:11px"><span>TT gift combo counter</span>
+                    <select id="obsChatTtGiftCorner" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                      <option value="off">Off</option>
+                      <option value="tl">Top-left corner</option>
+                      <option value="tr">Top-right corner</option>
+                      <option value="bl">Bottom-left corner</option>
+                      <option value="br">Bottom-right corner</option>
+                      <option value="tm">Top-middle</option>
+                      <option value="bm">Bottom-middle</option>
+                    </select>
+                  </label>
                 </div>
               </div>
               <!-- Alerts overlay row -->
@@ -1938,7 +1967,12 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                   <label class="frow" style="font-size:11px"><span>Background opacity</span><input type="range" id="obsVerticalBgOpacity" min="0" max="100" value="55" onchange="updateObsConfig('vertical')" style="width:80px"></label>
                   <label class="frow" style="font-size:11px"><span>Show chat messages</span><input type="checkbox" id="obsVerticalShowChat" checked onchange="updateObsConfig('vertical')"></label>
                   <label class="frow" style="font-size:11px"><span>Show events / alerts</span><input type="checkbox" id="obsVerticalShowEvents" checked onchange="updateObsConfig('vertical')"></label>
+                  <label class="frow" style="font-size:11px"><span>Render emotes</span><input type="checkbox" id="obsVerticalShowEmotes" checked onchange="updateObsConfig('vertical')"></label>
+                  <label class="frow" style="font-size:11px"><span>Profile pictures</span><input type="checkbox" id="obsVerticalShowProfilePics" onchange="updateObsConfig('vertical')"></label>
+                  <label class="frow" style="font-size:11px"><span>Platform icon inline</span><input type="checkbox" id="obsVerticalShowPlatformIcon" onchange="updateObsConfig('vertical')"></label>
+                  <label class="frow" style="font-size:11px"><span>User badges</span><input type="checkbox" id="obsVerticalShowUserBadges" checked onchange="updateObsConfig('vertical')"></label>
                 </div>
+                <div style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Long messages auto-marquee (scroll right&rarr;left) so the whole line is readable within the hold time.</div>
               </div>
               <!-- Shoutout overlay row -->
               <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
@@ -2521,10 +2555,24 @@ var S = {
   // pushed to the obs-server whenever the streamer tweaks a setting so
   // connected browser sources re-render live.
   obsCfg: {
-    chat:     { fontSize: 18, maxMessages: 20, bgOpacity: 0, showPlatformBadge: false, showUserBadges: true, showEmotes: true, showEvents: false, showGiftAnimations: false },
-    alerts:   { enabled: { follow: true, sub: true, resub: true, gift: true, cheer: true, raid: true, host: true, tip: true }, duration: 6000 },
+    chat:     {
+      fontSize: 18, maxMessages: 20, bgOpacity: 0,
+      showPlatformBadge: false, showUserBadges: true, showEmotes: true,
+      showEvents: false, showGiftAnimations: false,
+      // New in 1.4.4 — grey-box theme (single wrapping box, no per-msg
+      // bubbles), pfp/platform-icon toggles, configurable event
+      // placement, TikTok gift combo counter at a chosen corner.
+      theme: 'hud',                  // 'hud' | 'box'
+      boxOpacity: 0.8,
+      showProfilePics: false,
+      showPlatformIcon: false,
+      eventPlacement: 'inline',      // 'inline' | 'above' | 'below' | 'off'
+      eventSize: 13,
+      ttGiftCorner: 'br'             // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
+    },
+    alerts:   { enabled: { follow: true, sub: true, resub: true, gift: true, cheer: true, raid: true, host: true, tip: true }, duration: 6000, showEmotes: true },
     shoutout: { duration: 8000, thankMessage: 'Thanks so much for supporting the stream!', showRecentEvent: true },
-    vertical: { fontSize: 20, holdMs: 4500, bgOpacity: 0.55, showChat: true, showEvents: true }
+    vertical: { fontSize: 20, holdMs: 4500, bgOpacity: 0.55, showChat: true, showEvents: true, showEmotes: true, showProfilePics: false, showPlatformIcon: false, showUserBadges: true }
   },
   // Raid Finder state — actions are re-queried from SB each time the panel opens
   raidFinder: {
@@ -6156,14 +6204,21 @@ function renderObsOverlaysTab() {
   var c = S.obsCfg || {};
   var get = function(id) { return document.getElementById(id); };
   if (c.chat) {
+    if (get('obsChatTheme'))                get('obsChatTheme').value = c.chat.theme || 'hud';
     if (get('obsChatFontSize'))             get('obsChatFontSize').value = c.chat.fontSize || 18;
     if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
     if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
+    if (get('obsChatBoxOpacity'))           get('obsChatBoxOpacity').value = Math.round((c.chat.boxOpacity != null ? c.chat.boxOpacity : 0.8) * 100);
+    if (get('obsChatShowProfilePics'))      get('obsChatShowProfilePics').checked = !!c.chat.showProfilePics;
+    if (get('obsChatShowPlatformIcon'))     get('obsChatShowPlatformIcon').checked = !!c.chat.showPlatformIcon;
     if (get('obsChatShowPlatformBadge'))    get('obsChatShowPlatformBadge').checked = !!c.chat.showPlatformBadge;
     if (get('obsChatShowUserBadges'))       get('obsChatShowUserBadges').checked = c.chat.showUserBadges !== false;
     if (get('obsChatShowEmotes'))           get('obsChatShowEmotes').checked = c.chat.showEmotes !== false;
     if (get('obsChatShowEvents'))           get('obsChatShowEvents').checked = !!c.chat.showEvents;
+    if (get('obsChatEventPlacement'))       get('obsChatEventPlacement').value = c.chat.eventPlacement || 'inline';
+    if (get('obsChatEventSize'))            get('obsChatEventSize').value = c.chat.eventSize || 13;
     if (get('obsChatShowGiftAnimations'))   get('obsChatShowGiftAnimations').checked = !!c.chat.showGiftAnimations;
+    if (get('obsChatTtGiftCorner'))         get('obsChatTtGiftCorner').value = c.chat.ttGiftCorner || 'br';
   }
   if (c.alerts) {
     var en = c.alerts.enabled || {};
@@ -6181,11 +6236,15 @@ function renderObsOverlaysTab() {
     if (get('obsShoutoutThankMessage'))    get('obsShoutoutThankMessage').value = c.shoutout.thankMessage || 'Thanks so much for supporting the stream!';
   }
   if (c.vertical) {
-    if (get('obsVerticalFontSize'))   get('obsVerticalFontSize').value = c.vertical.fontSize || 20;
-    if (get('obsVerticalHold'))       get('obsVerticalHold').value = Math.round((c.vertical.holdMs || 4500) / 1000);
-    if (get('obsVerticalBgOpacity'))  get('obsVerticalBgOpacity').value = Math.round((c.vertical.bgOpacity != null ? c.vertical.bgOpacity : 0.55) * 100);
-    if (get('obsVerticalShowChat'))   get('obsVerticalShowChat').checked = c.vertical.showChat !== false;
-    if (get('obsVerticalShowEvents')) get('obsVerticalShowEvents').checked = c.vertical.showEvents !== false;
+    if (get('obsVerticalFontSize'))         get('obsVerticalFontSize').value = c.vertical.fontSize || 20;
+    if (get('obsVerticalHold'))             get('obsVerticalHold').value = Math.round((c.vertical.holdMs || 4500) / 1000);
+    if (get('obsVerticalBgOpacity'))        get('obsVerticalBgOpacity').value = Math.round((c.vertical.bgOpacity != null ? c.vertical.bgOpacity : 0.55) * 100);
+    if (get('obsVerticalShowChat'))         get('obsVerticalShowChat').checked = c.vertical.showChat !== false;
+    if (get('obsVerticalShowEvents'))       get('obsVerticalShowEvents').checked = c.vertical.showEvents !== false;
+    if (get('obsVerticalShowEmotes'))       get('obsVerticalShowEmotes').checked = c.vertical.showEmotes !== false;
+    if (get('obsVerticalShowProfilePics'))  get('obsVerticalShowProfilePics').checked = !!c.vertical.showProfilePics;
+    if (get('obsVerticalShowPlatformIcon')) get('obsVerticalShowPlatformIcon').checked = !!c.vertical.showPlatformIcon;
+    if (get('obsVerticalShowUserBadges'))   get('obsVerticalShowUserBadges').checked = c.vertical.showUserBadges !== false;
   }
 }
 
@@ -6269,17 +6328,27 @@ function fireObsDemo(which) {
   } else {
     // Mixed demo for chat / alerts / vertical — send a believable stream
     // of activity so the streamer sees all the major code paths render.
+    // Demo messages intentionally exercise every new 1.4.4 surface so
+    // previewing the chat / vertical overlays shows every feature in
+    // action: emote swap, profile pics, platform icons, badges,
+    // long-message marquee (vertical), TT gift combo counter.
+    var kappa = [{ name: 'Kappa',    url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }];
+    var pogU  = [{ name: 'PogChamp', url: 'https://static-cdn.jtvnw.net/emoticons/v2/305954156/default/dark/2.0' }];
+    var avatarOf = function(name) { return 'https://unavatar.io/twitch/' + encodeURIComponent(name); };
     queue = [
-      function() { window.electronAPI.obsBroadcastChat({ platform:'tw', user:'mod_alice',    message:'Hyped for today!',       userColor:'#a970ff', badges:['mod'] }); },
+      function() { window.electronAPI.obsBroadcastChat({ platform:'tw', user:'mod_alice',    message:'Hyped for today! Kappa',        userColor:'#a970ff', badges:['mod'], emotes: kappa, avatar: avatarOf('twitch') }); },
       function() { window.electronAPI.obsBroadcastAlert({ eventType:'follow', platform:'tw', user:'new_viewer_99' }); },
-      function() { window.electronAPI.obsBroadcastChat({ platform:'yt',  user:'YT Pat',      message:'Love the new layout!',   userColor:'#ff4545' }); },
-      function() { window.electronAPI.obsBroadcastAlert({ eventType:'sub', platform:'tw', user:'longtime_sub', tier:'Tier 1' }); },
-      function() { window.electronAPI.obsBroadcastChat({ platform:'tt',  user:'TikTokFan',   message:'sent a gift \uD83C\uDF39', userColor:'#fe2c55' }); },
-      function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'generous_tiktoker', amount:1000, giftName:'Galaxy', giftImage:'' }); },
-      function() { window.electronAPI.obsBroadcastChat({ platform:'kk',  user:'KickKid',     message:'What game is this?',       userColor:'#53fc18' }); },
-      function() { window.electronAPI.obsBroadcastAlert({ eventType:'cheer', platform:'tw', user:'big_spender', amount:500 }); },
-      function() { window.electronAPI.obsBroadcastAlert({ eventType:'raid', platform:'tw', user:'raider_bob', amount:42 }); },
-      function() { window.electronAPI.obsBroadcastAlert({ eventType:'tip', platform:'se', user:'supporter', amount:10 }); }
+      function() { window.electronAPI.obsBroadcastChat({ platform:'yt',  user:'YT Pat',      message:'Love the new layout! This is a really long message to show the vertical bar marquee scroll animation in action.', userColor:'#ff4545', avatar: avatarOf('mkbhd') }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'sub', platform:'tw', user:'longtime_sub', tier:'Tier 1', message:'Loving the stream PogChamp', emotes: pogU }); },
+      function() { window.electronAPI.obsBroadcastChat({ platform:'tt',  user:'TikTokFan',   message:'sent a gift \uD83C\uDF39',       userColor:'#fe2c55', avatar: avatarOf('tiktok') }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'rose_spammer',        amount:10,   count:1,  giftName:'Rose',   giftImage:'', isBig:false }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'rose_spammer',        amount:10,   count:1,  giftName:'Rose',   giftImage:'', isBig:false }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'rose_spammer',        amount:10,   count:1,  giftName:'Rose',   giftImage:'', isBig:false }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'generous_tiktoker', amount:1000, count:1,  giftName:'Galaxy', giftImage:'' }); },
+      function() { window.electronAPI.obsBroadcastChat({ platform:'kk',  user:'KickKid',     message:'What game is this?',            userColor:'#53fc18', badges:['sub'], avatar: avatarOf('kick') }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'cheer', platform:'tw', user:'big_spender',  amount:500 }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'raid',  platform:'tw', user:'raider_bob',   amount:42  }); },
+      function() { window.electronAPI.obsBroadcastAlert({ eventType:'tip',   platform:'se', user:'supporter',    amount:10  }); }
     ];
   }
   queue.forEach(function(fn, i) { setTimeout(fn, i * 1100); });
@@ -6291,14 +6360,21 @@ function updateObsConfig(which) {
   var cfg = {};
   if (which === 'chat') {
     cfg = {
+      theme:                ((get('obsChatTheme') || {}).value) || 'hud',
       fontSize:             parseInt((get('obsChatFontSize') || {}).value, 10) || 18,
       maxMessages:          parseInt((get('obsChatMaxMessages') || {}).value, 10) || 20,
       bgOpacity:            (parseInt((get('obsChatBgOpacity') || {}).value, 10) || 0) / 100,
-      showPlatformBadge:    !!(get('obsChatShowPlatformBadge')   && get('obsChatShowPlatformBadge').checked),
-      showUserBadges:       !!(get('obsChatShowUserBadges')      && get('obsChatShowUserBadges').checked),
-      showEmotes:           !!(get('obsChatShowEmotes')          && get('obsChatShowEmotes').checked),
-      showEvents:           !!(get('obsChatShowEvents')          && get('obsChatShowEvents').checked),
-      showGiftAnimations:   !!(get('obsChatShowGiftAnimations')  && get('obsChatShowGiftAnimations').checked),
+      boxOpacity:           (parseInt((get('obsChatBoxOpacity') || {}).value, 10) || 80) / 100,
+      showProfilePics:      !!(get('obsChatShowProfilePics')    && get('obsChatShowProfilePics').checked),
+      showPlatformIcon:     !!(get('obsChatShowPlatformIcon')   && get('obsChatShowPlatformIcon').checked),
+      showPlatformBadge:    !!(get('obsChatShowPlatformBadge')  && get('obsChatShowPlatformBadge').checked),
+      showUserBadges:       !!(get('obsChatShowUserBadges')     && get('obsChatShowUserBadges').checked),
+      showEmotes:           !!(get('obsChatShowEmotes')         && get('obsChatShowEmotes').checked),
+      showEvents:           !!(get('obsChatShowEvents')         && get('obsChatShowEvents').checked),
+      eventPlacement:       ((get('obsChatEventPlacement') || {}).value) || 'inline',
+      eventSize:            parseInt((get('obsChatEventSize') || {}).value, 10) || 13,
+      showGiftAnimations:   !!(get('obsChatShowGiftAnimations') && get('obsChatShowGiftAnimations').checked),
+      ttGiftCorner:         ((get('obsChatTtGiftCorner') || {}).value) || 'br',
       showPlatforms:        S.show || { tw: true, yt: true, tt: true, kk: true }
     };
     S.obsCfg.chat = cfg;
@@ -6328,12 +6404,16 @@ function updateObsConfig(which) {
     S.obsCfg.shoutout = cfg;
   } else if (which === 'vertical') {
     cfg = {
-      fontSize:     parseInt((get('obsVerticalFontSize') || {}).value, 10) || 20,
-      holdMs:       (parseInt((get('obsVerticalHold') || {}).value, 10) || 4) * 1000,
-      bgOpacity:    (parseInt((get('obsVerticalBgOpacity') || {}).value, 10) || 55) / 100,
-      showChat:     !!(get('obsVerticalShowChat')   && get('obsVerticalShowChat').checked),
-      showEvents:   !!(get('obsVerticalShowEvents') && get('obsVerticalShowEvents').checked),
-      showPlatforms: S.show || { tw: true, yt: true, tt: true, kk: true }
+      fontSize:         parseInt((get('obsVerticalFontSize') || {}).value, 10) || 20,
+      holdMs:           (parseInt((get('obsVerticalHold') || {}).value, 10) || 4) * 1000,
+      bgOpacity:        (parseInt((get('obsVerticalBgOpacity') || {}).value, 10) || 55) / 100,
+      showChat:         !!(get('obsVerticalShowChat')         && get('obsVerticalShowChat').checked),
+      showEvents:       !!(get('obsVerticalShowEvents')       && get('obsVerticalShowEvents').checked),
+      showEmotes:       !!(get('obsVerticalShowEmotes')       && get('obsVerticalShowEmotes').checked),
+      showProfilePics:  !!(get('obsVerticalShowProfilePics')  && get('obsVerticalShowProfilePics').checked),
+      showPlatformIcon: !!(get('obsVerticalShowPlatformIcon') && get('obsVerticalShowPlatformIcon').checked),
+      showUserBadges:   !!(get('obsVerticalShowUserBadges')   && get('obsVerticalShowUserBadges').checked),
+      showPlatforms:    S.show || { tw: true, yt: true, tt: true, kk: true }
     };
     S.obsCfg.vertical = cfg;
   }
@@ -8301,6 +8381,33 @@ function sendOverlayChat(m) {
 // renderer-side events out to the server, which fans out to every
 // connected browser source via SSE. All three early-exit unless the user
 // is an active Tier 2/3 supporter so non-EA users incur zero cost.
+// Extract a {name, url}[] emote table from a pre-rendered HTML message.
+// The main renderer already resolves Twitch/Kick/YouTube/BTTV/7TV emotes
+// into <img class="emote" src="..." alt="..."> tags inside m.html; we
+// parse that here so OBS overlays get the same visuals without needing
+// their own emote stores. Returns an empty array if nothing matches.
+function _extractObsEmotes(html) {
+  if (!html || typeof html !== 'string') return [];
+  var out = [], seen = Object.create(null);
+  var re = /<img[^>]*class="[^"]*\bemote\b[^"]*"[^>]*>/g;
+  var srcRe = /src="([^"]+)"/;
+  var altRe = /alt="([^"]*)"/;
+  var m;
+  while ((m = re.exec(html)) !== null) {
+    var srcM = srcRe.exec(m[0]);
+    var altM = altRe.exec(m[0]);
+    if (!srcM || !altM) continue;
+    var name = altM[1]
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    var url = srcM[1];
+    if (!name || !url || seen[name]) continue;
+    seen[name] = 1;
+    out.push({ name: name, url: url });
+  }
+  return out;
+}
+
 function sendObsChat(m) {
   if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastChat) return;
   if (!m || !m.plat) return;
@@ -8308,13 +8415,15 @@ function sendObsChat(m) {
   // overlay respects "Show Platforms" from the sidebar without needing
   // its own redundant toggle.
   if (S.show && S.show[m.plat] === false) return;
+  var emotes = (m.emotes && m.emotes.length) ? m.emotes : _extractObsEmotes(m.html);
   window.electronAPI.obsBroadcastChat({
     platform:  m.plat,
     user:      m.user,
     message:   m.text || '',
     userColor: m.color || null,
     badges:    m.badges || [],
-    emotes:    m.emotes || [],
+    emotes:    emotes,
+    avatar:    m.avatar || null,
     ts:        Date.now()
   });
 }
@@ -8327,7 +8436,12 @@ function sendObsAlert(obj) {
   if (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.enabled) {
     if (S.obsCfg.alerts.enabled[ev] === false) return;
   }
-  window.electronAPI.obsBroadcastAlert(Object.assign({ duration: (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.duration) || 6000 }, obj));
+  // Alerts with a viewer message (sub/resub/cheer/tip/etc.) get emotes
+  // extracted from the rendered HTML too, so the alerts banner can
+  // render emote images in the "quoted" secondary line.
+  var payload = Object.assign({ duration: (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.duration) || 6000 }, obj);
+  if (!payload.emotes && payload.messageHtml) payload.emotes = _extractObsEmotes(payload.messageHtml);
+  window.electronAPI.obsBroadcastAlert(payload);
 }
 // ── Discord+ (EA-only): live events, records, bot ─────────────────────────
 // Expanded Discord integration that goes beyond the free-tier stream recap:

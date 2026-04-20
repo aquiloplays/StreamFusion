@@ -14,9 +14,14 @@
      a serialized queue so a single focal moment is legible on a narrow
      canvas where stacked messages would overlap the streamer or UI.
 
-     Listens at /events?type=vertical. Receives 'chat' and 'alert' events
-     and renders them through the same queue (alerts get a different
-     styling treatment so they stand out among chat lines).
+     1.4.4 updates:
+       - Long messages marquee (scroll right→left) instead of getting
+         cut off with an ellipsis. The animation duration scales with
+         content length so fast readers aren't forced to wait.
+       - Emote support: server sends `emotes: [{name, url}]` and we
+         swap matching tokens inline as <img>.
+       - Optional profile pictures, platform icon chips, and badges —
+         same toggles as the horizontal chat overlay.
      ─────────────────────────────────────────────────────────────────── */
 
   :root {
@@ -46,8 +51,6 @@
     color: var(--text);
   }
 
-  /* Stage sits at the bottom. The bar itself is position:absolute inside
-     so we can animate transform:translateY cleanly without layout thrash. */
   #stage {
     position: absolute;
     inset: 0;
@@ -92,7 +95,6 @@
     100% { opacity: 0; transform: translateY(100%); }
   }
 
-  /* Platform-colored left bar for chat rows */
   .bar::before {
     content: '';
     position: absolute;
@@ -111,8 +113,7 @@
   .bar.fw { color: var(--fw); } .bar.fw::before { background: var(--fw); }
   .bar.kf { color: var(--kf); } .bar.kf::before { background: var(--kf); }
 
-  /* Alerts get a thicker highlight and a pulsing glow so they read as
-     "this is a big moment" instead of just another chat line. */
+  /* Alerts get a thicker highlight + pulsing ring. */
   .bar.is-alert {
     background: linear-gradient(90deg, rgba(14,14,16,.92), rgba(24,24,27,.92));
     border-color: rgba(255,255,255,.15);
@@ -133,6 +134,46 @@
     50%      { opacity: .8; }
   }
 
+  .pfp {
+    width: calc(var(--font-size) + 8px);
+    height: calc(var(--font-size) + 8px);
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.08);
+  }
+  .pi {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    border-radius: 4px;
+    color: #0e0e10;
+  }
+  .pi.tw { background: var(--tw); color: #fff; }
+  .pi.yt { background: var(--yt); color: #fff; }
+  .pi.tt { background: var(--tt); color: #fff; }
+  .pi.kk { background: var(--kk); color: #0e0e10; }
+
+  .ub {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+    vertical-align: 2px;
+    color: #fff;
+  }
+  .ub.mod { background: #00ad03; }
+  .ub.vip { background: #e00b8a; }
+  .ub.sub { background: #8205b4; }
+  .ub.broadcaster { background: #e91916; }
+
   .user {
     font-weight: 900;
     flex-shrink: 0;
@@ -140,15 +181,43 @@
     color: currentColor;
   }
   .sep { color: rgba(255,255,255,.6); flex-shrink: 0; }
+
+  /* Message text viewport. When content fits the bar, stays static.
+     When it overflows, the `.scrolling` class swaps the inner span
+     to a marquee-style right→left slide so the whole line is
+     readable within the bar's hold time. */
   .text {
     color: var(--text);
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
     text-shadow: 0 2px 6px rgba(0,0,0,.5);
+    mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, #000 14px, #000 calc(100% - 14px), rgba(0,0,0,0) 100%);
+    -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, #000 14px, #000 calc(100% - 14px), rgba(0,0,0,0) 100%);
   }
+  .text .inner {
+    display: inline-block;
+    padding-left: 0;
+    white-space: nowrap;
+    will-change: transform;
+  }
+  .text.scrolling .inner {
+    animation: marquee var(--marquee-dur, 8s) linear forwards;
+    padding-left: 0;
+  }
+  @keyframes marquee {
+    /* Start offscreen to the right so the first character enters
+       smoothly after the bar finishes sliding up. End offscreen to
+       the left so the last character has fully cleared before the
+       bar slides back down. */
+    0%   { transform: translateX(var(--start-x, 0)); }
+    12%  { transform: translateX(0); }
+    100% { transform: translateX(var(--end-x, -100%)); }
+  }
+
+  .text img.emote { height: 1.1em; width: auto; vertical-align: middle; margin: 0 2px; }
+
   .kicker {
     display: inline-block;
     padding: 2px 8px;
@@ -193,7 +262,11 @@
     holdMs:       4500,
     showPlatforms: { tw: true, yt: true, tt: true, kk: true, se: true, pa: true, fw: true, kf: true },
     showEvents:   true,
-    showChat:     true
+    showChat:     true,
+    showEmotes:   true,
+    showProfilePics: false,
+    showPlatformIcon: false,
+    showUserBadges:  true
   };
 
   var stage = document.getElementById('stage');
@@ -208,8 +281,40 @@
     });
   }
 
-  // Coerce alert event types into a human kicker. Shared with any future
-  // alert-type additions — adding a case here is enough to wire it in.
+  // Emote swap — same shape as the horizontal chat overlay. Called
+  // only for chat items; alerts render their named gift separately.
+  function renderMessage(text, emotes) {
+    if (!CFG.showEmotes || !emotes || !emotes.length) return escapeHtml(text);
+    var byName = Object.create(null);
+    emotes.forEach(function(e) { if (e && e.name && e.url) byName[e.name] = e.url; });
+    return String(text || '').split(/(\s+)/).map(function(tok) {
+      if (byName[tok]) {
+        return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
+      }
+      return escapeHtml(tok);
+    }).join('');
+  }
+
+  function renderBadges(badges) {
+    if (!CFG.showUserBadges || !badges || !badges.length) return '';
+    return badges.map(function(b) {
+      var cls = String(b).toLowerCase();
+      if (!/^(mod|vip|sub|broadcaster)$/.test(cls)) return '';
+      var label = cls === 'broadcaster' ? 'HOST' : cls.toUpperCase();
+      return '<span class="ub ' + cls + '">' + label + '</span>';
+    }).join('');
+  }
+
+  function renderPfp(item) {
+    if (!CFG.showProfilePics || !item.avatar) return '';
+    return '<img class="pfp" src="' + escapeHtml(item.avatar) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+  }
+
+  function renderPlatIcon(plat) {
+    if (!CFG.showPlatformIcon || !plat) return '';
+    return '<span class="pi ' + plat + '">' + plat.toUpperCase() + '</span>';
+  }
+
   function kickerFor(eventType) {
     return {
       follow: 'FOLLOW',  sub:   'SUB',    resub: 'RE-SUB',
@@ -220,17 +325,41 @@
     }[eventType] || 'EVENT';
   }
 
+  // After a bar lands in the DOM, measure its .text inner width vs.
+  // the available text-column width; if the inner overflows, enable
+  // the marquee animation scaled to the hold time + overflow amount.
+  function maybeStartMarquee(bar, holdMs) {
+    var text = bar.querySelector('.text');
+    var inner = text && text.querySelector('.inner');
+    if (!text || !inner) return;
+    // Wait a frame so layout settles before measuring.
+    requestAnimationFrame(function() {
+      var textW  = text.clientWidth;
+      var innerW = inner.scrollWidth;
+      if (innerW <= textW + 2) return;
+      var overflow = innerW - textW;
+      // Animation cycle covers the full bar hold time with a short
+      // pause at the start so readers can recognize the first words
+      // before the scroll begins. Speed floors at ~60px/s so even
+      // huge overflows never crawl.
+      var secs = Math.max(4, Math.min((holdMs / 1000) - 0.5, overflow / 60));
+      text.style.setProperty('--start-x', '0px');
+      text.style.setProperty('--end-x',   -(overflow + 24) + 'px');
+      text.style.setProperty('--marquee-dur', secs + 's');
+      text.classList.add('scrolling');
+    });
+  }
+
   function showItem(item) {
     if (!entitled) { nextInQueue(); return; }
     var plat = (item.platform || '').toLowerCase();
 
-    // Respect platform + type filters.
     if (item._kind === 'chat' && !CFG.showChat) { nextInQueue(); return; }
     if (item._kind === 'alert' && !CFG.showEvents) { nextInQueue(); return; }
     if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) { nextInQueue(); return; }
-    // Suppress the vertical bar for small TT gifts for the same reason
-    // as alerts.html — spammy gift drops shouldn't flood a single-line
-    // bar. Chat overlay's floating animation still shows them.
+    // Suppress the vertical bar for small TT gifts — they get the chat
+    // overlay's floating animation instead. Spammy gift drops shouldn't
+    // flood a single-line bar.
     if (item._kind === 'alert' && item.eventType === 'gift' && item.platform === 'tt' && item.isBig === false) {
       nextInQueue();
       return;
@@ -243,8 +372,6 @@
     if (item._kind === 'alert') {
       var kicker = kickerFor(item.eventType);
       var primary;
-      // TikTok gifts get the named-gift + coins treatment; every other
-      // "gift" event is subs.
       if (item.eventType === 'gift' && item.platform === 'tt') {
         primary = (item.user || 'someone') + ' sent ' + (item.giftName ? item.giftName + ' ' : '') + '(' + (item.amount || 0) + ' coins)';
       } else if (item.eventType === 'gift')  primary = (item.user || 'someone') + ' gifted ' + (item.amount || 1) + ' subs!';
@@ -254,24 +381,31 @@
       else if (item.eventType === 'follow') primary = (item.user || 'someone') + ' followed';
       else primary = (item.user || 'someone') + ' ' + (item.eventType || 'event');
 
-      // If the event carries an image (TT gift artwork), show a small
-      // thumbnail in the kicker slot. The bar still reads as the same
-      // length so the slide-up animation doesn't change timing.
       var kickerHtml = item.giftImage
         ? '<span class="kicker" style="padding:0;background:transparent;box-shadow:none"><img src="' + escapeHtml(item.giftImage) + '" alt="" style="height:28px;width:28px;object-fit:contain;vertical-align:middle" onerror="this.replaceWith(Object.assign(document.createElement(&quot;span&quot;),{textContent:&quot;' + escapeHtml(kicker) + '&quot;,className:&quot;kicker&quot;}))"></span>'
         : '<span class="kicker">' + escapeHtml(kicker) + '</span>';
 
-      inner = kickerHtml + '<span class="text">' + escapeHtml(primary) + '</span>';
+      inner =
+        renderPfp(item) +
+        kickerHtml +
+        '<div class="text"><span class="inner">' + escapeHtml(primary) + '</span></div>';
     } else {
-      inner = '<span class="user">' + escapeHtml(item.user || 'anon') + '</span>' +
-              '<span class="sep">\u00b7</span>' +
-              '<span class="text">' + escapeHtml(item.message || '') + '</span>';
+      inner =
+        renderPfp(item) +
+        renderPlatIcon(plat) +
+        renderBadges(item.badges) +
+        '<span class="user">' + escapeHtml(item.user || 'anon') + '</span>' +
+        '<span class="sep">\u00b7</span>' +
+        '<div class="text"><span class="inner">' + renderMessage(item.message || '', item.emotes) + '</span></div>';
     }
 
     bar.innerHTML = inner;
     stage.appendChild(bar);
 
-    requestAnimationFrame(function() { bar.classList.add('in'); });
+    requestAnimationFrame(function() {
+      bar.classList.add('in');
+      maybeStartMarquee(bar, Math.max(1500, CFG.holdMs));
+    });
 
     setTimeout(function() {
       bar.classList.remove('in');
@@ -287,8 +421,6 @@
     showing = false;
     if (queue.length > 0) {
       showing = true;
-      // Drop oldest if the backlog gets too big — in a fast-moving chat
-      // we'd otherwise show stale messages 30s after the fact.
       while (queue.length > 20) queue.shift();
       showItem(queue.shift());
     }

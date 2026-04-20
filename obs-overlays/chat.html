@@ -13,15 +13,30 @@
      to 'entitlement' to hide itself instantly if the user's Patreon
      membership lapses mid-stream.
 
-     Default look is a gamer-HUD style: bottom-up message flow, fade+slide
-     in, subtle text shadow, platform-colored vertical bar on the left
-     edge of each message. Small enough to read across an HD canvas.
+     Themes:
+       - 'hud' (default): gamer-HUD, per-message cards with platform
+         colored left bar. Original look.
+       - 'box':           single grey container wrapping the whole feed,
+         no per-message cards, just text. Box opacity adjustable.
+
+     Optional surfaces (all opt-in via settings):
+       - Profile pictures next to each message
+       - Inline platform icon chip before the username
+       - Platform-specific badges (sub / mod / vip / broadcaster)
+       - Event placement: inline (mixed with chat), above or below the
+         chat as a compact strip, or off entirely
+       - TikTok gift combo counter anchored to a configurable corner
+         (tl/tr/bl/br) or mid-top / mid-bottom. Grows+shrinks per
+         incoming gift, accumulates "x30" until the combo dies down
+       - TikTok gift floating animation across the full canvas
      ─────────────────────────────────────────────────────────────────── */
 
   :root {
-    --bg-op: 0;          /* 0 = fully transparent; 0.6 = semi-dark chip */
+    --bg-op: 0;            /* per-message bubble bg (hud theme only) */
+    --box-op: 0.8;         /* whole-feed container bg (box theme) */
+    --box-color: 20, 20, 24;
     --font-size: 18px;
-    --msg-max: 20;       /* rendered as JS limit, here for reference */
+    --event-size: 13px;
     --accent: #3A86FF;
     --text: #ffffff;
     --mut: #cfd2dc;
@@ -43,10 +58,12 @@
     color: var(--text);
   }
 
-  /* Messages stack upward from the bottom — newest at bottom, oldest fade
-     off the top. This is how most on-stream chat overlays render because
-     the streamer's eye tracks "what just came in" which stays near the
-     bottom edge of the source. */
+  /* ──────────────────────────────────────────────────────────────────
+     Feed layout. The feed stacks messages upward from the bottom —
+     newest at the bottom, oldest fade off the top. Matches how most
+     on-stream chat overlays read: streamer's eye tracks the bottom
+     edge where the newest message lives.
+     ────────────────────────────────────────────────────────────────── */
   #feed {
     position: absolute;
     left: 0; right: 0; bottom: 0;
@@ -57,6 +74,19 @@
     max-height: 100vh;
     overflow: hidden;
     pointer-events: none;
+  }
+
+  /* Single-box theme: wraps the entire #feed in a single translucent
+     grey panel. Text floats inside it with no per-message bubbles. */
+  body.theme-box #feed {
+    left: 10px; right: 10px; bottom: 10px;
+    max-height: calc(100vh - 20px);
+    padding: 14px 16px 10px;
+    background: rgba(var(--box-color), var(--box-op));
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .msg {
@@ -77,8 +107,19 @@
     text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.65);
   }
 
-  /* Left-edge accent: colored bar per platform. Gives an instant-read
-     of which service the message is from without a badge icon. */
+  /* Box theme strips all per-message chrome: no background, no left
+     bar, no drop-shadow behind text. The container handles the bg. */
+  body.theme-box .msg {
+    padding: 3px 2px;
+    margin-top: 2px;
+    border-radius: 0;
+    background: transparent !important;
+    text-shadow: none;
+  }
+  body.theme-box .msg::before { display: none !important; }
+
+  /* Left-edge accent: colored bar per platform. Instant-read of which
+     service the message is from. 'hud' theme only. */
   .msg::before {
     content: '';
     position: absolute;
@@ -93,12 +134,7 @@
   .msg.tt::before { background: var(--tt); color: var(--tt); }
   .msg.kk::before { background: var(--kk); color: var(--kk); }
 
-  /* Messages fading out as they scroll up past the top edge. Handled via
-     a staggered class set when the feed is over capacity. */
-  .msg.leaving {
-    animation: msgOut .25s cubic-bezier(.42,0,1,1) forwards;
-  }
-
+  .msg.leaving { animation: msgOut .25s cubic-bezier(.42,0,1,1) forwards; }
   @keyframes msgIn {
     0%   { opacity: 0; transform: translateX(-20px) scale(.98); }
     60%  { opacity: 1; }
@@ -108,6 +144,40 @@
     0%   { opacity: 1; transform: translateY(0); }
     100% { opacity: 0; transform: translateY(-6px); }
   }
+
+  /* Profile picture. Shown inline before the username when the
+     streamer enables it. Falls back to a platform-tinted initial chip
+     if the URL fails to load. */
+  .pfp {
+    width: calc(var(--font-size) + 4px);
+    height: calc(var(--font-size) + 4px);
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.08);
+    margin-right: 2px;
+  }
+
+  /* Platform icon chip — same size as the user-badges row. Shown when
+     `showPlatformIcon` is on. */
+  .pi {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 3px;
+    color: #0e0e10;
+    text-shadow: none;
+    margin-right: 2px;
+  }
+  .pi.tw { background: var(--tw); color: #fff; }
+  .pi.yt { background: var(--yt); color: #fff; }
+  .pi.tt { background: var(--tt); color: #fff; }
+  .pi.kk { background: var(--kk); color: #0e0e10; }
 
   .u {
     font-weight: 800;
@@ -133,8 +203,8 @@
     min-width: 0;
   }
 
-  /* Platform badge — inline icon before username. Keeps compatibility
-     when user disables the left bar but still wants a platform marker. */
+  /* Legacy left-edge platform badge — kept for the old `showPlatformBadge`
+     config. The new `showPlatformIcon` uses `.pi` above. */
   .pb {
     width: 16px;
     height: 16px;
@@ -154,8 +224,7 @@
   .pb.tt { background: var(--tt); color: #fff; }
   .pb.kk { background: var(--kk); color: #0e0e10; }
 
-  /* Inline user badges (sub/mod/vip). Rendered as compact letter chips
-     since we can't always get the full badge images across platforms. */
+  /* User badges (sub/mod/vip/broadcaster). Compact letter chips. */
   .ub {
     display: inline-block;
     font-size: 10px;
@@ -171,12 +240,10 @@
   .ub.sub { background: #8205b4; color: #fff; }
   .ub.broadcaster { background: #e91916; color: #fff; }
 
-  /* Emote inline image sizing */
+  /* Emote inline image. height:1.15em keeps it aligned with text. */
   .m img.emote { height: 1.15em; width: auto; vertical-align: middle; margin: 0 1px; }
 
-  /* "Gated" banner shown if Patreon entitlement drops mid-stream. Hidden
-     by default — the server-side gating returns a different page in the
-     first place. This one is for live revocation without refresh. */
+  /* Gated page shown if entitlement flips off mid-stream. */
   #gated {
     position: absolute;
     inset: 0;
@@ -194,10 +261,7 @@
   }
   #gated.show { display: flex; }
 
-  /* "Setup hint" shown only in the browser preview (not in OBS) if no
-     messages have arrived yet AFTER ~10 seconds. Helps the streamer
-     confirm the SSE pipe is alive. Hidden automatically once the first
-     message renders. */
+  /* Setup hint — only in browser preview if no messages after ~10s. */
   #hint {
     position: absolute;
     left: 14px; bottom: 14px;
@@ -211,34 +275,36 @@
   #hint.show { opacity: 1; }
 
   /* ──────────────────────────────────────────────────────────────────
-     Events strip (optional) — shown BELOW the chat feed when the
-     streamer enables `showEvents` in Settings → OBS Overlays. Hosts
-     compact event cards for subs / gifts / cheers / raids / tips /
-     follows. Stays at the bottom edge of the canvas; chat feed shifts
-     up to clear space when enabled.
+     Events strips. Two independent containers let the streamer pick
+     where events render — above the chat, below it, or inline (mixed
+     into the #feed). The inline variant re-uses event-card DOM nodes
+     appended directly to #feed.
      ────────────────────────────────────────────────────────────────── */
-  body.has-events #feed { bottom: 60px; }
-
-  #events {
-    display: none;
+  .events {
     position: absolute;
-    left: 0; right: 0; bottom: 0;
+    left: 0; right: 0;
     padding: 6px 12px;
     pointer-events: none;
     z-index: 5;
+    display: none;
   }
-  body.has-events #events { display: block; }
+  #events-above { top: 0; }
+  #events-below { bottom: 0; }
+  body.placement-above #events-above { display: block; }
+  body.placement-below #events-below { display: block; }
+  body.placement-above #feed { top: 60px; bottom: auto; height: calc(100vh - 60px); justify-content: flex-end; }
+  body.placement-below #feed { bottom: 60px; }
 
   .ev-row {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 5px 11px;
     border-radius: 999px;
     background: linear-gradient(135deg, rgba(14,14,16,.9), rgba(24,24,27,.85));
     border: 1px solid rgba(255,255,255,.12);
     backdrop-filter: blur(8px);
-    font-size: 14px;
+    font-size: var(--event-size);
     font-weight: 700;
     color: #fff;
     text-shadow: 0 1px 2px rgba(0,0,0,.7);
@@ -248,6 +314,11 @@
     animation: evRowIn .45s cubic-bezier(.22,1.2,.36,1) forwards;
     margin-top: 4px;
     max-width: 94%;
+  }
+  .ev-row.inline {
+    /* When placed inline inside #feed, events stretch naturally. */
+    display: flex;
+    margin-top: 4px;
   }
   .ev-row.leaving { animation: evRowOut .35s cubic-bezier(.55,0,.7,.2) forwards; }
   @keyframes evRowIn  { 0%{opacity:0;transform:translateY(14px) scale(.96)} 60%{opacity:1;transform:translateY(-2px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} }
@@ -283,19 +354,14 @@
     border-radius: 999px;
     background: #f0b429;
     color: #0e0e10;
-    font-size: 12px;
+    font-size: calc(var(--event-size) - 1px);
     font-weight: 900;
   }
 
   /* ──────────────────────────────────────────────────────────────────
-     TikTok gift floating animation — fires on EVERY TT gift alert when
-     the streamer has `showGiftAnimations` enabled. Gift image floats
-     up from the bottom-right, drifts leftward, fades out over ~4s.
-     Label underneath the image shows who sent it + how many.
-
-     The animation layer is position:fixed over the whole canvas so
-     gifts can land "outside the box" of the chat feed — the point is
-     they visually escape the chat confines.
+     TikTok gift floating rain — fires on every TT gift when
+     `showGiftAnimations` is on. Whole-canvas effect, lets the real
+     gift artwork travel from bottom-right up and left.
      ────────────────────────────────────────────────────────────────── */
   #gifts {
     position: fixed;
@@ -315,12 +381,7 @@
     animation: giftFloat var(--gift-dur, 4.6s) cubic-bezier(.22,.8,.32,1) forwards;
     filter: drop-shadow(0 4px 12px rgba(254,44,85,.5)) drop-shadow(0 0 20px rgba(254,44,85,.35));
   }
-  .gift img {
-    width: 92px;
-    height: 92px;
-    object-fit: contain;
-    display: block;
-  }
+  .gift img { width: 92px; height: 92px; object-fit: contain; display: block; }
   .gift .g-count {
     position: absolute;
     top: -6px; right: -6px;
@@ -345,20 +406,118 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
   @keyframes giftFloat {
     0%   { opacity: 0; transform: translate(var(--start-x, 20px),   0) scale(.3) rotate(-8deg); }
     12%  { opacity: 1; transform: translate(var(--start-x, 20px), -120px) scale(1.1) rotate(4deg); }
     70%  { opacity: 1; transform: translate(var(--mid-x, -100px), -55vh) scale(1)   rotate(-6deg); }
     100% { opacity: 0; transform: translate(var(--end-x, -220px), -80vh) scale(.85) rotate(8deg); }
   }
+
+  /* ──────────────────────────────────────────────────────────────────
+     TikTok gift combo counter — anchored to a configurable corner
+     (tl/tr/bl/br) or the horizontal midline (tm/bm). When a streamer
+     receives multiple of the SAME gift from the SAME user in quick
+     succession (the TikTok "Rose x30" pattern), we accumulate into a
+     single chip that grows+shrinks on each new arrival and displays
+     the running count. Dies out 3s after the last arrival.
+
+     Multiple simultaneous combos (different users / different gifts)
+     stack vertically from their anchor.
+     ────────────────────────────────────────────────────────────────── */
+  #combo {
+    position: fixed;
+    pointer-events: none;
+    z-index: 12;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    max-width: 340px;
+  }
+  #combo[data-anchor="tl"] { top: 0;    left: 0;    align-items: flex-start; }
+  #combo[data-anchor="tr"] { top: 0;    right: 0;   align-items: flex-end; }
+  #combo[data-anchor="bl"] { bottom: 0; left: 0;    align-items: flex-start; flex-direction: column-reverse; }
+  #combo[data-anchor="br"] { bottom: 0; right: 0;   align-items: flex-end;   flex-direction: column-reverse; }
+  #combo[data-anchor="tm"] { top: 0;    left: 50%;  transform: translateX(-50%); align-items: center; }
+  #combo[data-anchor="bm"] { bottom: 0; left: 50%;  transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
+  #combo[data-anchor="off"] { display: none; }
+
+  .combo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px 8px 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(254,44,85,0.92), rgba(240,180,41,0.88));
+    box-shadow: 0 8px 30px rgba(254,44,85,0.45), 0 0 16px rgba(240,180,41,0.35);
+    border: 2px solid rgba(255,255,255,0.35);
+    color: #0e0e10;
+    font-weight: 900;
+    animation: comboIn .45s cubic-bezier(.22,1.3,.36,1) forwards;
+  }
+  .combo.fade { animation: comboOut .6s cubic-bezier(.55,0,.8,.2) forwards; }
+  .combo.bump { animation: comboBump .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes comboIn   { 0%{opacity:0;transform:scale(.4) translateY(12px)} 60%{opacity:1;transform:scale(1.12) translateY(-2px)} 100%{opacity:1;transform:scale(1) translateY(0)} }
+  @keyframes comboOut  { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(.4) translateY(18px)} }
+  @keyframes comboBump {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.25); filter: drop-shadow(0 0 12px rgba(255,255,255,0.85)); }
+    70%  { transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  .combo .c-img {
+    width: 48px; height: 48px;
+    flex-shrink: 0;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+  }
+  .combo .c-fallback {
+    width: 48px; height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .combo .c-body {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+  .combo .c-user {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .combo .c-name {
+    font-size: 13px;
+    font-weight: 900;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .combo .c-count {
+    font-size: 24px;
+    font-weight: 900;
+    margin-left: 4px;
+    text-shadow: 0 2px 0 rgba(255,255,255,0.25);
+    letter-spacing: 0.5px;
+  }
 </style>
 </head>
 <body>
 
+<div class="events" id="events-above"></div>
 <div id="feed"></div>
-<div id="events"></div>
+<div class="events" id="events-below"></div>
 <div id="gifts"></div>
+<div id="combo" data-anchor="off"></div>
 <div id="gated">Patreon Early Access required<br><span style="font-size:11px;color:#adadb8;letter-spacing:.04em;text-transform:none;font-weight:600">Connect in StreamFusion → Settings → Early Access</span></div>
 <div id="hint">StreamFusion chat overlay — waiting for messages…</div>
 
@@ -367,35 +526,45 @@
   'use strict';
 
   // ──────────────────────────────────────────────────────────────────
-  // State
+  // Config. Defaults tuned so existing streamers see no behavior
+  // change unless they flip on the new 1.4.4 options (themes, pfps,
+  // event placement, gift combo counter).
   // ──────────────────────────────────────────────────────────────────
   var CFG = {
     maxMessages: 20,
     fontSize:    18,
-    bgOpacity:   0,             // 0 = fully transparent
-    showPlatformBadge: false,   // left-edge accent bar is on by default
-    showUserBadges:    true,    // sub/mod/vip chips
+    bgOpacity:   0,
+    showPlatformBadge: false,
+    showUserBadges:    true,
     showEmotes:        true,
     showPlatforms: { tw: true, yt: true, tt: true, kk: true },
-    fadeOutAfterMs: 0,          // 0 = don't auto-remove; only trim on overflow
-    // New for 1.4.3: alert-type events can render as an inline events
-    // strip beneath the chat feed, and TikTok gifts can spawn floating
-    // animations over the whole canvas. Both default OFF so existing
-    // streamers don't see behavior changes mid-stream.
+    fadeOutAfterMs: 0,
     showEvents:         false,
     eventsHoldMs:       6000,
-    showGiftAnimations: false
+    showGiftAnimations: false,
+
+    // New in 1.4.4
+    theme:              'hud',            // 'hud' | 'box'
+    boxOpacity:         0.8,              // for 'box' theme (0–1)
+    showProfilePics:    false,
+    showPlatformIcon:   false,
+    eventPlacement:     'inline',         // 'inline' | 'above' | 'below' | 'off'
+    eventSize:          13,
+    ttGiftCorner:       'br',             // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
+    ttGiftComboHoldMs:  3000              // time since last gift before combo dies
   };
 
-  var feed = document.getElementById('feed');
-  var events = document.getElementById('events');
-  var gifts = document.getElementById('gifts');
-  var gated = document.getElementById('gated');
-  var hint = document.getElementById('hint');
+  var feed      = document.getElementById('feed');
+  var evAbove   = document.getElementById('events-above');
+  var evBelow   = document.getElementById('events-below');
+  var gifts     = document.getElementById('gifts');
+  var comboBox  = document.getElementById('combo');
+  var gated     = document.getElementById('gated');
+  var hint      = document.getElementById('hint');
   var messageCount = 0;
 
   // ──────────────────────────────────────────────────────────────────
-  // Render a chat message
+  // Helpers
   // ──────────────────────────────────────────────────────────────────
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, function(c) {
@@ -403,9 +572,10 @@
     });
   }
 
-  // Expand emotes by tokenizing the message. If an emote's name appears
-  // as a whole word, swap it for an <img>. Graceful fallback to plain
-  // text if no emotes array is supplied.
+  // Emote swap by whole-word match. Server-side extraction stuffs every
+  // <img class="emote"> it finds in the rendered message into the
+  // `emotes` array (see sendObsChat in index.html), so OBS just
+  // rebuilds inline <img>s by token lookup.
   function renderMessage(text, emotes) {
     if (!CFG.showEmotes || !emotes || !emotes.length) {
       return escapeHtml(text);
@@ -430,15 +600,31 @@
     }).join('');
   }
 
+  function renderPfp(m) {
+    if (!CFG.showProfilePics || !m.avatar) return '';
+    var alt = escapeHtml(m.user || 'u');
+    return '<img class="pfp" src="' + escapeHtml(m.avatar) + '" alt="' + alt + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+  }
+
+  function renderPlatIcon(plat) {
+    if (!CFG.showPlatformIcon || !plat) return '';
+    return '<span class="pi ' + plat + '">' + plat.toUpperCase() + '</span>';
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Chat message rendering
+  // ──────────────────────────────────────────────────────────────────
   function addMessage(m) {
     if (!m) return;
     var plat = (m.platform || '').toLowerCase();
-    if (!CFG.showPlatforms[plat] && plat) return;   // filter by platform
+    if (!CFG.showPlatforms[plat] && plat) return;
     if (hint) hint.classList.remove('show');
 
     var div = document.createElement('div');
     div.className = 'msg ' + plat;
 
+    // Legacy platform badge remains available so existing streamers'
+    // settings keep working. New code prefers showPlatformIcon.
     var platBadge = CFG.showPlatformBadge && plat
       ? '<span class="pb ' + plat + '">' + plat.toUpperCase() + '</span>'
       : '';
@@ -447,7 +633,9 @@
     var uCls = 'u ' + plat;
 
     div.innerHTML =
+      renderPfp(m) +
       platBadge +
+      renderPlatIcon(plat) +
       renderBadges(m.badges) +
       '<span class="' + uCls + '" style="' + userColor + '">' + escapeHtml(m.user || 'anon') + '</span>' +
       '<span class="sep">:</span>' +
@@ -455,13 +643,22 @@
 
     feed.appendChild(div);
     messageCount++;
+    trimFeed();
+  }
 
-    // Trim old messages off the top, animating their exit. We keep the
-    // DOM slightly larger than max during the animation so the slide
-    // doesn't collapse visually.
+  function trimFeed() {
+    // Trim oldest off the top with an animation pass. We keep the node
+    // around an extra 260ms so the slide-out reads visually.
     while (feed.children.length > CFG.maxMessages) {
       var stale = feed.children[0];
-      if (stale.classList.contains('leaving')) break;  // already animating
+      if (stale.classList.contains('leaving') || stale.classList.contains('ev-row')) {
+        // event rows inside the feed (inline placement) self-remove on timeout
+        if (feed.children.length > CFG.maxMessages + 6) {
+          if (stale.parentNode) stale.parentNode.removeChild(stale);
+          continue;
+        }
+        break;
+      }
       stale.classList.add('leaving');
       setTimeout(function(node) {
         return function() { if (node && node.parentNode) node.parentNode.removeChild(node); };
@@ -470,18 +667,12 @@
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Events strip — one card per alert event, shown beneath the chat
-  // feed when the streamer enables `showEvents`. Each row auto-clears
-  // after `eventsHoldMs` so the strip never piles up.
+  // Event rendering. Three placement modes:
+  //   'inline'  — event cards mix into #feed alongside chat
+  //   'above'   — fixed strip at the top of the canvas
+  //   'below'   — fixed strip at the bottom (the original behavior)
+  //   'off'     — events are dropped
   // ──────────────────────────────────────────────────────────────────
-  function eventKicker(t) {
-    return {
-      follow:'FOLLOW', sub:'SUB', resub:'RE-SUB', gift:'GIFT',
-      cheer:'BITS',  raid:'RAID', tip:'TIP', host:'HOST',
-      pledge:'PATREON', tier_change:'TIER UP', pledge_end:'PLEDGE ENDED',
-      order:'ORDER', donation:'DONATION'
-    }[t] || 'EVENT';
-  }
   function eventIcon(ev) {
     if (ev.giftImage) return '<img src="' + ev.giftImage + '" alt="" onerror="this.outerHTML=\'\u2605\'">';
     return {
@@ -508,14 +699,24 @@
   }
   function addEvent(ev) {
     if (!CFG.showEvents) return;
+    var place = CFG.eventPlacement || 'inline';
+    if (place === 'off') return;
     var plat = (ev.platform || '').toLowerCase();
     if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) return;
     var row = document.createElement('div');
-    row.className = 'ev-row ' + plat;
+    row.className = 'ev-row ' + plat + (place === 'inline' ? ' inline' : '');
     row.innerHTML =
       '<span class="ev-icon">' + eventIcon(ev) + '</span>' +
       '<span>' + eventText(ev) + '</span>';
-    events.appendChild(row);
+    var host =
+      place === 'above' ? evAbove :
+      place === 'below' ? evBelow :
+      feed;
+    host.appendChild(row);
+    if (place === 'inline') {
+      messageCount++;
+      trimFeed();
+    }
     setTimeout(function() {
       row.classList.add('leaving');
       setTimeout(function() { if (row.parentNode) row.parentNode.removeChild(row); }, 360);
@@ -523,21 +724,16 @@
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // TikTok gift floating animation — full-canvas effect that lets the
-  // actual gift artwork physically travel up and to the left across
-  // the overlay. Fires on every TT gift (big or small), stacks so
-  // multiple gifts can be in flight at once.
+  // TikTok gift floating animation — unchanged from 1.4.3. Fires on
+  // every TT gift, multiple gifts in flight at once.
   // ──────────────────────────────────────────────────────────────────
   function spawnGiftAnimation(ev) {
     if (!CFG.showGiftAnimations) return;
     if (ev.platform !== 'tt') return;
-    if (!ev.giftImage) return;                     // no image = nothing worth animating
+    if (!ev.giftImage) return;
     var el = document.createElement('div');
     el.className = 'gift';
-    // Randomize start/mid/end X so multiple gifts don't overlap perfectly.
-    // The whole thing travels from bottom-right to top-left so the feel
-    // matches TikTok's own gift-rain animation.
-    var startX = 20 + Math.random() * 60;          // small horizontal jitter near right edge
+    var startX = 20 + Math.random() * 60;
     var midX   = -(window.innerWidth * (0.25 + Math.random() * 0.35));
     var endX   = -(window.innerWidth * (0.55 + Math.random() * 0.25));
     var dur    = (4.2 + Math.random() * 1.6).toFixed(2) + 's';
@@ -551,23 +747,102 @@
       countBadge +
       '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>';
     gifts.appendChild(el);
-    // Clean up after the animation finishes. 500ms buffer past the
-    // declared duration covers the exit fade.
     var ms = parseFloat(dur) * 1000 + 500;
     setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, ms);
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Config application
+  // TikTok gift combo counter. Aggregates multiple same-user + same-
+  // gift events into one chip that grows+shrinks on every new arrival
+  // and displays a running count. Each combo times out CFG.ttGiftCombo
+  // HoldMs after its last increment.
+  //
+  // Key is `user|giftName` so two users sending Rose x5 each render as
+  // two separate chips that stack vertically from the configured
+  // anchor corner.
+  // ──────────────────────────────────────────────────────────────────
+  var combos = Object.create(null);
+
+  function registerGiftCombo(ev) {
+    if (CFG.ttGiftCorner === 'off') return;
+    if (ev.platform !== 'tt') return;
+    if (ev.eventType !== 'gift') return;
+    comboBox.setAttribute('data-anchor', CFG.ttGiftCorner || 'br');
+
+    var key = (ev.user || 'someone') + '|' + (ev.giftName || 'gift');
+    var inc = Math.max(1, ev.count || 1);
+    var entry = combos[key];
+    if (!entry) {
+      entry = { count: 0, el: null, timer: null, ev: ev };
+      entry.el = buildComboElement(ev);
+      comboBox.appendChild(entry.el);
+      combos[key] = entry;
+    }
+    entry.count += inc;
+    entry.ev = ev;
+    updateComboElement(entry);
+    // Bump animation — re-apply the class after a tick so it re-triggers
+    entry.el.classList.remove('bump');
+    // Force reflow so the class removal takes effect before re-add
+    void entry.el.offsetWidth;
+    entry.el.classList.add('bump');
+
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(function() { fadeCombo(key); }, CFG.ttGiftComboHoldMs || 3000);
+  }
+
+  function buildComboElement(ev) {
+    var div = document.createElement('div');
+    div.className = 'combo';
+    var img = ev.giftImage
+      ? '<img class="c-img" src="' + escapeHtml(ev.giftImage) + '" alt="" onerror="this.outerHTML=\'<span class=\\\'c-fallback\\\'>\uD83C\uDF81</span>\'">'
+      : '<span class="c-fallback">\uD83C\uDF81</span>';
+    div.innerHTML =
+      img +
+      '<div class="c-body">' +
+        '<span class="c-user">' + escapeHtml(ev.user || '') + '</span>' +
+        '<span class="c-name">' + escapeHtml(ev.giftName || 'gift') + '</span>' +
+      '</div>' +
+      '<span class="c-count">\u00d71</span>';
+    return div;
+  }
+
+  function updateComboElement(entry) {
+    var cnt = entry.el.querySelector('.c-count');
+    if (cnt) cnt.textContent = '\u00d7' + entry.count;
+  }
+
+  function fadeCombo(key) {
+    var entry = combos[key];
+    if (!entry) return;
+    entry.el.classList.add('fade');
+    setTimeout(function() {
+      if (entry.el && entry.el.parentNode) entry.el.parentNode.removeChild(entry.el);
+      delete combos[key];
+    }, 600);
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Config application. Most settings are reactive — flipping the
+  // placement mode instantly re-homes the events-above/events-below
+  // strips, box/hud theme flip is just a body class, etc.
   // ──────────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     if (!cfg || typeof cfg !== 'object') return;
     Object.keys(cfg).forEach(function(k) { CFG[k] = cfg[k]; });
     document.documentElement.style.setProperty('--bg-op', String(CFG.bgOpacity || 0));
+    document.documentElement.style.setProperty('--box-op', String(CFG.boxOpacity != null ? CFG.boxOpacity : 0.8));
     document.documentElement.style.setProperty('--font-size', (CFG.fontSize || 18) + 'px');
-    // Toggle the has-events body class so the feed's bottom offset
-    // respects the events strip when it's enabled.
-    document.body.classList.toggle('has-events', !!CFG.showEvents);
+    document.documentElement.style.setProperty('--event-size', (CFG.eventSize || 13) + 'px');
+
+    document.body.classList.toggle('theme-box', CFG.theme === 'box');
+    document.body.classList.toggle('theme-hud', CFG.theme !== 'box');
+
+    document.body.classList.remove('placement-above', 'placement-below', 'placement-inline', 'placement-off');
+    var p = CFG.showEvents ? (CFG.eventPlacement || 'inline') : 'off';
+    document.body.classList.add('placement-' + p);
+
+    comboBox.setAttribute('data-anchor', CFG.ttGiftCorner || 'br');
   }
 
   function setEntitled(v) {
@@ -576,8 +851,7 @@
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // SSE wiring. EventSource auto-reconnects with exponential backoff
-  // built into the browser, so we don't need to handle retry ourselves.
+  // SSE
   // ──────────────────────────────────────────────────────────────────
   var es = new EventSource('/events?type=chat');
 
@@ -593,17 +867,13 @@
     try { addMessage(JSON.parse(e.data)); } catch (err) {}
   });
 
-  // Alert events land here when main.js broadcasts to the 'chat' target
-  // (as of 1.4.3, alerts fan out to alerts / vertical / chat). We fork
-  // into two rendering paths: the events strip (for every kind of event
-  // the streamer enabled) and the TT gift floating animation (TT gift
-  // events only, when showGiftAnimations is on).
   es.addEventListener('alert', function(e) {
     var ev;
     try { ev = JSON.parse(e.data); } catch (err) { return; }
     if (!ev) return;
     addEvent(ev);
     spawnGiftAnimation(ev);
+    registerGiftCombo(ev);
   });
 
   es.addEventListener('config', function(e) {
@@ -616,8 +886,6 @@
 
   es.addEventListener('shutdown', function() { es.close(); });
 
-  // Preview hint — only shows after 10s of silence so it doesn't flash
-  // onto OBS when the stream is mid-quiet-moment.
   setTimeout(function() {
     if (messageCount === 0 && !gated.classList.contains('show')) hint.classList.add('show');
   }, 10000);

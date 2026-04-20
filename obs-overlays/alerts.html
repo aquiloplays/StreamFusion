@@ -283,7 +283,8 @@
     duration: 6000,
     bigGiftThreshold: 5,    // gift count that triggers confetti + pulse ring
     bigCheerThreshold: 500, // bits
-    bigTipThreshold:   10   // USD
+    bigTipThreshold:   10,  // USD
+    showEmotes:        true // render <img> emotes in the secondary message line
   };
 
   var stage = document.getElementById('stage');
@@ -315,6 +316,25 @@
     return String(s || '').replace(/[&<>"']/g, function(c) {
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
     });
+  }
+
+  // Emote swap for the secondary message line. Alerts carrying a
+  // viewer message (sub msg, resub msg, cheer msg, etc.) get the
+  // same `emotes: [{name, url}]` array the chat overlay uses, so we
+  // can render Twitch/Kick/YouTube/BTTV/7TV emote images inline.
+  // Falls back to plain escaped text if emotes aren't supplied or the
+  // streamer disabled emote rendering in the chat config (mirrored
+  // here via CFG.showEmotes).
+  function renderMessageWithEmotes(text, emotes) {
+    if (CFG.showEmotes === false || !emotes || !emotes.length) return escapeHtml(text);
+    var byName = Object.create(null);
+    emotes.forEach(function(e) { if (e && e.name && e.url) byName[e.name] = e.url; });
+    return String(text || '').split(/(\s+)/).map(function(tok) {
+      if (byName[tok]) {
+        return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" style="height:1.1em;width:auto;vertical-align:middle;margin:0 1px" onerror="this.outerHTML=this.alt">';
+      }
+      return escapeHtml(tok);
+    }).join('');
   }
 
   function formatPrimary(ev, meta) {
@@ -398,7 +418,7 @@
       ? '<img src="' + escapeHtml(ev.giftImage) + '" alt="" style="width:70%;height:70%;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))" onerror="this.outerHTML=' + JSON.stringify(meta.icon) + '">'
       : meta.icon;
     var secondary = ev.message
-      ? '<div class="secondary"><span class="msg">"' + escapeHtml(ev.message) + '"</span></div>'
+      ? '<div class="secondary"><span class="msg">"' + renderMessageWithEmotes(ev.message, ev.emotes) + '"</span></div>'
       : (ev.tier ? '<div class="secondary">' + escapeHtml(ev.tier) + '</div>' : '');
 
     card.innerHTML =

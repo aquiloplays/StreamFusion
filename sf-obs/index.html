@@ -1,0 +1,1284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SF OBS — Multi-platform chat for OBS</title>
+<meta name="description" content="SF OBS is a free, standalone OBS Custom Browser Dock that shows your Twitch / YouTube / TikTok / Kick chat in one place. From the makers of StreamFusion.">
+<style>
+  /* ───────────────────────────────────────────────────────────────────────
+     SF OBS — standalone web app for OBS Custom Browser Docks.
+
+     This page is a sibling product to StreamFusion. It runs entirely in
+     the browser, connects directly to the streamer's local Streamer.bot
+     and (optionally) Tikfinity WebSockets, and renders a single unified
+     chat feed. No installer, no Electron, no server — drop the URL into
+     OBS → Docks → Custom Browser Docks and it works.
+
+     Architecture:
+       - ./app.js is inlined here to keep the download to one file.
+       - Config (host, port, password, platform toggles) persists via
+         localStorage. First run shows a setup modal.
+       - Can also be driven via URL query params so the streamer can
+         paste a pre-configured URL into OBS:
+           ?host=127.0.0.1&port=8080&tfPort=21213&pass=xyz&auto=1
+         "auto=1" skips the setup modal on first run.
+       - No telemetry, no external analytics, no Patreon gate.
+
+     Lifted (and heavily simplified) from StreamFusion's renderer:
+       - Streamer.bot Hello → Auth → Subscribe handshake
+       - Per-platform event handlers (chat, follow, sub, gift, cheer, raid)
+       - Tikfinity event handler (chat, gift, follow, sub, like, share)
+       - Emote rendering from parts[] arrays
+       - Avatar resolution with unavatar.io fallback for Twitch/Kick
+     ─────────────────────────────────────────────────────────────────── */
+
+  :root {
+    --bg:       #0b0b0d;
+    --bg2:      #18181b;
+    --bg3:      #22222a;
+    --bdr:      #2a2a30;
+    --txt:      #efeff1;
+    --mut:      #8a8a98;
+    --mut2:     #adadb8;
+    --accent:   #3A86FF;
+    --accent2:  #2AD4B9;
+    --tw:       #a970ff;
+    --yt:       #ff4545;
+    --tt:       #fe2c55;
+    --kk:       #53fc18;
+    --gold:     #f0b429;
+    --ok:       #22c55e;
+    --warn:     #f59e0b;
+    --err:      #ef4444;
+    --font-size: 14px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--txt);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ──────────────────────────────────────────────────────────────────
+     Header — status chips + settings gear. Compact so the chat feed
+     gets as much room as possible inside a narrow OBS dock.
+     ────────────────────────────────────────────────────────────────── */
+  #hdr {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--bdr);
+    user-select: none;
+  }
+  .brand {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+  .brand .a { color: var(--accent); }
+  .brand .b { color: var(--mut); font-weight: 700; }
+  .chips {
+    display: flex;
+    gap: 4px;
+    margin-left: 4px;
+    overflow-x: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .chips::-webkit-scrollbar { height: 3px; }
+  .chips::-webkit-scrollbar-thumb { background: var(--bdr); }
+  .chip {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--bdr);
+    color: var(--mut);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chip::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--mut);
+  }
+  .chip.on         { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.4); color: #93f0b5; }
+  .chip.on::before { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .chip.wait       { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.4); color: #fdca7a; }
+  .chip.wait::before { background: var(--warn); animation: pulse 1.3s ease-in-out infinite; }
+  .chip.err        { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.4); color: #ffa3a3; }
+  .chip.err::before { background: var(--err); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .chip.plat.tw.on { color: #c8a6ff; border-color: rgba(169,112,255,0.55); background: rgba(169,112,255,0.1); }
+  .chip.plat.yt.on { color: #ffb5b5; border-color: rgba(255,69,69,0.55);  background: rgba(255,69,69,0.1); }
+  .chip.plat.tt.on { color: #ff8fae; border-color: rgba(254,44,85,0.55);  background: rgba(254,44,85,0.1); }
+  .chip.plat.kk.on { color: #a0ff8b; border-color: rgba(83,252,24,0.55);  background: rgba(83,252,24,0.1); }
+
+  .gear {
+    flex: 0 0 auto;
+    background: transparent;
+    border: 1px solid var(--bdr);
+    color: var(--mut);
+    border-radius: 5px;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: all 0.15s;
+  }
+  .gear:hover { background: var(--bg3); color: var(--txt); }
+
+  /* ──────────────────────────────────────────────────────────────────
+     Chat feed. Messages stack newest-at-bottom. An ev-row rendered
+     inline inside the feed shows big paid events (sub / gift / etc.)
+     with a colored pill kicker so they stand out from chat.
+     ────────────────────────────────────────────────────────────────── */
+  #feed {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 10px 10px;
+    font-size: var(--font-size);
+    line-height: 1.4;
+    scroll-behavior: smooth;
+  }
+  #feed::-webkit-scrollbar { width: 6px; }
+  #feed::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 3px; }
+  #feed::-webkit-scrollbar-thumb:hover { background: #3a3a40; }
+
+  .msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    word-wrap: break-word;
+    word-break: break-word;
+    opacity: 0;
+    transform: translateY(4px);
+    animation: msgIn 0.22s ease-out forwards;
+  }
+  .msg:last-child { border-bottom: none; }
+  @keyframes msgIn {
+    0%   { opacity: 0; transform: translateY(4px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .pfp {
+    width: calc(var(--font-size) + 4px);
+    height: calc(var(--font-size) + 4px);
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg3);
+    margin-top: 1px;
+  }
+  .pfp-fallback {
+    width: calc(var(--font-size) + 4px);
+    height: calc(var(--font-size) + 4px);
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--bg3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--font-size) - 4px);
+    font-weight: 900;
+    color: var(--mut);
+    margin-top: 1px;
+  }
+  .pi {
+    width: calc(var(--font-size) + 0px);
+    height: calc(var(--font-size) + 0px);
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--font-size) - 6px);
+    font-weight: 900;
+    border-radius: 3px;
+    color: #0e0e10;
+    margin-top: 1px;
+  }
+  .pi.tw { background: var(--tw); color: #fff; }
+  .pi.yt { background: var(--yt); color: #fff; }
+  .pi.tt { background: var(--tt); color: #fff; }
+  .pi.kk { background: var(--kk); color: #0e0e10; }
+
+  .ub {
+    display: inline-block;
+    font-size: calc(var(--font-size) - 4px);
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-right: 3px;
+    vertical-align: 2px;
+    color: #fff;
+  }
+  .ub.mod { background: #00ad03; }
+  .ub.vip { background: #e00b8a; }
+  .ub.sub { background: #8205b4; }
+  .ub.broadcaster { background: #e91916; }
+  .ub.member { background: #2ba640; }
+
+  .u {
+    font-weight: 800;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .u.tw { color: var(--tw); }
+  .u.yt { color: var(--yt); }
+  .u.tt { color: var(--tt); }
+  .u.kk { color: var(--kk); }
+  .sep { color: var(--mut); opacity: 0.6; margin: 0 2px; flex-shrink: 0; }
+  .m {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .m img.emote {
+    height: 1.2em;
+    width: auto;
+    vertical-align: middle;
+    margin: 0 1px;
+  }
+
+  /* Inline event row — sub / gift / cheer / raid / follow / tip. */
+  .ev {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    margin: 4px 0;
+    background: linear-gradient(135deg, rgba(58,134,255,0.08), rgba(42,212,185,0.06));
+    border: 1px solid rgba(58,134,255,0.3);
+    border-radius: 6px;
+    font-size: calc(var(--font-size) - 1px);
+    font-weight: 700;
+    opacity: 0;
+    transform: translateY(4px);
+    animation: msgIn 0.25s ease-out forwards;
+  }
+  .ev.tw { background: linear-gradient(135deg, rgba(169,112,255,0.1), rgba(169,112,255,0.04)); border-color: rgba(169,112,255,0.4); }
+  .ev.yt { background: linear-gradient(135deg, rgba(255,69,69,0.1), rgba(255,69,69,0.04));  border-color: rgba(255,69,69,0.4); }
+  .ev.tt { background: linear-gradient(135deg, rgba(254,44,85,0.1), rgba(254,44,85,0.04));  border-color: rgba(254,44,85,0.4); }
+  .ev.kk { background: linear-gradient(135deg, rgba(83,252,24,0.1), rgba(83,252,24,0.04));  border-color: rgba(83,252,24,0.4); }
+  .ev .kicker {
+    font-size: calc(var(--font-size) - 4px);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .ev.tw .kicker { background: rgba(169,112,255,0.2); color: #e5d4ff; }
+  .ev.yt .kicker { background: rgba(255,69,69,0.2);  color: #ffc6c6; }
+  .ev.tt .kicker { background: rgba(254,44,85,0.2);  color: #ffabc1; }
+  .ev.kk .kicker { background: rgba(83,252,24,0.2);  color: #c3ff9e; }
+  .ev .ev-txt { flex: 1 1 auto; min-width: 0; }
+  .ev .ev-u   { font-weight: 900; }
+  .ev .ev-amt {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: #0e0e10;
+    font-size: calc(var(--font-size) - 3px);
+    font-weight: 900;
+    margin: 0 2px;
+  }
+  .ev img.gift-img {
+    height: 20px;
+    width: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  /* System message (connection state, first-run hint). */
+  .sys {
+    padding: 6px 8px;
+    margin: 4px 0;
+    border-radius: 6px;
+    background: rgba(58,134,255,0.08);
+    border: 1px solid rgba(58,134,255,0.25);
+    color: var(--mut2);
+    font-size: calc(var(--font-size) - 2px);
+    text-align: center;
+  }
+  .sys.err {
+    background: rgba(239,68,68,0.08);
+    border-color: rgba(239,68,68,0.25);
+    color: #ffb0b0;
+  }
+  .sys a {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* Empty-state hint when feed has nothing yet. */
+  .empty {
+    text-align: center;
+    padding: 30px 14px;
+    color: var(--mut);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .empty h3 {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--txt);
+    margin: 0 0 4px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ──────────────────────────────────────────────────────────────────
+     Setup modal — first-run and settings-gear-reopenable. Config
+     fields here are the only knobs we expose; extra customization
+     happens via URL params if the streamer wants to preset things.
+     ────────────────────────────────────────────────────────────────── */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--bdr);
+    border-radius: 10px;
+    padding: 20px 22px;
+    max-width: 420px;
+    width: 100%;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal h2 {
+    font-size: 15px;
+    font-weight: 900;
+    margin: 0 0 4px;
+    letter-spacing: 0.3px;
+  }
+  .modal .sub {
+    font-size: 11px;
+    color: var(--mut);
+    line-height: 1.6;
+    margin: 0 0 16px;
+  }
+  .modal .sub a { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .modal .sub a:hover { text-decoration: underline; }
+  .sec-hd {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--mut);
+    text-transform: uppercase;
+    margin: 14px 0 6px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+  .field label {
+    font-size: 11px;
+    color: var(--mut2);
+  }
+  .field input[type="text"], .field input[type="password"], .field input[type="number"] {
+    background: var(--bg3);
+    border: 1px solid var(--bdr);
+    color: var(--txt);
+    border-radius: 5px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: 'Consolas', monospace;
+  }
+  .field input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .field-row {
+    display: flex;
+    gap: 6px;
+  }
+  .field-row .field { flex: 1; }
+  .toggle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .toggle-grid label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--bg3);
+    border: 1px solid var(--bdr);
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .toggle-grid input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--bdr);
+    background: var(--bg3);
+    color: var(--txt);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #2f2f38; }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    flex: 1;
+  }
+  .btn.primary:hover {
+    background: #5ca3ff;
+    border-color: #5ca3ff;
+  }
+  .hint-link {
+    font-size: 11px;
+    color: var(--mut);
+    line-height: 1.6;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--bdr);
+  }
+  .hint-link a {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .hint-link a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div class="brand"><span class="a">SF</span><span class="b"> OBS</span></div>
+  <div class="chips">
+    <span id="chip-sb" class="chip">SB</span>
+    <span id="chip-tf" class="chip">TF</span>
+    <span id="chip-tw" class="chip plat tw">TW</span>
+    <span id="chip-yt" class="chip plat yt">YT</span>
+    <span id="chip-tt" class="chip plat tt">TT</span>
+    <span id="chip-kk" class="chip plat kk">KK</span>
+  </div>
+  <button class="gear" onclick="openSetup()" title="Settings">&#9881;</button>
+</div>
+
+<div id="feed"></div>
+
+<!-- Setup / settings modal -->
+<div class="modal-bg" id="setupModal">
+  <div class="modal">
+    <h2>SF OBS Setup</h2>
+    <p class="sub">
+      Connects to your <strong>Streamer.bot</strong> (and optionally <strong>Tikfinity</strong>) WebSocket to pull chat from Twitch, YouTube, TikTok, and Kick into one feed.
+      Need the full multi-platform stream hub? <a href="https://aquilo.gg/StreamFusion.html" target="_blank">Get StreamFusion</a>.
+    </p>
+
+    <div class="sec-hd">Streamer.bot WebSocket</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="sbHost">Host</label>
+        <input type="text" id="sbHost" value="127.0.0.1" placeholder="127.0.0.1">
+      </div>
+      <div class="field" style="flex:0 0 100px">
+        <label for="sbPort">Port</label>
+        <input type="number" id="sbPort" value="8080" min="1" max="65535">
+      </div>
+    </div>
+    <div class="field">
+      <label for="sbPass">Password (if authentication enabled in SB)</label>
+      <input type="password" id="sbPass" value="" placeholder="(leave blank if no password)">
+    </div>
+
+    <div class="sec-hd">Tikfinity (optional — TikTok LIVE events)</div>
+    <div class="field">
+      <label for="tfPort">Port</label>
+      <input type="number" id="tfPort" value="21213" min="1" max="65535">
+    </div>
+    <div class="field">
+      <label><input type="checkbox" id="useTF"> Connect to Tikfinity for TikTok chat &amp; gifts</label>
+    </div>
+
+    <div class="sec-hd">Show platforms</div>
+    <div class="toggle-grid">
+      <label><input type="checkbox" id="showTW" checked> Twitch</label>
+      <label><input type="checkbox" id="showYT" checked> YouTube</label>
+      <label><input type="checkbox" id="showTT" checked> TikTok</label>
+      <label><input type="checkbox" id="showKK" checked> Kick</label>
+    </div>
+
+    <div class="sec-hd">Display</div>
+    <div class="toggle-grid">
+      <label><input type="checkbox" id="showPfp" checked> Profile pictures</label>
+      <label><input type="checkbox" id="showPi"  checked> Platform icon</label>
+      <label><input type="checkbox" id="showBadges" checked> Badges (mod/sub/vip)</label>
+      <label><input type="checkbox" id="showEmotes" checked> Emotes</label>
+      <label><input type="checkbox" id="showEvents" checked> Subs/gifts/cheers/raids</label>
+      <label><input type="checkbox" id="showFollows"> Follows</label>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label for="fontSize">Font size (px)</label>
+      <input type="number" id="fontSize" value="14" min="10" max="24">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSetup()">Cancel</button>
+      <button class="btn primary" onclick="saveAndConnect()">Save &amp; connect</button>
+    </div>
+
+    <div class="hint-link">
+      Tip: you can also preconfigure via URL — e.g.
+      <code style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">?host=127.0.0.1&amp;port=8080&amp;pass=xyz&amp;tfPort=21213&amp;auto=1</code>
+      — useful for pasting a ready-to-go URL into OBS.
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ──────────────────────────────────────────────────────────────────
+  // Config. Loaded from localStorage on boot, updated via the setup
+  // modal, optionally seeded from URL query params for turn-key OBS
+  // dock setups. LocalStorage key is scoped so a streamer running
+  // both SF and SF OBS doesn't collide.
+  // ──────────────────────────────────────────────────────────────────
+  var STORAGE_KEY = 'sfobs_cfg_v1';
+  var DEFAULTS = {
+    sbHost: '127.0.0.1',
+    sbPort: 8080,
+    sbPass: '',
+    tfPort: 21213,
+    useTF: false,
+    show:  { tw: true, yt: true, tt: true, kk: true },
+    showPfp: true,
+    showPi:  true,
+    showBadges: true,
+    showEmotes: true,
+    showEvents: true,
+    showFollows: false,
+    fontSize: 14
+  };
+
+  function loadCfg() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return Object.assign({}, DEFAULTS);
+      var parsed = JSON.parse(raw);
+      var merged = Object.assign({}, DEFAULTS, parsed);
+      merged.show = Object.assign({}, DEFAULTS.show, parsed.show || {});
+      return merged;
+    } catch (e) { return Object.assign({}, DEFAULTS); }
+  }
+  function saveCfg() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(CFG)); } catch (e) {}
+  }
+
+  // URL params win over localStorage for one-shot preconfigured URLs
+  // that the streamer can paste into OBS. `auto=1` also skips the
+  // setup modal on first run.
+  function seedFromUrl(cfg) {
+    try {
+      var p = new URLSearchParams(location.search);
+      if (p.get('host'))    cfg.sbHost = p.get('host');
+      if (p.get('port'))    cfg.sbPort = parseInt(p.get('port'), 10) || 8080;
+      if (p.get('pass'))    cfg.sbPass = p.get('pass');
+      if (p.get('tfPort'))  { cfg.tfPort = parseInt(p.get('tfPort'), 10) || 21213; cfg.useTF = true; }
+      if (p.get('useTF'))   cfg.useTF  = /^(1|true|yes)$/i.test(p.get('useTF'));
+      if (p.get('showTW') != null) cfg.show.tw = /^(1|true|yes)$/i.test(p.get('showTW'));
+      if (p.get('showYT') != null) cfg.show.yt = /^(1|true|yes)$/i.test(p.get('showYT'));
+      if (p.get('showTT') != null) cfg.show.tt = /^(1|true|yes)$/i.test(p.get('showTT'));
+      if (p.get('showKK') != null) cfg.show.kk = /^(1|true|yes)$/i.test(p.get('showKK'));
+    } catch (e) {}
+    return cfg;
+  }
+
+  var CFG = seedFromUrl(loadCfg());
+  var IS_FIRST_RUN = !localStorage.getItem(STORAGE_KEY);
+  var AUTO = /[?&]auto=1/.test(location.search);
+
+  // ──────────────────────────────────────────────────────────────────
+  // DOM refs + tiny helpers
+  // ──────────────────────────────────────────────────────────────────
+  var feed = document.getElementById('feed');
+  var setupModal = document.getElementById('setupModal');
+
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  // Status chips in the header. State goes through 'off' (default,
+  // neutral) → 'wait' (connecting) → 'on' (connected). 'err' shows
+  // a hard-failed state the streamer should act on.
+  function setChip(id, state, label) {
+    var el = document.getElementById('chip-' + id);
+    if (!el) return;
+    el.classList.remove('on', 'wait', 'err');
+    if (state === 'on')   el.classList.add('on');
+    if (state === 'wait') el.classList.add('wait');
+    if (state === 'err')  el.classList.add('err');
+    if (label) el.textContent = label;
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Message rendering. One .msg node per chat line, plus .ev for
+  // sub/gift/cheer/raid/follow. Feed auto-scrolls unless the user has
+  // scrolled up to read history (detected via scroll offset).
+  // ──────────────────────────────────────────────────────────────────
+  var userScrolled = false;
+  var emptyEl = null;
+  feed.addEventListener('scroll', function() {
+    userScrolled = feed.scrollHeight - feed.clientHeight - feed.scrollTop > 60;
+  });
+
+  function ensureEmptyGone() {
+    if (emptyEl && emptyEl.parentNode) { emptyEl.parentNode.removeChild(emptyEl); emptyEl = null; }
+  }
+
+  function showEmpty() {
+    if (emptyEl) return;
+    emptyEl = document.createElement('div');
+    emptyEl.className = 'empty';
+    emptyEl.innerHTML =
+      '<h3>Waiting for chat…</h3>' +
+      'Streamer.bot connection will pull messages as soon as viewers chat. <br>' +
+      'Not seeing anything? Click the <strong>&#9881;</strong> gear to check your Streamer.bot host/port.';
+    feed.appendChild(emptyEl);
+  }
+
+  function appendAndScroll(el) {
+    ensureEmptyGone();
+    feed.appendChild(el);
+    // Trim to a sensible backlog so an idle OBS dock doesn't grow to
+    // 10k DOM nodes during a 5-hour stream.
+    while (feed.children.length > 200) feed.removeChild(feed.firstChild);
+    if (!userScrolled) feed.scrollTop = feed.scrollHeight;
+  }
+
+  // Emote swap. Accepts an array of {name, url} or SB's parts[] shape
+  // (where each part can be a text token or {type:'emote', imageUrl,
+  // text}). Returns HTML with <img class="emote"> for matched tokens.
+  function renderText(text, parts, emotes) {
+    if (!CFG.showEmotes) return esc(text);
+    // Prefer SB's parts[] if available — richer than a name map.
+    if (parts && Array.isArray(parts) && parts.length > 0) {
+      var h = '';
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i]; if (!p) continue;
+        if (p.type === 'emote' || p.imageUrl) {
+          var url = p.imageUrl
+            || (p.emote && p.emote.id ? 'https://static-cdn.jtvnw.net/emoticons/v2/' + p.emote.id + '/default/dark/2.0' : null)
+            || (p.id ? 'https://files.kick.com/emotes/' + p.id + '/fullsize' : null);
+          var n = esc(p.text || (p.emote && p.emote.name) || p.name || '');
+          if (url) h += '<img class="emote" src="' + esc(url) + '" alt="' + n + '" title="' + n + '" onerror="this.replaceWith(document.createTextNode(this.alt))">';
+          else h += n;
+        } else {
+          h += esc(p.text || '');
+        }
+      }
+      return h;
+    }
+    // Twitch tag-style emotes[] with startIndex/endIndex positions.
+    if (emotes && Array.isArray(emotes) && emotes.length > 0 && text) {
+      var sorted = emotes.slice().sort(function(a, b) { return a.startIndex - b.startIndex; });
+      var out = '', cur = 0;
+      for (var j = 0; j < sorted.length; j++) {
+        var e = sorted[j];
+        if (e.startIndex > cur) out += esc(text.slice(cur, e.startIndex));
+        var url2 = e.imageUrl || (e.id ? 'https://static-cdn.jtvnw.net/emoticons/v2/' + e.id + '/default/dark/2.0' : null);
+        var n2 = esc(e.name || text.slice(e.startIndex, e.endIndex + 1));
+        if (url2) out += '<img class="emote" src="' + esc(url2) + '" alt="' + n2 + '" title="' + n2 + '" onerror="this.replaceWith(document.createTextNode(this.alt))">';
+        else out += n2;
+        cur = e.endIndex + 1;
+      }
+      if (cur < text.length) out += esc(text.slice(cur));
+      return out;
+    }
+    return esc(text);
+  }
+
+  function renderBadges(badges) {
+    if (!CFG.showBadges || !badges || !badges.length) return '';
+    return badges.map(function(b) {
+      var cls = String(b).toLowerCase();
+      if (!/^(mod|vip|sub|broadcaster|member)$/.test(cls)) return '';
+      var lbl = cls === 'broadcaster' ? 'HOST' : cls.toUpperCase();
+      return '<span class="ub ' + cls + '">' + lbl + '</span>';
+    }).join('');
+  }
+
+  function renderPfp(avatar, user, plat) {
+    if (!CFG.showPfp) return '';
+    if (avatar) {
+      var initial = (user || '?').charAt(0).toUpperCase();
+      // onerror swaps to a fallback so a 404 doesn't leave a broken image.
+      return '<img class="pfp" src="' + esc(avatar) + '" alt="" referrerpolicy="no-referrer" ' +
+        'onerror="this.outerHTML=\'<span class=&quot;pfp-fallback&quot;>' + esc(initial) + '</span>\'">';
+    }
+    var init = (user || '?').charAt(0).toUpperCase();
+    return '<span class="pfp-fallback">' + esc(init) + '</span>';
+  }
+
+  function renderPi(plat) {
+    if (!CFG.showPi || !plat) return '';
+    var label = { tw: 'TW', yt: 'YT', tt: 'TT', kk: 'KK' }[plat] || plat.toUpperCase();
+    return '<span class="pi ' + plat + '">' + label + '</span>';
+  }
+
+  function pushMsg(m) {
+    if (!m || !m.plat) return;
+    if (!CFG.show[m.plat]) return;
+    var div = document.createElement('div');
+    div.className = 'msg';
+    var userStyle = m.color ? ('color:' + esc(m.color) + ';') : '';
+    div.innerHTML =
+      renderPfp(m.avatar, m.user, m.plat) +
+      renderPi(m.plat) +
+      renderBadges(m.badges) +
+      '<span class="u ' + m.plat + '" style="' + userStyle + '">' + esc(m.user || 'anon') + '</span>' +
+      '<span class="sep">:</span>' +
+      '<span class="m">' + renderText(m.text || '', m.parts, m.emotes) + '</span>';
+    appendAndScroll(div);
+  }
+
+  function pushEv(ev) {
+    if (!CFG.showEvents) return;
+    if (ev.kind === 'follow' && !CFG.showFollows) return;
+    if (ev.plat && !CFG.show[ev.plat]) return;
+    var div = document.createElement('div');
+    div.className = 'ev ' + (ev.plat || '');
+    var kicker = {
+      follow: 'FOLLOW', sub: 'SUB', resub: 'RE-SUB', gift: 'GIFT',
+      cheer: 'BITS', raid: 'RAID', tip: 'TIP', share: 'SHARE',
+      like: 'LIKES', join: 'JOIN', super: 'SUPER', member: 'MEMBER'
+    }[ev.kind] || 'EVENT';
+    var giftImg = ev.giftImage
+      ? '<img class="gift-img" src="' + esc(ev.giftImage) + '" alt="" onerror="this.style.display=\'none\'">'
+      : '';
+    div.innerHTML =
+      '<span class="kicker">' + kicker + '</span>' +
+      giftImg +
+      '<span class="ev-txt">' + ev.html + '</span>';
+    appendAndScroll(div);
+  }
+
+  function pushSys(text, isErr) {
+    var div = document.createElement('div');
+    div.className = 'sys' + (isErr ? ' err' : '');
+    div.innerHTML = text;
+    appendAndScroll(div);
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Streamer.bot connection. Lifted + simplified from StreamFusion's
+  // renderer. Handshake: Hello (from server) → Authenticate (if
+  // required) → Subscribe to all events across all platforms.
+  // ──────────────────────────────────────────────────────────────────
+  var sbWS = null;
+  var sbConnected = false;
+  var sbReconnectTimer = null;
+  var avatarCache = Object.create(null);
+
+  function connectSB() {
+    if (sbWS) { try { sbWS.onclose = null; sbWS.close(); } catch(e) {} sbWS = null; }
+    if (sbReconnectTimer) { clearTimeout(sbReconnectTimer); sbReconnectTimer = null; }
+    setChip('sb', 'wait', 'SB …');
+    var ws;
+    try { ws = new WebSocket('ws://' + CFG.sbHost + ':' + CFG.sbPort + '/'); } catch (e) {
+      setChip('sb', 'err', 'SB ×');
+      pushSys('Streamer.bot address invalid. Click <a onclick="openSetup()">settings</a> to fix.', true);
+      return;
+    }
+    sbWS = ws;
+
+    ws.onopen = function() {
+      // GetInfo kicks a Hello back if the server doesn't send one
+      // unsolicited (older SB versions).
+      setTimeout(function() {
+        if (sbWS === ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ request: 'GetInfo', id: 'sfobs-info' }));
+        }
+      }, 2000);
+    };
+    ws.onmessage = function(e) {
+      var msg; try { msg = JSON.parse(e.data); } catch (x) { return; }
+      if (msg.request === 'Hello' || msg.id === 'sfobs-info') {
+        var authRequired = msg.authentication && (msg.authentication.required || (msg.authentication.salt && msg.authentication.challenge));
+        if (authRequired && CFG.sbPass) {
+          buildAuthHash(CFG.sbPass, msg.authentication.salt, msg.authentication.challenge).then(function(h) {
+            if (sbWS === ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ request: 'Authenticate', id: 'sfobs-auth', authentication: h }));
+            }
+          });
+        } else if (authRequired && !CFG.sbPass) {
+          setChip('sb', 'err', 'SB pass?');
+          pushSys('Streamer.bot requires a password. Click <a onclick="openSetup()">settings</a> to set it.', true);
+          try { ws.close(); } catch(_) {}
+        } else {
+          subscribeAll(ws);
+        }
+        return;
+      }
+      if (msg.id === 'sfobs-auth') {
+        if (msg.status === 'ok') subscribeAll(ws);
+        else {
+          setChip('sb', 'err', 'SB auth');
+          pushSys('Streamer.bot: wrong password. Click <a onclick="openSetup()">settings</a> to fix.', true);
+          try { ws.close(); } catch(_) {}
+        }
+        return;
+      }
+      if (msg.id === 'sfobs-sub') {
+        if (msg.status === 'ok') {
+          sbConnected = true;
+          setChip('sb', 'on', 'SB');
+          // Let the user know we're live so the empty state doesn't
+          // sit blank forever if their channel is quiet.
+          showEmpty();
+        }
+        return;
+      }
+      if (msg.event) handleSBEvent(msg.event, msg.data || {});
+    };
+    ws.onerror = function() {};
+    ws.onclose = function() {
+      if (sbWS !== ws) return;
+      sbConnected = false;
+      setChip('sb', 'err', 'SB ×');
+      // Retry after 5s.
+      sbReconnectTimer = setTimeout(connectSB, 5000);
+    };
+  }
+
+  // Streamer.bot's own challenge-response scheme:
+  //   hash1 = base64(SHA256(password + salt))
+  //   hash2 = base64(SHA256(hash1 + challenge))
+  // Uses Web Crypto — works in any modern browser, no lib needed.
+  function buildAuthHash(pass, salt, challenge) {
+    var enc = new TextEncoder();
+    return crypto.subtle.digest('SHA-256', enc.encode(pass + salt)).then(function(h1) {
+      var b1 = btoa(String.fromCharCode.apply(null, new Uint8Array(h1)));
+      return crypto.subtle.digest('SHA-256', enc.encode(b1 + challenge));
+    }).then(function(h2) {
+      return btoa(String.fromCharCode.apply(null, new Uint8Array(h2)));
+    });
+  }
+
+  function subscribeAll(ws) {
+    var payload = {
+      request: 'Subscribe', id: 'sfobs-sub',
+      events: { Twitch: ['*'], YouTube: ['*'], Kick: ['*'], General: ['*'] }
+    };
+    ws.send(JSON.stringify(payload));
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // SB event handler. We route by `source.type` (Twitch.ChatMessage,
+  // Twitch.Sub, YouTube.Message, Kick.Follow, etc.) and normalize the
+  // payload into pushMsg / pushEv calls. Field-shape variants handled
+  // are ones SF has encountered across SB versions 0.1.x → 0.2.x.
+  // ──────────────────────────────────────────────────────────────────
+  function handleSBEvent(event, data) {
+    var src = (event && event.source) || '';
+    var type = (event && event.type) || '';
+    // Normalize source casing — SB uses mixed case across versions.
+    var srcL = src.toLowerCase();
+    if (srcL === 'youtube') src = 'YouTube';
+    else if (srcL === 'twitch') src = 'Twitch';
+    else if (srcL === 'kick') src = 'Kick';
+    var key = src + '.' + type;
+
+    // Mark the platform's chip as "on" the first time we see any
+    // event from it — tells the streamer SB has that service wired
+    // up and alive.
+    var plat = null;
+    if (src === 'Twitch') plat = 'tw';
+    else if (src === 'YouTube') plat = 'yt';
+    else if (src === 'Kick') plat = 'kk';
+    if (plat && CFG.show[plat]) setChip(plat, 'on');
+
+    if (key === 'Twitch.ChatMessage') {
+      var u = data.user || (data.message && data.message.user) || {};
+      var msg = data.message || data;
+      var parts = data.parts || msg.parts || null;
+      var raw = data.text || msg.message || msg.text || '';
+      var emotes = data.emotes || msg.emotes || null;
+      var avatar = u.profileImageUrl || u.profileImage || u.avatar || u.avatarUrl || '';
+      var login = (u.login || u.name || u.displayName || '').toLowerCase();
+      if (avatar && login) avatarCache['tw:' + login] = avatar;
+      else if (login) avatar = avatarCache['tw:' + login] || '';
+      // Fallback: most Twitch chat messages don't carry the avatar
+      // field. unavatar.io resolves any Twitch login to its avatar.
+      if (!avatar && /^[a-z0-9_]{1,30}$/.test(login)) {
+        avatar = 'https://unavatar.io/twitch/' + login;
+        avatarCache['tw:' + login] = avatar;
+      }
+      pushMsg({
+        plat: 'tw',
+        user: u.name || u.displayName || u.login || '?',
+        color: u.color || null,
+        badges: parseBadges(u.badges, msg.badges),
+        text: raw,
+        parts: parts,
+        emotes: emotes,
+        avatar: avatar
+      });
+    } else if (key === 'YouTube.Message') {
+      var yu = data.user || data;
+      var yparts = data.parts || data.messageParts || null;
+      var ytext = data.message || data.text || '';
+      pushMsg({
+        plat: 'yt',
+        user: yu.name || yu.displayName || yu.channelName || yu.userName || '?',
+        badges: parseYTBadges(yu),
+        text: ytext,
+        parts: yparts,
+        avatar: yu.profileImageUrl || yu.profileImage || yu.avatar || ''
+      });
+    } else if (key === 'Kick.ChatMessage' || key === 'Kick.Message') {
+      var ku = data.user || data;
+      var kparts = data.parts || null;
+      var ktext = data.message || data.content || data.text || '';
+      var kavatar = ku.profileImageUrl || ku.profilePic || ku.avatar || '';
+      var kbadges = [];
+      if (ku.isBroadcaster || ku.isOwner) kbadges.push('broadcaster');
+      if (ku.isModerator || ku.isMod)    kbadges.push('mod');
+      if (ku.isSubscriber || ku.isSub)   kbadges.push('sub');
+      if (ku.isVip)                       kbadges.push('vip');
+      pushMsg({
+        plat: 'kk',
+        user: ku.username || ku.displayName || ku.name || '?',
+        text: ktext,
+        parts: kparts,
+        badges: kbadges,
+        avatar: kavatar
+      });
+
+    // ── Twitch events ──────────────────────────────────────────────
+    } else if (key === 'Twitch.Follow' || key === 'Twitch.Followed' || key === 'Twitch.ChannelFollow') {
+      var fn = gu(data);
+      pushEv({ kind: 'follow', plat: 'tw', html: '<span class="ev-u">' + esc(fn) + '</span> just followed on Twitch!' });
+    } else if (key === 'Twitch.Sub' || key === 'Twitch.Subscribe' || key === 'Twitch.Subscription') {
+      var sn = gu(data); var tier = tierName(data.subTier || data.tier || data.sub_tier);
+      pushEv({ kind: 'sub', plat: 'tw', html: '<span class="ev-u">' + esc(sn) + '</span> subscribed! <em>(' + esc(tier) + ')</em>' });
+    } else if (key === 'Twitch.ReSub' || key === 'Twitch.Resub' || key === 'Twitch.ReSubscribe') {
+      var rn = gu(data); var months = data.cumulativeMonths || data.cumMonths || data.months || data.totalMonths || '?';
+      pushEv({ kind: 'resub', plat: 'tw', html: '<span class="ev-u">' + esc(rn) + '</span> resubscribed! <em>(' + esc(months) + ' months)</em>' });
+    } else if (key === 'Twitch.GiftSub' || key === 'Twitch.SubGift' || key === 'Twitch.GiftSubscription') {
+      var gn = gifterName(data); var rc = recipientName(data);
+      pushEv({ kind: 'gift', plat: 'tw', html: '<span class="ev-u">' + esc(gn) + '</span> gifted a sub to ' + esc(rc) });
+    } else if (key === 'Twitch.GiftBomb' || key === 'Twitch.MassGift' || key === 'Twitch.CommunitySubGift' || key === 'Twitch.MassSubGift') {
+      var gb = gifterName(data); var gc = data.gifts || data.giftCount || data.amount || '?';
+      pushEv({ kind: 'gift', plat: 'tw', html: '<span class="ev-u">' + esc(gb) + '</span> gifted <span class="ev-amt">' + esc(gc) + '</span> subs!' });
+    } else if (key === 'Twitch.Cheer' || key === 'Twitch.Bits') {
+      var cn = gu(data); var bits = Number(data.bits || data.amount || 0);
+      pushEv({ kind: 'cheer', plat: 'tw', html: '<span class="ev-u">' + esc(cn) + '</span> cheered <span class="ev-amt">' + bits + '</span> bits!' });
+    } else if (key === 'Twitch.Raid' || key === 'Twitch.Raided' || key === 'Twitch.IncomingRaid' || key === 'Twitch.OnRaid') {
+      var rdr = raidRaider(data); var rc2 = raidCount(data);
+      pushEv({ kind: 'raid', plat: 'tw', html: '<span class="ev-u">' + esc(rdr) + '</span> raided with <span class="ev-amt">' + esc(rc2) + '</span> viewers!' });
+
+    // ── YouTube events ─────────────────────────────────────────────
+    } else if (key === 'YouTube.NewSubscriber' || key === 'YouTube.Subscription' || key === 'YouTube.Sub') {
+      var yn = gu(data);
+      pushEv({ kind: 'sub', plat: 'yt', html: '<span class="ev-u">' + esc(yn) + '</span> subscribed on YouTube!' });
+    } else if (key === 'YouTube.SuperChat' || key === 'YouTube.NewSuperChat') {
+      var yn2 = gu(data); var amt = data.amount || data.displayString || data.amountDisplayString || '';
+      var scMsg = data.message || data.userComment || '';
+      pushEv({ kind: 'super', plat: 'yt', html: '<span class="ev-u">' + esc(yn2) + '</span> Super Chat <span class="ev-amt">' + esc(amt) + '</span> ' + esc(scMsg) });
+    } else if (key === 'YouTube.NewSuperSticker' || key === 'YouTube.SuperSticker') {
+      var yn3 = gu(data); var stkAmt = data.amount || data.displayString || '';
+      pushEv({ kind: 'super', plat: 'yt', html: '<span class="ev-u">' + esc(yn3) + '</span> sent a Super Sticker <span class="ev-amt">' + esc(stkAmt) + '</span>!' });
+    } else if (key === 'YouTube.Member' || key === 'YouTube.NewSponsor' || key === 'YouTube.NewMember' || key === 'YouTube.Membership' || key === 'YouTube.NewMembership') {
+      var yn4 = gu(data);
+      pushEv({ kind: 'member', plat: 'yt', html: '<span class="ev-u">' + esc(yn4) + '</span> became a YouTube Member!' });
+
+    // ── Kick events ────────────────────────────────────────────────
+    } else if (key === 'Kick.Follow' || key === 'Kick.Followed' || key === 'Kick.NewFollower') {
+      var kfn = gu(data);
+      pushEv({ kind: 'follow', plat: 'kk', html: '<span class="ev-u">' + esc(kfn) + '</span> followed on Kick!' });
+    } else if (key === 'Kick.Sub' || key === 'Kick.Subscribe' || key === 'Kick.Subscription') {
+      var ksn = gu(data);
+      pushEv({ kind: 'sub', plat: 'kk', html: '<span class="ev-u">' + esc(ksn) + '</span> subscribed on Kick!' });
+    } else if (key === 'Kick.GiftSub' || key === 'Kick.SubGift' || key === 'Kick.GiftSubscription' || key === 'Kick.GiftedSub') {
+      var kgn = gifterName(data); var krc = recipientName(data);
+      pushEv({ kind: 'gift', plat: 'kk', html: '<span class="ev-u">' + esc(kgn) + '</span> gifted a sub to ' + esc(krc) + ' on Kick' });
+    } else if (key === 'Kick.GiftedSubscriptions' || key === 'Kick.MassGift' || key === 'Kick.CommunitySubGift' || key === 'Kick.MassSubGift') {
+      var kgb = gifterName(data); var kgc = data.gifts || data.giftCount || data.amount || '?';
+      pushEv({ kind: 'gift', plat: 'kk', html: '<span class="ev-u">' + esc(kgb) + '</span> gifted <span class="ev-amt">' + esc(kgc) + '</span> subs on Kick!' });
+    } else if (key === 'Kick.Raid' || key === 'Kick.IncomingRaid' || key === 'Kick.HostIncoming') {
+      var krn = raidRaider(data); var krc2 = raidCount(data);
+      pushEv({ kind: 'raid', plat: 'kk', html: '<span class="ev-u">' + esc(krn) + '</span> raided from Kick with <span class="ev-amt">' + esc(krc2) + '</span> viewers!' });
+    }
+  }
+
+  // Pull a user display from one of the many SB field-name variants.
+  function gu(data) {
+    return (data && (
+      data.displayName || data.userName || data.user_name || data.name || data.login ||
+      (data.user && (data.user.display_name || data.user.displayName || data.user.name || data.user.login || data.user.username)) ||
+      (data.sender && (data.sender.display_name || data.sender.displayName || data.sender.name)) ||
+      data.nickname
+    )) || 'Someone';
+  }
+  function gifterName(data) {
+    var g = data.gifter || {};
+    return g.display_name || g.displayName || g.name || g.login || g.username || g.userName
+      || data.gifterName || data.gifterDisplayName || data.gifter_display_name || data.gifter_name
+      || gu(data) || 'Anonymous';
+  }
+  function recipientName(data) {
+    var r = data.recipient || {};
+    return r.display_name || r.displayName || r.name || r.login || r.username || r.userName
+      || data.recipientName || data.recipientDisplayName || data.recipient_display_name || data.recipient_name
+      || '?';
+  }
+  function raidRaider(data) {
+    var r = (typeof data.raider === 'object' && data.raider) ? data.raider
+          : (typeof data.fromUser === 'object' && data.fromUser) ? data.fromUser
+          : (typeof data.from === 'object' && data.from) ? data.from
+          : (typeof data.user === 'object' && data.user) ? data.user
+          : {};
+    return r.display_name || r.displayName || r.name || r.login || r.username || r.userName
+      || data.raiderUserDisplayName || data.raiderUserName || data.raiderUserLogin
+      || data.raiderDisplayName || data.raiderName || gu(data);
+  }
+  function raidCount(data) {
+    return data.viewerCount != null ? data.viewerCount
+      : data.viewers != null ? data.viewers
+      : data.raiderCount != null ? data.raiderCount
+      : data.viewer_count != null ? data.viewer_count
+      : '?';
+  }
+  function tierName(raw) {
+    var t = String(raw || '1000');
+    if (t === '2000' || t === '2') return 'Tier 2';
+    if (t === '3000' || t === '3') return 'Tier 3';
+    if (t.toLowerCase() === 'prime') return 'Prime';
+    return 'Tier 1';
+  }
+
+  // SB's Twitch badges field arrives as either an array of objects
+  // ({name:'moderator'}) or a comma-separated string. Normalize to the
+  // renderer's short-code set: mod / vip / sub / broadcaster.
+  function parseBadges(a, b) {
+    var src = Array.isArray(a) ? a : Array.isArray(b) ? b : [];
+    var out = [];
+    src.forEach(function(x) {
+      var s = (x && (x.name || x.id || x.setId || x.set_id || x.type)) || x || '';
+      s = String(s).toLowerCase();
+      if (s.indexOf('moderator') >= 0)            out.push('mod');
+      else if (s.indexOf('vip') >= 0)             out.push('vip');
+      else if (s.indexOf('broadcaster') >= 0)     out.push('broadcaster');
+      else if (s.indexOf('sub') >= 0 || s.indexOf('founder') >= 0) out.push('sub');
+    });
+    return out;
+  }
+  function parseYTBadges(u) {
+    var b = [];
+    if (u.isOwner || u.isBroadcaster || u.isChatOwner) b.push('broadcaster');
+    if (u.isChatModerator || u.isModerator) b.push('mod');
+    if (u.isChatSponsor || u.isMember)      b.push('member');
+    return b;
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Tikfinity connection. Optional. If enabled, connects to the
+  // Tikfinity desktop app's WebSocket on localhost and pipes in
+  // TikTok LIVE events (chat, gifts, follows, likes, joins, shares).
+  // ──────────────────────────────────────────────────────────────────
+  var tfWS = null;
+  var tfReconnectTimer = null;
+  var tfConnected = false;
+
+  function connectTF() {
+    if (!CFG.useTF) { setChip('tf', 'off', 'TF off'); return; }
+    if (tfWS) { try { tfWS.onclose = null; tfWS.close(); } catch(e) {} tfWS = null; }
+    if (tfReconnectTimer) { clearTimeout(tfReconnectTimer); tfReconnectTimer = null; }
+    setChip('tf', 'wait', 'TF …');
+    var ws;
+    try { ws = new WebSocket('ws://localhost:' + CFG.tfPort + '/'); } catch (e) {
+      setChip('tf', 'err', 'TF ×'); return;
+    }
+    tfWS = ws;
+    ws.onopen = function() {
+      tfConnected = true;
+      setChip('tf', 'on', 'TF');
+      if (CFG.show.tt) setChip('tt', 'on');
+    };
+    ws.onmessage = function(e) {
+      try { handleTFEvent(JSON.parse(e.data)); } catch (x) {}
+    };
+    ws.onerror = function() {};
+    ws.onclose = function() {
+      if (tfWS !== ws) return;
+      tfConnected = false;
+      setChip('tf', 'err', 'TF ×');
+      tfReconnectTimer = setTimeout(connectTF, 5000);
+    };
+  }
+  function handleTFEvent(d) {
+    var ev = ((d.event || d.type || d.action) || '').toLowerCase();
+    var data = d.data || d;
+    var user = data.nickname || data.uniqueId || (data.user && (data.user.nickname || data.user.uniqueId)) || 'User';
+    var avatar = data.profilePictureUrl || (data.user && data.user.profilePictureUrl) || data.avatarUrl || '';
+
+    if (ev === 'chat' || ev === 'comment') {
+      pushMsg({ plat: 'tt', user: user, text: data.comment || data.message || data.text || '', avatar: avatar });
+    } else if (ev === 'gift') {
+      // TT's gift event fires once per gift in a streak AND once at
+      // streak end. Only show streak-end to avoid flooding the feed.
+      var isMidStreak = Number(data.giftType) === 1 && (data.repeatEnd === false || data.repeatEnd === 'false' || data.repeatEnd === 0);
+      if (isMidStreak) return;
+      var count = data.repeatCount || 1;
+      var perCoin = data.diamondCount || data.giftCost || 0;
+      var totalCoins = perCoin * count;
+      var gimg = data.giftPictureUrl || data.giftImage || data.pictureUrl || data.imageUrl || '';
+      var gname = data.giftName || 'Gift';
+      var countStr = count > 1 ? ' <span class="ev-amt">&times;' + count + '</span>' : '';
+      var coinsStr = totalCoins ? ' <span class="ev-amt">' + totalCoins.toLocaleString() + ' coins</span>' : '';
+      pushEv({
+        kind: 'gift', plat: 'tt', giftImage: gimg,
+        html: '<span class="ev-u">' + esc(user) + '</span> sent <strong>' + esc(gname) + '</strong>' + countStr + coinsStr
+      });
+    } else if (ev === 'follow') {
+      pushEv({ kind: 'follow', plat: 'tt', html: '<span class="ev-u">' + esc(user) + '</span> followed on TikTok!' });
+    } else if (ev === 'subscribe' || ev === 'subscription') {
+      pushEv({ kind: 'sub', plat: 'tt', html: '<span class="ev-u">' + esc(user) + '</span> subscribed on TikTok!' });
+    } else if (ev === 'share') {
+      pushEv({ kind: 'share', plat: 'tt', html: '<span class="ev-u">' + esc(user) + '</span> shared the stream' });
+    } else if (ev === 'member' || ev === 'join') {
+      // Joins are very chatty during popular streams. Skip by default
+      // (only fires if showFollows is on since they're the same vibe).
+      if (!CFG.showFollows) return;
+      pushEv({ kind: 'join', plat: 'tt', html: '<span class="ev-u">' + esc(user) + '</span> joined the stream' });
+    }
+    // likes are intentionally not surfaced as events — too noisy.
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Setup modal wiring
+  // ──────────────────────────────────────────────────────────────────
+  function openSetup() {
+    document.getElementById('sbHost').value = CFG.sbHost;
+    document.getElementById('sbPort').value = CFG.sbPort;
+    document.getElementById('sbPass').value = CFG.sbPass;
+    document.getElementById('tfPort').value = CFG.tfPort;
+    document.getElementById('useTF').checked = CFG.useTF;
+    document.getElementById('showTW').checked = CFG.show.tw;
+    document.getElementById('showYT').checked = CFG.show.yt;
+    document.getElementById('showTT').checked = CFG.show.tt;
+    document.getElementById('showKK').checked = CFG.show.kk;
+    document.getElementById('showPfp').checked = CFG.showPfp;
+    document.getElementById('showPi').checked = CFG.showPi;
+    document.getElementById('showBadges').checked = CFG.showBadges;
+    document.getElementById('showEmotes').checked = CFG.showEmotes;
+    document.getElementById('showEvents').checked = CFG.showEvents;
+    document.getElementById('showFollows').checked = CFG.showFollows;
+    document.getElementById('fontSize').value = CFG.fontSize;
+    setupModal.classList.add('show');
+  }
+  function closeSetup() { setupModal.classList.remove('show'); }
+  function saveAndConnect() {
+    CFG.sbHost = (document.getElementById('sbHost').value || '127.0.0.1').trim();
+    CFG.sbPort = parseInt(document.getElementById('sbPort').value, 10) || 8080;
+    CFG.sbPass = document.getElementById('sbPass').value || '';
+    CFG.tfPort = parseInt(document.getElementById('tfPort').value, 10) || 21213;
+    CFG.useTF = document.getElementById('useTF').checked;
+    CFG.show.tw = document.getElementById('showTW').checked;
+    CFG.show.yt = document.getElementById('showYT').checked;
+    CFG.show.tt = document.getElementById('showTT').checked;
+    CFG.show.kk = document.getElementById('showKK').checked;
+    CFG.showPfp = document.getElementById('showPfp').checked;
+    CFG.showPi = document.getElementById('showPi').checked;
+    CFG.showBadges = document.getElementById('showBadges').checked;
+    CFG.showEmotes = document.getElementById('showEmotes').checked;
+    CFG.showEvents = document.getElementById('showEvents').checked;
+    CFG.showFollows = document.getElementById('showFollows').checked;
+    CFG.fontSize = Math.max(10, Math.min(24, parseInt(document.getElementById('fontSize').value, 10) || 14));
+    document.documentElement.style.setProperty('--font-size', CFG.fontSize + 'px');
+    saveCfg();
+    closeSetup();
+    connectSB();
+    connectTF();
+    // Dim chips for platforms the streamer toggled off.
+    ['tw','yt','tt','kk'].forEach(function(p) {
+      var el = document.getElementById('chip-' + p);
+      if (el) el.style.opacity = CFG.show[p] ? '' : '0.35';
+    });
+  }
+  // Expose so onclick="" handlers in the modal can find them.
+  window.openSetup = openSetup;
+  window.closeSetup = closeSetup;
+  window.saveAndConnect = saveAndConnect;
+
+  // ──────────────────────────────────────────────────────────────────
+  // Boot
+  // ──────────────────────────────────────────────────────────────────
+  document.documentElement.style.setProperty('--font-size', CFG.fontSize + 'px');
+  ['tw','yt','tt','kk'].forEach(function(p) {
+    var el = document.getElementById('chip-' + p);
+    if (el) el.style.opacity = CFG.show[p] ? '' : '0.35';
+  });
+
+  if (IS_FIRST_RUN && !AUTO) {
+    // First run: show setup modal and wait for user to save.
+    openSetup();
+    pushSys('Welcome to SF OBS! Set your Streamer.bot host + password above, then click <strong>Save &amp; connect</strong>.');
+  } else {
+    // Already configured (or auto=1): connect on boot.
+    connectSB();
+    connectTF();
+  }
+})();
+</script>
+</body>
+</html>

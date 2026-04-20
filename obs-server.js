@@ -80,6 +80,7 @@ function landingPage() {
          '<li><div class="lbl">Chat feed</div><code>' + urls.chat + '</code></li>' +
          '<li><div class="lbl">Alerts banner</div><code>' + urls.alerts + '</code></li>' +
          '<li><div class="lbl">Shoutout card</div><code>' + urls.shoutout + '</code></li>' +
+         '<li><div class="lbl">Vertical bar</div><code>' + urls.vertical + '</code></li>' +
          '</ul><p class="hint">These URLs work only while StreamFusion is running. Set the browser source width/height in OBS as needed — overlays are transparent-backed.</p></body></html>';
 }
 
