@@ -48,7 +48,13 @@ process.on('unhandledRejection', function(reason) {
 let autoUpdater = null;
 try {
   autoUpdater = require('electron-updater').autoUpdater;
-  autoUpdater.autoDownload = false;
+  // Silent updates: download in the background as soon as an update is
+  // detected, then apply on next app quit. The user never sees a prompt
+  // or an installer UI — they just close SF and reopen to the new
+  // version. This matches the behavior most desktop apps (Slack,
+  // Discord, VS Code) ship by default and was the top 1.4.5 ask.
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
   // electron-updater's electron-log dependency expects a full logger interface.
   // Missing methods (debug/verbose/silly) throw "X is not a function" and kill
   // the update flow silently. Provide all methods to be safe.

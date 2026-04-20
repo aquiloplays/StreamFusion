@@ -8568,14 +8568,62 @@ function dcEmbed(opts) {
   return { embeds: [embed] };
 }
 
+// Throttled "Discord post failed" notifier. When a webhook post comes
+// back with an error or non-2xx status, we log every failure to the
+// console (so DevTools shows it) but only surface ONE entry in the
+// Events panel per 90s per event type — otherwise a bad webhook URL
+// would spam the panel with one banner per viewer action.
+var _dcFailSeen = Object.create(null);
+function _dcWarnOnce(typeKey, res) {
+  try {
+    var now = Date.now();
+    var last = _dcFailSeen[typeKey] || 0;
+    var status = res && res.status;
+    var errStr = (res && res.error) || '';
+    var bodyPreview = '';
+    if (res && res.body) {
+      try {
+        bodyPreview = typeof res.body === 'string' ? res.body.slice(0, 160) : JSON.stringify(res.body).slice(0, 160);
+      } catch (e) {}
+    }
+    console.warn('[SF discord]', typeKey, 'FAIL', 'status=' + status, 'err=' + errStr, 'body=' + bodyPreview);
+    if (now - last < 90000) return;
+    _dcFailSeen[typeKey] = now;
+    var hint;
+    if (status === 404) hint = 'Webhook URL not found (404). The channel or webhook was deleted — generate a new one in Discord → Channel → Integrations → Webhooks.';
+    else if (status === 401 || status === 403) hint = 'Webhook rejected (' + status + '). Paste a fresh URL from Discord.';
+    else if (status === 429) hint = 'Discord rate-limited the webhook (429). Your event volume is too high — posts will resume shortly.';
+    else if (status === 400) hint = 'Discord rejected the embed (400). ' + (bodyPreview || 'Check the Events tab for payload details.');
+    else if (status === 0)    hint = 'Could not reach Discord (network error: ' + (errStr || 'unknown') + ').';
+    else                       hint = 'Discord webhook failed (status ' + status + ').';
+    addEvHistory('StreamFusion', 'Discord+ ' + typeKey + ' post failed: ' + hint, 'tw', false);
+  } catch (e) {}
+}
+
 // Fire an event embed through the configured webhook. Silently no-ops if
-// no webhook URL is set OR the user disabled this event type.
+// no webhook URL is set OR the user disabled this event type. All real
+// failures (bad URL, rate limit, malformed payload) now log to the
+// console and surface a throttled hint in the Events panel — previously
+// they were swallowed by a bare .catch() with no visibility anywhere.
 function postDiscordEvent(typeKey, payload) {
   if (!S.hasEarlyAccess) return;
   if (!dcEventWebhook) return;
-  if (!dcPost[typeKey]) return;
+  if (!dcPost[typeKey]) {
+    console.log('[SF discord] skip', typeKey, '— toggle off');
+    return;
+  }
   if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
-  window.electronAPI.discordWebhookPost(dcEventWebhook, payload).catch(function() {});
+  console.log('[SF discord] post', typeKey, '→', dcEventWebhook.slice(0, 55) + '…');
+  window.electronAPI.discordWebhookPost(dcEventWebhook, payload).then(function(res) {
+    if (res && res.ok) {
+      console.log('[SF discord] ok', typeKey, 'msgId=' + (res.id || '?'));
+    } else {
+      _dcWarnOnce(typeKey, res);
+    }
+  }).catch(function(err) {
+    console.error('[SF discord] catch', typeKey, err);
+    _dcWarnOnce(typeKey, { status: 0, error: String(err && err.message || err) });
+  });
 }
 
 function discordPostFollow(user, plat) {
@@ -8776,9 +8824,30 @@ function testEventWebhook() {
     title: 'StreamFusion Discord+ webhook test',
     description: 'If you see this embed in your configured channel, your event-post webhook is wired up correctly. Safe to delete.'
   });
+  console.log('[SF discord] TEST → webhook', dcEventWebhook.slice(0, 55) + '…');
   window.electronAPI.discordWebhookPost(dcEventWebhook, payload).then(function(res) {
-    if (res && res.ok) addEvHistory('StreamFusion', 'Event webhook test sent \u2014 check Discord.', 'tw', false);
-    else addEvHistory('StreamFusion', 'Event webhook test failed (status ' + (res && res.status) + '). Double-check the URL.', 'tw', false);
+    console.log('[SF discord] TEST response', res);
+    if (res && res.ok) {
+      addEvHistory('StreamFusion', 'Event webhook test sent \u2014 check Discord (msg id ' + (res.id || '?') + ').', 'tw', false);
+      return;
+    }
+    var status = res && res.status;
+    var errStr = (res && res.error) || '';
+    var bodyPreview = '';
+    if (res && res.body) {
+      try { bodyPreview = typeof res.body === 'string' ? res.body.slice(0, 200) : JSON.stringify(res.body).slice(0, 200); } catch (e) {}
+    }
+    var hint;
+    if (status === 404)                        hint = 'Webhook not found (404) \u2014 the webhook was deleted in Discord or the URL has a typo. Generate a new one in Discord: Channel \u2192 Integrations \u2192 Webhooks.';
+    else if (status === 401 || status === 403) hint = 'Webhook rejected (' + status + ') \u2014 the URL is invalid or was rotated. Generate a fresh webhook URL.';
+    else if (status === 400)                    hint = 'Discord rejected the payload (400). ' + (bodyPreview ? 'Response: ' + bodyPreview : '');
+    else if (status === 429)                    hint = 'Discord rate-limited the webhook (429). Wait ~10s and try again.';
+    else if (status === 0)                      hint = 'Could not reach Discord. Network error: ' + (errStr || 'unknown') + '.';
+    else                                         hint = 'Unexpected status ' + status + '. ' + (bodyPreview ? 'Response: ' + bodyPreview : '');
+    addEvHistory('StreamFusion', 'Event webhook test failed: ' + hint, 'tw', false);
+  }).catch(function(err) {
+    console.error('[SF discord] TEST catch', err);
+    addEvHistory('StreamFusion', 'Event webhook test failed (IPC error: ' + (err && err.message || err) + ').', 'tw', false);
   });
 }
 
@@ -9213,17 +9282,18 @@ function initUpdateListeners() {
       var st = document.getElementById('updateStatus');
       var acts = document.getElementById('updateActions');
       var dlBtn = document.getElementById('updateDownloadBtn');
-      if (st) st.innerHTML = 'Update <strong>v' + _pendingUpdateVersion + '</strong> is available!';
-      if (acts) acts.style.display = 'block';
-      if (dlBtn) dlBtn.style.display = '';
-      // Toolbar button
+      // Settings → Updates panel stays informational so curious users
+      // can still see that an update is in flight. We no longer fire
+      // action buttons — autoDownload in the main process handles the
+      // download automatically in the background.
+      if (st) st.innerHTML = 'Update <strong>v' + _pendingUpdateVersion + '</strong> detected \u2014 downloading in the background\u2026';
+      if (acts) acts.style.display = 'none';
+      if (dlBtn) dlBtn.style.display = 'none';
+      // Toolbar button stays hidden too — the whole point of 1.4.5 is
+      // updates happen silently. Users can still see the state in
+      // Settings → Updates if they're curious about a version bump.
       var btn = document.getElementById('updateAvailBtn');
-      if (btn) { btn.style.display = ''; btn.title = 'Update v' + _pendingUpdateVersion + ' is available — click to install'; }
-      // Startup prompt (unless the user already dismissed it this session)
-      if (!window._updPromptShownThisSession) {
-        window._updPromptShownThisSession = true;
-        showUpdatePrompt();
-      }
+      if (btn) { btn.style.display = 'none'; }
     });
   }
   if (electronAPI.onUpdateDownloaded) {
@@ -9231,17 +9301,18 @@ function initUpdateListeners() {
       _pendingUpdateVersion = d && d.version || _pendingUpdateVersion || '?';
       _updateReady = true;
       var st = document.getElementById('updateStatus');
+      // Once downloaded, electron-updater will auto-install on next
+      // app quit. We surface a tiny note in Settings so users who look
+      // know their next restart will pick up the new build, but we
+      // never pop a modal or ask them to click anything.
+      if (st) st.innerHTML = 'Update <strong>v' + _pendingUpdateVersion + '</strong> ready \u2014 will apply automatically the next time you close StreamFusion.';
       var dlBtn = document.getElementById('updateDownloadBtn');
       var instBtn = document.getElementById('updateInstallBtn');
-      if (st) st.innerHTML = 'Update <strong>v' + _pendingUpdateVersion + '</strong> downloaded and ready to install.';
       if (dlBtn) dlBtn.style.display = 'none';
-      if (instBtn) instBtn.style.display = '';
-      // Re-open the prompt so the user can one-click install
-      var yesBtn = document.getElementById('updPromptYes');
-      if (yesBtn) { yesBtn.disabled = false; }
-      var p = document.getElementById('updPrompt');
-      if (p && !p.classList.contains('show')) showUpdatePrompt();
-      else if (p && p.classList.contains('show') && yesBtn) yesBtn.textContent = 'Install & Restart';
+      if (instBtn) instBtn.style.display = 'none';
+      // Also surface once in the Events panel so users who never open
+      // Settings still know it happened. Stays a plain system note.
+      try { addEvHistory('StreamFusion', 'Update v' + _pendingUpdateVersion + ' downloaded. Will apply automatically when you close StreamFusion.', 'tw', false); } catch (e) {}
     });
   }
 }

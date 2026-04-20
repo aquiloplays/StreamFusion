@@ -1,8 +1,18 @@
 {
   "name": "streamfusion",
-  "version": "1.4.4",
-  "description": "Unified multi-platform stream chat viewer",
+  "version": "1.4.5",
+  "description": "Unified multi-platform stream chat viewer for Twitch, YouTube, TikTok, and Kick. Built by aquilo_plays.",
   "main": "main.js",
+  "author": {
+    "name": "aquilo_plays",
+    "email": "bisherclay@gmail.com",
+    "url": "https://aquilo.gg"
+  },
+  "homepage": "https://aquilo.gg",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aquiloplays/StreamFusion.git"
+  },
   "scripts": {
     "start": "electron .",
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --publish never",
@@ -18,9 +28,9 @@
     "electron-builder": "^24.0.0"
   },
   "build": {
-    "appId": "com.streamfusion.app",
+    "appId": "gg.aquilo.streamfusion",
     "productName": "StreamFusion",
-    "copyright": "StreamFusion",
+    "copyright": "Copyright © 2025 aquilo_plays · https://aquilo.gg",
     "directories": {
       "output": "dist"
     },
@@ -49,13 +59,22 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
       "signingHashAlgorithms": [
         "sha256"
       ],
-      "sign": null
+      "sign": null,
+      "publisherName": "aquilo_plays",
+      "verifyUpdateCodeSignature": false,
+      "legalTrademarks": "StreamFusion is a trademark of aquilo_plays."
     },
     "mac": {
       "target": [
@@ -72,15 +91,17 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "StreamFusion",
       "installerHeaderIcon": "assets/icon.ico",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": true
     },
     "portable": {
-      "artifactName": "StreamFusion-Portable.exe"
+      "artifactName": "StreamFusion-Portable-${version}.exe"
     }
   }
 }

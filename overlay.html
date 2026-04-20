@@ -213,31 +213,35 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
    row never gets clipped — min-height keeps the empty-state reservation.
    NOTE: if you bump min-height here, also bump the body's padding-bottom
    so chat can always scroll clear of the event zone. */
-.ov-event-area{position:fixed;bottom:0;left:0;right:0;min-height:96px;display:flex;align-items:flex-end;justify-content:center;z-index:180;pointer-events:none;padding:8px 10px 12px;box-sizing:border-box;overflow:visible}
+.ov-event-area{position:fixed;bottom:0;left:0;right:0;min-height:96px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;z-index:180;pointer-events:none;padding:6px 8px 10px;box-sizing:border-box;overflow:visible;gap:6px;max-height:60vh}
 .ov-event-area .ov-event{pointer-events:auto}
-/* Larger, easier-to-read events — bigger type, taller card, bolder accents.
-   Was font-size:15, padding:10/18 → now 19, 14/24. Username jumps from
-   16 → 22 for the same reason. */
+/* Wide event cards — full pop-out width so text breathes and multiple
+   stacked events share the same visual column (was width:max-content,
+   which shrank short events to tiny chips when stacked and looked off).
+   Cards are slightly shorter per-row to accommodate stacking in a
+   bounded vertical slot. */
 .ov-event{
   position:relative;
-  padding:14px 24px;
-  border-radius:14px;
-  font-size:19px;
+  padding:10px 16px;
+  border-radius:12px;
+  font-size:17px;
   font-weight:700;
-  line-height:1.35;
+  line-height:1.32;
   animation:evToastIn .45s cubic-bezier(.34,1.56,.64,1) both;
   border:2px solid var(--ev);
   border-left-width:6px;
   background:linear-gradient(135deg,rgba(240,180,41,.22),rgba(240,180,41,.08));
   box-shadow:0 6px 28px rgba(0,0,0,.55),0 0 20px rgba(240,180,41,.4);
   text-align:center;
-  min-width:min(340px,92%);
-  max-width:97%;
-  width:max-content;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
   overflow:hidden;
   backdrop-filter:blur(10px);
   color:#fff;
   text-shadow:0 1px 6px rgba(0,0,0,.75);
+  flex-shrink:0;
 }
 /* Shine sweep — was `infinite` which kept running on every visible
    event for the entire life of the pop-out, burning compositor cycles
@@ -261,7 +265,7 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-event.cc{border-color:var(--cc);background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(245,165,36,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(245,165,36,.25)}
 .ov-event.out{animation:evToastOut .35s cubic-bezier(.4,0,.6,1) forwards}
 .ov-ev-head{display:block}
-.ov-ev-user{color:var(--ev);font-weight:900;font-size:22px;text-shadow:0 0 12px currentColor;margin-right:6px}
+.ov-ev-user{color:var(--ev);font-weight:900;font-size:20px;text-shadow:0 0 12px currentColor;margin-right:6px}
 .ov-ev-msg{margin-top:7px;padding:7px 12px;font-size:15px;font-style:italic;color:#e9e9ef;background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.35);border-radius:5px;line-height:1.45;word-break:break-word;animation:ovEvMsgIn .35s .1s ease-out both}
 .ov-ev-msg::before{content:'\201C';opacity:.55;margin-right:2px}
 .ov-ev-msg::after{content:'\201D';opacity:.55;margin-left:2px}
@@ -759,7 +763,10 @@ var cfg = {
 };
 var feed = document.getElementById('ovFeed');
 var eventArea = document.getElementById('ovEventArea');
-var _evTimer = null, _evQueue = [];
+// _evTimer / _evQueue used to track a single-slot replace-only event
+// system. The new stacked system tracks per-element timers on the DOM
+// node itself (el._ovTimer), so the globals aren't needed. Leaving a
+// pointer here in case older code paths try to clear them — harmless.
 
 // ── Activity pulse — briefly tints the overlay surface when chat
 // or events arrive. Single shared timer so rapid messages don't
@@ -1060,13 +1067,22 @@ var _ovModOpen = null;
   });
 })();
 
-// ── Events (one at a time, fades) ───────────────────────────
+// ── Events (stacked, fade individually) ─────────────────────
+// Events stack from the bottom up so the streamer can see up to
+// OV_EV_MAX recent events at once. Each card has its own dwell timer,
+// so the first event fades out independently of the ones that arrived
+// after it. Dwell was bumped to 12s (plain) / 18s (with message or
+// gift) — long enough that mid-stream chatter doesn't push a sub or
+// gift off-screen before the streamer can thank them out loud.
+//
+// Oldest-wins trim: when the stack exceeds OV_EV_MAX cards we yank the
+// top (oldest) one with its out animation. This bounds vertical growth
+// so the event area can't eat more than ~60vh of the pop-out even
+// during a gift bomb.
+var OV_EV_MAX = 5;
 function showEvent(d) {
   if (!cfg.showEvents) return;
   if (!platAllowed(d.plat)) return;
-  // Immediately replace — no queueing, no stacking
-  if (_evTimer) { clearTimeout(_evTimer); _evTimer = null; }
-  while (eventArea.firstChild) eventArea.removeChild(eventArea.firstChild);
   var el = document.createElement('div');
   el.className = 'ov-event ' + (d.plat || '');
   var evText = d.text || '';
@@ -1078,13 +1094,33 @@ function showEvent(d) {
   el.innerHTML = '<div class="ov-ev-head"><span class="ov-ev-user">' + esc(d.user || 'Event') + '</span> ' + esc(evText) + '</div>' + msgHtml + giftBlock;
   eventArea.appendChild(el);
   triggerActivityPulse(d.plat || 'ev');
-  var dwell = (d.evMessage || d.giftHtml) ? 6500 : 4200;
-  _evTimer = setTimeout(function() {
+
+  // Trim oldest cards past the cap so the stack never exceeds
+  // OV_EV_MAX. We use the out animation so the top card fades out
+  // gracefully instead of popping.
+  while (eventArea.children.length > OV_EV_MAX) {
+    var stale = eventArea.firstChild;
+    if (!stale) break;
+    if (stale.classList.contains('out')) {
+      // Already animating — just let its own setTimeout remove it.
+      break;
+    }
+    if (stale._ovTimer) { clearTimeout(stale._ovTimer); stale._ovTimer = null; }
+    stale.classList.add('out');
+    (function(node) {
+      setTimeout(function() {
+        if (node && node.parentNode) node.parentNode.removeChild(node);
+      }, 400);
+    })(stale);
+  }
+
+  var dwell = (d.evMessage || d.giftHtml) ? 18000 : 12000;
+  el._ovTimer = setTimeout(function() {
     el.classList.add('out');
     setTimeout(function() {
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 400);
-    _evTimer = null;
+    el._ovTimer = null;
   }, dwell);
 }
 
