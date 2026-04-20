@@ -3568,14 +3568,83 @@ function modAction(action, username, duration, msgId) {
 
 // ── Emotes ────────────────────────────────────────────────────────────────────
 function setEmoteStatus(m) { var el = document.getElementById('emoteStatus'); if (el) el.textContent = m; }
+// Emote aggregation from third-party services. 1.5.0 expanded 7TV from
+// global-only to "global + channel set + personal sets" (resolved via
+// the user's Twitch ID), matching how 7TV's own browser extension
+// pulls emotes for a channel.
+//
+// 7TV public API (no auth needed):
+//   GET /v3/emote-sets/global         — global emote set
+//   GET /v3/users/twitch/{twitch_id}  — {user, emote_set:{id,...}, emote_sets:[]}
+//   GET /v3/emote-sets/{set_id}       — full emote set with the emote array
+//
+// BTTV + 7TV share EMOTE_MAP (name → URL). On name collision the last
+// writer wins; we sequence 7TV channel set LAST so streamer-specific
+// emotes override BTTV globals — aligns with what 7TV extension users see.
 function fetchAllEmotes(id) {
   if (emotesFetched && fetchedForUserId === id) return;
   fetchedForUserId = id; emotesFetched = true; EMOTE_MAP.clear();
   setEmoteStatus('Loading emotes...');
+
+  // Pull an emote-set payload into EMOTE_MAP. Response shape:
+  //   {emotes: [{name, data:{host:{url}}}]}
+  // host.url is protocol-relative ("//cdn.7tv.app/...") — prepend
+  // https: so Electron doesn't flag it mixed-content.
+  function ingest7TV(set) {
+    var emotes = (set && set.emotes) || [];
+    emotes.forEach(function(e) {
+      var host = e && e.data && e.data.host && e.data.host.url;
+      if (e.name && host) EMOTE_MAP.set(e.name, 'https:' + host + '/2x.webp');
+    });
+  }
+  // Fetch the channel's current 7TV emote set + any personal sets
+  // attached to the user. We cap personal sets at 4 so an unusually
+  // prolific streamer can't spam hundreds of requests.
+  function fetch7TVChannel(twitchId) {
+    return fetch('https://7tv.io/v3/users/twitch/' + twitchId)
+      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function(u) {
+        var jobs = [];
+        var mainId = u && u.emote_set && u.emote_set.id;
+        if (mainId) {
+          jobs.push(
+            fetch('https://7tv.io/v3/emote-sets/' + mainId)
+              .then(function(r) { if (!r.ok) throw 0; return r.json(); })
+              .then(ingest7TV)
+              .catch(function(){})
+          );
+        }
+        if (Array.isArray(u.emote_sets)) {
+          u.emote_sets.slice(0, 4).forEach(function(s) {
+            if (!s || !s.id || s.id === mainId) return;
+            jobs.push(
+              fetch('https://7tv.io/v3/emote-sets/' + s.id)
+                .then(function(r) { if (!r.ok) throw 0; return r.json(); })
+                .then(ingest7TV)
+                .catch(function(){})
+            );
+          });
+        }
+        return Promise.all(jobs);
+      })
+      .catch(function(){});
+  }
+
   Promise.all([
-    fetch('https://api.betterttv.net/3/cached/emotes/global').then(function(r) { return r.json(); }).then(function(d) { (d || []).forEach(function(e) { if (e.code && e.id) EMOTE_MAP.set(e.code, 'https://cdn.betterttv.net/emote/' + e.id + '/2x'); }); }).catch(function(){}),
-    fetch('https://api.betterttv.net/3/cached/users/twitch/' + id).then(function(r) { if (!r.ok) throw 0; return r.json(); }).then(function(d) { [].concat(d.channelEmotes || [], d.sharedEmotes || []).forEach(function(e) { if (e.code && e.id) EMOTE_MAP.set(e.code, 'https://cdn.betterttv.net/emote/' + e.id + '/2x'); }); }).catch(function(){}),
-    fetch('https://7tv.io/v3/emote-sets/global').then(function(r) { return r.json(); }).then(function(d) { (d && d.emotes || []).forEach(function(e) { var h = e.data && e.data.host && e.data.host.url; if (e.name && h) EMOTE_MAP.set(e.name, 'https:' + h + '/2x.webp'); }); }).catch(function(){})
+    // BTTV global
+    fetch('https://api.betterttv.net/3/cached/emotes/global').then(function(r) { return r.json(); }).then(function(d) {
+      (d || []).forEach(function(e) { if (e.code && e.id) EMOTE_MAP.set(e.code, 'https://cdn.betterttv.net/emote/' + e.id + '/2x'); });
+    }).catch(function(){}),
+    // BTTV channel
+    fetch('https://api.betterttv.net/3/cached/users/twitch/' + id).then(function(r) { if (!r.ok) throw 0; return r.json(); }).then(function(d) {
+      [].concat(d.channelEmotes || [], d.sharedEmotes || []).forEach(function(e) {
+        if (e.code && e.id) EMOTE_MAP.set(e.code, 'https://cdn.betterttv.net/emote/' + e.id + '/2x');
+      });
+    }).catch(function(){}),
+    // 7TV global
+    fetch('https://7tv.io/v3/emote-sets/global').then(function(r) { return r.json(); }).then(ingest7TV).catch(function(){}),
+    // 7TV channel + personal sets (1.5.0 addition)
+    fetch7TVChannel(id)
   ]).then(function() {
     window.EMOTE_MAP = EMOTE_MAP;
     setEmoteStatus(EMOTE_MAP.size + ' emotes loaded');
@@ -9702,7 +9771,7 @@ function initUpdateListeners() {
 // Mirrors package.json. Used by both the post-update changelog card
 // (maybeShowChangelog) AND the remote notice filter (checkSfNotices)
 // for version-gated announcements. Update on every release bump.
-var SF_VERSION = '1.4.8';
+var SF_VERSION = '1.5.0';
 var SF_CHANGELOG = {
   '1.4.4': {
     features: [
@@ -9760,6 +9829,14 @@ var SF_CHANGELOG = {
       'Vertical chat bar no longer cuts off the first letter of every message (the left-edge mask fade was too aggressive).',
       'Hot-path perf pass: less idle CPU during quiet stream moments, animations respect the hide-animations toggle across more surfaces.'
     ]
+  },
+  '1.5.0': {
+    features: [
+      '7TV channel emotes now render inline everywhere (were only fetching 7TV globals). Pulls your channel set + personal sets via your Twitch ID, matching what the 7TV browser extension does.',
+      'TikTok gift floating animation refreshed: pop-in overshoot, platform-tinted glow halo, sparkle particle trail, gentle rotation during drift — and multiple gifts from the same user now visually cluster along a single trail instead of scattering.',
+      'Release notes now auto-post to the StreamFusion community Discord via the shared bot whenever a new version ships.'
+    ],
+    fixes: []
   }
 };
 function _verToTuple(v) {

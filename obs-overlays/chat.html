@@ -346,11 +346,15 @@
   }
 
   /* ──────────────────────────────────────────────────────────────────
-     TikTok gift floating layer — now confined to the TOP HALF of the
-     canvas so it never covers the chat feed sitting at the bottom.
-     Gifts spawn at the RIGHT edge of the zone and drift LEFT, fading
-     on the left edge. Multiple gifts stack in parallel with randomized
-     Y offsets so they don't all travel in one line.
+     TikTok gift floating layer — 1.5.0 refresh: pop-in overshoot +
+     platform glow pulse + sparkle particle trail. Gifts are
+     constrained to the TOP HALF of the canvas so they never cover
+     the chat feed sitting at the bottom.
+
+     Clustering: when the same user sends the same gift again within
+     ~700ms we spawn the new one at an adjacent X so they visually
+     "stack" along the drift path instead of scattering randomly.
+     The count badge on the lead gift ticks up.
      ────────────────────────────────────────────────────────────────── */
   #gifts {
     position: fixed;
@@ -359,47 +363,114 @@
     overflow: hidden;
     pointer-events: none;
     z-index: 10;
+    contain: layout paint;  /* isolate to its own compositor layer */
   }
 
   .gift {
     position: absolute;
     top: var(--spawn-y, 30%);
-    right: 0;
-    width: 88px;
+    right: var(--spawn-right, 0px);
+    width: 92px;
     text-align: center;
     opacity: 0;
-    animation: giftFloat var(--gift-dur, 5s) cubic-bezier(.22,.65,.32,1) forwards;
-    filter: drop-shadow(0 4px 12px rgba(254,44,85,.45));
+    animation: giftFloat var(--gift-dur, 5.2s) cubic-bezier(.22,.7,.32,1) forwards;
+    will-change: transform, opacity;
   }
-  .gift img { width: 88px; height: 88px; object-fit: contain; display: block; }
+  /* Gift artwork. The container does the wobble-rotation animation
+     so the image + glow halo stay in register. A separate ::before
+     pseudo paints the radial halo, scaled to the image. */
+  .gift .g-art {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    margin: 0 auto;
+    animation: giftWobble 1.8s ease-in-out infinite;
+  }
+  .gift .g-art::before {
+    content: '';
+    position: absolute;
+    inset: -22px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(254,44,85,.45) 0%, rgba(254,44,85,0.18) 45%, transparent 70%);
+    animation: giftHalo 1.4s ease-in-out infinite;
+    z-index: -1;
+  }
+  .gift .g-art img {
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,.55));
+  }
+  /* Sparkle trail dots — three tiny markers that scale-pulse on a
+     staggered delay behind the gift. Cheaper than particle emitters
+     but reads as "something magical is trailing this". */
+  .gift .g-spark {
+    position: absolute;
+    top: 50%;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff, rgba(255,255,255,0) 70%);
+    animation: sparklePulse 1.1s ease-out infinite;
+    pointer-events: none;
+  }
+  .gift .g-spark.s1 { right: 110px; margin-top: -5px; animation-delay: 0s;    opacity: .85; }
+  .gift .g-spark.s2 { right: 140px; margin-top: 6px;  animation-delay: .25s;  opacity: .7;  background: radial-gradient(circle, #f0b429, rgba(240,180,41,0) 70%); }
+  .gift .g-spark.s3 { right: 170px; margin-top: -8px; animation-delay: .5s;   opacity: .6; }
   .gift .g-count {
     position: absolute;
-    top: -6px; right: -6px;
+    top: -4px; right: -4px;
     background: linear-gradient(135deg, #fe2c55, #f0b429);
     color: #0e0e10;
     font-weight: 900;
     font-size: 17px;
-    padding: 2px 9px;
+    padding: 2px 10px;
     border-radius: 999px;
     border: 2px solid #fff;
-    min-width: 26px;
+    min-width: 30px;
+    box-shadow: 0 3px 10px rgba(254,44,85,0.55);
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1);
   }
+  .gift .g-count.bump { transform: scale(1.35); }
   .gift .g-user {
     margin-top: 4px;
     font-size: 12px;
     font-weight: 900;
     color: #fff;
-    text-shadow: 0 2px 6px rgba(0,0,0,.9);
+    text-shadow: 0 2px 6px rgba(0,0,0,.9), 0 0 10px rgba(254,44,85,.5);
     white-space: nowrap;
     max-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-left: auto;
+    margin-right: auto;
   }
+  /* Main drift — overshoot pop-in, then glide left across the zone.
+     --mid-x / --end-x let spawning code randomize the flight path;
+     --drift-y adds a gentle vertical drift so streaks feel organic. */
   @keyframes giftFloat {
-    0%   { opacity: 0; transform: translate(60px, 0) scale(.4); }
-    15%  { opacity: 1; transform: translate(-10px, 0) scale(1); }
-    70%  { opacity: 1; transform: translate(var(--mid-x, -50vw), var(--drift-y, 4vh)) scale(.95); }
-    100% { opacity: 0; transform: translate(var(--end-x, -100vw), var(--drift-y, 6vh)) scale(.8); }
+    0%   { opacity: 0; transform: translate(60px, 12px) scale(.3)  rotate(-10deg); }
+    10%  { opacity: 1; transform: translate(-18px, -6px) scale(1.18) rotate(4deg); }
+    20%  { opacity: 1; transform: translate(-8px, 0)    scale(1)    rotate(0deg); }
+    70%  { opacity: 1; transform: translate(var(--mid-x, -50vw), var(--drift-y, 5vh)) scale(.95) rotate(-4deg); }
+    100% { opacity: 0; transform: translate(var(--end-x, -100vw), calc(var(--drift-y, 5vh) + 2vh)) scale(.8) rotate(8deg); }
+  }
+  /* Subtle wobble keeps the gift feeling alive during its long glide. */
+  @keyframes giftWobble {
+    0%, 100% { transform: rotate(-3deg) scale(1); }
+    50%      { transform: rotate(3deg)  scale(1.04); }
+  }
+  /* Halo pulse — synced slightly off the wobble so the glow feels
+     like it's breathing rather than tied to one motion. */
+  @keyframes giftHalo {
+    0%, 100% { opacity: .55; transform: scale(0.92); }
+    50%      { opacity: 1;   transform: scale(1.08); }
+  }
+  /* Sparkle trail — grows and fades. */
+  @keyframes sparklePulse {
+    0%   { opacity: 0;   transform: scale(.4); }
+    30%  { opacity: 1;   transform: scale(1.3); }
+    100% { opacity: 0;   transform: scale(.5); }
   }
 
   /* ──────────────────────────────────────────────────────────────────
@@ -647,34 +718,130 @@
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // TikTok gift floating animation — constrained to the top half so
-  // gifts never cover the chat feed. Each gift gets a randomized
-  // spawn Y (5-40% of #gifts height) and drift Y so simultaneous
-  // gifts don't queue up on a single horizontal line.
+  // TikTok gift floating animation (1.5.0 refresh)
+  //
+  // Visual upgrades:
+  //   - Pop-in overshoot at spawn (scale .3 -> 1.18 -> 1) so gifts
+  //     feel like they're ARRIVING instead of just appearing.
+  //   - Platform-tinted glow halo that breathes behind the image.
+  //   - Sparkle trail: 3 tiny white/gold dots pulsing behind the drift.
+  //   - Gentle rotation wobble during the long glide.
+  //
+  // Clustering / stacking:
+  //   - Track the most recent gift by (user|giftName). When a new
+  //     arrival matches within 700ms, spawn it next to the previous
+  //     one (offset X) so rapid streaks visually cluster along the
+  //     drift path instead of scattering randomly across the canvas.
+  //   - The lead gift's count badge bumps up on each arrival so the
+  //     streamer sees the streak accumulate in place too.
   // ──────────────────────────────────────────────────────────────────
+  var _recentGifts = Object.create(null);   // key -> { el, time, right }
+  var STACK_WINDOW_MS = 700;
+  var STACK_OFFSET_PX = 34;  // horizontal spacing between stacked siblings
+
   function spawnGiftAnimation(ev) {
     if (!CFG.showGiftAnimations) return;
     if (ev.platform !== 'tt') return;
     if (!ev.giftImage) return;
+
+    var key = (ev.user || 'someone') + '|' + (ev.giftName || 'gift');
+    var now = Date.now();
+    var recent = _recentGifts[key];
+
+    // Stacking: a matching gift arrived recently → bump the existing
+    // lead's count AND spawn a small sibling next to it instead of a
+    // full new streak. Feels like the gifts are piling up along one
+    // trail, which is what users actually do ("Rose spam ×30").
+    if (recent && (now - recent.time) < STACK_WINDOW_MS && recent.el && recent.el.parentNode) {
+      var lead = recent.el;
+      var badge = lead.querySelector('.g-count');
+      var curCount = parseInt((badge && badge.textContent || '').replace(/\D+/g, ''), 10) || 1;
+      var inc = Math.max(1, ev.count || 1);
+      var newCount = curCount + inc;
+      if (!badge) {
+        var b = document.createElement('div');
+        b.className = 'g-count';
+        b.textContent = '\u00d7' + newCount;
+        lead.appendChild(b);
+      } else {
+        badge.textContent = '\u00d7' + newCount;
+      }
+      // Bump animation on the count badge.
+      if (badge) {
+        badge.classList.remove('bump');
+        void badge.offsetWidth;
+        badge.classList.add('bump');
+        setTimeout(function() { if (badge) badge.classList.remove('bump'); }, 240);
+      }
+      // Spawn a sibling slightly to the right of the lead so the
+      // stack reads as a cluster moving together. The sibling uses
+      // the lead's animation settings (same spawn-y / drift path)
+      // so they stay visually locked.
+      recent.count = newCount;
+      recent.time = now;
+      var sib = buildGiftElement(ev, {
+        spawnY: lead.style.getPropertyValue('--spawn-y') || '30%',
+        spawnRight: (recent.right + STACK_OFFSET_PX) + 'px',
+        midX:   lead.style.getPropertyValue('--mid-x')  || '-50vw',
+        endX:   lead.style.getPropertyValue('--end-x')  || '-100vw',
+        driftY: lead.style.getPropertyValue('--drift-y') || '5vh',
+        // Slightly shorter duration for followers so they catch up
+        // to the lead at the left edge and fade together.
+        dur: (parseFloat(lead.style.getPropertyValue('--gift-dur') || '5') - 0.3).toFixed(2) + 's',
+        showCount: false,
+        showUser: false
+      });
+      gifts.appendChild(sib);
+      recent.right += STACK_OFFSET_PX;
+      setTimeout(function() { if (sib.parentNode) sib.parentNode.removeChild(sib); }, parseFloat(lead.style.getPropertyValue('--gift-dur') || '5') * 1000 + 500);
+      return;
+    }
+
+    // Fresh streak — spawn a full gift with count + user label.
+    var spawnYPct = 5 + Math.random() * 30;
+    var opts = {
+      spawnY: spawnYPct.toFixed(1) + '%',
+      spawnRight: '0px',
+      midX:   -(window.innerWidth * (0.35 + Math.random() * 0.25)) + 'px',
+      endX:   -(window.innerWidth * (0.95 + Math.random() * 0.15)) + 'px',
+      driftY: (2 + Math.random() * 6).toFixed(1) + 'vh',
+      dur:    (4.4 + Math.random() * 1.2).toFixed(2) + 's',
+      showCount: !!(ev.count && ev.count > 1),
+      showUser: true
+    };
+    var el = buildGiftElement(ev, opts);
+    gifts.appendChild(el);
+    _recentGifts[key] = { el: el, time: now, right: 0, count: Math.max(1, ev.count || 1) };
+
+    // Clean up DOM + recent-gift tracker after the animation ends.
+    var lifeMs = parseFloat(opts.dur) * 1000 + 500;
+    setTimeout(function() {
+      if (el.parentNode) el.parentNode.removeChild(el);
+      if (_recentGifts[key] && _recentGifts[key].el === el) delete _recentGifts[key];
+    }, lifeMs);
+  }
+
+  function buildGiftElement(ev, opts) {
     var el = document.createElement('div');
     el.className = 'gift';
-    var spawnY = (5 + Math.random() * 35).toFixed(1) + '%';
-    var midX   = -(window.innerWidth * (0.35 + Math.random() * 0.25));
-    var endX   = -(window.innerWidth * (0.95 + Math.random() * 0.15));
-    var driftY = (2 + Math.random() * 6).toFixed(1) + 'vh';
-    var dur    = (4 + Math.random() * 1.5).toFixed(2) + 's';
-    el.style.setProperty('--spawn-y', spawnY);
-    el.style.setProperty('--mid-x',   midX   + 'px');
-    el.style.setProperty('--end-x',   endX   + 'px');
-    el.style.setProperty('--drift-y', driftY);
-    el.style.setProperty('--gift-dur', dur);
-    var countBadge = (ev.count && ev.count > 1) ? '<div class="g-count">\u00d7' + ev.count + '</div>' : '';
+    el.style.setProperty('--spawn-y',     opts.spawnY);
+    el.style.setProperty('--spawn-right', opts.spawnRight);
+    el.style.setProperty('--mid-x',       opts.midX);
+    el.style.setProperty('--end-x',       opts.endX);
+    el.style.setProperty('--drift-y',     opts.driftY);
+    el.style.setProperty('--gift-dur',    opts.dur);
+    var countBadge = opts.showCount ? '<div class="g-count">\u00d7' + (ev.count || 1) + '</div>' : '';
+    var userLabel  = opts.showUser  ? '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>' : '';
     el.innerHTML =
-      '<img src="' + escapeHtml(ev.giftImage) + '" alt="" onerror="this.parentNode.parentNode.removeChild(this.parentNode)">' +
-      countBadge +
-      '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>';
-    gifts.appendChild(el);
-    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, parseFloat(dur) * 1000 + 500);
+      '<div class="g-art">' +
+        '<span class="g-spark s1"></span>' +
+        '<span class="g-spark s2"></span>' +
+        '<span class="g-spark s3"></span>' +
+        '<img src="' + escapeHtml(ev.giftImage) + '" alt="" onerror="this.closest(\'.gift\').remove()">' +
+        countBadge +
+      '</div>' +
+      userLabel;
+    return el;
   }
 
   // Combo counter (unchanged from 1.4.4 — aggregates same-user/same-gift

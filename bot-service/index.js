@@ -48,6 +48,11 @@ const OWNER_EMAILS = (process.env.OWNER_EMAILS || '')
   .map(function(s) { return s.trim().toLowerCase(); })
   .filter(Boolean);
 
+// Shared-secret for the /post-release webhook. Only callers that know
+// this secret can post release announcements through the bot. Set on
+// Railway via env var. If unset, the endpoint is disabled.
+const RELEASE_POST_SECRET = process.env.RELEASE_POST_SECRET || '';
+
 // Permissions the bot needs when invited: View Channels (1024) +
 // Read Message History (65536) + Connect (1048576 — for voice state
 // events we need to be a guild member, which View Channels covers).
@@ -427,6 +432,134 @@ function handleHealth(res) {
   });
 }
 
+// ── /post-release ───────────────────────────────────────────────────────
+// Authenticated POST endpoint that the desktop-side release flow calls
+// after publishing a new GitHub release. The bot formats a release-note
+// embed + posts it to a configured Discord channel as itself.
+//
+// Request body (JSON):
+//   {
+//     "secret":    "<RELEASE_POST_SECRET>",
+//     "channelId": "1494765819891159202",
+//     "version":   "1.5.0",
+//     "title":     "StreamFusion 1.5.0",
+//     "body":      "## Highlights ...",   // may be truncated to Discord's
+//                                         //   4096-char embed.description limit
+//     "url":       "https://github.com/.../releases/tag/v1.5.0",
+//     "color":     0x3A86FF               // optional
+//   }
+//
+// Response: { ok: true, messageId } on success, { ok: false, error } on failure.
+async function handlePostRelease(req, res) {
+  const body = await readJsonBody(req).catch(function() { return null; });
+  if (!body) { sendJson(res, { ok: false, error: 'bad_json' }, 400); return; }
+
+  if (!RELEASE_POST_SECRET) {
+    sendJson(res, { ok: false, error: 'disabled' }, 503);
+    return;
+  }
+  if (body.secret !== RELEASE_POST_SECRET) {
+    sendJson(res, { ok: false, error: 'unauthorized' }, 401);
+    return;
+  }
+  const channelId = String(body.channelId || '').trim();
+  if (!/^\d{15,25}$/.test(channelId)) {
+    sendJson(res, { ok: false, error: 'invalid_channel_id' }, 400);
+    return;
+  }
+  if (!DISCORD_BOT_TOKEN) {
+    sendJson(res, { ok: false, error: 'no_bot_token' }, 500);
+    return;
+  }
+
+  // Discord caps embed.description at 4096 chars. Truncate if longer so
+  // we don't get 400s from the API. If somebody pastes a novel we give
+  // them a link at the bottom pointing to the full release notes.
+  const MAX = 4096;
+  let desc = String(body.body || '');
+  if (desc.length > MAX) desc = desc.slice(0, MAX - 80).replace(/\n[^\n]*$/, '') + '\n\n… [full notes on GitHub →](' + (body.url || '#') + ')';
+
+  const embed = {
+    title:       String(body.title || ('StreamFusion ' + (body.version || ''))).slice(0, 256),
+    description: desc,
+    url:         body.url || undefined,
+    color:       typeof body.color === 'number' ? body.color : 0x3A86FF,
+    timestamp:   new Date().toISOString(),
+    footer:      { text: 'StreamFusion v' + (body.version || '?') }
+  };
+
+  try {
+    const msg = await discordRest('POST', '/channels/' + channelId + '/messages', {
+      embeds: [embed],
+      allowed_mentions: { parse: [] }
+    });
+    if (msg && msg.id) {
+      sendJson(res, { ok: true, messageId: msg.id, channelId: channelId });
+    } else {
+      sendJson(res, { ok: false, error: 'discord_no_id', response: msg }, 502);
+    }
+  } catch (err) {
+    console.error('[post-release] discord REST error:', err && err.message);
+    sendJson(res, { ok: false, error: String(err && err.message || err) }, 502);
+  }
+}
+
+// Read a request's body as JSON. Resolves with the parsed object or
+// rejects on timeout / invalid JSON / excessive size (cap at 128KB to
+// reject accidental giant payloads).
+function readJsonBody(req) {
+  return new Promise(function(resolve, reject) {
+    let chunks = [], total = 0;
+    req.on('data', function(c) {
+      total += c.length;
+      if (total > 128 * 1024) { req.destroy(new Error('body_too_large')); return; }
+      chunks.push(c);
+    });
+    req.on('end', function() {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+    setTimeout(function() { reject(new Error('timeout')); }, 10000);
+  });
+}
+
+// Minimal Discord REST helper. Returns the parsed JSON response or
+// throws on non-2xx. Only used for release-post right now, but kept
+// generic so future bot features (reactions, edits) can share it.
+function discordRest(method, path, bodyObj) {
+  return new Promise(function(resolve, reject) {
+    const https = require('https');
+    const body = bodyObj ? JSON.stringify(bodyObj) : '';
+    const req = https.request({
+      method: method,
+      hostname: 'discord.com',
+      path: '/api/v10' + path,
+      headers: {
+        'Authorization': 'Bot ' + DISCORD_BOT_TOKEN,
+        'Content-Type':  'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent':    'StreamFusion-BotService (release-post, 1.0)'
+      }
+    }, function(res) {
+      const chunks = [];
+      res.on('data', function(c) { chunks.push(c); });
+      res.on('end', function() {
+        const text = Buffer.concat(chunks).toString('utf8');
+        let json = null; try { json = JSON.parse(text); } catch (e) {}
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve(json);
+        else reject(new Error('HTTP ' + res.statusCode + ': ' + (json && json.message || text.slice(0, 200))));
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, function() { req.destroy(new Error('timeout')); });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 const server = http.createServer(async function(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -450,6 +583,7 @@ const server = http.createServer(async function(req, res) {
     if (req.method === 'GET'    && p === '/events')      { await handleEvents(req, res); return; }
     if (req.method === 'POST'   && p === '/associate')   { await handleAssociate(req, res); return; }
     if (req.method === 'DELETE' && p === '/associate')   { await handleDisassociate(req, res); return; }
+    if (req.method === 'POST'   && p === '/post-release') { await handlePostRelease(req, res); return; }
 
     res.writeHead(404); res.end('not found');
   } catch (e) {
