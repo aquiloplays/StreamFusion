@@ -7,35 +7,30 @@
 <style>
   /* ───────────────────────────────────────────────────────────────────────
      StreamFusion OBS chat overlay — transparent-background browser source.
-     Connects to /events?type=chat via SSE. Receives 'chat' messages for
-     each chat line and 'config' messages when the streamer changes
-     settings in StreamFusion's Settings → OBS Overlays tab. Also listens
-     to 'entitlement' to hide itself instantly if the user's Patreon
-     membership lapses mid-stream.
+     Connects to /events?type=chat via SSE.
 
-     Themes:
-       - 'hud' (default): gamer-HUD, per-message cards with platform
-         colored left bar. Original look.
-       - 'box':           single grey container wrapping the whole feed,
-         no per-message cards, just text. Box opacity adjustable.
+     1.4.9 design refresh — removed the "Gamer HUD" theme (busy per-msg
+     cards with shine sweeps + pulsing borders) in favor of a single
+     clean "card" layout inspired by the common multi-chat overlay
+     pattern on nutty.gg and similar streamer widgets:
+       - each message is a compact rounded card
+       - small avatar + platform-colored username head row
+       - message text on its own line below, wraps cleanly
+       - subtle dark background, platform-tinted left accent
+     The alternative "box" theme still exists for streamers who want
+     one unified panel with no per-msg chrome.
 
-     Optional surfaces (all opt-in via settings):
-       - Profile pictures next to each message
-       - Inline platform icon chip before the username
-       - Platform-specific badges (sub / mod / vip / broadcaster)
-       - Event placement: inline (mixed with chat), above or below the
-         chat as a compact strip, or off entirely
-       - TikTok gift combo counter anchored to a configurable corner
-         (tl/tr/bl/br) or mid-top / mid-bottom. Grows+shrinks per
-         incoming gift, accumulates "x30" until the combo dies down
-       - TikTok gift floating animation across the full canvas
+     TikTok gift floating animation was rewritten to confine itself to
+     the TOP half of the canvas — previously it drifted from the
+     bottom-right up through the chat feed, covering messages. Now the
+     zone is fixed to the upper 50vh so the streamer's chat stays clear.
      ─────────────────────────────────────────────────────────────────── */
 
   :root {
-    --bg-op: 0;            /* per-message bubble bg (hud theme only) */
-    --box-op: 0.8;         /* whole-feed container bg (box theme) */
+    --msg-bg-op: 0.85;       /* per-message card bg opacity (card theme) */
+    --box-op: 0.8;           /* whole-feed container bg (box theme) */
     --box-color: 20, 20, 24;
-    --font-size: 18px;
+    --font-size: 16px;
     --event-size: 13px;
     --accent: #3A86FF;
     --text: #ffffff;
@@ -53,197 +48,196 @@
     background: transparent;
     overflow: hidden;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-feature-settings: 'ss01' on, 'cv11' on;
     -webkit-font-smoothing: antialiased;
     color: var(--text);
   }
 
   /* ──────────────────────────────────────────────────────────────────
-     Feed layout. The feed stacks messages upward from the bottom —
-     newest at the bottom, oldest fade off the top. Matches how most
-     on-stream chat overlays read: streamer's eye tracks the bottom
-     edge where the newest message lives.
+     Feed. Messages stack upward from the bottom so the newest line
+     sits where the streamer's eye tracks. The feed gets out of the
+     way of the TT gift zone (top half) by default.
      ────────────────────────────────────────────────────────────────── */
   #feed {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    padding: 12px 14px;
+    /* Cap at 55vh so chat never grows into the upper half where the
+       gift animations play. Users who disable gift animations can
+       reclaim the full height via --feed-max override if needed. */
+    max-height: var(--feed-max, 55vh);
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    max-height: 100vh;
     overflow: hidden;
     pointer-events: none;
   }
 
-  /* Single-box theme: wraps the entire #feed in a single translucent
-     grey panel. Text floats inside it with no per-message bubbles. */
+  /* Unified-box theme: one translucent container wraps every message.
+     Per-msg chrome disappears. Text reads as a flowing transcript. */
   body.theme-box #feed {
     left: 10px; right: 10px; bottom: 10px;
-    max-height: calc(100vh - 20px);
-    padding: 14px 16px 10px;
+    max-height: calc(var(--feed-max, 55vh) - 10px);
+    padding: 12px 14px 10px;
     background: rgba(var(--box-color), var(--box-op));
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
+  /* ──────────────────────────────────────────────────────────────────
+     Message card — the default "card" theme. One row per message.
+     Left column: avatar (if enabled) at card-head height.
+     Right column: head row (platform chip + badges + username) then
+     message text underneath wrapping naturally.
+     ────────────────────────────────────────────────────────────────── */
   .msg {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
-    padding: 6px 10px 6px 12px;
-    margin-top: 4px;
-    border-radius: 6px;
-    background: rgba(14, 14, 16, calc(var(--bg-op) * 1));
-    position: relative;
+    gap: 10px;
+    padding: 7px 12px 8px 14px;
+    margin-top: 5px;
+    border-radius: 9px;
+    background: rgba(14, 14, 16, var(--msg-bg-op));
+    border-left: 3px solid var(--accent);
     font-size: var(--font-size);
     line-height: 1.35;
     word-break: break-word;
     opacity: 0;
-    transform: translateX(-20px);
-    animation: msgIn .38s cubic-bezier(.22,.9,.32,1) forwards;
-    text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.65);
+    transform: translateY(6px);
+    animation: msgIn .28s cubic-bezier(.22,.9,.32,1) forwards;
   }
+  /* 1.4.9: only messages from the last 400ms animate — a burst of
+     back-to-back messages shouldn't all replay the in animation,
+     which causes stutter. Older nodes skip the animation and just
+     appear. The body class is toggled from JS when messages arrive
+     faster than the animation's runtime. */
+  body.quiet-anim .msg { animation: none; opacity: 1; transform: none; }
 
-  /* Box theme strips all per-message chrome: no background, no left
-     bar, no drop-shadow behind text. The container handles the bg. */
+  .msg.tw { border-left-color: var(--tw); }
+  .msg.yt { border-left-color: var(--yt); }
+  .msg.tt { border-left-color: var(--tt); }
+  .msg.kk { border-left-color: var(--kk); }
+
   body.theme-box .msg {
     padding: 3px 2px;
     margin-top: 2px;
     border-radius: 0;
+    border-left: none;
     background: transparent !important;
-    text-shadow: none;
-  }
-  body.theme-box .msg::before { display: none !important; }
-
-  /* Left-edge accent: colored bar per platform. Instant-read of which
-     service the message is from. 'hud' theme only. */
-  .msg::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 4px; bottom: 4px;
-    width: 3px;
-    border-radius: 0 2px 2px 0;
-    background: var(--accent);
-    box-shadow: 0 0 8px currentColor;
-  }
-  .msg.tw::before { background: var(--tw); color: var(--tw); }
-  .msg.yt::before { background: var(--yt); color: var(--yt); }
-  .msg.tt::before { background: var(--tt); color: var(--tt); }
-  .msg.kk::before { background: var(--kk); color: var(--kk); }
-
-  .msg.leaving { animation: msgOut .25s cubic-bezier(.42,0,1,1) forwards; }
-  @keyframes msgIn {
-    0%   { opacity: 0; transform: translateX(-20px) scale(.98); }
-    60%  { opacity: 1; }
-    100% { opacity: 1; transform: translateX(0) scale(1); }
-  }
-  @keyframes msgOut {
-    0%   { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-6px); }
   }
 
-  /* Profile picture. Shown inline before the username when the
-     streamer enables it. Falls back to a platform-tinted initial chip
-     if the URL fails to load. */
+  .msg.leaving { animation: msgOut .22s cubic-bezier(.4,0,1,1) forwards; }
+  @keyframes msgIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes msgOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-4px); } }
+
+  /* Avatar — round thumbnail at the start of the card. Clean fallback
+     chip if the URL fails. Sized with the font so the card geometry
+     stays consistent across font-size settings. */
   .pfp {
-    width: calc(var(--font-size) + 4px);
-    height: calc(var(--font-size) + 4px);
+    width: calc(var(--font-size) + 12px);
+    height: calc(var(--font-size) + 12px);
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
     background: rgba(255,255,255,0.08);
-    margin-right: 2px;
+    margin-top: 1px;
   }
-
-  /* Platform icon chip — same size as the user-badges row. Shown when
-     `showPlatformIcon` is on. */
-  .pi {
-    width: 16px;
-    height: 16px;
+  .pfp-fallback {
+    width: calc(var(--font-size) + 12px);
+    height: calc(var(--font-size) + 12px);
+    border-radius: 50%;
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: calc(var(--font-size) - 2px);
+    font-weight: 900;
+    background: rgba(255,255,255,0.06);
+    color: var(--mut);
+    margin-top: 1px;
+  }
+
+  .msg-body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .msg-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+    margin-bottom: 2px;
+    min-width: 0;
+  }
+  .msg-head > * { flex-shrink: 0; }
+  .msg-head .u {
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* Small platform chip sits at the head of every message so the
+     streamer can read the source without needing per-message colors. */
+  .pi {
+    width: calc(var(--font-size) + 2px);
+    height: calc(var(--font-size) + 2px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--font-size) - 5px);
+    font-weight: 800;
+    border-radius: 4px;
+    color: #fff;
+    letter-spacing: 0.3px;
+  }
+  .pi.tw { background: var(--tw); }
+  .pi.yt { background: var(--yt); }
+  .pi.tt { background: var(--tt); }
+  .pi.kk { background: var(--kk); color: #0e0e10; }
+
+  /* User badges (mod/sub/vip/broadcaster/member). Short letter chips. */
+  .ub {
+    display: inline-flex;
+    align-items: center;
+    height: calc(var(--font-size) + 2px);
+    padding: 0 6px;
+    font-size: calc(var(--font-size) - 6px);
     font-weight: 800;
     border-radius: 3px;
-    color: #0e0e10;
-    text-shadow: none;
-    margin-right: 2px;
+    color: #fff;
+    letter-spacing: 0.3px;
   }
-  .pi.tw { background: var(--tw); color: #fff; }
-  .pi.yt { background: var(--yt); color: #fff; }
-  .pi.tt { background: var(--tt); color: #fff; }
-  .pi.kk { background: var(--kk); color: #0e0e10; }
+  .ub.mod { background: #00ad03; }
+  .ub.vip { background: #e00b8a; }
+  .ub.sub { background: #8205b4; }
+  .ub.broadcaster { background: #e91916; }
+  .ub.member { background: #2ba640; }
 
   .u {
     font-weight: 800;
     color: var(--accent);
-    flex-shrink: 0;
     white-space: nowrap;
+    font-size: var(--font-size);
+    letter-spacing: -0.005em;
   }
   .u.tw { color: var(--tw); }
   .u.yt { color: var(--yt); }
   .u.tt { color: var(--tt); }
   .u.kk { color: var(--kk); }
 
-  .sep {
-    color: var(--mut);
-    opacity: .7;
-    margin: 0 2px;
-    flex-shrink: 0;
-  }
-
   .m {
     color: var(--text);
-    flex: 1 1 auto;
-    min-width: 0;
+    font-size: var(--font-size);
+    line-height: 1.4;
+  }
+  .m img.emote {
+    height: 1.25em;
+    width: auto;
+    vertical-align: middle;
+    margin: 0 2px;
   }
 
-  /* Legacy left-edge platform badge — kept for the old `showPlatformBadge`
-     config. The new `showPlatformIcon` uses `.pi` above. */
-  .pb {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: 800;
-    border-radius: 3px;
-    color: #0e0e10;
-    text-shadow: none;
-    margin-right: 4px;
-  }
-  .pb.tw { background: var(--tw); color: #fff; }
-  .pb.yt { background: var(--yt); color: #fff; }
-  .pb.tt { background: var(--tt); color: #fff; }
-  .pb.kk { background: var(--kk); color: #0e0e10; }
-
-  /* User badges (sub/mod/vip/broadcaster). Compact letter chips. */
-  .ub {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 1px 5px;
-    border-radius: 3px;
-    margin-right: 4px;
-    vertical-align: 2px;
-    text-shadow: none;
-  }
-  .ub.mod { background: #00ad03; color: #fff; }
-  .ub.vip { background: #e00b8a; color: #fff; }
-  .ub.sub { background: #8205b4; color: #fff; }
-  .ub.broadcaster { background: #e91916; color: #fff; }
-
-  /* Emote inline image. height:1.15em keeps it aligned with text. */
-  .m img.emote { height: 1.15em; width: auto; vertical-align: middle; margin: 0 1px; }
-
-  /* Gated page shown if entitlement flips off mid-stream. */
+  /* Gated fallback if entitlement flips off mid-stream. */
   #gated {
     position: absolute;
     inset: 0;
@@ -261,7 +255,8 @@
   }
   #gated.show { display: flex; }
 
-  /* Setup hint — only in browser preview if no messages after ~10s. */
+  /* Preview hint — only appears after 10s of silence (in-browser preview
+     mode) so streamers know the pipe is alive even when chat is quiet. */
   #hint {
     position: absolute;
     left: 14px; bottom: 14px;
@@ -275,10 +270,13 @@
   #hint.show { opacity: 1; }
 
   /* ──────────────────────────────────────────────────────────────────
-     Events strips. Two independent containers let the streamer pick
-     where events render — above the chat, below it, or inline (mixed
-     into the #feed). The inline variant re-uses event-card DOM nodes
-     appended directly to #feed.
+     Event cards (subs / gifts / cheers / raids / etc.). Three
+     placement modes:
+       inline  — mixed into #feed alongside chat
+       above   — strip pinned to the top of the canvas
+       below   — strip pinned just above the chat feed bottom
+       off     — never rendered
+     Events get a slightly richer card than chat so they stand out.
      ────────────────────────────────────────────────────────────────── */
   .events {
     position: absolute;
@@ -288,66 +286,55 @@
     z-index: 5;
     display: none;
   }
-  #events-above { top: 0; }
+  #events-above { top: 50vh; }         /* just below the gift zone */
   #events-below { bottom: 0; }
   body.placement-above #events-above { display: block; }
   body.placement-below #events-below { display: block; }
-  body.placement-above #feed { top: 60px; bottom: auto; height: calc(100vh - 60px); justify-content: flex-end; }
+  body.placement-above #feed { bottom: auto; top: calc(50vh + 60px); max-height: calc(50vh - 60px); justify-content: flex-end; }
   body.placement-below #feed { bottom: 60px; }
 
   .ev-row {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 11px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, rgba(14,14,16,.9), rgba(24,24,27,.85));
-    border: 1px solid rgba(255,255,255,.12);
-    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 9px;
+    background: rgba(14,14,16,0.88);
+    border-left: 3px solid var(--accent);
     font-size: var(--event-size);
     font-weight: 700;
     color: #fff;
-    text-shadow: 0 1px 2px rgba(0,0,0,.7);
-    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    margin-top: 4px;
+    max-width: 100%;
     opacity: 0;
-    transform: translateY(14px);
-    animation: evRowIn .45s cubic-bezier(.22,1.2,.36,1) forwards;
-    margin-top: 4px;
-    max-width: 94%;
+    transform: translateY(6px);
+    animation: evRowIn .32s cubic-bezier(.22,1.1,.36,1) forwards;
   }
-  .ev-row.inline {
-    /* When placed inline inside #feed, events stretch naturally. */
-    display: flex;
-    margin-top: 4px;
-  }
-  .ev-row.leaving { animation: evRowOut .35s cubic-bezier(.55,0,.7,.2) forwards; }
-  @keyframes evRowIn  { 0%{opacity:0;transform:translateY(14px) scale(.96)} 60%{opacity:1;transform:translateY(-2px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} }
-  @keyframes evRowOut { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-6px) scale(.95)} }
+  .ev-row.leaving { animation: evRowOut .25s cubic-bezier(.55,0,.7,.2) forwards; }
+  @keyframes evRowIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes evRowOut { from { opacity: 1; transform: translateY(0); }  to { opacity: 0; transform: translateY(-4px); } }
 
-  .ev-row.tw { border-color: rgba(169,112,255,.55); }
-  .ev-row.yt { border-color: rgba(255,69,69,.55); }
-  .ev-row.tt { border-color: rgba(254,44,85,.55); }
-  .ev-row.kk { border-color: rgba(83,252,24,.55); }
-  .ev-row.se { border-color: rgba(124,223,33,.55); }
+  .ev-row.tw { border-left-color: var(--tw); }
+  .ev-row.yt { border-left-color: var(--yt); }
+  .ev-row.tt { border-left-color: var(--tt); }
+  .ev-row.kk { border-left-color: var(--kk); }
+  .ev-row.se { border-left-color: #7cdf21; }
 
   .ev-icon {
-    width: 22px; height: 22px;
+    width: 20px; height: 20px;
     border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    font-size: 14px;
+    font-size: 13px;
     background: linear-gradient(135deg, #3A86FF, #2AD4B9);
     flex-shrink: 0;
   }
   .ev-row.tw .ev-icon { background: linear-gradient(135deg, #a970ff, #7d3fff); }
   .ev-row.yt .ev-icon { background: linear-gradient(135deg, #ff4545, #ff7373); }
-  .ev-row.tt .ev-icon { background: linear-gradient(135deg, #fe2c55, #25f4ee); }
+  .ev-row.tt .ev-icon { background: linear-gradient(135deg, #fe2c55, #ff8fae); }
   .ev-row.kk .ev-icon { background: linear-gradient(135deg, #53fc18, #00e573); color: #0e0e10; }
   .ev-icon img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; }
   .ev-u { font-weight: 900; }
-  .ev-u.tw { color: #c8a6ff; }
-  .ev-u.yt { color: #ffb5b5; }
-  .ev-u.tt { color: #ff8fae; }
-  .ev-u.kk { color: #a0ff8b; }
+  .ev-u.tw { color: #c8a6ff; } .ev-u.yt { color: #ffb5b5; } .ev-u.tt { color: #ff8fae; } .ev-u.kk { color: #a0ff8b; }
   .ev-amt {
     display: inline-block;
     padding: 1px 8px;
@@ -359,13 +346,16 @@
   }
 
   /* ──────────────────────────────────────────────────────────────────
-     TikTok gift floating rain — fires on every TT gift when
-     `showGiftAnimations` is on. Whole-canvas effect, lets the real
-     gift artwork travel from bottom-right up and left.
+     TikTok gift floating layer — now confined to the TOP HALF of the
+     canvas so it never covers the chat feed sitting at the bottom.
+     Gifts spawn at the RIGHT edge of the zone and drift LEFT, fading
+     on the left edge. Multiple gifts stack in parallel with randomized
+     Y offsets so they don't all travel in one line.
      ────────────────────────────────────────────────────────────────── */
   #gifts {
     position: fixed;
-    inset: 0;
+    top: 0; left: 0; right: 0;
+    height: 50vh;
     overflow: hidden;
     pointer-events: none;
     z-index: 10;
@@ -373,56 +363,49 @@
 
   .gift {
     position: absolute;
-    bottom: -120px;
+    top: var(--spawn-y, 30%);
     right: 0;
-    width: 92px;
+    width: 88px;
     text-align: center;
     opacity: 0;
-    animation: giftFloat var(--gift-dur, 4.6s) cubic-bezier(.22,.8,.32,1) forwards;
-    filter: drop-shadow(0 4px 12px rgba(254,44,85,.5)) drop-shadow(0 0 20px rgba(254,44,85,.35));
+    animation: giftFloat var(--gift-dur, 5s) cubic-bezier(.22,.65,.32,1) forwards;
+    filter: drop-shadow(0 4px 12px rgba(254,44,85,.45));
   }
-  .gift img { width: 92px; height: 92px; object-fit: contain; display: block; }
+  .gift img { width: 88px; height: 88px; object-fit: contain; display: block; }
   .gift .g-count {
     position: absolute;
     top: -6px; right: -6px;
     background: linear-gradient(135deg, #fe2c55, #f0b429);
     color: #0e0e10;
     font-weight: 900;
-    font-size: 18px;
-    padding: 2px 10px;
+    font-size: 17px;
+    padding: 2px 9px;
     border-radius: 999px;
     border: 2px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,.5);
-    min-width: 28px;
+    min-width: 26px;
   }
   .gift .g-user {
-    margin-top: 6px;
-    font-size: 13px;
+    margin-top: 4px;
+    font-size: 12px;
     font-weight: 900;
     color: #fff;
-    text-shadow: 0 2px 6px rgba(0,0,0,.9), 0 0 4px rgba(254,44,85,.7);
+    text-shadow: 0 2px 6px rgba(0,0,0,.9);
     white-space: nowrap;
-    max-width: 120px;
+    max-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   @keyframes giftFloat {
-    0%   { opacity: 0; transform: translate(var(--start-x, 20px),   0) scale(.3) rotate(-8deg); }
-    12%  { opacity: 1; transform: translate(var(--start-x, 20px), -120px) scale(1.1) rotate(4deg); }
-    70%  { opacity: 1; transform: translate(var(--mid-x, -100px), -55vh) scale(1)   rotate(-6deg); }
-    100% { opacity: 0; transform: translate(var(--end-x, -220px), -80vh) scale(.85) rotate(8deg); }
+    0%   { opacity: 0; transform: translate(60px, 0) scale(.4); }
+    15%  { opacity: 1; transform: translate(-10px, 0) scale(1); }
+    70%  { opacity: 1; transform: translate(var(--mid-x, -50vw), var(--drift-y, 4vh)) scale(.95); }
+    100% { opacity: 0; transform: translate(var(--end-x, -100vw), var(--drift-y, 6vh)) scale(.8); }
   }
 
   /* ──────────────────────────────────────────────────────────────────
-     TikTok gift combo counter — anchored to a configurable corner
-     (tl/tr/bl/br) or the horizontal midline (tm/bm). When a streamer
-     receives multiple of the SAME gift from the SAME user in quick
-     succession (the TikTok "Rose x30" pattern), we accumulate into a
-     single chip that grows+shrinks on each new arrival and displays
-     the running count. Dies out 3s after the last arrival.
-
-     Multiple simultaneous combos (different users / different gifts)
-     stack vertically from their anchor.
+     TikTok combo counter — same spec as 1.4.4. Anchored to a corner
+     (tl/tr/bl/br) or the horizontal mid (tm/bm). Multiple simultaneous
+     combos stack vertically.
      ────────────────────────────────────────────────────────────────── */
   #combo {
     position: fixed;
@@ -431,84 +414,41 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 12px;
-    max-width: 340px;
+    padding: 10px;
+    max-width: 320px;
   }
-  #combo[data-anchor="tl"] { top: 0;    left: 0;    align-items: flex-start; }
-  #combo[data-anchor="tr"] { top: 0;    right: 0;   align-items: flex-end; }
-  #combo[data-anchor="bl"] { bottom: 0; left: 0;    align-items: flex-start; flex-direction: column-reverse; }
-  #combo[data-anchor="br"] { bottom: 0; right: 0;   align-items: flex-end;   flex-direction: column-reverse; }
-  #combo[data-anchor="tm"] { top: 0;    left: 50%;  transform: translateX(-50%); align-items: center; }
-  #combo[data-anchor="bm"] { bottom: 0; left: 50%;  transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
+  #combo[data-anchor="tl"] { top: 0;    left: 0;   align-items: flex-start; }
+  #combo[data-anchor="tr"] { top: 0;    right: 0;  align-items: flex-end; }
+  #combo[data-anchor="bl"] { bottom: 0; left: 0;   align-items: flex-start; flex-direction: column-reverse; }
+  #combo[data-anchor="br"] { bottom: 0; right: 0;  align-items: flex-end;   flex-direction: column-reverse; }
+  #combo[data-anchor="tm"] { top: 0;    left: 50%; transform: translateX(-50%); align-items: center; }
+  #combo[data-anchor="bm"] { bottom: 0; left: 50%; transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
   #combo[data-anchor="off"] { display: none; }
 
   .combo {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 14px 8px 8px;
+    padding: 7px 14px 7px 7px;
     border-radius: 999px;
     background: linear-gradient(135deg, rgba(254,44,85,0.92), rgba(240,180,41,0.88));
-    box-shadow: 0 8px 30px rgba(254,44,85,0.45), 0 0 16px rgba(240,180,41,0.35);
+    box-shadow: 0 6px 22px rgba(254,44,85,0.4);
     border: 2px solid rgba(255,255,255,0.35);
     color: #0e0e10;
     font-weight: 900;
-    animation: comboIn .45s cubic-bezier(.22,1.3,.36,1) forwards;
+    animation: comboIn .4s cubic-bezier(.22,1.3,.36,1) forwards;
   }
-  .combo.fade { animation: comboOut .6s cubic-bezier(.55,0,.8,.2) forwards; }
-  .combo.bump { animation: comboBump .35s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes comboIn   { 0%{opacity:0;transform:scale(.4) translateY(12px)} 60%{opacity:1;transform:scale(1.12) translateY(-2px)} 100%{opacity:1;transform:scale(1) translateY(0)} }
-  @keyframes comboOut  { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(.4) translateY(18px)} }
-  @keyframes comboBump {
-    0%   { transform: scale(1); }
-    35%  { transform: scale(1.25); filter: drop-shadow(0 0 12px rgba(255,255,255,0.85)); }
-    70%  { transform: scale(0.92); }
-    100% { transform: scale(1); }
-  }
-  .combo .c-img {
-    width: 48px; height: 48px;
-    flex-shrink: 0;
-    object-fit: contain;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
-  }
-  .combo .c-fallback {
-    width: 48px; height: 48px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    flex-shrink: 0;
-  }
-  .combo .c-body {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.1;
-  }
-  .combo .c-user {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    opacity: 0.85;
-    max-width: 180px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .combo .c-name {
-    font-size: 13px;
-    font-weight: 900;
-    max-width: 180px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .combo .c-count {
-    font-size: 24px;
-    font-weight: 900;
-    margin-left: 4px;
-    text-shadow: 0 2px 0 rgba(255,255,255,0.25);
-    letter-spacing: 0.5px;
-  }
+  .combo.fade { animation: comboOut .55s cubic-bezier(.55,0,.8,.2) forwards; }
+  .combo.bump { animation: comboBump .32s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes comboIn   { 0%{opacity:0;transform:scale(.5)} 60%{opacity:1;transform:scale(1.1)} 100%{opacity:1;transform:scale(1)} }
+  @keyframes comboOut  { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(.5)} }
+  @keyframes comboBump { 0%{transform:scale(1)} 35%{transform:scale(1.2)} 100%{transform:scale(1)} }
+  .combo .c-img { width: 42px; height: 42px; object-fit: contain; flex-shrink: 0; }
+  .combo .c-fallback { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+  .combo .c-body { display: flex; flex-direction: column; line-height: 1.1; }
+  .combo .c-user { font-size: 11px; font-weight: 800; opacity: 0.85; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .combo .c-name { font-size: 12px; font-weight: 900; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .combo .c-count { font-size: 22px; font-weight: 900; margin-left: 2px; letter-spacing: 0.5px; }
 </style>
 </head>
 <body>
@@ -525,33 +465,24 @@
 (function() {
   'use strict';
 
-  // ──────────────────────────────────────────────────────────────────
-  // Config. Defaults tuned so existing streamers see no behavior
-  // change unless they flip on the new 1.4.4 options (themes, pfps,
-  // event placement, gift combo counter).
-  // ──────────────────────────────────────────────────────────────────
   var CFG = {
-    maxMessages: 20,
-    fontSize:    18,
-    bgOpacity:   0,
-    showPlatformBadge: false,
-    showUserBadges:    true,
-    showEmotes:        true,
+    maxMessages: 30,
+    fontSize:    16,
+    msgBgOpacity: 0.85,
+    boxOpacity:  0.8,
+    showPlatformIcon: true,
+    showProfilePics:  true,
+    showUserBadges:   true,
+    showEmotes:       true,
     showPlatforms: { tw: true, yt: true, tt: true, kk: true },
-    fadeOutAfterMs: 0,
-    showEvents:         false,
-    eventsHoldMs:       6000,
+    theme:            'card',          // 'card' | 'box'
+    showEvents:       false,
+    eventPlacement:   'inline',        // 'inline' | 'above' | 'below' | 'off'
+    eventSize:        13,
+    eventsHoldMs:     6000,
     showGiftAnimations: false,
-
-    // New in 1.4.4
-    theme:              'hud',            // 'hud' | 'box'
-    boxOpacity:         0.8,              // for 'box' theme (0–1)
-    showProfilePics:    false,
-    showPlatformIcon:   false,
-    eventPlacement:     'inline',         // 'inline' | 'above' | 'below' | 'off'
-    eventSize:          13,
-    ttGiftCorner:       'br',             // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
-    ttGiftComboHoldMs:  3000              // time since last gift before combo dies
+    ttGiftCorner:     'off',           // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
+    ttGiftComboHoldMs: 3000
   };
 
   var feed      = document.getElementById('feed');
@@ -563,29 +494,38 @@
   var hint      = document.getElementById('hint');
   var messageCount = 0;
 
-  // ──────────────────────────────────────────────────────────────────
-  // Helpers
-  // ──────────────────────────────────────────────────────────────────
+  // Rapid-fire throttle: if >3 messages arrive in <400ms, switch into
+  // a quiet-animation mode so we don't thrash the compositor with
+  // overlapping keyframes. Body class toggles off ~600ms after the
+  // burst subsides.
+  var _recentMsgTimes = [];
+  var _quietTimer = null;
+  function noteMsgTime() {
+    var now = Date.now();
+    _recentMsgTimes.push(now);
+    while (_recentMsgTimes.length && now - _recentMsgTimes[0] > 400) _recentMsgTimes.shift();
+    if (_recentMsgTimes.length >= 3) {
+      if (!document.body.classList.contains('quiet-anim')) document.body.classList.add('quiet-anim');
+      if (_quietTimer) clearTimeout(_quietTimer);
+      _quietTimer = setTimeout(function() {
+        document.body.classList.remove('quiet-anim');
+        _quietTimer = null;
+      }, 600);
+    }
+  }
+
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, function(c) {
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
     });
   }
 
-  // Emote swap by whole-word match. Server-side extraction stuffs every
-  // <img class="emote"> it finds in the rendered message into the
-  // `emotes` array (see sendObsChat in index.html), so OBS just
-  // rebuilds inline <img>s by token lookup.
   function renderMessage(text, emotes) {
-    if (!CFG.showEmotes || !emotes || !emotes.length) {
-      return escapeHtml(text);
-    }
+    if (!CFG.showEmotes || !emotes || !emotes.length) return escapeHtml(text);
     var byName = Object.create(null);
     emotes.forEach(function(e) { if (e && e.name && e.url) byName[e.name] = e.url; });
     return String(text || '').split(/(\s+)/).map(function(tok) {
-      if (byName[tok]) {
-        return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
-      }
+      if (byName[tok]) return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
       return escapeHtml(tok);
     }).join('');
   }
@@ -594,25 +534,32 @@
     if (!CFG.showUserBadges || !badges || !badges.length) return '';
     return badges.map(function(b) {
       var cls = String(b).toLowerCase();
-      if (!/^(mod|vip|sub|broadcaster)$/.test(cls)) return '';
+      if (!/^(mod|vip|sub|broadcaster|member)$/.test(cls)) return '';
       var label = cls === 'broadcaster' ? 'HOST' : cls.toUpperCase();
       return '<span class="ub ' + cls + '">' + label + '</span>';
     }).join('');
   }
 
   function renderPfp(m) {
-    if (!CFG.showProfilePics || !m.avatar) return '';
-    var alt = escapeHtml(m.user || 'u');
-    return '<img class="pfp" src="' + escapeHtml(m.avatar) + '" alt="' + alt + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+    if (!CFG.showProfilePics) return '';
+    if (m.avatar) {
+      var initial = escapeHtml((m.user || '?').charAt(0).toUpperCase());
+      return '<img class="pfp" src="' + escapeHtml(m.avatar) + '" alt="" referrerpolicy="no-referrer" ' +
+        'onerror="this.outerHTML=\'<span class=&quot;pfp-fallback&quot;>' + initial + '</span>\'">';
+    }
+    return '<span class="pfp-fallback">' + escapeHtml((m.user || '?').charAt(0).toUpperCase()) + '</span>';
   }
 
   function renderPlatIcon(plat) {
     if (!CFG.showPlatformIcon || !plat) return '';
-    return '<span class="pi ' + plat + '">' + plat.toUpperCase() + '</span>';
+    var label = { tw: 'TW', yt: 'YT', tt: 'TT', kk: 'KK' }[plat] || plat.toUpperCase();
+    return '<span class="pi ' + plat + '">' + label + '</span>';
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Chat message rendering
+  // Message rendering. The card theme splits user-line (head) from
+  // message-line (body) — cleaner than the 1.4.x inline layout that
+  // crammed everything onto one row and had to truncate on overflow.
   // ──────────────────────────────────────────────────────────────────
   function addMessage(m) {
     if (!m) return;
@@ -620,26 +567,22 @@
     if (!CFG.showPlatforms[plat] && plat) return;
     if (hint) hint.classList.remove('show');
 
+    noteMsgTime();
     var div = document.createElement('div');
     div.className = 'msg ' + plat;
 
-    // Legacy platform badge remains available so existing streamers'
-    // settings keep working. New code prefers showPlatformIcon.
-    var platBadge = CFG.showPlatformBadge && plat
-      ? '<span class="pb ' + plat + '">' + plat.toUpperCase() + '</span>'
-      : '';
-
     var userColor = m.userColor ? ('color:' + m.userColor + ';') : '';
-    var uCls = 'u ' + plat;
 
     div.innerHTML =
       renderPfp(m) +
-      platBadge +
-      renderPlatIcon(plat) +
-      renderBadges(m.badges) +
-      '<span class="' + uCls + '" style="' + userColor + '">' + escapeHtml(m.user || 'anon') + '</span>' +
-      '<span class="sep">:</span>' +
-      '<span class="m">' + renderMessage(m.message || '', m.emotes) + '</span>';
+      '<div class="msg-body">' +
+        '<div class="msg-head">' +
+          renderPlatIcon(plat) +
+          renderBadges(m.badges) +
+          '<span class="u ' + plat + '" style="' + userColor + '">' + escapeHtml(m.user || 'anon') + '</span>' +
+        '</div>' +
+        '<div class="m">' + renderMessage(m.message || '', m.emotes) + '</div>' +
+      '</div>';
 
     feed.appendChild(div);
     messageCount++;
@@ -647,31 +590,19 @@
   }
 
   function trimFeed() {
-    // Trim oldest off the top with an animation pass. We keep the node
-    // around an extra 260ms so the slide-out reads visually.
     while (feed.children.length > CFG.maxMessages) {
       var stale = feed.children[0];
-      if (stale.classList.contains('leaving') || stale.classList.contains('ev-row')) {
-        // event rows inside the feed (inline placement) self-remove on timeout
-        if (feed.children.length > CFG.maxMessages + 6) {
-          if (stale.parentNode) stale.parentNode.removeChild(stale);
-          continue;
-        }
-        break;
-      }
+      if (stale.classList.contains('leaving')) break;
       stale.classList.add('leaving');
       setTimeout(function(node) {
         return function() { if (node && node.parentNode) node.parentNode.removeChild(node); };
-      }(stale), 260);
+      }(stale), 240);
     }
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Event rendering. Three placement modes:
-  //   'inline'  — event cards mix into #feed alongside chat
-  //   'above'   — fixed strip at the top of the canvas
-  //   'below'   — fixed strip at the bottom (the original behavior)
-  //   'off'     — events are dropped
+  // Event rendering. Matches chat-card styling for visual coherence
+  // across surfaces, with slight color accent.
   // ──────────────────────────────────────────────────────────────────
   function eventIcon(ev) {
     if (ev.giftImage) return '<img src="' + ev.giftImage + '" alt="" onerror="this.outerHTML=\'\u2605\'">';
@@ -704,28 +635,22 @@
     var plat = (ev.platform || '').toLowerCase();
     if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) return;
     var row = document.createElement('div');
-    row.className = 'ev-row ' + plat + (place === 'inline' ? ' inline' : '');
-    row.innerHTML =
-      '<span class="ev-icon">' + eventIcon(ev) + '</span>' +
-      '<span>' + eventText(ev) + '</span>';
-    var host =
-      place === 'above' ? evAbove :
-      place === 'below' ? evBelow :
-      feed;
+    row.className = 'ev-row ' + plat;
+    row.innerHTML = '<span class="ev-icon">' + eventIcon(ev) + '</span><span>' + eventText(ev) + '</span>';
+    var host = place === 'above' ? evAbove : place === 'below' ? evBelow : feed;
     host.appendChild(row);
-    if (place === 'inline') {
-      messageCount++;
-      trimFeed();
-    }
+    if (place === 'inline') { messageCount++; trimFeed(); }
     setTimeout(function() {
       row.classList.add('leaving');
-      setTimeout(function() { if (row.parentNode) row.parentNode.removeChild(row); }, 360);
+      setTimeout(function() { if (row.parentNode) row.parentNode.removeChild(row); }, 260);
     }, Math.max(2000, CFG.eventsHoldMs || 6000));
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // TikTok gift floating animation — unchanged from 1.4.3. Fires on
-  // every TT gift, multiple gifts in flight at once.
+  // TikTok gift floating animation — constrained to the top half so
+  // gifts never cover the chat feed. Each gift gets a randomized
+  // spawn Y (5-40% of #gifts height) and drift Y so simultaneous
+  // gifts don't queue up on a single horizontal line.
   // ──────────────────────────────────────────────────────────────────
   function spawnGiftAnimation(ev) {
     if (!CFG.showGiftAnimations) return;
@@ -733,13 +658,15 @@
     if (!ev.giftImage) return;
     var el = document.createElement('div');
     el.className = 'gift';
-    var startX = 20 + Math.random() * 60;
-    var midX   = -(window.innerWidth * (0.25 + Math.random() * 0.35));
-    var endX   = -(window.innerWidth * (0.55 + Math.random() * 0.25));
-    var dur    = (4.2 + Math.random() * 1.6).toFixed(2) + 's';
-    el.style.setProperty('--start-x', startX + 'px');
+    var spawnY = (5 + Math.random() * 35).toFixed(1) + '%';
+    var midX   = -(window.innerWidth * (0.35 + Math.random() * 0.25));
+    var endX   = -(window.innerWidth * (0.95 + Math.random() * 0.15));
+    var driftY = (2 + Math.random() * 6).toFixed(1) + 'vh';
+    var dur    = (4 + Math.random() * 1.5).toFixed(2) + 's';
+    el.style.setProperty('--spawn-y', spawnY);
     el.style.setProperty('--mid-x',   midX   + 'px');
     el.style.setProperty('--end-x',   endX   + 'px');
+    el.style.setProperty('--drift-y', driftY);
     el.style.setProperty('--gift-dur', dur);
     var countBadge = (ev.count && ev.count > 1) ? '<div class="g-count">\u00d7' + ev.count + '</div>' : '';
     el.innerHTML =
@@ -747,50 +674,34 @@
       countBadge +
       '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>';
     gifts.appendChild(el);
-    var ms = parseFloat(dur) * 1000 + 500;
-    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, ms);
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, parseFloat(dur) * 1000 + 500);
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // TikTok gift combo counter. Aggregates multiple same-user + same-
-  // gift events into one chip that grows+shrinks on every new arrival
-  // and displays a running count. Each combo times out CFG.ttGiftCombo
-  // HoldMs after its last increment.
-  //
-  // Key is `user|giftName` so two users sending Rose x5 each render as
-  // two separate chips that stack vertically from the configured
-  // anchor corner.
-  // ──────────────────────────────────────────────────────────────────
+  // Combo counter (unchanged from 1.4.4 — aggregates same-user/same-gift
+  // streaks into one bump-animated chip).
   var combos = Object.create(null);
-
   function registerGiftCombo(ev) {
     if (CFG.ttGiftCorner === 'off') return;
-    if (ev.platform !== 'tt') return;
-    if (ev.eventType !== 'gift') return;
+    if (ev.platform !== 'tt' || ev.eventType !== 'gift') return;
     comboBox.setAttribute('data-anchor', CFG.ttGiftCorner || 'br');
-
     var key = (ev.user || 'someone') + '|' + (ev.giftName || 'gift');
     var inc = Math.max(1, ev.count || 1);
     var entry = combos[key];
     if (!entry) {
-      entry = { count: 0, el: null, timer: null, ev: ev };
+      entry = { count: 0, el: null, timer: null };
       entry.el = buildComboElement(ev);
       comboBox.appendChild(entry.el);
       combos[key] = entry;
     }
     entry.count += inc;
-    entry.ev = ev;
-    updateComboElement(entry);
-    // Bump animation — re-apply the class after a tick so it re-triggers
+    var cnt = entry.el.querySelector('.c-count');
+    if (cnt) cnt.textContent = '\u00d7' + entry.count;
     entry.el.classList.remove('bump');
-    // Force reflow so the class removal takes effect before re-add
     void entry.el.offsetWidth;
     entry.el.classList.add('bump');
-
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = setTimeout(function() { fadeCombo(key); }, CFG.ttGiftComboHoldMs || 3000);
   }
-
   function buildComboElement(ev) {
     var div = document.createElement('div');
     div.className = 'combo';
@@ -799,50 +710,34 @@
       : '<span class="c-fallback">\uD83C\uDF81</span>';
     div.innerHTML =
       img +
-      '<div class="c-body">' +
-        '<span class="c-user">' + escapeHtml(ev.user || '') + '</span>' +
-        '<span class="c-name">' + escapeHtml(ev.giftName || 'gift') + '</span>' +
-      '</div>' +
+      '<div class="c-body"><span class="c-user">' + escapeHtml(ev.user || '') + '</span>' +
+      '<span class="c-name">' + escapeHtml(ev.giftName || 'gift') + '</span></div>' +
       '<span class="c-count">\u00d71</span>';
     return div;
   }
-
-  function updateComboElement(entry) {
-    var cnt = entry.el.querySelector('.c-count');
-    if (cnt) cnt.textContent = '\u00d7' + entry.count;
-  }
-
   function fadeCombo(key) {
-    var entry = combos[key];
-    if (!entry) return;
+    var entry = combos[key]; if (!entry) return;
     entry.el.classList.add('fade');
     setTimeout(function() {
       if (entry.el && entry.el.parentNode) entry.el.parentNode.removeChild(entry.el);
       delete combos[key];
-    }, 600);
+    }, 560);
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // Config application. Most settings are reactive — flipping the
-  // placement mode instantly re-homes the events-above/events-below
-  // strips, box/hud theme flip is just a body class, etc.
-  // ──────────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     if (!cfg || typeof cfg !== 'object') return;
     Object.keys(cfg).forEach(function(k) { CFG[k] = cfg[k]; });
-    document.documentElement.style.setProperty('--bg-op', String(CFG.bgOpacity || 0));
-    document.documentElement.style.setProperty('--box-op', String(CFG.boxOpacity != null ? CFG.boxOpacity : 0.8));
-    document.documentElement.style.setProperty('--font-size', (CFG.fontSize || 18) + 'px');
-    document.documentElement.style.setProperty('--event-size', (CFG.eventSize || 13) + 'px');
-
+    var root = document.documentElement;
+    root.style.setProperty('--msg-bg-op', String(CFG.msgBgOpacity != null ? CFG.msgBgOpacity : 0.85));
+    root.style.setProperty('--box-op', String(CFG.boxOpacity != null ? CFG.boxOpacity : 0.8));
+    root.style.setProperty('--font-size', (CFG.fontSize || 16) + 'px');
+    root.style.setProperty('--event-size', (CFG.eventSize || 13) + 'px');
     document.body.classList.toggle('theme-box', CFG.theme === 'box');
-    document.body.classList.toggle('theme-hud', CFG.theme !== 'box');
-
+    // If gift animations are off, let chat reclaim full height.
+    root.style.setProperty('--feed-max', CFG.showGiftAnimations ? '55vh' : '100vh');
     document.body.classList.remove('placement-above', 'placement-below', 'placement-inline', 'placement-off');
-    var p = CFG.showEvents ? (CFG.eventPlacement || 'inline') : 'off';
-    document.body.classList.add('placement-' + p);
-
-    comboBox.setAttribute('data-anchor', CFG.ttGiftCorner || 'br');
+    document.body.classList.add('placement-' + (CFG.showEvents ? (CFG.eventPlacement || 'inline') : 'off'));
+    comboBox.setAttribute('data-anchor', CFG.ttGiftCorner || 'off');
   }
 
   function setEntitled(v) {
@@ -850,40 +745,16 @@
     feed.style.display = v ? '' : 'none';
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // SSE
-  // ──────────────────────────────────────────────────────────────────
   var es = new EventSource('/events?type=chat');
-
-  es.addEventListener('hello', function(e) {
-    try {
-      var d = JSON.parse(e.data);
-      if (d.cfg) applyConfig(d.cfg);
-      setEntitled(!!d.entitled);
-    } catch (err) {}
-  });
-
-  es.addEventListener('chat', function(e) {
-    try { addMessage(JSON.parse(e.data)); } catch (err) {}
-  });
-
+  es.addEventListener('hello', function(e) { try { var d = JSON.parse(e.data); if (d.cfg) applyConfig(d.cfg); setEntitled(!!d.entitled); } catch (err) {} });
+  es.addEventListener('chat', function(e) { try { addMessage(JSON.parse(e.data)); } catch (err) {} });
   es.addEventListener('alert', function(e) {
-    var ev;
-    try { ev = JSON.parse(e.data); } catch (err) { return; }
+    var ev; try { ev = JSON.parse(e.data); } catch (err) { return; }
     if (!ev) return;
-    addEvent(ev);
-    spawnGiftAnimation(ev);
-    registerGiftCombo(ev);
+    addEvent(ev); spawnGiftAnimation(ev); registerGiftCombo(ev);
   });
-
-  es.addEventListener('config', function(e) {
-    try { applyConfig(JSON.parse(e.data)); } catch (err) {}
-  });
-
-  es.addEventListener('entitlement', function(e) {
-    try { setEntitled(!!JSON.parse(e.data).entitled); } catch (err) {}
-  });
-
+  es.addEventListener('config', function(e) { try { applyConfig(JSON.parse(e.data)); } catch (err) {} });
+  es.addEventListener('entitlement', function(e) { try { setEntitled(!!JSON.parse(e.data).entitled); } catch (err) {} });
   es.addEventListener('shutdown', function() { es.close(); });
 
   setTimeout(function() {

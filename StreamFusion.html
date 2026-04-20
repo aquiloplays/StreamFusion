@@ -403,6 +403,11 @@
       <span class="platform-chip">Kick</span>
     </div>
 
+    <!-- The button points at GitHub's /releases/latest URL, which is a
+         permanent redirect GitHub maintains to whatever the current
+         release is. This link never needs to be edited across version
+         bumps — a fresh install of SF always pulls the latest from
+         here without touching this page. -->
     <a class="btn" href="https://github.com/aquiloplays/StreamFusion/releases/latest" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -413,7 +418,7 @@
     </a>
 
     <div class="alt-dl">
-      AV blocking the installer?
+      Antivirus blocking the installer?
       <a href="https://github.com/aquiloplays/StreamFusion/releases/latest" target="_blank" rel="noopener">Grab the portable <code>.exe</code> instead</a>
       — same binary, no install step, runs in place.
     </div>
@@ -421,12 +426,15 @@
     <div class="steps">
       <div class="steps-title">How to install</div>
       <ol>
-        <li>Click the button above and download <strong>StreamFusion-Setup-x.x.x.exe</strong> (or the portable <code>.exe</code>) from the latest release.</li>
-        <li>Run it. The installer places StreamFusion in <code>%LOCALAPPDATA%\Programs\StreamFusion</code> — no admin rights needed.</li>
-        <li>Launch from your desktop / Start Menu and connect your platforms.</li>
+        <li>Click <strong>Download StreamFusion</strong> above. GitHub opens the latest release page.</li>
+        <li>Scroll to <strong>Assets</strong> (below the release notes). Click <code>StreamFusion-Setup-x.x.x.exe</code> — the version number will match the current release.</li>
+        <li>Run the downloaded installer. StreamFusion installs to <code>%LOCALAPPDATA%\Programs\StreamFusion</code> per-user (no admin rights needed).</li>
+        <li>Launch from your Desktop shortcut or Start Menu and connect your platforms.</li>
       </ol>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);font-size:11.5px;color:var(--sub)">
-        <strong style="color:var(--txt)">Updates are silent.</strong> Once installed, StreamFusion downloads new versions in the background and applies them the next time you close the app. No prompts, no interruption mid-stream.
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);font-size:11.5px;color:var(--sub);line-height:1.65">
+        <strong style="color:var(--txt)">This download link is always current.</strong> GitHub&rsquo;s <code>/releases/latest</code> URL redirects to whatever the newest StreamFusion release is, so you never need to hunt down a specific version or bookmark a new URL when there&rsquo;s an update.
+        <br><br>
+        <strong style="color:var(--txt)">Updates are silent.</strong> Once installed, StreamFusion pulls new versions in the background and applies them the next time you close the app — no prompts, no interruption mid-stream.
       </div>
     </div>
 

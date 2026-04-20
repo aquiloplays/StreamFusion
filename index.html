@@ -1994,45 +1994,68 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                   <button class="cbtn tw" onclick="copyObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
                   <button class="cbtn" onclick="previewObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
                 </div>
-                <!-- Per-overlay config: chat -->
-                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                  <label class="frow" style="font-size:11px"><span>Theme</span>
-                    <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                      <option value="hud">Gamer HUD (per-msg cards)</option>
-                      <option value="box">Grey box (unified panel)</option>
-                    </select>
-                  </label>
-                  <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="18" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label class="frow" style="font-size:11px"><span>Max messages</span><input type="number" id="obsChatMaxMessages" min="3" max="60" value="20" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label class="frow" style="font-size:11px"><span>Bubble opacity (HUD)</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="0" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                  <label class="frow" style="font-size:11px"><span>Box opacity (grey box)</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                  <label class="frow" style="font-size:11px"><span>Profile pictures</span><input type="checkbox" id="obsChatShowProfilePics" onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>Platform icon inline</span><input type="checkbox" id="obsChatShowPlatformIcon" onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>Legacy platform bar</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>User badges (mod/sub/vip)</span><input type="checkbox" id="obsChatShowUserBadges" checked onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>Render emotes</span><input type="checkbox" id="obsChatShowEmotes" checked onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>Event placement</span>
-                    <select id="obsChatEventPlacement" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                      <option value="inline">Inline in chat</option>
-                      <option value="above">Popup above chat</option>
-                      <option value="below">Popup below chat</option>
-                      <option value="off">Off</option>
-                    </select>
-                  </label>
-                  <label class="frow" style="font-size:11px"><span>Event font size</span><input type="number" id="obsChatEventSize" min="10" max="22" value="13" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label class="frow" style="font-size:11px"><span>TikTok gift animations</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
-                  <label class="frow" style="font-size:11px"><span>TT gift combo counter</span>
-                    <select id="obsChatTtGiftCorner" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                      <option value="off">Off</option>
-                      <option value="tl">Top-left corner</option>
-                      <option value="tr">Top-right corner</option>
-                      <option value="bl">Bottom-left corner</option>
-                      <option value="br">Bottom-right corner</option>
-                      <option value="tm">Top-middle</option>
-                      <option value="bm">Bottom-middle</option>
-                    </select>
-                  </label>
+                <!-- Per-overlay config: chat. 1.4.9 regrouped the controls
+                     into Look / Who-and-what / Events / TikTok gifts so
+                     streamers don't have to scan 15 checkboxes in one grid
+                     to find the one they want. -->
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Look</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Grey box = single container around the whole feed, no per-message backgrounds."><span>Style</span>
+                      <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="card">Card (default)</option>
+                        <option value="box">Grey box</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="16" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px" title="Per-message background opacity for the Card style. 0 = fully transparent text."><span>Card opacity</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="85" onchange="updateObsConfig('chat')" style="width:80px"></label>
+                    <label class="frow" style="font-size:11px" title="Background opacity of the unified container for the Grey box style."><span>Box opacity</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
+                    <label class="frow" style="font-size:11px"><span>Max messages on screen</span><input type="number" id="obsChatMaxMessages" min="3" max="80" value="30" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Who &amp; what shows</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px" title="Round avatar at the start of each message."><span>Profile pictures</span><input type="checkbox" id="obsChatShowProfilePics" checked onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Small TW/YT/TT/KK colored chip next to the username so you can tell the source at a glance."><span>Platform icon</span><input type="checkbox" id="obsChatShowPlatformIcon" checked onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Sub / mod / VIP / broadcaster letter chips next to the username."><span>User badges</span><input type="checkbox" id="obsChatShowUserBadges" checked onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Render Twitch / Kick / YouTube / BTTV / 7TV emotes as inline images."><span>Emotes</span><input type="checkbox" id="obsChatShowEmotes" checked onchange="updateObsConfig('chat')"></label>
+                    <!-- 'Legacy platform bar' was the old pre-1.4.9 left-border colored strip. The new
+                         Card style already has a platform-tinted left border, so this is off by default
+                         and mainly kept for the Grey box style which doesn't show any accent otherwise. -->
+                    <label class="frow" style="font-size:11px" title="Older full-height colored bar on the left of each message. Off by default — the card style already tints its left border."><span>Legacy platform bar</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Sub / gift / cheer / raid events</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Inline = events mix into the chat feed. Above/Below = events sit in their own strip at the top/bottom of the canvas."><span>Where events appear</span>
+                      <select id="obsChatEventPlacement" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="inline">Inline in chat</option>
+                        <option value="above">Strip above chat</option>
+                        <option value="below">Strip below chat</option>
+                        <option value="off">Off</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px"><span>Event font size</span><input type="number" id="obsChatEventSize" min="10" max="22" value="13" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">TikTok gifts</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px" title="Floats the real gift artwork across the top half of the canvas (never covers chat) on every incoming TT gift."><span>Floating gift rain</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Anchor position of the combo-count chip. Aggregates back-to-back gifts from the same user into a single ×30 chip."><span>Combo counter position</span>
+                      <select id="obsChatTtGiftCorner" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="off">Off</option>
+                        <option value="tl">Top-left</option>
+                        <option value="tr">Top-right</option>
+                        <option value="bl">Bottom-left</option>
+                        <option value="br">Bottom-right</option>
+                        <option value="tm">Top-middle</option>
+                        <option value="bm">Bottom-middle</option>
+                      </select>
+                    </label>
+                  </div>
+
                 </div>
               </div>
               <!-- Alerts overlay row -->
@@ -2671,7 +2694,7 @@ var S = {
       // New in 1.4.4 — grey-box theme (single wrapping box, no per-msg
       // bubbles), pfp/platform-icon toggles, configurable event
       // placement, TikTok gift combo counter at a chosen corner.
-      theme: 'hud',                  // 'hud' | 'box'
+      theme: 'card',                 // 'card' | 'box'
       boxOpacity: 0.8,
       showProfilePics: false,
       showPlatformIcon: false,
@@ -6313,7 +6336,8 @@ function renderObsOverlaysTab() {
   var c = S.obsCfg || {};
   var get = function(id) { return document.getElementById(id); };
   if (c.chat) {
-    if (get('obsChatTheme'))                get('obsChatTheme').value = c.chat.theme || 'hud';
+    // 1.4.9 removed the 'hud' theme. Migrate any leftover value to 'card'.
+    if (get('obsChatTheme'))                get('obsChatTheme').value = (c.chat.theme === 'box' ? 'box' : 'card');
     if (get('obsChatFontSize'))             get('obsChatFontSize').value = c.chat.fontSize || 18;
     if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
     if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
@@ -6399,17 +6423,91 @@ function previewObsUrl(which) {
 
   m.innerHTML = ''
     + '<div class="mh"><svg class="ic"><use href="#i-eye"/></svg> Preview: ' + esc(which) + ' overlay</div>'
-    + '<div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5">Live preview of what OBS sees at <code style="color:var(--accent);user-select:all">' + esc(url) + '</code>. Settings changes in the tab apply to this preview in real time.</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5">Live preview of what OBS sees at <code style="color:var(--accent);user-select:all">' + esc(url) + '</code>. Settings changes in the tab apply to this preview in real time. <strong style="color:var(--txt)">Live preview mode</strong> also fires demo events into any running OBS browser source so you can position the source on your stream while it looks realistic.</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
-    +   '<button class="btn-tw" onclick="fireObsDemo(\'' + which + '\')"><svg class="ic"><use href="#i-play"/></svg> Send demo events</button>'
+    +   '<button id="obsPrevOneShotBtn" class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)" onclick="fireObsDemo(\'' + which + '\')"><svg class="ic"><use href="#i-play"/></svg> Send one burst</button>'
+    +   '<button id="obsPrevLiveBtn" class="btn-tw" onclick="toggleObsLivePreview(\'' + which + '\')"><svg class="ic"><use href="#i-play"/></svg> <span id="obsPrevLiveLbl">Start live preview</span></button>'
     +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)" onclick="window.open(\'' + escA(url) + '\',\'_blank\')"><svg class="ic"><use href="#i-arrow"/></svg> Open in browser</button>'
-    +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);margin-left:auto" onclick="closeModal()">Close</button>'
+    +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);margin-left:auto" onclick="stopObsLivePreview();closeModal()">Close</button>'
     + '</div>'
     + '<div style="background:linear-gradient(135deg,#1a1a2e 25%,#2a2a3e 25%,#2a2a3e 50%,#1a1a2e 50%,#1a1a2e 75%,#2a2a3e 75%);background-size:20px 20px;border:1px solid var(--bdr);border-radius:8px;padding:10px;overflow:auto">'
     +   '<iframe src="' + esc(url) + '" style="width:' + dims.w + 'px;height:' + dims.h + 'px;border:0;display:block;margin:0 auto;background:transparent" sandbox="allow-scripts allow-same-origin" allowtransparency="true"></iframe>'
     + '</div>'
-    + '<div style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Checkered background simulates a non-transparent background so you can see where the overlay edges are. In OBS on top of your real scene it&rsquo;ll be fully transparent.</div>';
+    + '<div style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Checkered background simulates a non-transparent background so you can see where the overlay edges are. In OBS on top of your real scene it&rsquo;ll be fully transparent. Live preview keeps demo events streaming into OBS until you click <strong>Stop live preview</strong> or close this window.</div>';
   ovEl.classList.add('show');
+  // Reflect live-preview state on the modal buttons if one is already running.
+  syncObsPrevButtons(which);
+}
+
+// Live preview mode: keep firing demo events into the localhost OBS
+// overlay server on a loop so the user can position the browser source
+// on their real stream canvas while it shows realistic content. Stops
+// on explicit Stop, on closing the preview modal, or on app quit.
+var _obsLivePreview = { timer: null, which: null, step: 0 };
+function toggleObsLivePreview(which) {
+  if (_obsLivePreview.timer) {
+    stopObsLivePreview();
+    return;
+  }
+  startObsLivePreview(which);
+}
+function startObsLivePreview(which) {
+  if (!S.hasEarlyAccess) { addEvHistory('StreamFusion', 'Live preview requires Early Access.', 'tw', false); return; }
+  stopObsLivePreview();
+  _obsLivePreview.which = which;
+  _obsLivePreview.step = 0;
+  // Fire one immediately so the user sees feedback without waiting.
+  fireObsDemoTick();
+  // Then every 2.5s until stopped. Slow enough that animations don't
+  // pile up; fast enough to show "real stream activity" pacing.
+  _obsLivePreview.timer = setInterval(fireObsDemoTick, 2500);
+  syncObsPrevButtons(which);
+  addEvHistory('StreamFusion', 'Live preview started — demo events are streaming to your OBS browser source.', 'tw', false);
+}
+function stopObsLivePreview() {
+  if (_obsLivePreview.timer) {
+    clearInterval(_obsLivePreview.timer);
+    _obsLivePreview.timer = null;
+    addEvHistory('StreamFusion', 'Live preview stopped.', 'tw', false);
+  }
+  _obsLivePreview.which = null;
+  _obsLivePreview.step = 0;
+  syncObsPrevButtons();
+}
+function fireObsDemoTick() {
+  if (!window.electronAPI) return;
+  var which = _obsLivePreview.which;
+  if (!which) return;
+  // Rotating set so the preview doesn't feel like the same 5 events
+  // repeating. Each tick fires one plausible live-stream event.
+  var kappa    = [{ name: 'Kappa',    url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }];
+  var pogchamp = [{ name: 'PogChamp', url: 'https://static-cdn.jtvnw.net/emoticons/v2/305954156/default/dark/2.0' }];
+  var avatarOf = function(name) { return 'https://unavatar.io/twitch/' + encodeURIComponent(name); };
+  var steps = [
+    function() { window.electronAPI.obsBroadcastChat({ platform:'tw', user:'mod_alice',    message:'Hyped for today! Kappa', userColor:'#a970ff', badges:['mod'], emotes: kappa, avatar: avatarOf('twitch') }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'follow', platform:'tw', user:'new_viewer_' + (Math.floor(Math.random()*999)) }); },
+    function() { window.electronAPI.obsBroadcastChat({ platform:'yt',  user:'YT Pat',      message:'Love the new layout!', userColor:'#ff4545', avatar: avatarOf('mkbhd') }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'sub', platform:'tw', user:'longtime_sub', tier:'Tier 1', message:'PogChamp loving this', emotes: pogchamp }); },
+    function() { window.electronAPI.obsBroadcastChat({ platform:'tt',  user:'TikTokFan',   message:'sent a rose \uD83C\uDF39', userColor:'#fe2c55', avatar: avatarOf('tiktok') }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'rose_spammer', amount:10, count:1, giftName:'Rose', giftImage:'', isBig:false }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'cheer', platform:'tw', user:'big_spender',  amount:500 }); },
+    function() { window.electronAPI.obsBroadcastChat({ platform:'kk',  user:'KickKid',     message:'What game is this?', userColor:'#53fc18', badges:['sub'], avatar: avatarOf('kick') }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'raid',  platform:'tw', user:'raider_bob',   amount:42  }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'gift', platform:'tt', user:'generous_tiktoker', amount:1000, count:1, giftName:'Galaxy', giftImage:'', isBig:true }); },
+    function() { window.electronAPI.obsBroadcastAlert({ eventType:'tip',   platform:'se', user:'supporter',    amount:10  }); }
+  ];
+  // shoutout is a one-off type — for live preview we skip it and cycle
+  // through generic events, which exercise chat/alerts/vertical dock.
+  try { steps[_obsLivePreview.step % steps.length](); } catch (e) {}
+  _obsLivePreview.step = (_obsLivePreview.step + 1) % steps.length;
+}
+function syncObsPrevButtons() {
+  var lbl = document.getElementById('obsPrevLiveLbl');
+  var btn = document.getElementById('obsPrevLiveBtn');
+  if (!btn || !lbl) return;
+  var running = !!_obsLivePreview.timer;
+  lbl.textContent = running ? 'Stop live preview' : 'Start live preview';
+  btn.classList.toggle('stop', running);
 }
 
 // Fire a burst of demo events at whichever OBS overlay is being previewed.
@@ -6469,7 +6567,7 @@ function updateObsConfig(which) {
   var cfg = {};
   if (which === 'chat') {
     cfg = {
-      theme:                ((get('obsChatTheme') || {}).value) || 'hud',
+      theme:                ((get('obsChatTheme') || {}).value) || 'card',
       fontSize:             parseInt((get('obsChatFontSize') || {}).value, 10) || 18,
       maxMessages:          parseInt((get('obsChatMaxMessages') || {}).value, 10) || 20,
       bgOpacity:            (parseInt((get('obsChatBgOpacity') || {}).value, 10) || 0) / 100,
@@ -9606,21 +9704,61 @@ function initUpdateListeners() {
 // for version-gated announcements. Update on every release bump.
 var SF_VERSION = '1.4.8';
 var SF_CHANGELOG = {
-  '1.2.0': {
+  '1.4.4': {
     features: [
-      'Pop-out overlay: big events now sit in a taller area so gift + message toasts no longer clip at the bottom.',
-      'Side banner events render with transparent backgrounds — just the glow + animation over your game, no grey card.',
-      'New "NEW VIEWER!" badge replaces the old "1st MSG" label and sits under the username so the name line stays compact.',
-      'Hype Train bar now animates out with a shake + slide when the timer expires, instead of lingering forever.',
-      'Demo Mode rebalanced for small streamers: realistic follower/sub/tip scales, TikTok gifts with coin bursts, and inline emotes.',
-      'TTS "speak immediately (interrupt previous)" now defaults to OFF so you hear full events instead of cut-off clips.',
-      'Startup update prompt + floating "Update Available" toolbar button — you pick when to install.',
-      'Kick logo replaced with the real stepped-K brand mark everywhere the "K" appeared.'
+      'OBS chat overlay: two themes — gamer HUD (per-msg cards) and grey box (single container, adjustable opacity).',
+      'Profile pictures + platform icon + badges as independent toggles on every OBS overlay.',
+      'Event placement picker: render subs/gifts/cheers inline with chat, as a popup above/below, or off.',
+      'TikTok gift combo counter: anchored to any corner, bumps on each new gift, shows running ×30 count.',
+      'Vertical chat bar auto-marquees long messages right→left so the full line reads within the hold time.',
+      'SF OBS — free, standalone browser-dock variant of the pop-out for OBS Custom Browser Docks.'
     ],
     fixes: [
-      'Display tab tooltip no longer references features that don\'t exist (badges/compact/auto-scroll).',
-      'Demo Mode OFF now wipes chat, viewer counts, events, and hype-train state so the switch is clean.',
-      'Gift/coin animation triggers use the correct internal function name (fixed a silent no-op).'
+      'Emote pipeline: OBS overlays now receive Twitch / Kick / YouTube / BTTV / 7TV emotes via the chat broadcast.',
+      'Alerts banner: emote images render in the quoted secondary line.'
+    ]
+  },
+  '1.4.5': {
+    features: [
+      'Silent auto-updates: downloads in the background + installs on next app close — no prompts, no interruption mid-stream.',
+      'Pop-out overlay events stack instead of replacing — up to 5 visible at once, each with its own 12s (plain) / 18s (with message) timer.',
+      'Portable .exe ships alongside the installer — runs with no install step if your AV blocks the NSIS installer.'
+    ],
+    fixes: [
+      'Discord+ webhook failures now surface a throttled hint in the Events panel (404 = webhook deleted, 401/403 = URL rotated, 429 = rate limit, etc.) so silent failures have visibility.',
+      'NSIS installer is now per-user — no UAC prompt, installs to %LOCALAPPDATA% like Slack / Discord / VS Code.'
+    ]
+  },
+  '1.4.6': {
+    fixes: [
+      'Fresh installer ships the new branded icon everywhere: taskbar + Start Menu + desktop shortcut all now match the tray icon. Every build regenerates icon.ico automatically so the two can\'t drift apart again.',
+      'Differential auto-updates — updater downloads only the changed blocks between versions, not the full 77MB installer.'
+    ]
+  },
+  '1.4.7': {
+    fixes: [
+      'Auto-update "Install & Restart" now runs the NSIS installer silently and relaunches reliably. Previous version showed the installer UI which could land behind OBS and never get clicked, leaving the app closed without updating.',
+      'Verbose update logging on every lifecycle event so future install failures leave a trace in the log file.'
+    ]
+  },
+  '1.4.8': {
+    features: [
+      'In-app notice banner — StreamFusion can now fetch remote announcements from aquilo.gg and show a dismissible banner at the top of the window, so out-of-band updates can reach you between releases.'
+    ],
+    fixes: [
+      'Post-update "what\'s new" card now actually fires (the version constant was stale since 1.3, so the check compared against the wrong number).'
+    ]
+  },
+  '1.4.9': {
+    features: [
+      'OBS chat overlay redesigned: cleaner card layout (avatar + platform chip + username head + message body) replacing the old Gamer HUD. The grey-box unified theme stays as an alternative.',
+      'Live preview for OBS overlays — hit Preview in Settings → OBS Overlays and demo events fire into your live OBS browser source until you hit Stop. Lets you position + color-check without real viewer activity.',
+      'TikTok gift floating animation now confined to the top half of the canvas — gifts never cover the chat feed anymore.',
+      'Chat overlay auto-throttles animations during chat bursts so rapid-fire messages don\'t stutter the compositor.'
+    ],
+    fixes: [
+      'Vertical chat bar no longer cuts off the first letter of every message (the left-edge mask fade was too aggressive).',
+      'Hot-path perf pass: less idle CPU during quiet stream moments, animations respect the hide-animations toggle across more surfaces.'
     ]
   }
 };
