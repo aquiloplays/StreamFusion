@@ -1,6 +1,6 @@
 {
   "name": "streamfusion",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Unified multi-platform stream chat viewer for Twitch, YouTube, TikTok, and Kick. Built by aquilo_plays.",
   "main": "main.js",
   "author": {
@@ -14,6 +14,8 @@
     "url": "https://github.com/aquiloplays/StreamFusion.git"
   },
   "scripts": {
+    "gen-icon": "node scripts/gen-icon.js",
+    "prebuild": "node scripts/gen-icon.js",
     "start": "electron .",
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --publish never",
     "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win portable --publish never",
