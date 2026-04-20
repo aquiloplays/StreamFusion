@@ -80,8 +80,15 @@ body:not(.is-electron) .titlebar{display:none}
 .update-avail-btn:hover{filter:brightness(1.1)}
 /* Startup update prompt (shown once per session when an update is available
    and there's no stored user preference to defer). */
-.upd-prompt{position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:9999}
-.upd-prompt.show{display:flex}
+/* 1.4.7 killed the modal prompt permanently. The download+install flow
+   is fully background — autoDownload=true in main.js pulls the update
+   while SF runs, and autoInstallOnAppQuit=true installs silently on
+   next app close. This CSS rule neutralizes even the .show class so
+   any legacy `showUpdatePrompt()` call from a stale code path just
+   no-ops instead of trapping the user in the broken install-UI modal
+   that 1.4.4/1.4.5 shipped. */
+.upd-prompt{display:none !important}
+.upd-prompt.show{display:none !important}
 .upd-prompt-card{background:linear-gradient(160deg,#1a1a22,#15151d);border:1px solid var(--bdr);border-radius:14px;padding:24px 28px;max-width:460px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 40px rgba(0,229,160,.15)}
 .upd-prompt-title{font-size:18px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .upd-prompt-title svg{width:22px;height:22px;color:#00E5A0}

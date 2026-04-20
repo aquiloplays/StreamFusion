@@ -1,6 +1,6 @@
 {
   "name": "streamfusion",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Unified multi-platform stream chat viewer for Twitch, YouTube, TikTok, and Kick. Built by aquilo_plays.",
   "main": "main.js",
   "author": {

@@ -507,19 +507,38 @@ app.whenReady().then(() => {
     });
   }, 2500);
 
-  // Check for updates (non-blocking)
+  // Check for updates (non-blocking). Verbose logging through every stage
+  // so 1.4.7+ installs that fail to complete leave a breadcrumb in the
+  // log file — 1.4.4/1.4.5 installs that silently failed left no trace.
   if (autoUpdater) {
+    autoUpdater.on('checking-for-update', () => {
+      logToFile('UPDATE', 'checking for updates…');
+    });
+    autoUpdater.on('update-not-available', (info) => {
+      logToFile('UPDATE', 'no update available (current ' + app.getVersion() + ')');
+    });
     autoUpdater.on('update-available', (info) => {
+      logToFile('UPDATE', 'update AVAILABLE: ' + (info && info.version) + ' (current ' + app.getVersion() + ') — autoDownload kicked off');
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('update-available', { version: info.version });
       }
     });
+    autoUpdater.on('download-progress', (p) => {
+      if (p && p.percent != null) logToFile('UPDATE', 'download ' + Math.round(p.percent) + '% (' + Math.round((p.bytesPerSecond||0)/1024) + ' KB/s)');
+    });
     autoUpdater.on('update-downloaded', (info) => {
+      logToFile('UPDATE', 'update DOWNLOADED: ' + (info && info.version) + ' — will auto-install on next app quit (autoInstallOnAppQuit=true)');
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('update-downloaded', { version: info.version });
       }
     });
-    setTimeout(() => { try { autoUpdater.checkForUpdates(); } catch (e) {} }, 8000);
+    autoUpdater.on('error', (err) => {
+      logToFile('UPDATE-ERR', 'autoUpdater error: ' + (err && err.stack || err));
+    });
+    setTimeout(() => {
+      try { autoUpdater.checkForUpdates(); }
+      catch (e) { logToFile('UPDATE-ERR', 'checkForUpdates threw: ' + (e && e.message)); }
+    }, 8000);
   }
 
   app.on('activate', () => {
@@ -1163,8 +1182,26 @@ ipcMain.on('banner-done', () => {
 });
 
 // ── Auto-update IPC ─────────────────────────────────────────────────────────
-ipcMain.on('download-update', () => { if (autoUpdater) try { autoUpdater.downloadUpdate(); } catch (e) {} });
-ipcMain.on('install-update', () => { if (autoUpdater) try { autoUpdater.quitAndInstall(false, true); } catch (e) {} });
+ipcMain.on('download-update', () => {
+  if (!autoUpdater) return;
+  logToFile('UPDATE', 'download-update IPC received');
+  try { autoUpdater.downloadUpdate(); } catch (e) { logToFile('UPDATE-ERR', 'downloadUpdate threw: ' + (e && e.message)); }
+});
+// install-update IPC: silent install + force relaunch. The 1.4.4/1.4.5
+// flow used quitAndInstall(false, true) which shows the NSIS installer
+// UI — if that window landed behind another app (common on busy streaming
+// setups) the user never saw it, the install never completed, and the
+// app never relaunched. Clicking "Install & Restart" looked like the app
+// just died. Silent install (`isSilent: true`) passes /S to NSIS so the
+// install happens without UI, and `isForceRunAfter: true` launches the
+// fresh app automatically when the installer finishes. This is the same
+// flow Slack/Discord/VS Code use for their auto-updates.
+ipcMain.on('install-update', () => {
+  if (!autoUpdater) { logToFile('UPDATE-ERR', 'install-update IPC but autoUpdater missing'); return; }
+  logToFile('UPDATE', 'install-update IPC received — calling quitAndInstall(silent=true, forceRunAfter=true)');
+  try { autoUpdater.quitAndInstall(true, true); }
+  catch (e) { logToFile('UPDATE-ERR', 'quitAndInstall threw: ' + (e && e.message)); }
+});
 
 // ── Settings export / import ────────────────────────────────────────────────
 ipcMain.handle('export-settings', async () => {
