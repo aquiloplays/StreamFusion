@@ -89,6 +89,100 @@ body:not(.is-electron) .titlebar{display:none}
    that 1.4.4/1.4.5 shipped. */
 .upd-prompt{display:none !important}
 .upd-prompt.show{display:none !important}
+
+/* ── In-app notice banner ──────────────────────────────────────
+   Lightweight remote-announcement channel. On app startup we fetch
+   sf-notices.json (hosted at aquilo.gg/sf-notices.json, configurable
+   via window.__SF_NOTICES_URL for dev). Each notice entry can target
+   a version range and has a unique id — once dismissed, the id lands
+   in localStorage under sf_notices_dismissed and never shows again
+   on this machine. Severity drives color: info (blue), warning
+   (amber), critical (red).
+
+   Sits fixed at the very top of the app, above every other surface,
+   so it's impossible to miss on launch. ~40px tall when visible. */
+#sfNoticeBar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(58,134,255,0.16), rgba(58,134,255,0.06));
+  border-bottom: 1px solid rgba(58,134,255,0.4);
+  color: #d7e9ff;
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  animation: sfNoticeIn .3s cubic-bezier(.22,.9,.32,1) both;
+  -webkit-app-region: no-drag;
+}
+#sfNoticeBar.show { display: flex; }
+#sfNoticeBar.sev-info     { background: linear-gradient(135deg, rgba(58,134,255,0.16), rgba(58,134,255,0.06)); border-bottom-color: rgba(58,134,255,0.4); color: #d7e9ff; }
+#sfNoticeBar.sev-warning  { background: linear-gradient(135deg, rgba(240,180,41,0.18), rgba(240,136,62,0.08)); border-bottom-color: rgba(240,180,41,0.5);  color: #ffe0b0; }
+#sfNoticeBar.sev-critical { background: linear-gradient(135deg, rgba(248,81,73,0.22),  rgba(248,81,73,0.08));  border-bottom-color: rgba(248,81,73,0.55);  color: #ffc8c8; }
+#sfNoticeBar .sfn-icon {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 900;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.14);
+  color: currentColor;
+}
+#sfNoticeBar .sfn-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#sfNoticeBar .sfn-body strong { font-weight: 800; }
+#sfNoticeBar .sfn-title {
+  font-weight: 800;
+  margin-right: 6px;
+}
+#sfNoticeBar .sfn-action {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.12);
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.18);
+  transition: background .15s ease;
+}
+#sfNoticeBar .sfn-action:hover { background: rgba(255,255,255,0.2); }
+#sfNoticeBar .sfn-close {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: currentColor;
+  opacity: 0.6;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity .15s, background .15s;
+}
+#sfNoticeBar .sfn-close:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+@keyframes sfNoticeIn {
+  0%   { opacity: 0; transform: translateY(-100%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+/* When the banner is visible, push the main app content down so it
+   doesn't sit under the banner. Uses a body class we toggle with JS. */
+body.has-sf-notice { padding-top: 42px !important; }
 .upd-prompt-card{background:linear-gradient(160deg,#1a1a22,#15151d);border:1px solid var(--bdr);border-radius:14px;padding:24px 28px;max-width:460px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 40px rgba(0,229,160,.15)}
 .upd-prompt-title{font-size:18px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .upd-prompt-title svg{width:22px;height:22px;color:#00E5A0}
@@ -1101,6 +1195,14 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 </style>
 </head>
 <body>
+
+<!-- Remote-announcement banner. Hidden by default; populated by
+     checkSfNotices() which pulls sf-notices.json from aquilo.gg on
+     startup. Lets us push messages (update prompts, security notices,
+     new-feature announcements) to running installs without needing a
+     full version release. Each notice has a unique id that lands in
+     localStorage after dismissal so it only shows once per user. -->
+<div id="sfNoticeBar" role="alert"></div>
 
 <!-- Update prompt: shown on startup when auto-updater signals a new version.
      The user picks Install Now (download + restart) or Later (just closes
@@ -9279,6 +9381,176 @@ function confirmUpdatePrompt() {
     if (yesBtn) { yesBtn.textContent = 'Downloading…'; yesBtn.disabled = true; }
   }
 }
+// ── In-app remote notice system ──────────────────────────────────────────────
+// Pulls a small JSON file from aquilo.gg on app start and renders the first
+// active, non-dismissed notice as a banner across the top of the window.
+// Lets us push messages (update nudges, security notices, new-feature
+// announcements) to running installs without cutting a new release — which
+// is what we needed when 1.4.4 users got stuck on the broken auto-update
+// but had no way to hear about the fix from inside the app.
+//
+// Notice JSON shape (served at SF_NOTICES_URL):
+//   {
+//     "notices": [
+//       {
+//         "id":          "unique-string",    // required, localStorage key
+//         "severity":    "info"|"warning"|"critical",
+//         "title":       "Short headline",
+//         "body":        "Longer explanation (plain text, <strong> allowed)",
+//         "minVersion":  "1.4.0",             // optional, inclusive
+//         "maxVersion":  "1.4.7",             // optional, inclusive
+//         "actionLabel": "Update now",        // optional
+//         "actionUrl":   "https://...",       // optional
+//         "expiresAt":   "2026-12-31T00:00Z", // optional
+//         "dismissible": true                 // default true
+//       }
+//     ]
+//   }
+//
+// Keeping the contract forward-compatible: unknown fields are ignored so
+// the server can ship new options without breaking old clients.
+var SF_NOTICES_URL = window.__SF_NOTICES_URL || 'https://aquilo.gg/sf-notices.json';
+var SF_NOTICES_DISMISS_KEY = 'sf_notices_dismissed';
+
+function _sfNoticeDismissed(id) {
+  try {
+    var raw = localStorage.getItem(SF_NOTICES_DISMISS_KEY);
+    if (!raw) return false;
+    var list = JSON.parse(raw);
+    return Array.isArray(list) && list.indexOf(id) !== -1;
+  } catch (e) { return false; }
+}
+function _sfNoticeMarkDismissed(id) {
+  try {
+    var raw = localStorage.getItem(SF_NOTICES_DISMISS_KEY);
+    var list = [];
+    if (raw) { try { list = JSON.parse(raw) || []; } catch (e) {} }
+    if (!Array.isArray(list)) list = [];
+    if (list.indexOf(id) === -1) list.push(id);
+    // Keep the list bounded so we don't grow forever on an unusually
+    // chatty notices stream.
+    if (list.length > 200) list = list.slice(-200);
+    localStorage.setItem(SF_NOTICES_DISMISS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+// Semver compare — true if a >= b. Handles the 3-digit "1.4.8" format
+// SF uses. Doesn't attempt to parse pre-release tags since we don't ship
+// any.
+function _sfVerGte(a, b) {
+  try {
+    var pa = String(a).split('.').map(function(n) { return parseInt(n, 10) || 0; });
+    var pb = String(b).split('.').map(function(n) { return parseInt(n, 10) || 0; });
+    for (var i = 0; i < 3; i++) {
+      var da = pa[i] || 0, db = pb[i] || 0;
+      if (da !== db) return da > db;
+    }
+    return true;
+  } catch (e) { return true; }
+}
+
+function _sfNoticeIsActive(n, curVersion, now) {
+  if (!n || !n.id || typeof n.id !== 'string') return false;
+  if (n.minVersion && !_sfVerGte(curVersion, n.minVersion)) return false;
+  if (n.maxVersion && !_sfVerGte(n.maxVersion, curVersion)) return false;
+  if (n.expiresAt) {
+    var exp = Date.parse(n.expiresAt);
+    if (!isNaN(exp) && exp < now) return false;
+  }
+  if (_sfNoticeDismissed(n.id)) return false;
+  return true;
+}
+
+var _sfNoticeShownId = null;
+
+function renderSfNotice(n) {
+  var bar = document.getElementById('sfNoticeBar');
+  if (!bar) return;
+  var severity = ({ info: 'info', warning: 'warning', critical: 'critical' })[n.severity] || 'info';
+  var icon = severity === 'critical' ? '!' : severity === 'warning' ? '!' : 'i';
+  // Only a narrow HTML whitelist — strong for emphasis, no script/link
+  // tags. Anything more would require a proper sanitizer; escape + allow
+  // <strong> is enough for the kinds of notices we'll post.
+  function renderText(s) {
+    var safe = String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    safe = safe.replace(/&lt;(\/?)strong&gt;/g, '<$1strong>');
+    return safe;
+  }
+  var actionHtml = '';
+  if (n.actionLabel && n.actionUrl) {
+    // Route outbound clicks through shell.openExternal (via electronAPI)
+    // so the URL opens in the user's default browser, not an Electron
+    // webview. Falls back to plain window.open for dev / non-Electron.
+    actionHtml = '<a class="sfn-action" href="#" data-sfn-action="' +
+      encodeURIComponent(n.actionUrl) + '">' + renderText(n.actionLabel) + '</a>';
+  }
+  var closeHtml = n.dismissible === false ? '' :
+    '<button class="sfn-close" data-sfn-dismiss="1" aria-label="Dismiss">\u00d7</button>';
+  bar.classList.remove('sev-info', 'sev-warning', 'sev-critical');
+  bar.classList.add('sev-' + severity);
+  bar.innerHTML =
+    '<span class="sfn-icon">' + icon + '</span>' +
+    '<span class="sfn-body">' +
+      (n.title ? '<span class="sfn-title">' + renderText(n.title) + '</span>' : '') +
+      renderText(n.body || '') +
+    '</span>' +
+    actionHtml +
+    closeHtml;
+  bar.classList.add('show');
+  document.body.classList.add('has-sf-notice');
+  _sfNoticeShownId = n.id;
+  // Wire handlers (delegated lookup keeps the innerHTML simple).
+  var closeBtn = bar.querySelector('[data-sfn-dismiss]');
+  if (closeBtn) closeBtn.onclick = function() { dismissSfNotice(n.id); };
+  var actionBtn = bar.querySelector('[data-sfn-action]');
+  if (actionBtn) {
+    actionBtn.onclick = function(e) {
+      e.preventDefault();
+      var url = decodeURIComponent(actionBtn.getAttribute('data-sfn-action'));
+      try { window.open(url, '_blank'); } catch (err) {}
+    };
+  }
+}
+
+function dismissSfNotice(id) {
+  _sfNoticeMarkDismissed(id);
+  var bar = document.getElementById('sfNoticeBar');
+  if (bar) {
+    bar.classList.remove('show');
+    bar.innerHTML = '';
+  }
+  document.body.classList.remove('has-sf-notice');
+  _sfNoticeShownId = null;
+}
+
+function checkSfNotices() {
+  // Defensive: on any error (offline, 404, malformed JSON, etc.) we just
+  // silently no-op. The notice system must never break the app.
+  var curVersion = (typeof SF_VERSION === 'string' && SF_VERSION) ||
+    (window.electronAPI && electronAPI.getAppVersion && electronAPI.getAppVersion()) || '0.0.0';
+  // Cache-buster to bypass aggressive CDN caching so users see updated
+  // notices within an hour rather than whenever their ISP's cache expires.
+  var bust = Math.floor(Date.now() / 3600000); // changes hourly
+  fetch(SF_NOTICES_URL + '?t=' + bust, { cache: 'no-cache' })
+    .then(function(r) { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
+    .then(function(data) {
+      if (!data || !Array.isArray(data.notices)) return;
+      var now = Date.now();
+      // Prefer the highest-severity active notice, then the first in the
+      // list. Only one banner visible at a time to avoid visual pileup.
+      var active = data.notices.filter(function(n) { return _sfNoticeIsActive(n, curVersion, now); });
+      if (!active.length) return;
+      var sevRank = { critical: 3, warning: 2, info: 1 };
+      active.sort(function(a, b) {
+        return (sevRank[b.severity] || 1) - (sevRank[a.severity] || 1);
+      });
+      renderSfNotice(active[0]);
+    })
+    .catch(function() { /* silent */ });
+}
+
 function initUpdateListeners() {
   if (!window.electronAPI) return;
   if (electronAPI.onUpdateAvailable) {
@@ -9329,7 +9601,10 @@ function initUpdateListeners() {
 // we compare the stored last-seen version against the current package.json
 // version (injected as SF_VERSION) and, if we just bumped, show the card
 // listing every entry between the old and new.
-var SF_VERSION = '1.2.0';
+// Mirrors package.json. Used by both the post-update changelog card
+// (maybeShowChangelog) AND the remote notice filter (checkSfNotices)
+// for version-gated announcements. Update on every release bump.
+var SF_VERSION = '1.4.8';
 var SF_CHANGELOG = {
   '1.2.0': {
     features: [
@@ -9444,6 +9719,12 @@ window.addEventListener('load', function() {
   showWelcome();
   initAbout();
   initUpdateListeners();
+  // Remote notices — deferred ~12s so the fetch doesn't compete with
+  // the app's initial connection handshakes (SB / TikFinity / Patreon /
+  // OBS overlay server). Any notice that IS posted will land as soon
+  // as the user is settled into the app, which is actually more
+  // useful than a first-frame banner that could be missed.
+  setTimeout(function() { try { checkSfNotices(); } catch (e) {} }, 12000);
   // Show the "what's new" card once, if we just booted into a newer version.
   maybeShowChangelog();
   // Global keyboard shortcuts

@@ -255,6 +255,79 @@
     font-weight: 700;
   }
 
+  /* Secondary download link styling (portable .exe). Sits just under
+     the primary button. Deliberately understated so the primary CTA
+     stays dominant \u2014 AV-blocked users who are looking for an
+     alternative will notice; everyone else's eye flows past it. */
+  .alt-dl {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--mut);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .alt-dl a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    border-bottom: 1px dashed rgba(58, 134, 255, 0.35);
+  }
+  .alt-dl a:hover {
+    color: var(--cyan);
+    border-bottom-color: rgba(42, 212, 185, 0.4);
+  }
+
+  /* SF OBS cross-promo card. For streamers who don't want the full
+     desktop app \u2014 the web dock is free, lives at aquilo.gg/obs,
+     and solves the "I just want chat in OBS" use case. Styled as a
+     subdued secondary product card so it doesn't compete with the
+     primary StreamFusion download. */
+  .sfobs {
+    margin-top: 20px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, rgba(42, 212, 185, 0.08), rgba(58, 134, 255, 0.04));
+    border: 1px solid rgba(42, 212, 185, 0.25);
+    border-radius: 10px;
+    text-align: left;
+  }
+  .sfobs-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--txt);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sfobs-title .tag {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(42, 212, 185, 0.18);
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+  .sfobs-desc {
+    font-size: 12px;
+    color: var(--mut);
+    line-height: 1.55;
+    margin-bottom: 10px;
+  }
+  .sfobs-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--cyan);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .sfobs-link:hover { color: #5cf2d9; }
+  .sfobs-link svg { width: 12px; height: 12px; }
+
   .footer {
     margin-top: 24px;
     padding-top: 20px;
@@ -339,17 +412,43 @@
       Download StreamFusion
     </a>
 
+    <div class="alt-dl">
+      AV blocking the installer?
+      <a href="https://github.com/aquiloplays/StreamFusion/releases/latest" target="_blank" rel="noopener">Grab the portable <code>.exe</code> instead</a>
+      — same binary, no install step, runs in place.
+    </div>
+
     <div class="steps">
       <div class="steps-title">How to install</div>
       <ol>
-        <li>Click the button above and download <strong>StreamFusion-Setup-x.x.x.exe</strong> from the latest release.</li>
-        <li>Run the installer and follow the prompts.</li>
-        <li>Launch StreamFusion from your desktop and connect your platforms.</li>
+        <li>Click the button above and download <strong>StreamFusion-Setup-x.x.x.exe</strong> (or the portable <code>.exe</code>) from the latest release.</li>
+        <li>Run it. The installer places StreamFusion in <code>%LOCALAPPDATA%\Programs\StreamFusion</code> — no admin rights needed.</li>
+        <li>Launch from your desktop / Start Menu and connect your platforms.</li>
       </ol>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);font-size:11.5px;color:var(--sub)">
+        <strong style="color:var(--txt)">Updates are silent.</strong> Once installed, StreamFusion downloads new versions in the background and applies them the next time you close the app. No prompts, no interruption mid-stream.
+      </div>
     </div>
 
     <div class="warn">
-      <strong>Heads up:</strong> Windows may show an "unknown publisher" warning on first install. Click <strong>More info</strong> → <strong>Run anyway</strong>. This is normal for independently distributed apps.
+      <strong>Antivirus note:</strong> StreamFusion isn't code-signed yet, so Windows SmartScreen or third-party AV may flag the installer on first run. If you see <strong>"Windows protected your PC"</strong>, click <strong>More info → Run anyway</strong>. If your AV blocks the installer outright, use the portable <code>.exe</code> linked above, or whitelist the install folder. Every release's SHA-512 is published in <code>latest.yml</code> on the GitHub release page for verification.
+    </div>
+
+    <!-- SF OBS cross-promo. Separate free product that lives entirely
+         in the browser and drops into OBS Custom Browser Docks. Aimed
+         at streamers who just want chat visible in OBS without
+         committing to the full desktop app. -->
+    <div class="sfobs">
+      <div class="sfobs-title">SF OBS <span class="tag">Free</span></div>
+      <div class="sfobs-desc">
+        Just want multi-platform chat inside OBS? SF OBS is a free, standalone browser dock — no installer, no desktop app. Paste one URL into <strong>OBS → Docks → Custom Browser Docks</strong> and you're live.
+      </div>
+      <a class="sfobs-link" href="https://aquilo.gg/obs" target="_blank" rel="noopener">
+        Open SF OBS
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/>
+        </svg>
+      </a>
     </div>
 
     <div class="footer">

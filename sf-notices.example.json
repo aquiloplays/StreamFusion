@@ -1,0 +1,55 @@
+{
+  "_readme": [
+    "Host this file at https://aquilo.gg/sf-notices.json (or wherever — point StreamFusion's SF_NOTICES_URL at it).",
+    "The running SF app fetches this on startup (deferred ~12s) and renders the highest-severity non-dismissed notice as a banner.",
+    "",
+    "Schema (unknown fields ignored, so you can extend without breaking old clients):",
+    "  id           required, unique. Dismissal uses this as the localStorage key.",
+    "  severity     'info' | 'warning' | 'critical'. Default 'info'. Critical is amber-red — reserve for urgent things.",
+    "  title        short headline (bold prefix). Optional.",
+    "  body         longer text. Plain text with <strong>...</strong> allowed. Everything else is escaped.",
+    "  minVersion   only show if the app version is >= this. Use for 'this feature arrived in 1.5' messaging.",
+    "  maxVersion   only show if the app version is <= this. Use for 'you're on an old version, please update' messaging.",
+    "  actionLabel  optional. If set with actionUrl, adds a button to the banner.",
+    "  actionUrl    opens in the user's default browser when the action button is clicked.",
+    "  expiresAt    ISO-8601 date. Notice is ignored after this timestamp.",
+    "  dismissible  default true. Set to false for notices that must be seen (very rare — be careful).",
+    "",
+    "To retire a notice, either remove it from the array or add an expiresAt in the past.",
+    "",
+    "Empty notices[] array is fine — just a JSON file with {\"notices\": []} means 'nothing active'."
+  ],
+
+  "notices": [
+    {
+      "id": "welcome-1-4-8",
+      "severity": "info",
+      "title": "New in 1.4.8:",
+      "body": "in-app notice system (this banner!), plus <strong>silent auto-updates</strong> so future versions install themselves when you close SF.",
+      "minVersion": "1.4.8",
+      "maxVersion": "1.4.99",
+      "expiresAt": "2026-06-01T00:00:00Z"
+    },
+
+    {
+      "_comment": "Example of an update-nudge for anyone still on 1.4.7 or older once 1.5.0 ships.",
+      "id": "upgrade-to-1-5",
+      "severity": "warning",
+      "title": "Update available:",
+      "body": "StreamFusion 1.5 is out. Your app is set to auto-install on next close, but you can grab the installer early.",
+      "maxVersion": "1.4.99",
+      "actionLabel": "Download 1.5",
+      "actionUrl": "https://github.com/aquiloplays/StreamFusion/releases/latest",
+      "expiresAt": "2026-12-31T00:00:00Z"
+    },
+
+    {
+      "_comment": "Example of a critical notice (Discord proxy outage, Patreon API issue, etc.).",
+      "id": "sb-webhook-outage-2026-05-01",
+      "severity": "critical",
+      "title": "Discord+ webhooks down:",
+      "body": "Discord's webhook API is throwing 500s — posts will retry automatically. No action needed.",
+      "expiresAt": "2026-05-02T00:00:00Z"
+    }
+  ]
+}
