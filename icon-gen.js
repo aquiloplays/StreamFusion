@@ -15,15 +15,49 @@
 'use strict';
 
 // ──────────────────────────────────────────────────────────────────────
-// Draw a StreamFusion icon at the requested size into a raw RGBA
-// buffer. Returns { W, H, px: Buffer }. Keep the drawing code here —
-// both the runtime tray icon and the build-time .ico are rendered from
-// this one function.
+// Palettes — exported so build scripts + main.js can pick between
+// the stable (blue/teal) and beta (amber/orange) look. Same shape:
+// { BLUE, TEAL, WHITE, DARK } because the drawing code references
+// those named slots regardless of which palette is active.
+//
+// STABLE: production, matches the aquilo.gg banner branding.
+// BETA:   amber-to-orange ring over a warm cream bolt — unmistakably
+//         different from stable at a glance (taskbar, tray, shortcut).
+//         Lets the user tell at-a-glance which variant they're using.
 // ──────────────────────────────────────────────────────────────────────
-function buildRawIcon(size) {
+const PALETTES = {
+  stable: {
+    BLUE:  [ 58, 134, 255],  // primary ring accent
+    TEAL:  [ 42, 212, 185],  // secondary gradient stop
+    WHITE: [239, 239, 241],  // bolt highlight
+    DARK:  [ 14,  14,  16]   // interior fill
+  },
+  beta: {
+    BLUE:  [245, 158,  11],  // amber-500 (replaces stable BLUE)
+    TEAL:  [249, 115,  22],  // orange-500 (replaces stable TEAL)
+    WHITE: [254, 243, 199],  // warm amber-50 (replaces stable WHITE)
+    DARK:  [ 20,  14,   4]   // warm near-black (still reads as "app bg")
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────
+// Draw a StreamFusion icon at the requested size into a raw RGBA
+// buffer. Returns { W, H, px: Buffer }. `palette` is an optional
+// palette name ('stable' | 'beta') or a palette object literal.
+// Defaults to the stable palette so existing callers don't break.
+// ──────────────────────────────────────────────────────────────────────
+function resolvePalette(p) {
+  if (!p) return PALETTES.stable;
+  if (typeof p === 'string') return PALETTES[p] || PALETTES.stable;
+  if (p.BLUE && p.TEAL && p.WHITE && p.DARK) return p;
+  return PALETTES.stable;
+}
+
+function buildRawIcon(size, palette) {
   const W = size || 256;
   const H = size || 256;
   const px = Buffer.alloc(W * H * 4, 0);
+  const P = resolvePalette(palette);
   // Scale factor so the geometry (bolt path, ring radii) authored for a
   // 256px canvas still reads cleanly at other resolutions.
   const K = W / 256;
@@ -81,11 +115,13 @@ function buildRawIcon(size) {
     }
   }
 
-  // Banner palette (aquilo.gg Discord Nitro banner).
-  const BLUE  = [ 58, 134, 255];
-  const TEAL  = [ 42, 212, 185];
-  const WHITE = [239, 239, 241];
-  const DARK  = [ 14,  14,  16];
+  // Resolved-palette slots. Keep the internal variable names BLUE /
+  // TEAL / WHITE / DARK so the drawing geometry below stays identical
+  // across palettes — only the colors change.
+  const BLUE  = P.BLUE;
+  const TEAL  = P.TEAL;
+  const WHITE = P.WHITE;
+  const DARK  = P.DARK;
 
   const cx = W/2, cy = H/2;
 
@@ -189,8 +225,8 @@ function encodePNG(W, H, px) {
 // Shorthand used at runtime by main.js — draws at 256x256 and returns
 // the PNG buffer directly. Kept so callers don't have to know about
 // the raw/encode split.
-function buildSFIcon(size) {
-  const raw = buildRawIcon(size || 256);
+function buildSFIcon(size, palette) {
+  const raw = buildRawIcon(size || 256, palette);
   return encodePNG(raw.W, raw.H, raw.px);
 }
 
@@ -207,10 +243,10 @@ function buildSFIcon(size) {
 // icons 32-48px, alt-tab preview 32-256px, Explorer large icons
 // 48-256px). Embedding only a 256 source produces fuzzy small icons.
 // ──────────────────────────────────────────────────────────────────────
-function buildIco(sizes) {
+function buildIco(sizes, palette) {
   sizes = sizes || [16, 24, 32, 48, 64, 128, 256];
   const images = sizes.map(function(s) {
-    const raw = buildRawIcon(s);
+    const raw = buildRawIcon(s, palette);
     return { size: s, png: encodePNG(raw.W, raw.H, raw.px) };
   });
   const n = images.length;
@@ -240,5 +276,6 @@ module.exports = {
   buildRawIcon:  buildRawIcon,
   encodePNG:     encodePNG,
   buildSFIcon:   buildSFIcon,
-  buildIco:      buildIco
+  buildIco:      buildIco,
+  PALETTES:      PALETTES
 };

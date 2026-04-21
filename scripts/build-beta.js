@@ -25,6 +25,7 @@
 const path   = require('path');
 const fs     = require('fs');
 const builder = require('electron-builder');
+const { buildRawIcon, encodePNG, buildIco, PALETTES } = require('../icon-gen');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'));
@@ -40,12 +41,31 @@ function betaVersion(v) {
 const version = betaVersion(pkg.version);
 console.log('[build-beta] building StreamFusion Beta v' + version);
 
-// Regenerate icon assets before the electron-builder run — same prebuild
-// hook the main build uses. Done inline here so `npm run build:beta`
-// doesn't need a separate prebuild target.
+// Generate BETA icon assets in parallel to the stable ones. The beta
+// build gets a distinct amber/orange palette (see icon-gen.PALETTES.beta)
+// so users running both variants side-by-side can tell them apart at a
+// glance on the taskbar, tray, desktop shortcut, and Alt+Tab switcher.
+// We also run the stable prebuild so assets/icon.ico stays fresh for
+// the next normal build — this script doesn't assume it ran most
+// recently.
 try {
-  require('./gen-icon');
-} catch (e) { console.warn('[build-beta] gen-icon prebuild failed:', e.message); }
+  require('./gen-icon');   // regenerates assets/icon.ico + assets/icon.png (stable)
+} catch (e) { console.warn('[build-beta] stable gen-icon failed:', e.message); }
+
+const ASSETS = path.join(REPO_ROOT, 'assets');
+try {
+  const bigRaw = buildRawIcon(512, PALETTES.beta);
+  const bigPng = encodePNG(bigRaw.W, bigRaw.H, bigRaw.px);
+  fs.writeFileSync(path.join(ASSETS, 'icon-beta.png'), bigPng);
+  console.log('[build-beta] wrote assets/icon-beta.png (' + bigPng.length + ' bytes, 512x512, beta palette)');
+
+  const betaIco = buildIco([16, 24, 32, 48, 64, 128, 256], PALETTES.beta);
+  fs.writeFileSync(path.join(ASSETS, 'icon-beta.ico'), betaIco);
+  console.log('[build-beta] wrote assets/icon-beta.ico (' + betaIco.length + ' bytes, 7 sizes, beta palette)');
+} catch (e) {
+  console.error('[build-beta] failed to generate beta icons:', e);
+  process.exit(1);
+}
 
 // Hoist-level overrides: appId, productName, NSIS shortcut/artifact
 // naming, portable artifact name, output dir. Everything else is
@@ -61,6 +81,17 @@ const config = {
   directories: {
     output: 'dist-beta'
   },
+  // Point electron-builder at the amber/orange beta icons generated
+  // above. These drive: the taskbar icon, Start Menu shortcut icon,
+  // desktop shortcut icon, Alt+Tab preview, and the NSIS installer
+  // header. Runtime-drawn surfaces (tray, title bar) switch to the
+  // beta palette via main.js's PALETTES.beta detection.
+  win: {
+    icon: 'assets/icon-beta.ico'
+  },
+  mac: {
+    icon: 'assets/icon-beta.png'
+  },
   nsis: {
     oneClick: false,
     perMachine: false,
@@ -68,7 +99,7 @@ const config = {
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
     shortcutName: 'StreamFusion Beta',
-    installerHeaderIcon: 'assets/icon.ico',
+    installerHeaderIcon: 'assets/icon-beta.ico',
     deleteAppDataOnUninstall: false,
     differentialPackage: true,
     artifactName: 'StreamFusion-Beta-Setup-${version}.${ext}'

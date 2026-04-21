@@ -94,7 +94,22 @@ try {
 //     wired as the prebuild npm hook)
 // This prevents the 1.4.5-era drift where the tray got the new branding but
 // the taskbar + desktop shortcuts stayed on the old .ico.
-const { buildSFIcon } = require('./icon-gen');
+const { buildSFIcon, PALETTES } = require('./icon-gen');
+
+// 1.5.1: palette pick at runtime. Beta variant (app name includes
+// "Beta") draws its tray + window icon in the amber/orange palette
+// so it's visually distinct from main SF even on the taskbar. File-
+// based icons (Start Menu / desktop shortcut / Alt+Tab preview /
+// NSIS header) come from the icon-beta.ico file that scripts/
+// build-beta.js pre-generates.
+function _sfIconPalette() {
+  try {
+    var n = (app.getName() || '').toLowerCase();
+    if (n.indexOf('beta') !== -1) return PALETTES.beta;
+    if ((app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) return PALETTES.beta;
+  } catch (e) {}
+  return PALETTES.stable;
+}
 
 // Keep references so they don't get garbage collected
 let mainWindow = null;
@@ -346,7 +361,7 @@ function createWindow() {
   // Generate custom icon — write to userData (always writable, even from inside asar)
   let appIcon;
   try {
-    const iconBuf = buildSFIcon();
+    const iconBuf = buildSFIcon(256, _sfIconPalette());
     const iconPath = path.join(app.getPath('userData'), 'sf-icon.png');
     fs.writeFileSync(iconPath, iconBuf);
     appIcon = nativeImage.createFromPath(iconPath);
@@ -454,7 +469,7 @@ function createTray() {
   // Reuse the same programmatic SF icon for the tray
   let trayIcon;
   try {
-    const iconBuf = buildSFIcon();
+    const iconBuf = buildSFIcon(256, _sfIconPalette());
     trayIcon = nativeImage.createFromBuffer(iconBuf);
     // Resize to 16x16 for crisp tray rendering on Windows
     trayIcon = trayIcon.resize({ width: 16, height: 16 });
