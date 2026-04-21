@@ -94,6 +94,15 @@ let resumeUrl = null;
 let lastSequence = null;
 let isClosing = false;
 
+// Bot identity + joined-guilds tracking. Populated as Discord's Gateway
+// dispatches READY + GUILD_CREATE / GUILD_DELETE events. Surfaced via
+// /health so operators can verify the bot is actually in the server
+// they expect. Was missing before 1.5.1 — /health only reported
+// SUBSCRIBED guilds (EA user associations) which misled one operator
+// into thinking the bot had joined zero servers.
+let botUser = null;                         // { id, username, discriminator, ... }
+const joinedGuilds = new Map();             // guildId → { name, memberCount, joinedAt }
+
 function sendGateway(op, d) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   try { ws.send(JSON.stringify({ op: op, d: d })); } catch (e) { console.error('[gw] send failed', e.message); }
@@ -156,13 +165,32 @@ function handleDispatch(eventName, data) {
     case 'READY':
       sessionId = data.session_id;
       resumeUrl = data.resume_gateway_url;
-      console.log('[gw] READY — bot user:', data.user && data.user.username, '— in', (data.guilds || []).length, 'guilds');
+      botUser = data.user || null;
+      // Clear stale guild map on reconnect — GUILD_CREATE events will
+      // repopulate it (Discord sends one GUILD_CREATE per joined guild
+      // right after READY).
+      joinedGuilds.clear();
+      console.log('[gw] READY — bot user:', botUser && botUser.username, '— in', (data.guilds || []).length, 'guilds');
       break;
     case 'GUILD_CREATE':
       // Fires for each guild the bot is already in on startup, AND when
-      // the bot is newly invited to a guild. We don't need to do anything
-      // here beyond logging — associations are user-driven.
-      console.log('[gw] GUILD_CREATE', data.id, '(member count:', data.member_count, ')');
+      // the bot is newly invited to a guild. Track it so /health can
+      // report an accurate joined-guild list to operators.
+      joinedGuilds.set(data.id, {
+        name: data.name || '(unknown)',
+        memberCount: data.member_count,
+        joinedAt: Date.now()
+      });
+      console.log('[gw] GUILD_CREATE', data.id, data.name || '', '(member count:', data.member_count, ')');
+      break;
+    case 'GUILD_DELETE':
+      // Fires when bot is kicked / guild is deleted / guild becomes
+      // unavailable. If unavailable:true the bot is still a member; we
+      // keep the entry. Otherwise drop it.
+      if (!data.unavailable) {
+        joinedGuilds.delete(data.id);
+        console.log('[gw] GUILD_DELETE', data.id, '(bot removed)');
+      }
       break;
     case 'GUILD_MEMBER_ADD': {
       const u = data.user || {};
@@ -437,9 +465,30 @@ async function handleEvents(req, res) {
 }
 
 function handleHealth(res) {
+  // Build a list of joined-guild summaries so operators can verify the
+  // bot is actually a member of the server they expect. The /post-release
+  // endpoint will fail with 403 if the target channel's server isn't in
+  // this list — that's a common gotcha, so we surface it prominently.
+  const guildList = [];
+  joinedGuilds.forEach(function(info, gid) {
+    guildList.push({ id: gid, name: info.name, memberCount: info.memberCount });
+  });
+
   sendJson(res, {
     ok: true,
     gateway: ws && ws.readyState === WebSocket.OPEN,
+    botUser: botUser ? {
+      id: botUser.id,
+      username: botUser.username,
+      discriminator: botUser.discriminator
+    } : null,
+    // Guilds the bot is ACTUALLY a member of (via Discord Gateway).
+    joinedGuildCount: joinedGuilds.size,
+    joinedGuilds: guildList,
+    // Guilds EA users have LINKED via /associate for event forwarding.
+    // Kept under the old name too for backward compat with any older
+    // monitoring scripts that might be polling this.
+    subscribedGuildCount: guildSubscribers.size,
     guildCount: guildSubscribers.size,
     userCount: userConnections.size,
     botInvite: BOT_INVITE_URL
