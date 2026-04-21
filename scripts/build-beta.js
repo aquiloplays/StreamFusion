@@ -107,21 +107,19 @@ const config = {
   portable: {
     artifactName: 'StreamFusion-Beta-Portable-${version}.${ext}'
   },
-  // Publish channel = 'beta' means electron-builder generates beta.yml
-  // instead of latest.yml. The beta build's auto-updater (see main.js
-  // — reads app.getName() and sets autoUpdater.channel = 'beta' when
-  // running as the beta variant) looks specifically at beta.yml, so
-  // beta installs never accidentally downgrade to or duplicate the
-  // main channel's releases.
-  publish: [
-    {
-      provider: 'github',
-      owner:    'aquiloplays',
-      repo:     'StreamFusion',
-      channel:  'beta',
-      releaseType: 'prerelease'
-    }
-  ]
+  // INTENTIONALLY NO `publish` override here. electron-builder 24
+  // deep-merges the programmatic config against package.json's build
+  // field, and the merge does something broken when both sides have
+  // `publish: [{...}]` — it produces a Franken-object with a stray
+  // `'0': {...}` key attached to the same element, which fails schema
+  // validation with a useless whole-config dump. Keeping the publish
+  // config exclusively in package.json dodges the merge bug.
+  //
+  // electron-builder auto-detects the `beta` channel from the
+  // prerelease version suffix (1.5.1-beta.0) — it generates beta.yml
+  // automatically for any semver with a `-beta.N` tail. The prerelease
+  // state on the GitHub release itself (UI checkbox / API
+  // `prerelease: true`) is what actually routes auto-updater clients.
 };
 
 builder.build({
@@ -129,8 +127,36 @@ builder.build({
   config: config,
   publish: 'never'
 }).then(function() {
+  // Rename latest.yml → beta.yml. electron-builder writes the manifest
+  // as `latest.yml` by default because the publish config (inherited
+  // from package.json) doesn't specify a channel — and we can't override
+  // it here thanks to the config-merge bug that produces a malformed
+  // publish entry when we try. Renaming is simpler and reliable.
+  //
+  // The beta variant's auto-updater is pinned to channel = 'beta' (see
+  // main.js), so it fetches `beta.yml` from the GitHub release. If we
+  // shipped `latest.yml` instead, beta installs would never see updates.
+  const outDir = path.join(REPO_ROOT, 'dist-beta');
+  const src = path.join(outDir, 'latest.yml');
+  const dst = path.join(outDir, 'beta.yml');
+  try {
+    if (fs.existsSync(src)) {
+      fs.renameSync(src, dst);
+      console.log('[build-beta] renamed latest.yml → beta.yml');
+    } else {
+      console.warn('[build-beta] WARN: latest.yml not found in dist-beta/ — auto-updater manifest missing');
+    }
+  } catch (e) {
+    console.error('[build-beta] manifest rename failed:', e.message);
+    process.exit(1);
+  }
   console.log('[build-beta] done. artifacts in dist-beta/');
 }).catch(function(err) {
-  console.error('[build-beta] failed:', err);
+  console.error('[build-beta] failed:', err.message);
+  if (err.errors) {
+    const util = require('util');
+    console.error('[build-beta] full error tree:');
+    console.error(util.inspect(err.errors, { depth: 10, colors: false }));
+  }
   process.exit(1);
 });
