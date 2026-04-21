@@ -19,6 +19,7 @@
     "start": "electron .",
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --publish never",
     "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win portable --publish never",
+    "build:beta": "set CSC_IDENTITY_AUTO_DISCOVERY=false && node scripts/build-beta.js",
     "release": "electron-builder --win --publish always"
   },
   "dependencies": {

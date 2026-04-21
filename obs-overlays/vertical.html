@@ -5,28 +5,25 @@
 <title>StreamFusion — Vertical Chat Bar</title>
 <style>
   /* ───────────────────────────────────────────────────────────────────────
-     Vertical-stream chat bar overlay. Built for phones-in-portrait streams
-     (TikTok LIVE, YT Shorts Live, Twitch vertical). Renders one message
-     or event at a time along the bottom edge of the canvas: slides up,
-     holds for a few seconds, slides back down.
+     Vertical-stream chat + event overlay. Portrait canvas
+     (phones-in-OBS / TikTok LIVE / YT Shorts Live).
 
-     Unlike the main chat.html overlay (which stacks messages), this is
-     a serialized queue so a single focal moment is legible on a narrow
-     canvas where stacked messages would overlap the streamer or UI.
-
-     1.4.4 updates:
-       - Long messages marquee (scroll right→left) instead of getting
-         cut off with an ellipsis. The animation duration scales with
-         content length so fast readers aren't forced to wait.
-       - Emote support: server sends `emotes: [{name, url}]` and we
-         swap matching tokens inline as <img>.
-       - Optional profile pictures, platform icon chips, and badges —
-         same toggles as the horizontal chat overlay.
+     Surfaces:
+       - Chat bar: single row at the bottom, one message at a time, marquee
+         for long text. Chat only — gifts + alerts no longer queue here.
+       - Events column: configurable placement above or below the chat
+         bar. Each event is a compact card (SUB / FOLLOW / CHEER / etc.)
+         with platform-tinted left accent. Stacks multiple events so a
+         sub-bomb doesn't lose earlier entries.
+       - TikTok gift layer: floating animation in the TOP 50vh, confined
+         so gifts never cover chat or events. Matches the horizontal
+         overlay's spec so the visual language is consistent.
      ─────────────────────────────────────────────────────────────────── */
 
   :root {
     --bg-op: 0.55;
     --font-size: 20px;
+    --event-size: 14px;
     --tw: #a970ff;
     --yt: #ff4545;
     --tt: #fe2c55;
@@ -38,6 +35,7 @@
     --accent: #3A86FF;
     --accent2: #2AD4B9;
     --text: #ffffff;
+    --mut: #cfd2dc;
   }
 
   * { box-sizing: border-box; }
@@ -51,14 +49,18 @@
     color: var(--text);
   }
 
+  /* ──────────────────────────────────────────────────────────────────
+     Chat bar stage — pinned to the bottom, one message at a time.
+     ────────────────────────────────────────────────────────────────── */
   #stage {
     position: absolute;
-    inset: 0;
+    inset: auto 0 0 0;
     overflow: hidden;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     padding: 10px;
+    z-index: 3;
   }
 
   .bar {
@@ -84,16 +86,8 @@
 
   .bar.in  { animation: barIn  .45s cubic-bezier(.22,1.1,.36,1) forwards; }
   .bar.out { animation: barOut .35s cubic-bezier(.55,0,.7,.2) forwards; }
-
-  @keyframes barIn {
-    0%   { opacity: 0; transform: translateY(100%); }
-    60%  { opacity: 1; transform: translateY(-4%); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes barOut {
-    0%   { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(100%); }
-  }
+  @keyframes barIn  { 0%{opacity:0;transform:translateY(100%)} 60%{opacity:1;transform:translateY(-4%)} 100%{opacity:1;transform:translateY(0)} }
+  @keyframes barOut { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(100%)} }
 
   .bar::before {
     content: '';
@@ -108,31 +102,6 @@
   .bar.yt { color: var(--yt); } .bar.yt::before { background: var(--yt); }
   .bar.tt { color: var(--tt); } .bar.tt::before { background: var(--tt); }
   .bar.kk { color: var(--kk); } .bar.kk::before { background: var(--kk); }
-  .bar.se { color: var(--se); } .bar.se::before { background: var(--se); }
-  .bar.pa { color: var(--pa); } .bar.pa::before { background: var(--pa); }
-  .bar.fw { color: var(--fw); } .bar.fw::before { background: var(--fw); }
-  .bar.kf { color: var(--kf); } .bar.kf::before { background: var(--kf); }
-
-  /* Alerts get a thicker highlight + pulsing ring. */
-  .bar.is-alert {
-    background: linear-gradient(90deg, rgba(14,14,16,.92), rgba(24,24,27,.92));
-    border-color: rgba(255,255,255,.15);
-  }
-  .bar.is-alert::before { width: 6px; box-shadow: 0 0 20px currentColor; }
-  .bar.is-alert::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    border: 1px solid currentColor;
-    opacity: .6;
-    animation: alertPulse 1.4s ease-in-out infinite;
-    pointer-events: none;
-  }
-  @keyframes alertPulse {
-    0%, 100% { opacity: .3; }
-    50%      { opacity: .8; }
-  }
 
   .pfp {
     width: calc(var(--font-size) + 8px);
@@ -143,16 +112,12 @@
     background: rgba(255,255,255,0.08);
   }
   .pi {
-    width: 22px;
-    height: 22px;
+    width: 22px; height: 22px;
     flex-shrink: 0;
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 900;
-    border-radius: 4px;
-    color: #0e0e10;
+    align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 900;
+    border-radius: 4px; color: #0e0e10;
   }
   .pi.tw { background: var(--tw); color: #fff; }
   .pi.yt { background: var(--yt); color: #fff; }
@@ -161,8 +126,7 @@
 
   .ub {
     display: inline-block;
-    font-size: 11px;
-    font-weight: 800;
+    font-size: 11px; font-weight: 800;
     padding: 2px 6px;
     border-radius: 4px;
     margin-right: 4px;
@@ -182,16 +146,9 @@
   }
   .sep { color: rgba(255,255,255,.6); flex-shrink: 0; }
 
-  /* Message text viewport. When content fits the bar, stays static.
-     When it overflows, the `.scrolling` class swaps the inner span
-     to a marquee-style right→left slide so the whole line is
-     readable within the bar's hold time. */
-  /* 1.4.9 fix: the old mask-image had a 14px fade on the LEFT edge which
-     chopped the first letter of every message. Text starts at the left
-     of the container AND doesn't scroll past it (marquee scrolls right
-     -> left, so the left edge is always the "already-read" side), so
-     the left fade was gratuitous and actively destructive. Kept the
-     right fade so text scrolling out looks smooth, not cliff-cut. */
+  /* 1.4.9: left-edge mask removed — text never scrolls past the left,
+     so the fade was cutting off the first letter with no benefit. Kept
+     the right fade so the marquee's exit reads smooth. */
   .text {
     color: var(--text);
     flex: 1 1 auto;
@@ -203,41 +160,185 @@
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), rgba(0,0,0,0) 100%);
     padding-right: 4px;
   }
-  .text .inner {
-    display: inline-block;
-    padding-left: 0;
-    white-space: nowrap;
-    will-change: transform;
-  }
-  .text.scrolling .inner {
-    animation: marquee var(--marquee-dur, 8s) linear forwards;
-    padding-left: 0;
-  }
+  .text .inner { display: inline-block; white-space: nowrap; will-change: transform; }
+  .text.scrolling .inner { animation: marquee var(--marquee-dur, 8s) linear forwards; }
   @keyframes marquee {
-    /* Start offscreen to the right so the first character enters
-       smoothly after the bar finishes sliding up. End offscreen to
-       the left so the last character has fully cleared before the
-       bar slides back down. */
     0%   { transform: translateX(var(--start-x, 0)); }
     12%  { transform: translateX(0); }
     100% { transform: translateX(var(--end-x, -100%)); }
   }
-
   .text img.emote { height: 1.1em; width: auto; vertical-align: middle; margin: 0 2px; }
 
-  .kicker {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 100px;
-    background: currentColor;
-    color: #0e0e10;
-    font-size: 11px;
+  /* ──────────────────────────────────────────────────────────────────
+     Event cards — 1.5.1 split. Stacked column, configurable placement
+     above or below the chat bar. Compact so a portrait canvas doesn't
+     fill up with a single event.
+     ────────────────────────────────────────────────────────────────── */
+  .events {
+    position: absolute;
+    left: 0; right: 0;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  /* Above: sits in the middle of the canvas, grows upward as new events
+     push older ones up (column-reverse + bottom anchor). */
+  #events-above {
+    bottom: 90px;                 /* clear of the chat bar */
+    justify-content: flex-end;
+    flex-direction: column;
+  }
+  /* Below: same zone as chat bar — events sit just above the bar,
+     oldest at top, newest at bottom (next to the chat). */
+  #events-below {
+    bottom: 80px;
+    flex-direction: column;
+  }
+  body.placement-above #events-above { display: flex; }
+  body.placement-below #events-below { display: flex; }
+
+  .ev-card {
+    position: relative;
+    padding: 8px 14px 8px 16px;
+    border-radius: 10px;
+    background: rgba(14, 14, 16, 0.88);
+    border-left: 4px solid var(--accent);
+    color: var(--text);
+    font-size: var(--event-size);
+    font-weight: 700;
+    line-height: 1.3;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: evIn .3s cubic-bezier(.22,1.1,.36,1) forwards;
+  }
+  .ev-card.out { animation: evOut .3s ease-in forwards; }
+  @keyframes evIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+  @keyframes evOut { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-4px)} }
+
+  .ev-card.tw { border-left-color: var(--tw); }
+  .ev-card.yt { border-left-color: var(--yt); }
+  .ev-card.tt { border-left-color: var(--tt); }
+  .ev-card.kk { border-left-color: var(--kk); }
+  .ev-card.se { border-left-color: var(--se); }
+
+  .ev-kick {
+    font-size: 10px;
     font-weight: 900;
-    letter-spacing: .1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin-right: 4px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
     flex-shrink: 0;
   }
+  .ev-card.tw .ev-kick { background: rgba(169,112,255,0.22); color: #e5d4ff; }
+  .ev-card.yt .ev-kick { background: rgba(255,69,69,0.22);  color: #ffc6c6; }
+  .ev-card.kk .ev-kick { background: rgba(83,252,24,0.22);  color: #c3ff9e; }
+  .ev-card.tt .ev-kick { background: rgba(254,44,85,0.22);  color: #ffabc1; }
+
+  .ev-body { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev-u { font-weight: 900; }
+  .ev-amt {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #f0b429;
+    color: #0e0e10;
+    font-size: calc(var(--event-size) - 2px);
+    font-weight: 900;
+    margin: 0 2px;
+  }
+
+  /* ──────────────────────────────────────────────────────────────────
+     TikTok gift floating layer — mirrors horizontal overlay's 1.5.0
+     design: pop-in overshoot, glow halo, sparkle trail, stacking on
+     rapid arrivals. Confined to the top 50vh so gifts stay away from
+     chat + events which live in the bottom half.
+     ────────────────────────────────────────────────────────────────── */
+  #gifts {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 50vh;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 4;
+    contain: layout paint;
+  }
+  .gift {
+    position: absolute;
+    top: var(--spawn-y, 30%);
+    right: var(--spawn-right, 0px);
+    width: 88px;
+    text-align: center;
+    opacity: 0;
+    animation: giftFloat var(--gift-dur, 5s) cubic-bezier(.22,.7,.32,1) forwards;
+    will-change: transform, opacity;
+  }
+  .gift .g-art {
+    position: relative;
+    width: 88px; height: 88px;
+    margin: 0 auto;
+    animation: giftWobble 1.8s ease-in-out infinite;
+  }
+  .gift .g-art::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(254,44,85,.45) 0%, rgba(254,44,85,0.18) 45%, transparent 70%);
+    animation: giftHalo 1.4s ease-in-out infinite;
+    z-index: -1;
+  }
+  .gift .g-art img {
+    width: 88px; height: 88px;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,.55));
+  }
+  .gift .g-count {
+    position: absolute;
+    top: -4px; right: -4px;
+    background: linear-gradient(135deg, #fe2c55, #f0b429);
+    color: #0e0e10;
+    font-weight: 900;
+    font-size: 16px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 2px solid #fff;
+    min-width: 28px;
+    box-shadow: 0 3px 8px rgba(254,44,85,0.5);
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+  }
+  .gift .g-count.bump { transform: scale(1.35); }
+  .gift .g-user {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0,0,0,.9);
+    white-space: nowrap;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-left: auto; margin-right: auto;
+  }
+  @keyframes giftFloat {
+    0%   { opacity: 0; transform: translate(60px, 12px) scale(.3)  rotate(-10deg); }
+    10%  { opacity: 1; transform: translate(-18px, -6px) scale(1.18) rotate(4deg); }
+    20%  { opacity: 1; transform: translate(-8px, 0)    scale(1)    rotate(0deg); }
+    70%  { opacity: 1; transform: translate(var(--mid-x, -50vw), var(--drift-y, 5vh)) scale(.95) rotate(-4deg); }
+    100% { opacity: 0; transform: translate(var(--end-x, -100vw), calc(var(--drift-y, 5vh) + 2vh)) scale(.8) rotate(8deg); }
+  }
+  @keyframes giftWobble { 0%,100%{transform:rotate(-3deg) scale(1)} 50%{transform:rotate(3deg) scale(1.04)} }
+  @keyframes giftHalo   { 0%,100%{opacity:.55;transform:scale(0.92)} 50%{opacity:1;transform:scale(1.08)} }
 
   #gated {
     position: absolute;
@@ -251,12 +352,16 @@
     font-size: 14px;
     letter-spacing: .08em;
     text-transform: uppercase;
+    z-index: 99;
   }
   #gated.show { display: flex; }
 </style>
 </head>
 <body>
+<div id="events-above" class="events"></div>
+<div id="events-below" class="events"></div>
 <div id="stage"></div>
+<div id="gifts"></div>
 <div id="gated">Early Access required</div>
 
 <script>
@@ -264,22 +369,35 @@
   'use strict';
 
   var CFG = {
-    bgOpacity:    0.55,
-    fontSize:     20,
-    holdMs:       4500,
-    showPlatforms: { tw: true, yt: true, tt: true, kk: true, se: true, pa: true, fw: true, kf: true },
-    showEvents:   true,
-    showChat:     true,
-    showEmotes:   true,
-    showProfilePics: false,
+    bgOpacity:        0.55,
+    fontSize:         20,
+    holdMs:           4500,
+    showPlatforms:    { tw: true, yt: true, tt: true, kk: true, se: true, pa: true, fw: true, kf: true },
+    // Chat: only plain chat messages queue through the slide-up bar.
+    showChat:         true,
+    // Events (subs / follows / cheers / raids / tips): render as
+    // stacked cards in a column, placement configurable.
+    showEvents:       true,
+    eventPlacement:   'above',        // 'above' | 'below' | 'off'
+    eventSize:        14,
+    eventHoldMs:      8000,
+    // TikTok gifts: dedicated floating animation, NOT queued as chat.
+    showGiftAnimations: true,
+    ttGiftComboWindowMs: 700,
+    // Display toggles (shared with horizontal overlay)
+    showEmotes:       true,
+    showProfilePics:  false,
     showPlatformIcon: false,
-    showUserBadges:  true
+    showUserBadges:   true
   };
 
-  var stage = document.getElementById('stage');
-  var gated = document.getElementById('gated');
-  var queue = [];
-  var showing = false;
+  var stage    = document.getElementById('stage');
+  var evAbove  = document.getElementById('events-above');
+  var evBelow  = document.getElementById('events-below');
+  var gifts    = document.getElementById('gifts');
+  var gated    = document.getElementById('gated');
+  var queue    = [];
+  var showing  = false;
   var entitled = true;
 
   function escapeHtml(s) {
@@ -288,16 +406,12 @@
     });
   }
 
-  // Emote swap — same shape as the horizontal chat overlay. Called
-  // only for chat items; alerts render their named gift separately.
   function renderMessage(text, emotes) {
     if (!CFG.showEmotes || !emotes || !emotes.length) return escapeHtml(text);
     var byName = Object.create(null);
     emotes.forEach(function(e) { if (e && e.name && e.url) byName[e.name] = e.url; });
     return String(text || '').split(/(\s+)/).map(function(tok) {
-      if (byName[tok]) {
-        return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
-      }
+      if (byName[tok]) return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
       return escapeHtml(tok);
     }).join('');
   }
@@ -322,33 +436,16 @@
     return '<span class="pi ' + plat + '">' + plat.toUpperCase() + '</span>';
   }
 
-  function kickerFor(eventType) {
-    return {
-      follow: 'FOLLOW',  sub:   'SUB',    resub: 'RE-SUB',
-      gift:   'GIFT',    cheer: 'BITS',   raid:  'RAID',
-      tip:    'TIP',     host:  'HOST',
-      pledge: 'PATREON', tier_change: 'TIER UP',
-      order:  'ORDER',   donation: 'DONATION'
-    }[eventType] || 'EVENT';
-  }
-
-  // After a bar lands in the DOM, measure its .text inner width vs.
-  // the available text-column width; if the inner overflows, enable
-  // the marquee animation scaled to the hold time + overflow amount.
+  // Marquee — measure inner overflow, animate right-to-left so long
+  // messages fully read within the hold time.
   function maybeStartMarquee(bar, holdMs) {
     var text = bar.querySelector('.text');
     var inner = text && text.querySelector('.inner');
     if (!text || !inner) return;
-    // Wait a frame so layout settles before measuring.
     requestAnimationFrame(function() {
-      var textW  = text.clientWidth;
-      var innerW = inner.scrollWidth;
+      var textW = text.clientWidth, innerW = inner.scrollWidth;
       if (innerW <= textW + 2) return;
       var overflow = innerW - textW;
-      // Animation cycle covers the full bar hold time with a short
-      // pause at the start so readers can recognize the first words
-      // before the scroll begins. Speed floors at ~60px/s so even
-      // huge overflows never crawl.
       var secs = Math.max(4, Math.min((holdMs / 1000) - 0.5, overflow / 60));
       text.style.setProperty('--start-x', '0px');
       text.style.setProperty('--end-x',   -(overflow + 24) + 'px');
@@ -357,63 +454,30 @@
     });
   }
 
-  function showItem(item) {
+  // ──────────────────────────────────────────────────────────────────
+  // Chat bar queue (chat messages only — 1.5.1 split)
+  // ──────────────────────────────────────────────────────────────────
+  function showChatBar(item) {
     if (!entitled) { nextInQueue(); return; }
     var plat = (item.platform || '').toLowerCase();
-
-    if (item._kind === 'chat' && !CFG.showChat) { nextInQueue(); return; }
-    if (item._kind === 'alert' && !CFG.showEvents) { nextInQueue(); return; }
+    if (!CFG.showChat) { nextInQueue(); return; }
     if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) { nextInQueue(); return; }
-    // Suppress the vertical bar for small TT gifts — they get the chat
-    // overlay's floating animation instead. Spammy gift drops shouldn't
-    // flood a single-line bar.
-    if (item._kind === 'alert' && item.eventType === 'gift' && item.platform === 'tt' && item.isBig === false) {
-      nextInQueue();
-      return;
-    }
 
     var bar = document.createElement('div');
-    bar.className = 'bar ' + plat + (item._kind === 'alert' ? ' is-alert' : '');
-
-    var inner;
-    if (item._kind === 'alert') {
-      var kicker = kickerFor(item.eventType);
-      var primary;
-      if (item.eventType === 'gift' && item.platform === 'tt') {
-        primary = (item.user || 'someone') + ' sent ' + (item.giftName ? item.giftName + ' ' : '') + '(' + (item.amount || 0) + ' coins)';
-      } else if (item.eventType === 'gift')  primary = (item.user || 'someone') + ' gifted ' + (item.amount || 1) + ' subs!';
-      else if (item.eventType === 'cheer') primary = (item.user || 'someone') + ' cheered ' + (item.amount || 0) + ' bits!';
-      else if (item.eventType === 'raid')  primary = (item.user || 'someone') + ' raided with ' + (item.amount || 0) + ' viewers';
-      else if (item.eventType === 'tip')   primary = (item.user || 'someone') + ' tipped $' + (item.amount || 0);
-      else if (item.eventType === 'follow') primary = (item.user || 'someone') + ' followed';
-      else primary = (item.user || 'someone') + ' ' + (item.eventType || 'event');
-
-      var kickerHtml = item.giftImage
-        ? '<span class="kicker" style="padding:0;background:transparent;box-shadow:none"><img src="' + escapeHtml(item.giftImage) + '" alt="" style="height:28px;width:28px;object-fit:contain;vertical-align:middle" onerror="this.replaceWith(Object.assign(document.createElement(&quot;span&quot;),{textContent:&quot;' + escapeHtml(kicker) + '&quot;,className:&quot;kicker&quot;}))"></span>'
-        : '<span class="kicker">' + escapeHtml(kicker) + '</span>';
-
-      inner =
-        renderPfp(item) +
-        kickerHtml +
-        '<div class="text"><span class="inner">' + escapeHtml(primary) + '</span></div>';
-    } else {
-      inner =
-        renderPfp(item) +
-        renderPlatIcon(plat) +
-        renderBadges(item.badges) +
-        '<span class="user">' + escapeHtml(item.user || 'anon') + '</span>' +
-        '<span class="sep">\u00b7</span>' +
-        '<div class="text"><span class="inner">' + renderMessage(item.message || '', item.emotes) + '</span></div>';
-    }
-
-    bar.innerHTML = inner;
+    bar.className = 'bar ' + plat;
+    bar.innerHTML =
+      renderPfp(item) +
+      renderPlatIcon(plat) +
+      renderBadges(item.badges) +
+      '<span class="user">' + escapeHtml(item.user || 'anon') + '</span>' +
+      '<span class="sep">\u00b7</span>' +
+      '<div class="text"><span class="inner">' + renderMessage(item.message || '', item.emotes) + '</span></div>';
     stage.appendChild(bar);
 
     requestAnimationFrame(function() {
       bar.classList.add('in');
       maybeStartMarquee(bar, Math.max(1500, CFG.holdMs));
     });
-
     setTimeout(function() {
       bar.classList.remove('in');
       bar.classList.add('out');
@@ -429,22 +493,180 @@
     if (queue.length > 0) {
       showing = true;
       while (queue.length > 20) queue.shift();
-      showItem(queue.shift());
+      showChatBar(queue.shift());
     }
   }
 
-  function enqueue(kind, data) {
+  function enqueueChat(data) {
     if (!data) return;
-    data._kind = kind;
     if (showing) queue.push(data);
-    else { showing = true; showItem(data); }
+    else { showing = true; showChatBar(data); }
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // Event cards (sub / follow / cheer / raid / tip / etc.) — 1.5.1
+  // split. Render as stacked cards in a column above or below chat.
+  // TikTok gifts NEVER appear as event cards — they're handled by the
+  // dedicated floating layer below. That gives them their own visual
+  // space separate from the "big paid events" column.
+  // ──────────────────────────────────────────────────────────────────
+  function eventKicker(ev) {
+    return {
+      follow: 'FOLLOW',   sub:    'SUB',      resub: 'RE-SUB',
+      gift:   'GIFT',     cheer:  'BITS',     raid:  'RAID',
+      tip:    'TIP',      host:   'HOST',
+      pledge: 'PATREON',  tier_change: 'TIER UP',
+      order:  'ORDER',    donation: 'DONATION',
+      super:  'SUPER CHAT', member: 'MEMBER'
+    }[ev.eventType] || 'EVENT';
+  }
+  function eventText(ev) {
+    var u = '<span class="ev-u">' + escapeHtml(ev.user || 'someone') + '</span>';
+    switch (ev.eventType) {
+      case 'follow': return u + ' followed';
+      case 'sub':    return u + ' subscribed';
+      case 'resub':  return u + ' resubbed' + (ev.months ? ' (' + ev.months + 'mo)' : '');
+      case 'gift':   return u + ' gifted <span class="ev-amt">' + (ev.amount || 1) + '</span>';
+      case 'cheer':  return u + ' cheered <span class="ev-amt">' + (ev.amount || 0) + '</span>';
+      case 'raid':   return u + ' raided <span class="ev-amt">' + (ev.amount || 0) + '</span>';
+      case 'tip':    return u + ' tipped <span class="ev-amt">$' + (ev.amount || 0) + '</span>';
+      case 'host':   return u + ' hosted';
+      case 'super':  return u + ' super chat' + (ev.amount ? ' <span class="ev-amt">' + escapeHtml(String(ev.amount)) + '</span>' : '');
+      case 'member': return u + ' became a member';
+      default:       return u + ' ' + escapeHtml(ev.eventType || 'event');
+    }
+  }
+  function addEvent(ev) {
+    if (!CFG.showEvents || CFG.eventPlacement === 'off') return;
+    // TikTok gifts route to the floating layer, not the event column.
+    if (ev.eventType === 'gift' && ev.platform === 'tt') return;
+    var plat = (ev.platform || '').toLowerCase();
+    if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) return;
+
+    var card = document.createElement('div');
+    card.className = 'ev-card ' + plat;
+    card.innerHTML =
+      '<span class="ev-kick">' + eventKicker(ev) + '</span>' +
+      '<span class="ev-body">' + eventText(ev) + '</span>';
+
+    var host = CFG.eventPlacement === 'below' ? evBelow : evAbove;
+    host.appendChild(card);
+    // Trim to 5 visible so a sub-bomb doesn't push everything else
+    // off-screen forever. Oldest animates out gracefully.
+    while (host.children.length > 5) {
+      var stale = host.firstChild;
+      if (stale.classList.contains('out')) break;
+      stale.classList.add('out');
+      (function(n) { setTimeout(function() { if (n.parentNode) n.parentNode.removeChild(n); }, 320); })(stale);
+    }
+    setTimeout(function() {
+      card.classList.add('out');
+      setTimeout(function() { if (card.parentNode) card.parentNode.removeChild(card); }, 320);
+    }, Math.max(3000, CFG.eventHoldMs || 8000));
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // TikTok gift floating animation — matches horizontal overlay.
+  // Stacks same-user + same-gift arrivals within 700ms so rapid Rose
+  // spam reads as one moving cluster with an incrementing count.
+  // ──────────────────────────────────────────────────────────────────
+  var _recentGifts = Object.create(null);
+  var STACK_WINDOW_MS = 700;
+  var STACK_OFFSET_PX = 34;
+
+  function spawnGiftAnimation(ev) {
+    if (!CFG.showGiftAnimations) return;
+    if (ev.platform !== 'tt') return;
+    if (!ev.giftImage) return;
+
+    var key = (ev.user || 'someone') + '|' + (ev.giftName || 'gift');
+    var now = Date.now();
+    var recent = _recentGifts[key];
+    if (recent && (now - recent.time) < (CFG.ttGiftComboWindowMs || STACK_WINDOW_MS) && recent.el && recent.el.parentNode) {
+      var lead = recent.el;
+      var badge = lead.querySelector('.g-count');
+      var curCount = parseInt((badge && badge.textContent || '').replace(/\D+/g, ''), 10) || 1;
+      var newCount = curCount + Math.max(1, ev.count || 1);
+      if (!badge) {
+        var b = document.createElement('div');
+        b.className = 'g-count';
+        b.textContent = '\u00d7' + newCount;
+        lead.appendChild(b);
+      } else {
+        badge.textContent = '\u00d7' + newCount;
+        badge.classList.remove('bump');
+        void badge.offsetWidth;
+        badge.classList.add('bump');
+        setTimeout(function() { if (badge) badge.classList.remove('bump'); }, 240);
+      }
+      recent.time = now;
+      var sib = buildGiftElement(ev, {
+        spawnY: lead.style.getPropertyValue('--spawn-y') || '30%',
+        spawnRight: (recent.right + STACK_OFFSET_PX) + 'px',
+        midX:   lead.style.getPropertyValue('--mid-x')  || '-50vw',
+        endX:   lead.style.getPropertyValue('--end-x')  || '-100vw',
+        driftY: lead.style.getPropertyValue('--drift-y') || '5vh',
+        dur: (parseFloat(lead.style.getPropertyValue('--gift-dur') || '5') - 0.3).toFixed(2) + 's',
+        showCount: false, showUser: false
+      });
+      gifts.appendChild(sib);
+      recent.right += STACK_OFFSET_PX;
+      setTimeout(function() { if (sib.parentNode) sib.parentNode.removeChild(sib); }, parseFloat(lead.style.getPropertyValue('--gift-dur') || '5') * 1000 + 500);
+      return;
+    }
+
+    var opts = {
+      spawnY:     (5 + Math.random() * 30).toFixed(1) + '%',
+      spawnRight: '0px',
+      midX:   -(window.innerWidth * (0.35 + Math.random() * 0.25)) + 'px',
+      endX:   -(window.innerWidth * (0.95 + Math.random() * 0.15)) + 'px',
+      driftY: (2 + Math.random() * 6).toFixed(1) + 'vh',
+      dur:    (4.4 + Math.random() * 1.2).toFixed(2) + 's',
+      showCount: !!(ev.count && ev.count > 1),
+      showUser: true
+    };
+    var el = buildGiftElement(ev, opts);
+    gifts.appendChild(el);
+    _recentGifts[key] = { el: el, time: now, right: 0 };
+    var lifeMs = parseFloat(opts.dur) * 1000 + 500;
+    setTimeout(function() {
+      if (el.parentNode) el.parentNode.removeChild(el);
+      if (_recentGifts[key] && _recentGifts[key].el === el) delete _recentGifts[key];
+    }, lifeMs);
+  }
+
+  function buildGiftElement(ev, opts) {
+    var el = document.createElement('div');
+    el.className = 'gift';
+    el.style.setProperty('--spawn-y',     opts.spawnY);
+    el.style.setProperty('--spawn-right', opts.spawnRight);
+    el.style.setProperty('--mid-x',       opts.midX);
+    el.style.setProperty('--end-x',       opts.endX);
+    el.style.setProperty('--drift-y',     opts.driftY);
+    el.style.setProperty('--gift-dur',    opts.dur);
+    var countBadge = opts.showCount ? '<div class="g-count">\u00d7' + (ev.count || 1) + '</div>' : '';
+    var userLabel  = opts.showUser  ? '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>' : '';
+    el.innerHTML =
+      '<div class="g-art">' +
+        '<img src="' + escapeHtml(ev.giftImage) + '" alt="" onerror="this.closest(\'.gift\').remove()">' +
+        countBadge +
+      '</div>' +
+      userLabel;
+    return el;
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Config + SSE
+  // ──────────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     if (!cfg) return;
     Object.keys(cfg).forEach(function(k) { CFG[k] = cfg[k]; });
-    document.documentElement.style.setProperty('--bg-op', String(CFG.bgOpacity != null ? CFG.bgOpacity : 0.55));
-    document.documentElement.style.setProperty('--font-size', (CFG.fontSize || 20) + 'px');
+    var root = document.documentElement;
+    root.style.setProperty('--bg-op', String(CFG.bgOpacity != null ? CFG.bgOpacity : 0.55));
+    root.style.setProperty('--font-size', (CFG.fontSize || 20) + 'px');
+    root.style.setProperty('--event-size', (CFG.eventSize || 14) + 'px');
+    document.body.classList.remove('placement-above', 'placement-below', 'placement-off');
+    document.body.classList.add('placement-' + (CFG.showEvents ? (CFG.eventPlacement || 'above') : 'off'));
   }
 
   var es = new EventSource('/events?type=vertical');
@@ -456,8 +678,20 @@
       gated.classList.toggle('show', !entitled);
     } catch (err) {}
   });
-  es.addEventListener('chat',  function(e) { try { enqueue('chat',  JSON.parse(e.data)); } catch (err) {} });
-  es.addEventListener('alert', function(e) { try { enqueue('alert', JSON.parse(e.data)); } catch (err) {} });
+  es.addEventListener('chat', function(e) {
+    try { enqueueChat(JSON.parse(e.data)); } catch (err) {}
+  });
+  es.addEventListener('alert', function(e) {
+    var ev; try { ev = JSON.parse(e.data); } catch (err) { return; }
+    if (!ev) return;
+    // TikTok gifts → floating layer (not queued as chat, not rendered as an event card)
+    if (ev.eventType === 'gift' && ev.platform === 'tt') {
+      spawnGiftAnimation(ev);
+      return;
+    }
+    // Everything else → event card column
+    addEvent(ev);
+  });
   es.addEventListener('config', function(e) { try { applyConfig(JSON.parse(e.data)); } catch (err) {} });
   es.addEventListener('entitlement', function(e) {
     try { entitled = !!JSON.parse(e.data).entitled; gated.classList.toggle('show', !entitled); } catch (err) {}
