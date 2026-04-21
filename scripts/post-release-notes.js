@@ -36,10 +36,19 @@ const SECRET   = process.env.SF_RELEASE_POST_SECRET || '';
 const CHANNEL  = process.env.SF_RELEASE_CHANNEL_ID || '1494765819891159202';
 const GH_PAT   = process.env.SF_GITHUB_PAT || '';
 
-const tag = (process.argv[2] || '').replace(/^v?/, 'v');
+// Sanitize the tag input before we trust it: trim whitespace and strip
+// any character that isn't [A-Za-z0-9._-]. A stray close-paren or quote
+// from a copy-paste breaks the GitHub API lookup with a confusing 404.
+// Forcing a leading 'v' lets the caller pass either "v1.5.0" or "1.5.0".
+const rawTag = (process.argv[2] || '').trim();
+const tag = rawTag.replace(/[^\w.-]/g, '').replace(/^v?/, 'v');
 if (!tag || !/^v\d+\.\d+\.\d+/.test(tag)) {
   console.error('usage: node scripts/post-release-notes.js <tag>\n       e.g. node scripts/post-release-notes.js v1.5.0');
+  console.error('got:   ' + JSON.stringify(rawTag) + (rawTag !== tag ? ' (sanitized to ' + JSON.stringify(tag) + ')' : ''));
   process.exit(2);
+}
+if (rawTag !== tag) {
+  console.log('note: input "' + rawTag + '" sanitized to "' + tag + '"');
 }
 if (!SECRET) {
   console.error('SF_RELEASE_POST_SECRET not set. Export it and re-run.');
