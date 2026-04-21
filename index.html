@@ -2338,12 +2338,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec-hd">Diagnostics</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button onclick="if(window.electronAPI&&electronAPI.openLogFolder)electronAPI.openLogFolder()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;cursor:pointer">Open Log Folder</button>
-              <!-- Hidden promo overlay launcher: opaque OBS-friendly window that -->
-              <!-- advertises StreamFusion with live chat/stats/events. Intentionally -->
-              <!-- tucked into Diagnostics so casual users never trip over it. -->
-              <button id="promoBtn" onclick="togglePromoOverlay()" title="Opens an opaque chat+stats window designed to be captured as an OBS source. Promotes StreamFusion on-stream via an aquilo.gg download banner." style="padding:6px 12px;border-radius:6px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;cursor:pointer">Open promo overlay (for OBS)</button>
             </div>
-            <div style="font-size:10px;color:var(--mut);line-height:1.4;margin-top:6px">Promo overlay: a standalone window showing your live chat &amp; stats with an <strong>aquilo.gg</strong> banner — add it to OBS as a <em>Window Capture</em> source to advertise StreamFusion on-stream. Revenue is hidden.</div>
           </div>
           <div class="sec">
             <div class="sec-hd">Updates</div>
@@ -3857,21 +3852,29 @@ function connectSB(host, port, pass) {
         if (twp.broadcastUserName) S.twLogin = twp.broadcastUserName.toLowerCase();
         var bvc = twp.viewerCount != null ? twp.viewerCount : twp.viewers != null ? twp.viewers : null;
         if (bvc != null) { S.viewers.tw = bvc; S.twViewersFetched = true; _lastViewerUpdate.tw = Date.now(); updateViewers(); }
-        // Kick off the decapi-based viewer poll — SB's wildcard subscribe
-        // can't be trusted to deliver Twitch.PresentViewers on every version,
-        // so we poll directly as the ongoing source of truth.
         if (S.twLogin) startTwViewerPoll();
-        // Game / category fields come back under ~five different shapes
-        // depending on SB version. Newer SB nests the category under
-        // `broadcast` or uses `categoryName`; older ones use flat `game`.
-        var _tgn = twp.game || twp.gameName || twp.categoryName || twp.category
-                || (twp.broadcast && (twp.broadcast.gameName || twp.broadcast.game || twp.broadcast.categoryName))
-                || '';
-        var _tgid = twp.gameId || twp.categoryId
-                 || (twp.broadcast && (twp.broadcast.gameId || twp.broadcast.categoryId))
-                 || '';
+        // Game name + ID extraction. SB has shipped these under MANY
+        // different field shapes across versions — flat `gameName`,
+        // nested `broadcast.gameName`, snake_case `game_id`, etc. We
+        // ran into repeated "Game ID missing" reports in 1.4.x because
+        // the set of fields we checked was too narrow. Walk a wide
+        // variant list + fall back to a deep search. Logs what we
+        // matched (or didn't) under [SF rf] so missing-field-shape
+        // reports from users are trivial to diagnose.
+        var _tgn = _extractTwitchGameName(twp);
+        var _tgid = _extractTwitchGameId(twp);
+        console.log('[SF rf] GetBroadcaster: gameName=' + JSON.stringify(_tgn) + ' gameId=' + JSON.stringify(_tgid));
         if (_tgn) S.twGame = _tgn;
         if (_tgid) S.twGameId = String(_tgid);
+        // If GetBroadcaster left us without a game ID (common on some SB
+        // versions — only name, or broadcaster-info shape omits the cat-
+        // egory entirely when the channel hasn't broadcast yet this
+        // session), fire a TwitchGetChannelInfo fallback. Newer SB
+        // versions support it and return { gameId, gameName, title } in
+        // a stable shape. Older SB will reject unknown request types,
+        // which we handle silently — the Raid Finder's manual override
+        // stays as the final escape hatch.
+        if (!S.twGameId && S.twUserId) _rfFallbackChannelInfo(S.twUserId);
       }
       var ytp = msg.platforms && msg.platforms.youtube;
       if (ytp) {
@@ -4071,6 +4074,92 @@ function openRaidFinder() {
   });
 }
 
+// ── Twitch game-name / game-id extraction ───────────────────────────────────
+// SB has shipped the "current category" under a small zoo of field names
+// across versions. Rather than add one field at a time each time a user
+// reports "Game ID not detected", these helpers walk every known shape
+// (flat / snake-case / nested under `broadcast` / nested under `channel`)
+// plus do a one-level deep search for anything looking like a game id.
+// Logs the match path under [SF rf] so an unknown shape can be added to
+// this list within minutes.
+function _extractTwitchGameName(src) {
+  if (!src || typeof src !== 'object') return '';
+  var direct = src.game || src.gameName || src.game_name || src.categoryName || src.category_name
+            || src.category || src.currentGameName || src.currentCategoryName;
+  if (direct) return String(direct);
+  var buckets = [src.broadcast, src.broadcaster, src.channel, src.channelInfo, src.stream, src.streamInfo, src.info];
+  for (var i = 0; i < buckets.length; i++) {
+    var b = buckets[i];
+    if (!b || typeof b !== 'object') continue;
+    var hit = b.game || b.gameName || b.game_name || b.categoryName || b.category_name || b.category;
+    if (hit) return String(hit);
+  }
+  // Nested objects like `category: {id, name}` or `game: {id, name}`
+  if (src.game && typeof src.game === 'object' && src.game.name) return String(src.game.name);
+  if (src.category && typeof src.category === 'object' && src.category.name) return String(src.category.name);
+  return '';
+}
+function _extractTwitchGameId(src) {
+  if (!src || typeof src !== 'object') return '';
+  var direct = src.gameId || src.gameID || src.game_id || src.categoryId || src.categoryID
+            || src.category_id || src.currentGameId || src.currentCategoryId;
+  if (direct) return String(direct);
+  var buckets = [src.broadcast, src.broadcaster, src.channel, src.channelInfo, src.stream, src.streamInfo, src.info];
+  for (var i = 0; i < buckets.length; i++) {
+    var b = buckets[i];
+    if (!b || typeof b !== 'object') continue;
+    var hit = b.gameId || b.gameID || b.game_id || b.categoryId || b.categoryID || b.category_id;
+    if (hit) return String(hit);
+  }
+  // Nested objects like `category: {id, name}` or `game: {id, name}`
+  if (src.game && typeof src.game === 'object' && src.game.id) return String(src.game.id);
+  if (src.category && typeof src.category === 'object' && src.category.id) return String(src.category.id);
+  return '';
+}
+
+// ── TwitchGetChannelInfo fallback ───────────────────────────────────────────
+// When GetBroadcaster doesn't include the game id, ask SB directly via
+// TwitchGetChannelInfo (newer SB versions, ~0.2.3+). Response shape is
+// `{gameId, gameName, title, ...}` at the top level, so we thread it
+// through the same extractor helpers used for GetBroadcaster. If SB
+// doesn't know the request (old version) it replies with a non-ok
+// status and we just swallow — the Raid Finder manual override stays
+// available as the final escape hatch.
+function _rfFallbackChannelInfo(broadcasterUserId) {
+  if (!broadcasterUserId) return;
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) return;
+  var reqId = 'sf-rf-chinfo-' + Date.now();
+  console.log('[SF rf] firing TwitchGetChannelInfo fallback for', broadcasterUserId);
+  sbPending[reqId] = function(resp) {
+    console.log('[SF rf] TwitchGetChannelInfo response:', JSON.stringify(resp).slice(0, 500));
+    if (!resp || resp.status !== 'ok') return;
+    // Different SB versions nest the payload differently. Check both the
+    // top-level response + common sub-objects.
+    var src = resp.data || resp.info || resp.channel || resp;
+    var name = _extractTwitchGameName(src);
+    var id = _extractTwitchGameId(src);
+    if (name && !S.twGame)    S.twGame = name;
+    if (id   && !S.twGameId)  S.twGameId = String(id);
+    console.log('[SF rf] after fallback: gameName=' + S.twGame + ', gameId=' + S.twGameId);
+    // If the Raid Finder panel is currently open, re-render so the
+    // newly-arrived gameId re-enables the search button.
+    var modalEl = document.getElementById('modal');
+    if (modalEl && modalEl.innerHTML.indexOf('Raid Finder') !== -1) {
+      try { _rfRenderPanel(); } catch (e) {}
+    }
+  };
+  try {
+    S.sbWS.send(JSON.stringify({
+      request: 'TwitchGetChannelInfo',
+      id: reqId,
+      broadcaster: String(broadcasterUserId),
+      broadcasterUserId: String(broadcasterUserId)
+    }));
+  } catch (e) { console.log('[SF rf] TwitchGetChannelInfo send threw:', e && e.message); }
+  // Timeout cleanup so an old-SB silent-reject doesn't leak the callback.
+  setTimeout(function() { if (sbPending[reqId]) delete sbPending[reqId]; }, 8000);
+}
+
 // ── Action detection ─────────────────────────────────────────────────────────
 function _rfCheckActions(done) {
   var reqId = 'sf-rf-chk-' + Date.now();
@@ -4083,6 +4172,7 @@ function _rfCheckActions(done) {
     }
     S.raidFinder.actions.find = find;
     S.raidFinder.actions.startRaid = raid;
+    console.log('[SF rf] GetActions ' + actions.length + ' total; find=' + (find && find.id) + ', startRaid=' + (raid && raid.id));
     done(!!(find && raid));
   };
   S.sbWS.send(JSON.stringify({ request: 'GetActions', id: reqId }));
@@ -4215,8 +4305,14 @@ function _rfRenderPanel() {
     + '</div>'
     // Search button + results
     + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
-    + '<button class="btn-tw" id="rfSearchBtn" onclick="_rfFindTargets()"' + (!gameId ? ' disabled title="Start streaming so SF can detect your game"' : '') + '><svg class="ic"><use href="#i-eye"/></svg> Find Targets</button>'
-    + (!gameId ? '<span style="font-size:11px;color:var(--mut)">Start streaming to detect your game, or click refresh</span>' : '')
+    + '<button class="btn-tw" id="rfSearchBtn" onclick="_rfFindTargets()"' + (!gameId ? ' disabled title="No game ID detected yet. Click the refresh icon, or paste a game ID under Advanced"' : '') + '><svg class="ic"><use href="#i-eye"/></svg> Find Targets</button>'
+    + (!gameId
+        ? '<span style="font-size:11px;color:var(--warn,#f59e0b);line-height:1.4">'
+          + (S.twGame
+              ? 'Game name detected (<strong>' + esc(S.twGame) + '</strong>) but no ID \u2014 click <svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-refresh"/></svg> to retry, or open Advanced and paste a Game ID from <a onclick="window.open(\'https://twitchtracker.com/games\',\'_blank\');return false" style="color:var(--accent);cursor:pointer">twitchtracker.com/games</a>.'
+              : 'No game detected. Start streaming, then click <svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-refresh"/></svg> to refresh.')
+          + '</span>'
+        : '')
     + '</div>'
     + '<div id="rfResults" style="max-height:300px;overflow-y:auto"></div>'
     + '<div class="mbtns" style="margin-top:8px"><button class="btn-x" onclick="closeModal()">Close</button></div>';
@@ -4250,17 +4346,24 @@ function _rfUpdateRange() {
 
 function _rfRefreshGame() {
   if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) return;
+  console.log('[SF rf] _rfRefreshGame \u2014 firing GetBroadcaster + chaining TwitchGetChannelInfo fallback');
   S.sbWS.send(JSON.stringify({ request: 'GetBroadcaster', id: 'sf-broadcaster' }));
   var el = document.getElementById('rfGameName');
   if (el) el.textContent = 'Refreshing...';
+  // Parallel fallback: if we already know the broadcaster user id (from a
+  // previous GetBroadcaster), fire TwitchGetChannelInfo immediately so we
+  // don't wait for GetBroadcaster's ~100-500ms round-trip. The fallback's
+  // response handler checks for an empty gameId before overwriting, so a
+  // fresh GetBroadcaster win-the-race scenario still works.
+  if (S.twUserId) _rfFallbackChannelInfo(S.twUserId);
   setTimeout(function() {
     var el2 = document.getElementById('rfGameName');
     if (el2 && el2.textContent === 'Refreshing...') {
       el2.textContent = S.twGame || '(not detected)';
-      // Re-enable search button if game detected
       var btn = document.getElementById('rfSearchBtn');
       if (btn) btn.disabled = !S.twGameId;
     }
+    console.log('[SF rf] refresh settled \u2014 gameName=' + S.twGame + ', gameId=' + S.twGameId);
   }, 3000);
 }
 
@@ -4293,6 +4396,7 @@ function _rfFindTargets() {
   var resEl = document.getElementById('rfResults');
   if (resEl) resEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mut);font-size:12px">Searching Twitch for streamers...</div>';
 
+  console.log('[SF rf] DoAction find: gameId=' + gameId + ' range=[' + low + ',' + high + '] want=' + rf.wantCount + ' reqId=' + reqId);
   S.sbWS.send(JSON.stringify({
     request: 'DoAction',
     id: reqId,
@@ -4325,10 +4429,12 @@ function _rfResetSearchBtn() {
 // ── Response handler (called from handleSBEvent) ─────────────────────────────
 function _handleRaidFinderResponse(data) {
   var rf = S.raidFinder;
+  console.log('[SF rf] response received: kind=' + (data && data.kind) + ' reqId=' + (data && data.reqId) + ' streams=' + (data && data.streams ? data.streams.length : 0) + ' matches-last=' + (data && data.reqId === rf.lastReqId));
   if (!data.reqId || data.reqId !== rf.lastReqId) return;
   rf.searching = false;
   if (data.kind === 'error') {
     rf.lastResults = { error: data.code || 'unknown' };
+    console.warn('[SF rf] action error:', data.code, data.message || '');
   } else {
     rf.lastResults = { streams: data.streams || [] };
   }
