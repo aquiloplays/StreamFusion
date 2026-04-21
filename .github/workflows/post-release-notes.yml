@@ -7,6 +7,13 @@ name: Post release notes to Discord
 # moment you finish uploading assets and flip the release from draft
 # to published, the Discord post goes out automatically.
 #
+# This SAME workflow file lives on both aquiloplays/StreamFusion
+# (stable) and aquiloplays/StreamFusion-beta (private pre-release).
+# It's repo-agnostic — the script uses GITHUB_REPOSITORY to target the
+# correct repo for the release fetch, and each repo carries its own
+# secrets for the role ping + embed color so stable and beta posts
+# look distinct and ping different Discord roles.
+#
 # Manual re-run: Actions tab → "Post release notes to Discord" → Run
 # workflow → pick a tag from the dropdown. Useful if Railway was down
 # during the original publish.
@@ -14,11 +21,25 @@ name: Post release notes to Discord
 # ──────────────────────────────────────────────────────────────────────
 # Required repo secrets (Settings → Secrets and variables → Actions)
 # ──────────────────────────────────────────────────────────────────────
-#   SF_RELEASE_POST_SECRET    (required)
+#   SF_RELEASE_POST_SECRET    (required on BOTH repos, same value)
 #     Shared secret. Must match the RELEASE_POST_SECRET env var set on
 #     the Railway bot service. Generate one with:
 #       node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
-#     Then paste the SAME value into Railway AND into this repo secret.
+#     Then paste the SAME value into Railway AND into both repo secrets.
+#
+#   SF_RELEASE_PING_ROLE_ID   (optional, but set per-repo for @-pings)
+#     Discord role ID to @ping in the release-post message content.
+#       Stable repo: 1486090420675936488  (StreamFusion Updates)
+#       Beta repo:   1483242263961407670  (Tier 3 Patron)
+#     Unset/empty → no ping. The bot must have Mention Everyone (or
+#     the role must be marked "mentionable") in the target channel
+#     for the ping to actually fire for subscribers.
+#
+#   SF_RELEASE_EMBED_COLOR    (optional — beta should set this)
+#     Hex or decimal color for the embed sidebar. Accepts "0xF59E0B",
+#     "#F59E0B", "F59E0B", or "16034827".
+#       Stable repo: leave unset (falls back to SF blue 0x3A86FF)
+#       Beta repo:   0xF59E0B  (amber — matches the beta icon palette)
 #
 #   SF_BOT_SERVICE_URL        (optional, default below)
 #     Override for the bot service base URL. Defaults to the prod
@@ -26,10 +47,13 @@ name: Post release notes to Discord
 #
 #   SF_RELEASE_CHANNEL_ID     (optional, default below)
 #     Override for the target Discord channel. Defaults to
-#     1494765819891159202 (the community #releases channel).
+#     1494765819891159202 (the community #releases channel). Set on
+#     the beta repo if you want beta posts in a Tier-3-only channel
+#     instead of the same community channel.
 #
-# The built-in GITHUB_TOKEN is used for the GitHub release fetch — no
-# extra PAT needed.
+# The built-in GITHUB_TOKEN is used for the GitHub release fetch. On
+# private repos it's scoped to THIS repo, which is fine since the
+# workflow only ever fetches its own releases.
 
 on:
   release:
@@ -72,10 +96,16 @@ jobs:
 
       - name: Post release notes via SF bot
         env:
-          SF_RELEASE_POST_SECRET: ${{ secrets.SF_RELEASE_POST_SECRET }}
-          SF_BOT_SERVICE_URL:     ${{ secrets.SF_BOT_SERVICE_URL }}
-          SF_RELEASE_CHANNEL_ID:  ${{ secrets.SF_RELEASE_CHANNEL_ID }}
-          SF_GITHUB_PAT:          ${{ secrets.GITHUB_TOKEN }}
+          SF_RELEASE_POST_SECRET:    ${{ secrets.SF_RELEASE_POST_SECRET }}
+          SF_BOT_SERVICE_URL:        ${{ secrets.SF_BOT_SERVICE_URL }}
+          SF_RELEASE_CHANNEL_ID:     ${{ secrets.SF_RELEASE_CHANNEL_ID }}
+          SF_RELEASE_PING_ROLE_ID:   ${{ secrets.SF_RELEASE_PING_ROLE_ID }}
+          SF_RELEASE_EMBED_COLOR:    ${{ secrets.SF_RELEASE_EMBED_COLOR }}
+          SF_GITHUB_PAT:             ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_REPOSITORY is auto-set by Actions to owner/repo of
+          # the repo the workflow runs in — script uses this to fetch
+          # the release from the correct repo (beta vs stable) without
+          # any per-repo config.
         run: |
           if [ -z "$SF_RELEASE_POST_SECRET" ]; then
             echo "::error::SF_RELEASE_POST_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions."
