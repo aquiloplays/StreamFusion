@@ -3,28 +3,43 @@
 // StreamFusion (different appId = different Windows identity), so you
 // can run both and test pre-release changes without touching your
 // day-to-day install. Its auto-updater is pinned to the 'beta' channel
-// so it pulls ONLY from GitHub pre-release tags (e.g. v1.6.0-beta.1),
-// leaving production users on the main channel undisturbed.
+// and targets the PRIVATE aquiloplays/StreamFusion-beta repo — only
+// invited Tier 3 Patreon supporters get access to releases.
 //
 // Usage: npm run build:beta
 //
-// Output: dist-beta/StreamFusion-Beta-Setup-<ver>.exe + portable
+// Output: dist-beta/StreamFusion-Beta-Setup-<ver>.exe + portable + beta.yml
 //
 // Version stamping: if package.json's version is already a semver
 // prerelease (e.g. 1.5.1-beta.2), it's used as-is. Otherwise we
 // append `-beta.0` so the next beta-only release-tag can take over.
+//
+// How this differs from the stable build:
+//   - stable uses package.json's "build" field (merged into the
+//     electron-builder config). Beta uses a dedicated
+//     electron-builder-beta.json invoked via `--config`, which
+//     REPLACES package.json's build field rather than merging.
+//     Reason: electron-builder 24 has a deep-merge bug that corrupts
+//     `publish[0]` when both the programmatic config and package.json
+//     define it, producing a malformed `{ '0': {...}, provider, ... }`
+//     object that fails schema validation with no useful error. Using
+//     `--config` sidesteps the merge entirely and lets us point at a
+//     different publish repo (StreamFusion-beta instead of
+//     StreamFusion) cleanly.
+//
 // Release flow:
 //   1. `npm run build:beta`
-//   2. Upload assets to a GitHub release tagged e.g. v1.6.0-beta.1
-//      and mark it as a pre-release in the GitHub UI.
+//   2. Upload assets to a GitHub release tagged e.g. v1.6.0-beta.1 on
+//      aquiloplays/StreamFusion-beta (PRIVATE repo) and mark it as a
+//      pre-release in the GitHub UI.
 //   3. Upload `beta.yml` (produced alongside the installer) as an
 //      asset too — that's the manifest the beta auto-updater reads.
 
 'use strict';
 
-const path   = require('path');
-const fs     = require('fs');
-const builder = require('electron-builder');
+const path = require('path');
+const fs   = require('fs');
+const { spawnSync } = require('child_process');
 const { buildRawIcon, encodePNG, buildIco, PALETTES } = require('../icon-gen');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -67,96 +82,64 @@ try {
   process.exit(1);
 }
 
-// Hoist-level overrides: appId, productName, NSIS shortcut/artifact
-// naming, portable artifact name, output dir. Everything else is
-// inherited from package.json's build config so the beta build stays
-// structurally identical to production.
-const config = {
-  appId:        'gg.aquilo.streamfusion-beta',
-  productName:  'StreamFusion Beta',
-  extraMetadata: {
-    name: 'streamfusion-beta',
-    version: version
-  },
-  directories: {
-    output: 'dist-beta'
-  },
-  // Point electron-builder at the amber/orange beta icons generated
-  // above. These drive: the taskbar icon, Start Menu shortcut icon,
-  // desktop shortcut icon, Alt+Tab preview, and the NSIS installer
-  // header. Runtime-drawn surfaces (tray, title bar) switch to the
-  // beta palette via main.js's PALETTES.beta detection.
-  win: {
-    icon: 'assets/icon-beta.ico'
-  },
-  mac: {
-    icon: 'assets/icon-beta.png'
-  },
-  nsis: {
-    oneClick: false,
-    perMachine: false,
-    allowToChangeInstallationDirectory: true,
-    createDesktopShortcut: true,
-    createStartMenuShortcut: true,
-    shortcutName: 'StreamFusion Beta',
-    installerHeaderIcon: 'assets/icon-beta.ico',
-    deleteAppDataOnUninstall: false,
-    differentialPackage: true,
-    artifactName: 'StreamFusion-Beta-Setup-${version}.${ext}'
-  },
-  portable: {
-    artifactName: 'StreamFusion-Beta-Portable-${version}.${ext}'
-  },
-  // INTENTIONALLY NO `publish` override here. electron-builder 24
-  // deep-merges the programmatic config against package.json's build
-  // field, and the merge does something broken when both sides have
-  // `publish: [{...}]` — it produces a Franken-object with a stray
-  // `'0': {...}` key attached to the same element, which fails schema
-  // validation with a useless whole-config dump. Keeping the publish
-  // config exclusively in package.json dodges the merge bug.
-  //
-  // electron-builder auto-detects the `beta` channel from the
-  // prerelease version suffix (1.5.1-beta.0) — it generates beta.yml
-  // automatically for any semver with a `-beta.N` tail. The prerelease
-  // state on the GitHub release itself (UI checkbox / API
-  // `prerelease: true`) is what actually routes auto-updater clients.
-};
+// Invoke electron-builder CLI. `--config` points at our dedicated
+// config file (replaces package.json's build field). `--extraMetadata`
+// overrides package.json fields at build time — we use it to stamp
+// `version` and `name` on the bundled app's package.json without
+// touching the repo's package.json. The `-c.` prefix tells
+// electron-builder this is a config-path override.
+const configPath = path.join(REPO_ROOT, 'electron-builder-beta.json');
+const betaName   = 'streamfusion-beta';
 
-builder.build({
-  targets: builder.Platform.WINDOWS.createTarget(['nsis', 'portable']),
-  config: config,
-  publish: 'never'
-}).then(function() {
-  // Rename latest.yml → beta.yml. electron-builder writes the manifest
-  // as `latest.yml` by default because the publish config (inherited
-  // from package.json) doesn't specify a channel — and we can't override
-  // it here thanks to the config-merge bug that produces a malformed
-  // publish entry when we try. Renaming is simpler and reliable.
-  //
-  // The beta variant's auto-updater is pinned to channel = 'beta' (see
-  // main.js), so it fetches `beta.yml` from the GitHub release. If we
-  // shipped `latest.yml` instead, beta installs would never see updates.
-  const outDir = path.join(REPO_ROOT, 'dist-beta');
-  const src = path.join(outDir, 'latest.yml');
-  const dst = path.join(outDir, 'beta.yml');
-  try {
-    if (fs.existsSync(src)) {
-      fs.renameSync(src, dst);
-      console.log('[build-beta] renamed latest.yml → beta.yml');
-    } else {
-      console.warn('[build-beta] WARN: latest.yml not found in dist-beta/ — auto-updater manifest missing');
-    }
-  } catch (e) {
-    console.error('[build-beta] manifest rename failed:', e.message);
-    process.exit(1);
-  }
-  console.log('[build-beta] done. artifacts in dist-beta/');
-}).catch(function(err) {
-  console.error('[build-beta] failed:', err.message);
-  if (err.errors) {
-    const util = require('util');
-    console.error('[build-beta] full error tree:');
-    console.error(util.inspect(err.errors, { depth: 10, colors: false }));
-  }
-  process.exit(1);
+// Windows: .cmd shim; POSIX: bash shim. spawnSync on Windows can't
+// launch `.cmd` directly (CreateProcess ENOENT) unless shell:true,
+// so we always go via the shell. Quoting the path handles spaces.
+const binName = process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder';
+const binPath = path.join(REPO_ROOT, 'node_modules', '.bin', binName);
+
+console.log('[build-beta] invoking electron-builder CLI with --config ' + path.basename(configPath));
+const args = [
+  '--win',
+  '--config', JSON.stringify(configPath),
+  '--publish', 'never',
+  '-c.extraMetadata.version=' + version,
+  '-c.extraMetadata.name=' + betaName
+];
+const result = spawnSync(JSON.stringify(binPath) + ' ' + args.join(' '), {
+  cwd: REPO_ROOT,
+  stdio: 'inherit',
+  shell: true,
+  env: Object.assign({}, process.env, {
+    // Prevent electron-builder from trying to auto-discover a code
+    // signing identity (fails on this machine without a cert).
+    CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  })
 });
+
+if (result.status !== 0) {
+  console.error('[build-beta] electron-builder exited with code', result.status);
+  process.exit(result.status || 1);
+}
+
+// Rename latest.yml → beta.yml. electron-builder writes the manifest
+// as `latest.yml` by default because the publish config doesn't
+// specify a channel. The beta variant's auto-updater is pinned to
+// channel = 'beta' (see main.js) so it fetches `beta.yml` from the
+// GitHub release — without this rename, beta installs would never
+// see update manifests.
+const outDir = path.join(REPO_ROOT, 'dist-beta');
+const src = path.join(outDir, 'latest.yml');
+const dst = path.join(outDir, 'beta.yml');
+try {
+  if (fs.existsSync(src)) {
+    fs.renameSync(src, dst);
+    console.log('[build-beta] renamed latest.yml → beta.yml');
+  } else {
+    console.warn('[build-beta] WARN: latest.yml not found in dist-beta/ — auto-updater manifest missing');
+  }
+} catch (e) {
+  console.error('[build-beta] manifest rename failed:', e.message);
+  process.exit(1);
+}
+
+console.log('[build-beta] done. artifacts in dist-beta/');

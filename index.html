@@ -27,6 +27,44 @@ body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans
 .titlebar-btn:hover{background:var(--surf3);color:var(--txt)}
 .titlebar-btn.close:hover{background:#c42b1c;color:#fff}
 body:not(.is-electron) .titlebar{display:none}
+/* Beta wordmark badge — only visible when electronAPI.isBeta() resolves true
+   and boot.js adds `is-beta` to <body>. Inline next to the "StreamFusion"
+   wordmark in both the titlebar and the top sidebar logo. Amber palette
+   matches the beta app icon so the whole app reads beta at a glance. */
+.sf-beta-badge{display:none;margin-left:6px;padding:1px 5px;font-size:9px;font-weight:800;letter-spacing:.8px;color:#140e04;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);border-radius:3px;vertical-align:middle;-webkit-background-clip:border-box;-webkit-text-fill-color:#140e04;box-shadow:0 0 8px rgba(249,115,22,.35)}
+.sf-beta-badge.lg{font-size:10px;padding:2px 6px;margin-left:7px;letter-spacing:1px}
+body.is-beta .sf-beta-badge{display:inline-block}
+/* Paint the sidebar logo in amber/orange when on beta, so the wordmark
+   color matches the icon palette instead of the stable blue/teal. */
+body.is-beta .logo{background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+/* Boot splash wordmark on beta: matching amber gradient instead of
+   the stable blue/teal. Applies to the 1.5 sec startup overlay only. */
+body.is-beta .sf-boot-logo{background:linear-gradient(135deg,#f59e0b 0%,#f97316 70%,#fde68a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 40px rgba(249,115,22,.45))}
+/* Beta access gate — full-screen overlay that blocks UI interaction
+   until the user is Patreon Tier 3 entitled. Styled to match the beta
+   amber palette so it reads as a natural part of the app, not an
+   error. z-index sits above the onboarding flow (which may also open
+   on first launch) so a non-tier3 beta user can never bypass the
+   gate by navigating the onboarding. */
+.sf-beta-gate{position:fixed;inset:0;z-index:99999;background:radial-gradient(ellipse at center,#201604 0%,#0a0605 75%);display:flex;align-items:center;justify-content:center;padding:24px;animation:sfBetaGateFade .35s ease forwards;-webkit-app-region:drag}
+.sf-beta-gate-card{max-width:540px;width:100%;background:#140e04;border:1px solid rgba(245,158,11,.35);border-radius:14px;padding:36px 32px;text-align:center;box-shadow:0 0 60px rgba(249,115,22,.18),inset 0 1px 0 rgba(254,243,199,.06);-webkit-app-region:no-drag}
+.sf-beta-gate-logo{font-size:34px;font-weight:900;letter-spacing:-1px;margin-bottom:4px;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sf-beta-gate-badge{display:inline-block;margin-left:6px;padding:3px 8px;font-size:14px;font-weight:800;letter-spacing:1.5px;color:#140e04;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);border-radius:5px;vertical-align:6px;-webkit-text-fill-color:#140e04}
+.sf-beta-gate-title{font-size:18px;font-weight:700;color:#fde68a;margin:18px 0 8px;letter-spacing:.2px}
+.sf-beta-gate-sub{font-size:13px;line-height:1.55;color:#c9b89a;margin-bottom:20px}
+.sf-beta-gate-sub strong{color:#fde68a;font-weight:700}
+.sf-beta-gate-status{font-size:12px;color:#a08a6a;min-height:18px;margin-bottom:18px;padding:8px 12px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-radius:6px;display:none}
+.sf-beta-gate-status.show{display:block}
+.sf-beta-gate-btns{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.sf-beta-gate-btn{height:40px;padding:0 18px;border:1px solid rgba(245,158,11,.35);background:#1f1608;color:#fde68a;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;transition:background .15s,border-color .15s,transform .08s}
+.sf-beta-gate-btn:hover{background:#2a1d0c;border-color:rgba(245,158,11,.55)}
+.sf-beta-gate-btn:active{transform:scale(.98)}
+.sf-beta-gate-btn.primary{background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);color:#140e04;border-color:#f59e0b;font-weight:800}
+.sf-beta-gate-btn.primary:hover{background:linear-gradient(135deg,#fbbf24 0%,#fb923c 100%)}
+.sf-beta-gate-btn.quiet{background:transparent;border-color:rgba(245,158,11,.15);color:#8a7555;font-weight:500}
+.sf-beta-gate-btn.quiet:hover{background:rgba(245,158,11,.06)}
+.sf-beta-gate-foot{font-size:11px;color:#6f5a3f;line-height:1.45}
+@keyframes sfBetaGateFade{from{opacity:0}to{opacity:1}}
 .topbar{background:var(--surf);border-bottom:1px solid var(--bdr);padding:8px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
 .logo{font-size:18px;font-weight:900;background:linear-gradient(135deg,var(--accent),#00E5A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;margin-right:4px}
 .vcounts{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
@@ -1507,8 +1545,28 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 <div id="sfBanner"><div class="sfBn-inner"><svg class="ic ic-lg" id="sfBnIcon"><use href="#i-party"/></svg><div class="sfBn-title" id="sfBnTitle">Event</div><div class="sfBn-sub" id="sfBnSub"></div><span class="sfBn-amt" id="sfBnAmt" style="display:none"></span></div></div>
 <!-- Hype Train LEVEL UP fullscreen fanfare -->
 <div id="sfHypeLevelUp"><div class="hlu-rays" id="hluRays"></div><div class="hlu-card"><div class="hlu-label">Hype Train</div><div class="hlu-title">LEVEL UP!</div><div class="hlu-level">Level <b id="hluLvNum">1</b></div></div></div>
+<!-- Tier 3 access gate. Only injected into the DOM on beta installs
+     (main.js IPC is-beta -> true). Hidden until the entitlement check
+     resolves with a non-tier3 state; shown as a full-screen blocker
+     that requires Patreon Tier 3 sign-in before the rest of the UI
+     is usable. Owner email bypass in patreon-auth.js means the creator
+     never sees this. -->
+<div id="sfBetaGate" class="sf-beta-gate" style="display:none">
+  <div class="sf-beta-gate-card">
+    <div class="sf-beta-gate-logo">StreamFusion <span class="sf-beta-gate-badge">BETA</span></div>
+    <div class="sf-beta-gate-title" id="sfBetaGateTitle">Tier 3 Patreon supporters only</div>
+    <div class="sf-beta-gate-sub" id="sfBetaGateSub">StreamFusion Beta is a pre-release channel reserved for Patreon <strong>Tier 3 (Contributor)</strong> supporters. Sign in with your Patreon account to unlock access.</div>
+    <div class="sf-beta-gate-status" id="sfBetaGateStatus"></div>
+    <div class="sf-beta-gate-btns">
+      <button class="sf-beta-gate-btn primary" id="sfBetaGateSignInBtn" onclick="_sfBetaGateSignIn()">Sign in with Patreon</button>
+      <a class="sf-beta-gate-btn" href="https://www.patreon.com/cw/aquilo" target="_blank" rel="noopener" style="text-decoration:none;display:flex;align-items:center;justify-content:center">Upgrade to Tier 3</a>
+      <button class="sf-beta-gate-btn quiet" onclick="_sfBetaGateQuit()">Quit</button>
+    </div>
+    <div class="sf-beta-gate-foot">You can still run the stable version of StreamFusion — it's free for everyone.</div>
+  </div>
+</div>
 <div class="titlebar">
-  <span class="titlebar-title"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion</span>
+  <span class="titlebar-title"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion<span class="sf-beta-badge" title="Beta channel (Patreon Tier 3)">BETA</span></span>
   <div class="titlebar-btns">
     <button class="titlebar-btn" onclick="window.electronAPI&&window.electronAPI.minimize()" title="Minimize"><svg class="ic"><use href="#i-min"/></svg></button>
     <button class="titlebar-btn" onclick="window.electronAPI&&window.electronAPI.maximize()" title="Maximize"><svg class="ic"><use href="#i-max"/></svg></button>
@@ -1517,7 +1575,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 </div>
 
 <div class="topbar">
-  <div class="logo"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion</div>
+  <div class="logo"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion<span class="sf-beta-badge lg" title="Beta channel (Patreon Tier 3)">BETA</span></div>
   <div class="vcounts" id="vcounts"><div class="vc total"><svg class="ic"><use href="#i-eye"/></svg><span id="vcTotal">0</span> total</div></div>
   <button class="tbtn" id="sbBtn" onclick="toggleSettingsModal()"><svg class="ic"><use href="#i-cog"/></svg>Settings</button>
   <button class="tbtn" id="overlayLockBtn" onclick="toggleOverlayLockFromMain()" title="Lock pop-out (click-through)" style="display:none"><svg class="ic"><use href="#i-unlock"/></svg>Lock</button>
@@ -2470,6 +2528,109 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
 if (window.electronAPI) document.body.classList.add('is-electron');
 
+// Beta variant detection. Resolved asynchronously via IPC so we can't
+// gate the boot-splash wordmark on it synchronously — but the IPC
+// round-trip is ~1ms in practice, so by the time the user notices
+// the splash (>200ms) the class is already applied. The amber
+// `.sf-beta-badge` and `body.is-beta .logo` rules then take over.
+// Also overwrite document.title because Electron lets the loaded
+// HTML <title> win over the BrowserWindow constructor's title arg
+// once the page loads — so without this, the taskbar hover would
+// revert to "StreamFusion" even on the beta install.
+var _sfIsBeta = false;  // set by IPC resolution below; other code reads this flag
+if (window.electronAPI && electronAPI.isBeta) {
+  electronAPI.isBeta().then(function(isBeta) {
+    _sfIsBeta = !!isBeta;
+    if (isBeta) {
+      document.body.classList.add('is-beta');
+      document.title = 'StreamFusion BETA';
+      // Kick off the initial gate check once entitlement resolves.
+      // applyPatreonState (invoked by the entitlement listener below)
+      // will call _sfBetaGateSync each time state changes.
+      if (electronAPI.patreonGetEntitlement) {
+        electronAPI.patreonGetEntitlement().then(_sfBetaGateSync).catch(function() {
+          // If even reading cached entitlement fails, show the gate
+          // in its "not signed in" state so the user isn't stuck with
+          // a blank app — they can still click Sign In.
+          _sfBetaGateSync({ signedIn: false, entitled: false, tier: 'none', reason: 'boot_check_failed' });
+        });
+      }
+    }
+  }).catch(function() { /* non-fatal — default (stable) branding wins */ });
+}
+
+// Beta Tier 3 access gate. Full-screen overlay that blocks the app
+// until the user authenticates with Patreon AND holds Tier 3. Owner
+// email bypass lives in patreon-auth.js so the creator never hits
+// this. Runs only on beta installs (_sfIsBeta). applyPatreonState
+// calls _sfBetaGateSync(state) on every entitlement change so the
+// gate opens / closes live — if a user's Tier 3 membership lapses,
+// the app re-locks within the next runtime check (~1h).
+function _sfBetaGateSync(state) {
+  if (!_sfIsBeta) return;
+  var gate = document.getElementById('sfBetaGate');
+  if (!gate) return;
+  var title  = document.getElementById('sfBetaGateTitle');
+  var sub    = document.getElementById('sfBetaGateSub');
+  var status = document.getElementById('sfBetaGateStatus');
+  var signBtn = document.getElementById('sfBetaGateSignInBtn');
+
+  state = state || {};
+  var tier3 = state.entitled && state.tier === 'tier3';
+
+  if (tier3) {
+    gate.style.display = 'none';
+    return;
+  }
+
+  // Customize the messaging based on exactly why they're gated out.
+  // Keep the primary message concise — the detail goes in the status
+  // chip below so users can see both their tier AND what's needed.
+  if (!state.signedIn) {
+    title.textContent = 'Tier 3 Patreon supporters only';
+    sub.innerHTML = 'StreamFusion Beta is a pre-release channel reserved for Patreon <strong>Tier 3 (Contributor)</strong> supporters. Sign in with your Patreon account to unlock access.';
+    status.className = 'sf-beta-gate-status';
+    signBtn.textContent = 'Sign in with Patreon';
+  } else if (state.reason === 'insufficient_tier' || state.tier === 'tier2' || state.tier === 'tier1' || state.tier === 'follower') {
+    title.textContent = 'Upgrade to Tier 3 to continue';
+    sub.innerHTML = 'You\'re signed in, but StreamFusion Beta requires the <strong>Tier 3 (Contributor)</strong> pledge. Tier 2 supporters have full access to the stable release\'s Early Access features.';
+    status.className = 'sf-beta-gate-status show';
+    var tierLabel = state.tier === 'tier2' ? 'Tier 2' : (state.tier === 'tier1' ? 'Tier 1' : 'Follower');
+    status.textContent = 'Connected as ' + (state.userName || 'you') + ' — ' + tierLabel;
+    signBtn.textContent = 'Refresh entitlement';
+  } else if (state.reason === 'reverify_failed' || state.reason === 'boot_check_failed') {
+    title.textContent = 'Couldn\'t verify your Tier 3 access';
+    sub.innerHTML = 'We couldn\'t reach Patreon to verify your membership. Check your internet connection and try again.';
+    status.className = 'sf-beta-gate-status show';
+    status.textContent = 'Network error during entitlement check';
+    signBtn.textContent = 'Retry sign in';
+  } else {
+    // Signed in, inactive patron (declined/former), or some edge case.
+    title.textContent = 'Your Patreon membership is inactive';
+    sub.innerHTML = 'Your Patreon pledge isn\'t currently active at Tier 3. Renew or upgrade to continue with StreamFusion Beta.';
+    status.className = 'sf-beta-gate-status show';
+    status.textContent = 'Status: ' + (state.reason || 'unknown') + (state.userName ? ' · ' + state.userName : '');
+    signBtn.textContent = 'Re-sign in with Patreon';
+  }
+  gate.style.display = 'flex';
+}
+
+function _sfBetaGateSignIn() {
+  if (!window.electronAPI || !electronAPI.patreonBeginAuth) return;
+  var btn = document.getElementById('sfBetaGateSignInBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening browser…'; }
+  electronAPI.patreonBeginAuth().then(function(state) {
+    _sfBetaGateSync(state);
+    if (btn) btn.disabled = false;
+  }).catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign in with Patreon'; }
+  });
+}
+
+function _sfBetaGateQuit() {
+  if (window.electronAPI && electronAPI.quit) electronAPI.quit();
+}
+
 // ── Onboarding ───────────────────────────────────────────────────────────────
 var _obPage = 0, _obTotal = 11;
 function _obBuildDots() {
@@ -2593,6 +2754,8 @@ function applyPatreonState(state) {
   if (S.hasEarlyAccess && typeof applyTheme === 'function') {
     try { applyTheme(); } catch (e) {}
   }
+  // Sync the beta Tier 3 gate. No-op on stable installs (_sfIsBeta false).
+  try { _sfBetaGateSync(state); } catch (e) {}
 }
 
 // Map an entitlement state to a human message, used on both the onboarding
