@@ -241,50 +241,101 @@ async function verifyMembership(accessToken) {
   }
 
   if (!data || !data.included) {
+    console.warn('[patreon-auth] verify: no `included` in response (token may lack identity.memberships scope) email=' + (userEmail || 'unknown'));
     return { active: false, entitled: false, tier: 'none', patronStatus: null, reason: 'no_memberships', userName: userName };
   }
 
   // Membership records (type=member) include a relationship to the campaign
   // and a relationship to `currently_entitled_tiers`. Find the membership
-  // record for our campaign; read its tier IDs.
+  // record for our campaign; read its tier IDs. String-cast both sides of
+  // the campaign ID comparison — Patreon normally returns IDs as strings
+  // per JSONAPI spec, but defensive coercion costs nothing and guards
+  // against any client-side deserializer that turned them back into ints.
   var memberships = data.included.filter(function(i) { return i.type === 'member'; });
   var myMembership = null;
   for (var i = 0; i < memberships.length; i++) {
     var rel = memberships[i].relationships || {};
-    // Some Patreon API responses nest campaign under .data, some older ones
-    // put it directly — handle both defensively.
     var camp = rel.campaign && rel.campaign.data;
-    if (camp && camp.id === PATREON_CAMPAIGN_ID) {
+    if (camp && String(camp.id) === String(PATREON_CAMPAIGN_ID)) {
       myMembership = memberships[i];
       break;
     }
   }
 
   if (!myMembership) {
+    console.log('[patreon-auth] verify: user has ' + memberships.length + ' memberships but none on campaign ' + PATREON_CAMPAIGN_ID + ' — email=' + (userEmail || 'unknown'));
     return { active: false, entitled: false, tier: 'follower', patronStatus: null, reason: 'not_a_member', userName: userName };
   }
 
-  var patronStatus = (myMembership.attributes && myMembership.attributes.patron_status) || null;
+  var mAttrs = myMembership.attributes || {};
+  var patronStatus = mAttrs.patron_status || null;
+  // `currently_entitled_amount_cents` = sum of the user's active
+  // entitlements on our campaign in cents. Used below as a robust
+  // fallback when tier-ID matching misses — the amount threshold is
+  // independent of tier ID drift, tier renames, or API-response lag.
+  var amountCents = Number(mAttrs.currently_entitled_amount_cents) || 0;
   var entitledTierIds = ((myMembership.relationships &&
                           myMembership.relationships.currently_entitled_tiers &&
                           myMembership.relationships.currently_entitled_tiers.data) || [])
-                        .map(function(t) { return t.id; });
+                        .map(function(t) { return String(t.id); });
 
-  var hasTier3 = entitledTierIds.indexOf(PATREON_TIER_IDS.tier3) !== -1;
-  var hasTier2 = entitledTierIds.indexOf(PATREON_TIER_IDS.tier2) !== -1;
+  // Canonical check — tier IDs as they appear in the Patreon campaign
+  // config. Fast-path: this hits for anyone whose currently_entitled_tiers
+  // array comes back fully populated with the expected IDs.
+  var tier2Id = String(PATREON_TIER_IDS.tier2);
+  var tier3Id = String(PATREON_TIER_IDS.tier3);
+  var hasTier3 = entitledTierIds.indexOf(tier3Id) !== -1;
+  var hasTier2 = entitledTierIds.indexOf(tier2Id) !== -1;
+
+  // Amount-cents fallback. Protects against three known failure modes:
+  //   1. Tier IDs on the campaign change (tier recreated / renamed)
+  //      without a corresponding app update — thresholds stay true.
+  //   2. Patreon's API occasionally returns an empty / partial
+  //      `currently_entitled_tiers` array for recently-pledged users
+  //      whose tier association hasn't fully synced. amount_cents is
+  //      set to the pledge value as soon as the charge succeeds.
+  //   3. Edge-case response shapes where the tier relationship is
+  //      missing but the summary attribute is present.
+  // Thresholds match the public campaign (verified 2026-04-21):
+  //   Tier 2 "Early Access"  → $6   → >= 600 cents
+  //   Tier 3 "Contributor"   → $10  → >= 1000 cents
+  if (!hasTier3 && amountCents >= 1000) {
+    console.log('[patreon-auth] verify: tier3 granted via amount_cents fallback (' + amountCents + 'c, tier-id list was ' + JSON.stringify(entitledTierIds) + ')');
+    hasTier3 = true;
+  }
+  if (!hasTier2 && amountCents >= 600) {
+    console.log('[patreon-auth] verify: tier2 granted via amount_cents fallback (' + amountCents + 'c, tier-id list was ' + JSON.stringify(entitledTierIds) + ')');
+    hasTier2 = true;
+  }
+
   var tier = hasTier3 ? 'tier3'
            : hasTier2 ? 'tier2'
-           : entitledTierIds.length > 0 ? 'tier1'
+           : (entitledTierIds.length > 0 || amountCents > 0) ? 'tier1'
            : 'follower';
 
   var active = patronStatus === 'active_patron';
   var entitled = active && (hasTier2 || hasTier3);
 
+  // Diagnostic log: if we're reporting `entitled: false` for a user who
+  // clearly has SOME pledge signal (non-null status, non-zero amount,
+  // any tier IDs), dump the key fields to the log so post-hoc debugging
+  // of support requests doesn't require repro steps. Fires AT MOST once
+  // per verifyMembership call, so normal "not a patron" paths don't
+  // spam the log.
+  if (!entitled && (patronStatus || amountCents > 0 || entitledTierIds.length > 0)) {
+    console.warn('[patreon-auth] verify: pledge signal present but entitled=false — ' +
+                 'email=' + (userEmail || 'unknown') + ' ' +
+                 'patron_status=' + patronStatus + ' ' +
+                 'amount_cents=' + amountCents + ' ' +
+                 'tier_ids=' + JSON.stringify(entitledTierIds) + ' ' +
+                 '(expected tier2=' + tier2Id + ' tier3=' + tier3Id + ')');
+  }
+
   var reason;
   if (entitled) reason = 'entitled';
   else if (!active && patronStatus) reason = patronStatus;   // declined_patron, former_patron, etc.
   else if (!active) reason = 'follower';
-  else reason = 'insufficient_tier';  // active, but on Tier 1 or lower
+  else reason = 'insufficient_tier';  // active, but below Tier 2 threshold
 
   return { active: active, entitled: entitled, tier: tier, patronStatus: patronStatus, reason: reason, userName: userName };
 }
