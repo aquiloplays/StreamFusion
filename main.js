@@ -635,7 +635,49 @@ app.whenReady().then(() => {
     autoUpdater.on('error', (err) => {
       logToFile('UPDATE-ERR', 'autoUpdater error: ' + (err && err.stack || err));
     });
+    // Beta installs publish to a PRIVATE repo (aquiloplays/StreamFusion-beta),
+    // so electron-updater needs a PAT with `repo` read scope to fetch the
+    // manifest. We look for one at userData/beta-updater-token.txt — the user
+    // (or a future automated vending flow via Cloudflare Worker) drops the
+    // token there. If the file is missing or empty, we disable auto-update
+    // for this session rather than letting electron-updater log 404s from
+    // the private-repo API. Stable installs are unaffected.
+    var _skipAutoUpdate = false;
+    try {
+      if (_isBetaVariant()) {
+        var tokenPath = path.join(app.getPath('userData'), 'beta-updater-token.txt');
+        if (fs.existsSync(tokenPath)) {
+          var betaToken = fs.readFileSync(tokenPath, 'utf8').trim();
+          if (betaToken) {
+            // Explicit feed URL so electron-updater uses the PAT (via the
+            // `token` field — which it passes as `Authorization: token X`).
+            // `private: true` tells electron-updater to fetch release assets
+            // through the authenticated GitHub API instead of the public
+            // download CDN, which would 404 on a private repo.
+            autoUpdater.setFeedURL({
+              provider: 'github',
+              owner:    'aquiloplays',
+              repo:     'StreamFusion-beta',
+              private:  true,
+              token:    betaToken,
+              channel:  'beta'
+            });
+            logToFile('UPDATE', 'beta: PAT loaded from userData/beta-updater-token.txt, feed pinned to StreamFusion-beta');
+          } else {
+            logToFile('UPDATE', 'beta: beta-updater-token.txt is empty — auto-update disabled for this session');
+            _skipAutoUpdate = true;
+          }
+        } else {
+          logToFile('UPDATE', 'beta: no beta-updater-token.txt in userData — auto-update disabled for this session');
+          _skipAutoUpdate = true;
+        }
+      }
+    } catch (e) {
+      logToFile('UPDATE-ERR', 'beta PAT setup threw: ' + (e && e.message));
+      _skipAutoUpdate = true;
+    }
     setTimeout(() => {
+      if (_skipAutoUpdate) { logToFile('UPDATE', 'beta: checkForUpdates skipped (no PAT)'); return; }
       try { autoUpdater.checkForUpdates(); }
       catch (e) { logToFile('UPDATE-ERR', 'checkForUpdates threw: ' + (e && e.message)); }
     }, 8000);
