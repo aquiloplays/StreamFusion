@@ -540,14 +540,20 @@ function handleHealth(res) {
 //
 // Request body (JSON):
 //   {
-//     "secret":    "<RELEASE_POST_SECRET>",
-//     "channelId": "1494765819891159202",
-//     "version":   "1.5.0",
-//     "title":     "StreamFusion 1.5.0",
-//     "body":      "## Highlights ...",   // may be truncated to Discord's
-//                                         //   4096-char embed.description limit
-//     "url":       "https://github.com/.../releases/tag/v1.5.0",
-//     "color":     0x3A86FF               // optional
+//     "secret":      "<RELEASE_POST_SECRET>",
+//     "channelId":   "1494765819891159202",
+//     "version":     "1.5.0",
+//     "title":       "StreamFusion 1.5.0",
+//     "body":        "## Highlights ...",   // may be truncated to Discord's
+//                                           //   4096-char embed.description limit
+//     "url":         "https://github.com/.../releases/tag/v1.5.0",
+//     "color":       0x3A86FF,              // optional — default SF blue
+//     "pingRoleId":  "1486090420675936488"  // optional — Discord role ID to @ping
+//                                           //   in the message content. Stable
+//                                           //   release workflow passes the
+//                                           //   "StreamFusion Updates" role;
+//                                           //   beta workflow passes the
+//                                           //   "Tier 3 Patron" role.
 //   }
 //
 // Response: { ok: true, messageId } on success, { ok: false, error } on failure.
@@ -589,11 +595,27 @@ async function handlePostRelease(req, res) {
     footer:      { text: 'StreamFusion v' + (body.version || '?') }
   };
 
+  // Role ping — only fires if a valid snowflake is passed. Role mentions
+  // must live in `content` (not inside the embed), AND they must be
+  // whitelisted in `allowed_mentions.roles` to actually ping, so we set
+  // both. `parse: []` prevents any OTHER mention in the body from firing
+  // accidentally (e.g. if someone puts @everyone in a release note).
+  const payload = {
+    embeds: [embed],
+    allowed_mentions: { parse: [] }
+  };
+  const pingRoleId = body.pingRoleId ? String(body.pingRoleId).trim() : '';
+  if (pingRoleId && /^\d{15,25}$/.test(pingRoleId)) {
+    payload.content = '<@&' + pingRoleId + '>';
+    payload.allowed_mentions = { parse: [], roles: [pingRoleId] };
+  } else if (body.pingRoleId) {
+    // Caller passed something but it wasn't a snowflake — log and drop
+    // rather than silently posting without the ping.
+    console.warn('[post-release] ignoring invalid pingRoleId:', body.pingRoleId);
+  }
+
   try {
-    const msg = await discordRest('POST', '/channels/' + channelId + '/messages', {
-      embeds: [embed],
-      allowed_mentions: { parse: [] }
-    });
+    const msg = await discordRest('POST', '/channels/' + channelId + '/messages', payload);
     if (msg && msg.id) {
       sendJson(res, { ok: true, messageId: msg.id, channelId: channelId });
     } else {
