@@ -74,8 +74,29 @@ const TOKEN_PROXY_URL     = process.env.SF_TOKEN_PROXY_URL     || 'https://strea
 const LOOPBACK_PORTS = [17823, 17824, 17825];
 const SCOPES = ['identity', 'identity.memberships'];
 
-// Owner account — always entitled regardless of Patreon membership state.
-const OWNER_EMAILS = ['bisherclay@gmail.com'];
+// Owner accounts — always entitled regardless of Patreon membership
+// state. Primary use: the creator (who can't pledge to their own
+// Patreon) needs full access to test EA / Tier 3 features. Bypass
+// fires inside verifyMembership() after Patreon returns the user's
+// email, so it ONLY kicks in when the user has actually signed in
+// with a matching Patreon account — i.e. it's not a "skip sign-in"
+// cheat, it's a "skip the tier check for this verified identity".
+//
+// Env override: SF_OWNER_EMAILS=foo@x.com,bar@y.com lets additional
+// accounts get the same treatment without a code change. Useful for
+// adding a second owner or a beta co-tester. Primary email stays
+// hardcoded so the default build always grants bisherclay@gmail.com
+// without depending on env setup.
+const OWNER_EMAILS = (function() {
+  var set = {};
+  set['bisherclay@gmail.com'] = true;
+  var extra = (process.env.SF_OWNER_EMAILS || '').split(',');
+  for (var i = 0; i < extra.length; i++) {
+    var e = extra[i].trim().toLowerCase();
+    if (e) set[e] = true;
+  }
+  return Object.keys(set);
+})();
 
 const REVERIFY_INTERVAL_MS =      24 * 60 * 60 * 1000;  // stale-cache threshold: reverify on next launch after 24h
 const OFFLINE_GRACE_MS     = 7 * 24 * 60 * 60 * 1000;   // honor cached "ok" for 7d if Patreon is unreachable
@@ -258,8 +279,12 @@ async function verifyMembership(accessToken) {
   var userName = (data && data.data && data.data.attributes && data.data.attributes.full_name) || '';
   var userEmail = (data && data.data && data.data.attributes && data.data.attributes.email) || '';
 
-  // Owner bypass — always grant full access
+  // Owner bypass — always grant full Tier 3 access. Applies on BOTH
+  // stable and beta installs (the beta Tier 3 gate sees entitled +
+  // tier: 'tier3' and hides itself). Logged so presence / absence of
+  // the bypass is visible in logs when debugging access issues.
   if (userEmail && OWNER_EMAILS.indexOf(userEmail.toLowerCase()) !== -1) {
+    console.log('[patreon-auth] owner bypass: ' + userEmail + ' → synthetic tier3 (entitled)');
     return { active: true, entitled: true, tier: 'tier3', patronStatus: 'active_patron', reason: 'entitled', userName: userName };
   }
 
@@ -558,9 +583,56 @@ async function beginAuth() {
   }
 }
 
+// Beta-only convenience bypass: if a file named `owner-tier3-bypass`
+// exists in this install's userData, getEntitlement() returns a
+// synthetic tier3 entitled state without touching Patreon. Purpose:
+// let the owner iterate on the beta locally without signing in
+// through the Patreon OAuth flow every time the cache expires or
+// they reinstall. ONLY active on beta installs (checks app.getName
+// for 'beta') — on stable, this file does nothing. Contents of the
+// file are ignored (the file's existence IS the signal). Created
+// manually by the owner; the build doesn't ship one.
+function _isBetaInstall() {
+  try {
+    var n = (app.getName() || '').toLowerCase();
+    if (n.indexOf('beta') !== -1) return true;
+    if ((app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) return true;
+  } catch (e) {}
+  return false;
+}
+
+var _loggedBetaBypassOnce = false;
+function _checkBetaOwnerBypass() {
+  if (!_isBetaInstall()) return null;
+  try {
+    var bypassPath = path.join(app.getPath('userData'), 'owner-tier3-bypass');
+    if (fs.existsSync(bypassPath)) {
+      if (!_loggedBetaBypassOnce) {
+        console.log('[patreon-auth] beta: owner-tier3-bypass file present at ' + bypassPath + ' — granting synthetic tier3 entitlement without Patreon sign-in');
+        _loggedBetaBypassOnce = true;
+      }
+      return {
+        signedIn: true,
+        entitled: true,
+        tier: 'tier3',
+        patronStatus: 'active_patron',
+        reason: 'owner_bypass',
+        userName: 'Owner',
+        verifiedAt: Date.now()
+      };
+    }
+  } catch (e) { /* fall through to normal path */ }
+  return null;
+}
+
 // Return the current entitlement state. Uses cache when fresh; reverifies
 // against Patreon when stale (>24h); respects offline grace on network errors.
 async function getEntitlement() {
+  // Beta-only local-file bypass. Checked first so it short-circuits
+  // both the cached-state read AND any Patreon network call. See
+  // _checkBetaOwnerBypass above for semantics.
+  var betaBypass = _checkBetaOwnerBypass();
+  if (betaBypass) { emitEntitlement(betaBypass); return betaBypass; }
   var state = readState();
   if (!state || !state.access_token) {
     var pub = buildPublicState(null);
