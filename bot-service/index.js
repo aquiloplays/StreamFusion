@@ -100,9 +100,23 @@ function sendGateway(op, d) {
 }
 
 function identify() {
+  // Explicit presence on IDENTIFY so the bot reliably shows as ONLINE
+  // to users in the server. Without this, Discord's default presence
+  // handling can leave bots showing as offline in the member list even
+  // while the Gateway socket is healthy — which is exactly what was
+  // happening on the SF community server before 1.5.1.
   sendGateway(2, {
     token: DISCORD_BOT_TOKEN,
     intents: INTENTS,
+    presence: {
+      status: 'online',
+      activities: [{
+        name: 'StreamFusion',
+        type: 3   // Watching
+      }],
+      since: null,
+      afk: false
+    },
     properties: { os: process.platform, browser: 'StreamFusion-bot', device: 'StreamFusion-bot' }
   });
 }
