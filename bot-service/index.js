@@ -120,6 +120,18 @@ function sendGateway(op, d) {
   try { ws.send(JSON.stringify({ op: op, d: d })); } catch (e) { console.error('[gw] send failed', e.message); }
 }
 
+// Canonical presence payload. Shared between the IDENTIFY frame and
+// the standalone PRESENCE_UPDATE refresh below so they can't drift.
+const PRESENCE_PAYLOAD = {
+  status: 'online',
+  activities: [{
+    name: 'StreamFusion',
+    type: 3   // Watching
+  }],
+  since: null,
+  afk: false
+};
+
 function identify() {
   // Explicit presence on IDENTIFY so the bot reliably shows as ONLINE
   // to users in the server. Without this, Discord's default presence
@@ -129,17 +141,19 @@ function identify() {
   sendGateway(2, {
     token: DISCORD_BOT_TOKEN,
     intents: INTENTS,
-    presence: {
-      status: 'online',
-      activities: [{
-        name: 'StreamFusion',
-        type: 3   // Watching
-      }],
-      since: null,
-      afk: false
-    },
+    presence: PRESENCE_PAYLOAD,
     properties: { os: process.platform, browser: 'StreamFusion-bot', device: 'StreamFusion-bot' }
   });
+}
+
+// Standalone OP 3 PRESENCE_UPDATE. Used as a belt-and-suspenders
+// refresh after READY / RESUMED and on a periodic timer. Presence set
+// on IDENTIFY is supposed to persist, but in practice Discord's
+// presence gossip can drift — especially after a RESUME, which
+// restores session state but NOT the presence from the original
+// IDENTIFY. Re-sending explicitly corrects that.
+function sendPresence() {
+  sendGateway(3, PRESENCE_PAYLOAD);
 }
 
 function resumeSession() {
@@ -183,6 +197,18 @@ function handleDispatch(eventName, data) {
       // right after READY).
       joinedGuilds.clear();
       console.log('[gw] READY — bot user:', botUser && botUser.username, '— in', (data.guilds || []).length, 'guilds');
+      // Re-assert presence right after READY. The IDENTIFY frame
+      // already carried it, but an explicit OP 3 here defends against
+      // the case where Discord's presence broadcast raced the READY
+      // and some members never saw the bot come online.
+      sendPresence();
+      break;
+    case 'RESUMED':
+      // After a successful OP 6 RESUME, Gateway state is restored but
+      // presence is not — the bot will silently show as offline until
+      // the next full reconnect unless we re-send it here.
+      console.log('[gw] RESUMED — re-asserting presence');
+      sendPresence();
       break;
     case 'GUILD_CREATE':
       // Fires for each guild the bot is already in on startup, AND when
@@ -671,6 +697,12 @@ server.listen(PORT, function() {
   console.log('[http] listening on :' + PORT);
   console.log('[http] bot invite URL:', BOT_INVITE_URL || '(not configured)');
   connectGateway();
+  // Safety net: re-send presence every 10 minutes. Discord's presence
+  // gossip can drift over long-lived Gateway connections and leave the
+  // bot looking offline to some members while the socket is healthy.
+  // sendGateway no-ops when the socket isn't OPEN, so this is safe
+  // during reconnect windows too.
+  setInterval(sendPresence, 10 * 60 * 1000);
 });
 
 process.on('SIGTERM', function() {
