@@ -53,12 +53,24 @@ const OWNER_EMAILS = (process.env.OWNER_EMAILS || '')
 // Railway via env var. If unset, the endpoint is disabled.
 const RELEASE_POST_SECRET = process.env.RELEASE_POST_SECRET || '';
 
-// Permissions the bot needs when invited: View Channels (1024) +
-// Read Message History (65536) + Connect (1048576 — for voice state
-// events we need to be a guild member, which View Channels covers).
-// We request only what's essential so server owners see a minimal
-// permission prompt.
-const BOT_INVITE_PERMISSIONS = '1024';
+// Permissions the bot needs on invite. Before 1.5.1 this was just
+// VIEW_CHANNEL (1024) — enough for the EA member/voice-join read-only
+// use case, but insufficient for the /post-release write path which
+// needs to send embeds. The bot would show up in the server but any
+// REST POST to a channel would 403 Missing Access.
+//
+//   VIEW_CHANNEL          1024   (1 << 10)
+//   SEND_MESSAGES         2048   (1 << 11)
+//   EMBED_LINKS          16384   (1 << 14)
+//   READ_MESSAGE_HISTORY 65536   (1 << 16)
+//   ─────────────────────────────
+//   total                84992
+//
+// Bumping now so a fresh invite grants everything the bot needs to post
+// release notes AND observe joins. Server owners can still scope the
+// bot down channel-by-channel after inviting if they want stricter
+// control.
+const BOT_INVITE_PERMISSIONS = '84992';
 const BOT_INVITE_URL = DISCORD_BOT_CLIENT_ID
   ? 'https://discord.com/api/oauth2/authorize?client_id=' + DISCORD_BOT_CLIENT_ID
     + '&permissions=' + BOT_INVITE_PERMISSIONS
