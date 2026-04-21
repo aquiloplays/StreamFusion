@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeToTray:() => ipcRenderer.send('close-window'),
   quit:       () => ipcRenderer.send('quit-app'),
   getVersion: () => ipcRenderer.invoke('app-version'),
+  // True when this install is the StreamFusion Beta variant. Renderer
+  // uses it to show the BETA wordmark + tier-3 upsell UI.
+  isBeta:     () => ipcRenderer.invoke('is-beta'),
   fetchKickViewers: (slug)    => ipcRenderer.invoke('fetch-kick-viewers', slug),
   fetchTwitchViewers: (login) => ipcRenderer.invoke('fetch-twitch-viewers', login),
   fetchTwitchGame: (login)    => ipcRenderer.invoke('fetch-twitch-game', login),

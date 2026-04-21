@@ -1,0 +1,66 @@
+{
+  "appId": "gg.aquilo.streamfusion-beta",
+  "productName": "StreamFusion Beta",
+  "copyright": "Copyright © 2025 aquilo_plays · https://aquilo.gg",
+  "directories": {
+    "output": "dist-beta"
+  },
+  "files": [
+    "**/*",
+    "!patreon-proxy.worker.js",
+    "!SETUP-PATREON.md",
+    "!.env*",
+    "!bot-service/**",
+    "!sf-obs/**",
+    "!preview-icon.js",
+    "!icon-preview.png",
+    "!electron-builder-beta.json",
+    "!dist/**",
+    "!dist-beta/**"
+  ],
+  "asarUnpack": [],
+  "extraMetadata": {
+    "name": "streamfusion-beta"
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "aquiloplays",
+      "repo": "StreamFusion-beta"
+    }
+  ],
+  "win": {
+    "target": [
+      { "target": "nsis",     "arch": ["x64"] },
+      { "target": "portable", "arch": ["x64"] }
+    ],
+    "icon": "assets/icon-beta.ico",
+    "signingHashAlgorithms": ["sha256"],
+    "sign": null,
+    "publisherName": "aquilo_plays",
+    "verifyUpdateCodeSignature": false,
+    "legalTrademarks": "StreamFusion is a trademark of aquilo_plays."
+  },
+  "mac": {
+    "target": [
+      { "target": "dmg", "arch": ["x64", "arm64"] }
+    ],
+    "icon": "assets/icon-beta.png",
+    "category": "public.app-category.entertainment"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "StreamFusion Beta",
+    "installerHeaderIcon": "assets/icon-beta.ico",
+    "deleteAppDataOnUninstall": false,
+    "differentialPackage": true,
+    "artifactName": "StreamFusion-Beta-Setup-${version}.${ext}"
+  },
+  "portable": {
+    "artifactName": "StreamFusion-Beta-Portable-${version}.${ext}"
+  }
+}

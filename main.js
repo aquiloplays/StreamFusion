@@ -96,19 +96,23 @@ try {
 // the taskbar + desktop shortcuts stayed on the old .ico.
 const { buildSFIcon, PALETTES } = require('./icon-gen');
 
-// 1.5.1: palette pick at runtime. Beta variant (app name includes
-// "Beta") draws its tray + window icon in the amber/orange palette
-// so it's visually distinct from main SF even on the taskbar. File-
-// based icons (Start Menu / desktop shortcut / Alt+Tab preview /
-// NSIS header) come from the icon-beta.ico file that scripts/
-// build-beta.js pre-generates.
-function _sfIconPalette() {
+// 1.5.1: single source of truth for "are we the beta variant?".
+// Check both app.getName() (driven by build-beta.js's extraMetadata
+// rewrite of package.json name → streamfusion-beta) AND the exe path
+// (driven by productName → "StreamFusion Beta" install folder). Two
+// signals so a rename or manual copy of the exe doesn't mis-classify.
+// Used by: icon palette, window title, in-app BETA badge, Tier 3 gate.
+function _isBetaVariant() {
   try {
     var n = (app.getName() || '').toLowerCase();
-    if (n.indexOf('beta') !== -1) return PALETTES.beta;
-    if ((app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) return PALETTES.beta;
+    if (n.indexOf('beta') !== -1) return true;
+    if ((app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) return true;
   } catch (e) {}
-  return PALETTES.stable;
+  return false;
+}
+
+function _sfIconPalette() {
+  return _isBetaVariant() ? PALETTES.beta : PALETTES.stable;
 }
 
 // Keep references so they don't get garbage collected
@@ -373,7 +377,10 @@ function createWindow() {
     height: 750,
     minWidth: 520,
     minHeight: 400,
-    title: 'StreamFusion',
+    // Taskbar hover / Alt+Tab label. Title bar inside the app is a
+    // custom HTML element (see index.html .titlebar) that reads the
+    // same signal via electronAPI.isBeta().
+    title: _isBetaVariant() ? 'StreamFusion BETA' : 'StreamFusion',
     icon: appIcon || path.join(__dirname, 'assets', 'icon.png'),
     backgroundColor: '#0e0e10',
     webPreferences: {
@@ -654,6 +661,9 @@ app.on('before-quit', () => {
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
 ipcMain.handle('app-version', () => app.getVersion());
+// Renderer asks this on boot to decide whether to render the BETA
+// badge + "StreamFusion BETA" wordmark + any beta-only UI affordances.
+ipcMain.handle('is-beta', () => _isBetaVariant());
 
 // ── OBS overlay IPC ─────────────────────────────────────────────────────────
 // The renderer is the single source of truth for chat/events/shoutouts —

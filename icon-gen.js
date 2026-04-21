@@ -35,7 +35,13 @@ const PALETTES = {
   beta: {
     BLUE:  [245, 158,  11],  // amber-500 (replaces stable BLUE)
     TEAL:  [249, 115,  22],  // orange-500 (replaces stable TEAL)
-    WHITE: [254, 243, 199],  // warm amber-50 (replaces stable WHITE)
+    // WHITE was [254, 243, 199] (amber-50 — basically cream) which, at
+    // the topmost bolt vertex where fillPoly only lights ONE pixel at
+    // alpha 255, rendered as a bright near-white dot against the
+    // saturated amber ring. Users read it as a stray white pixel.
+    // amber-200 keeps the highlight bright but visibly golden, so the
+    // icon reads as "amber top to bottom" with no off-tone pixel.
+    WHITE: [253, 230, 138],  // amber-200 (was amber-50 — too close to white)
     DARK:  [ 20,  14,   4]   // warm near-black (still reads as "app bg")
   }
 };
