@@ -56,7 +56,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 1.5.1: bumped from 20 to 24 — GitHub is deprecating Node 20
+          # on their runners starting Jun 2026. 24 is available now and
+          # has the same built-in globals (fetch, https, URL) we use.
+          node-version: '24'
 
       - name: Resolve release tag
         id: tag
