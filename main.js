@@ -55,6 +55,21 @@ try {
   // Discord, VS Code) ship by default and was the top 1.4.5 ask.
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  // 1.5.1: beta channel detection. The build-beta script produces a
+  // separate "StreamFusion Beta" variant with a distinct appId that
+  // installs alongside the main app. At runtime, check whether we're
+  // that variant (by productName / app name / package.json `name`)
+  // and pin the auto-updater to the 'beta' channel — makes it pull
+  // beta.yml instead of latest.yml. Main SF installs stay on the
+  // stable channel, so beta users don't accidentally "demote" to a
+  // production release.
+  try {
+    var pname = app.getName() || '';
+    if (pname.toLowerCase().indexOf('beta') !== -1 ||
+        (app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) {
+      autoUpdater.channel = 'beta';
+    }
+  } catch (e) {}
   // electron-updater's electron-log dependency expects a full logger interface.
   // Missing methods (debug/verbose/silly) throw "X is not a function" and kill
   // the update flow silently. Provide all methods to be safe.
@@ -99,6 +114,27 @@ let overlayHotkeyAccel = 'CommandOrControl+Shift+L';
 // (further down) watches the corresponding XButton state and emits the
 // toggle event itself.
 let overlayHotkeyMouseButton = null; // null | 'Mouse4' | 'Mouse5'
+// 1.5.1: user-configurable mouse-side-button bindings that fire hotbar
+// SB actions. Keys: 'Mouse4' / 'Mouse5'. Values: integer hotbar slot
+// index, or null to leave unbound. Keep separate from the overlay
+// toggle binding above — both can be live simultaneously (e.g. M4 =
+// overlay toggle, M5 = hotbar slot 0) as long as they don't collide.
+let mouseHotbarBindings = { Mouse4: null, Mouse5: null };
+function getMouseBindingsPath() { return path.join(app.getPath('userData'), 'mouse-bindings.json'); }
+function saveMouseBindings() {
+  try { fs.writeFileSync(getMouseBindingsPath(), JSON.stringify(mouseHotbarBindings)); } catch (e) {}
+}
+function loadMouseBindings() {
+  try {
+    var raw = fs.readFileSync(getMouseBindingsPath(), 'utf8');
+    var d = JSON.parse(raw);
+    if (d && typeof d === 'object') {
+      if (d.Mouse4 == null || typeof d.Mouse4 === 'number') mouseHotbarBindings.Mouse4 = d.Mouse4;
+      if (d.Mouse5 == null || typeof d.Mouse5 === 'number') mouseHotbarBindings.Mouse5 = d.Mouse5;
+    }
+  } catch (e) {}
+}
+loadMouseBindings();
 // Separate hotkey for toggling overlay visibility (hide/show). Lets the
 // streamer quickly hide the pop-out from their own screen without losing
 // its position / state. Defaults to Ctrl+Shift+H.
@@ -247,18 +283,14 @@ function startCtrlPoller() {
         } else if (line === 'M4D') {
           if (!mouse4WasDown) {
             mouse4WasDown = true;
-            if (overlayHotkeyMouseButton === 'Mouse4' && overlayWindow && !overlayWindow.isDestroyed()) {
-              overlayWindow.webContents.send('overlay-toggle-interact');
-            }
+            _dispatchMouseSideButton('Mouse4');
           }
         } else if (line === 'M4U') {
           mouse4WasDown = false;
         } else if (line === 'M5D') {
           if (!mouse5WasDown) {
             mouse5WasDown = true;
-            if (overlayHotkeyMouseButton === 'Mouse5' && overlayWindow && !overlayWindow.isDestroyed()) {
-              overlayWindow.webContents.send('overlay-toggle-interact');
-            }
+            _dispatchMouseSideButton('Mouse5');
           }
         } else if (line === 'M5U') {
           mouse5WasDown = false;
@@ -279,6 +311,29 @@ function startCtrlPoller() {
     ctrlPoller = null;
   }
 }
+// When a mouse side button press is detected, route it to the
+// appropriate target(s). A single button can drive the overlay-toggle
+// hotkey AND a hotbar slot simultaneously if the user has both
+// assigned — for streamers on 2-button-only mice, that's often the
+// pragmatic config. No-op when the window isn't available yet.
+function _dispatchMouseSideButton(btn) {
+  try {
+    // (a) Overlay toggle — fires when the user has set this mouse
+    // button as the overlay-interact hotkey.
+    if (overlayHotkeyMouseButton === btn && overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('overlay-toggle-interact');
+    }
+    // (b) Hotbar slot — fires when the user bound this button to an
+    // SB action via Settings. The main renderer owns the SB websocket,
+    // so we forward through mainWindow's overlay-fire-hotbar listener
+    // (same path the pop-out uses for its own button clicks).
+    var slot = mouseHotbarBindings[btn];
+    if (typeof slot === 'number' && slot >= 0 && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('overlay-fire-hotbar', slot);
+    }
+  } catch (e) { console.error('[mouse-dispatch]', e); }
+}
+
 function stopCtrlPoller() {
   if (ctrlPoller) {
     try { ctrlPoller.kill(); } catch (e) {}
@@ -449,13 +504,36 @@ if (!_gotLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
+    // 1.5.1 fix: a recurring user report was "double-clicked the SF
+    // shortcut while SF was minimized to tray, nothing happened, had
+    // to use the tray icon to reopen." Root cause was two issues
+    // stacked:
+    //   1. Windows focus-stealing prevention can silently no-op a
+    //      mainWindow.focus() call from a background process. The
+    //      setAlwaysOnTop(true) + focus + setAlwaysOnTop(false) dance
+    //      is the canonical Electron workaround.
+    //   2. If the window was hidden (close-to-tray path), show()
+    //      needs to run BEFORE focus() — otherwise focus targets a
+    //      hidden window and the title bar briefly flashes but
+    //      nothing visible happens.
+    // Plus diagnostic logging so future regressions leave a trace.
+    logToFile('WINDOW', 'second-instance fired; mainWindow=' + !!mainWindow + ' destroyed=' + (mainWindow && mainWindow.isDestroyed()));
     if (mainWindow && !mainWindow.isDestroyed()) {
-      if (!mainWindow.isVisible()) mainWindow.show();
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+      try {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.setAlwaysOnTop(true);
+        mainWindow.focus();
+        // Release always-on-top a tick later so the window surfaces
+        // cleanly without stealing focus from OBS / games permanently.
+        setTimeout(function() {
+          try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false); } catch (e) {}
+        }, 150);
+      } catch (e) {
+        logToFile('WINDOW-ERR', 'second-instance surface failed: ' + (e && e.message));
+      }
     } else {
-      // Edge case: lock is held but window is gone. Recreate.
-      try { createWindow(); } catch (e) { console.error('[single-instance] recreate failed', e); }
+      try { createWindow(); } catch (e) { logToFile('WINDOW-ERR', 'recreate failed: ' + (e && e.message)); }
     }
   });
 }
@@ -741,12 +819,25 @@ function createOverlayWindow(opts) {
     return;
   }
 
-  // Restore saved position from previous session (multi-monitor snap)
+  // Restore saved bounds from previous session. 1.5.1 fix: previous
+  // logic guarded the size fields with `if (!opts.width)` which always
+  // skipped restore because the renderer's toggleOverlay sends the
+  // current preset's width/height on every open. That made saved size
+  // effectively ignored — the window snapped back to the preset
+  // dimensions every time the streamer reopened, even if they'd
+  // resized it. Now saved bounds (size + position) win by default.
+  //
+  // When the user explicitly picks a new preset from the pop-out's
+  // size selector, the renderer sets opts.forcePreset = true to
+  // signal "I'm intentionally resetting to this size, don't restore".
   var saved = loadOverlayBounds();
-  if (saved && opts.x == null && opts.y == null) {
-    opts.x = saved.x; opts.y = saved.y;
-    if (!opts.width) opts.width = saved.width;
-    if (!opts.height) opts.height = saved.height;
+  if (saved) {
+    if (opts.x == null) opts.x = saved.x;
+    if (opts.y == null) opts.y = saved.y;
+    if (!opts.forcePreset) {
+      opts.width  = saved.width;
+      opts.height = saved.height;
+    }
   }
 
   // Try transparent first; fall back to opaque dark window if it fails
@@ -917,6 +1008,27 @@ ipcMain.handle('overlay-set-hotkey', (event, accel) => {
   return { ok: ok, accel: overlayHotkeyAccel };
 });
 ipcMain.handle('overlay-get-hotkey', () => overlayHotkeyAccel);
+
+// 1.5.1: mouse side-button → hotbar-slot bindings. Each call replaces
+// the binding for a single button. Payload shape:
+//   { button: 'Mouse4' | 'Mouse5', slot: number | null }
+// slot = null unbinds. Persists to disk so the binding survives
+// restarts. Returns the full updated map so the renderer can reflect
+// state in its UI.
+ipcMain.handle('mouse-set-hotbar-binding', (event, payload) => {
+  if (!payload || !payload.button) return { ok: false, error: 'missing_button' };
+  if (payload.button !== 'Mouse4' && payload.button !== 'Mouse5') return { ok: false, error: 'invalid_button' };
+  if (payload.slot == null) {
+    mouseHotbarBindings[payload.button] = null;
+  } else {
+    var n = parseInt(payload.slot, 10);
+    if (isNaN(n) || n < 0) return { ok: false, error: 'invalid_slot' };
+    mouseHotbarBindings[payload.button] = n;
+  }
+  saveMouseBindings();
+  return { ok: true, bindings: mouseHotbarBindings };
+});
+ipcMain.handle('mouse-get-hotbar-bindings', () => mouseHotbarBindings);
 
 // Visibility toggle hotkey — separate from interact hotkey. Hides/shows the
 // overlay window without losing state or position.
@@ -1201,6 +1313,29 @@ ipcMain.on('install-update', () => {
   logToFile('UPDATE', 'install-update IPC received — calling quitAndInstall(silent=true, forceRunAfter=true)');
   try { autoUpdater.quitAndInstall(true, true); }
   catch (e) { logToFile('UPDATE-ERR', 'quitAndInstall threw: ' + (e && e.message)); }
+});
+
+// Manual "Check for updates" button in Settings → About → Updates. Lets
+// users trigger an out-of-cycle check instead of waiting for the
+// automatic periodic one. Resolves with a status string the renderer can
+// render in place ("checking…", "up to date", "downloading update…").
+ipcMain.handle('check-for-updates', async () => {
+  if (!autoUpdater) return { ok: false, status: 'no-updater', error: 'autoUpdater not available' };
+  logToFile('UPDATE', 'manual check-for-updates IPC received');
+  try {
+    const res = await autoUpdater.checkForUpdates();
+    const info = res && res.updateInfo;
+    const curVer = app.getVersion();
+    // electron-updater compares versions internally; if .updateInfo.version
+    // equals the running app version, no update is available.
+    if (!info || !info.version || info.version === curVer) {
+      return { ok: true, status: 'up-to-date', currentVersion: curVer };
+    }
+    return { ok: true, status: 'update-available', currentVersion: curVer, latestVersion: info.version };
+  } catch (e) {
+    logToFile('UPDATE-ERR', 'manual check threw: ' + (e && e.message));
+    return { ok: false, status: 'error', error: String(e && e.message || e) };
+  }
 });
 
 // ── Settings export / import ────────────────────────────────────────────────

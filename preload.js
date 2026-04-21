@@ -26,6 +26,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Visibility toggle hotkey (hide/show the pop-out; position preserved)
   overlaySetVisHotkey:(accel) => ipcRenderer.invoke('overlay-set-vis-hotkey', accel),
   overlayGetVisHotkey:()      => ipcRenderer.invoke('overlay-get-vis-hotkey'),
+  // 1.5.1: configure Mouse4/Mouse5 → hotbar slot bindings. slot is the
+  // 0-indexed hotbar slot to fire, or null to unbind.
+  setMouseHotbarBinding:  (button, slot) => ipcRenderer.invoke('mouse-set-hotbar-binding', { button: button, slot: slot }),
+  getMouseHotbarBindings: ()             => ipcRenderer.invoke('mouse-get-hotbar-bindings'),
   overlayToggleVisibility:()  => ipcRenderer.send('overlay-toggle-visibility'),
   overlaySetBounds: (b)       => ipcRenderer.send('overlay-set-bounds', b || {}),
   onOverlayToggleInteract:(fn)=> ipcRenderer.on('overlay-toggle-interact', fn),
@@ -72,6 +76,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (fn)      => ipcRenderer.on('update-downloaded', (e, d) => fn(d)),
   downloadUpdate:     ()        => ipcRenderer.send('download-update'),
   installUpdate:      ()        => ipcRenderer.send('install-update'),
+  // Manual "Check for updates" trigger from Settings > About > Updates.
+  // Returns { ok, status } — status is 'checking' | 'up-to-date' |
+  // 'update-available' — so the renderer can reflect state in the UI.
+  checkForUpdates:    ()        => ipcRenderer.invoke('check-for-updates'),
   // Settings export / import
   exportSettings:     ()        => ipcRenderer.invoke('export-settings'),
   importSettings:     ()        => ipcRenderer.invoke('import-settings'),
