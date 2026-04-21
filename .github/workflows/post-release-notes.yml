@@ -1,0 +1,81 @@
+name: Post release notes to Discord
+
+# Fires every time a GitHub Release on this repo is published (draft →
+# live). Calls the StreamFusion bot service's /post-release endpoint
+# which posts a formatted embed of the release notes to the Discord
+# community channel. One less thing to remember on release day — the
+# moment you finish uploading assets and flip the release from draft
+# to published, the Discord post goes out automatically.
+#
+# Manual re-run: Actions tab → "Post release notes to Discord" → Run
+# workflow → pick a tag from the dropdown. Useful if Railway was down
+# during the original publish.
+#
+# ──────────────────────────────────────────────────────────────────────
+# Required repo secrets (Settings → Secrets and variables → Actions)
+# ──────────────────────────────────────────────────────────────────────
+#   SF_RELEASE_POST_SECRET    (required)
+#     Shared secret. Must match the RELEASE_POST_SECRET env var set on
+#     the Railway bot service. Generate one with:
+#       node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+#     Then paste the SAME value into Railway AND into this repo secret.
+#
+#   SF_BOT_SERVICE_URL        (optional, default below)
+#     Override for the bot service base URL. Defaults to the prod
+#     Railway host if unset, so most deployments never need this.
+#
+#   SF_RELEASE_CHANNEL_ID     (optional, default below)
+#     Override for the target Discord channel. Defaults to
+#     1494765819891159202 (the community #releases channel).
+#
+# The built-in GITHUB_TOKEN is used for the GitHub release fetch — no
+# extra PAT needed.
+
+on:
+  release:
+    types: [published]
+  # Manual dispatch so you can re-post any past release from the
+  # Actions UI if the auto-fire missed (Railway blip, bot down, etc).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to post (e.g. v1.5.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  post-to-discord:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post release notes via SF bot
+        env:
+          SF_RELEASE_POST_SECRET: ${{ secrets.SF_RELEASE_POST_SECRET }}
+          SF_BOT_SERVICE_URL:     ${{ secrets.SF_BOT_SERVICE_URL }}
+          SF_RELEASE_CHANNEL_ID:  ${{ secrets.SF_RELEASE_CHANNEL_ID }}
+          SF_GITHUB_PAT:          ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$SF_RELEASE_POST_SECRET" ]; then
+            echo "::error::SF_RELEASE_POST_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          node scripts/post-release-notes.js "${{ steps.tag.outputs.value }}"
