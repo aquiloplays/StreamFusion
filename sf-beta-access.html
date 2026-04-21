@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>StreamFusion Beta — Tier 3 Access</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --amber-400: #fbbf24;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --orange-500: #f97316;
+    --orange-600: #ea580c;
+    --cream-50: #fde68a;
+    --cream-100: #fef3c7;
+    --muted: #a08a6a;
+    --dim: #6f5a3f;
+    --card-bg: #140e04;
+    --card-border: rgba(245,158,11,.35);
+    --bg-inner: #1f1608;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(ellipse at top, #201604 0%, #0a0605 75%);
+    color: #fde68a;
+    min-height: 100vh;
+    line-height: 1.5;
+    padding: 32px 16px 80px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  .header { text-align: center; margin-bottom: 32px; }
+  .logo {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--amber-500) 0%, var(--orange-500) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-badge {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #140e04;
+    background: linear-gradient(135deg, var(--amber-500) 0%, var(--orange-500) 100%);
+    -webkit-text-fill-color: #140e04;
+    padding: 4px 10px;
+    border-radius: 6px;
+    vertical-align: 6px;
+  }
+  .tagline {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 8px;
+  }
+
+  .welcome {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 24px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 0 40px rgba(249,115,22,.1);
+  }
+  .welcome h2 { margin: 0 0 10px; font-size: 20px; color: var(--cream-50); font-weight: 700; }
+  .welcome p  { margin: 6px 0; color: #c9b89a; font-size: 14px; }
+  .welcome strong { color: var(--cream-50); }
+
+  .version-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: var(--bg-inner);
+    border: 1px solid rgba(245,158,11,.18);
+    border-radius: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .version-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .version-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--amber-400);
+    font-feature-settings: "tnum";
+  }
+  .version-meta { font-size: 12px; color: var(--dim); }
+
+  .dl-row { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+  .dl-btn {
+    flex: 1 1 240px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 22px 18px;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    color: #fde68a;
+    text-decoration: none;
+    background: var(--card-bg);
+    transition: transform .15s, background .15s, border-color .15s, box-shadow .15s;
+    cursor: pointer;
+  }
+  .dl-btn:hover {
+    background: #1a1106;
+    border-color: rgba(245,158,11,.55);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(249,115,22,.15);
+  }
+  .dl-btn:active { transform: translateY(0); }
+  .dl-btn.primary {
+    background: linear-gradient(135deg, var(--amber-500) 0%, var(--orange-500) 100%);
+    border-color: var(--amber-500);
+    color: #140e04;
+  }
+  .dl-btn.primary:hover {
+    background: linear-gradient(135deg, var(--amber-400) 0%, #fb923c 100%);
+  }
+  .dl-btn .dl-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; opacity: .8; }
+  .dl-btn .dl-title { font-size: 18px; font-weight: 800; margin: 4px 0 2px; }
+  .dl-btn .dl-sub   { font-size: 12px; opacity: .7; }
+
+  .section {
+    background: var(--card-bg);
+    border: 1px solid rgba(245,158,11,.22);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .section summary {
+    padding: 16px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--cream-50);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .section summary::-webkit-details-marker { display: none; }
+  .section summary::after {
+    content: "▼";
+    font-size: 10px;
+    color: var(--muted);
+    transition: transform .2s;
+  }
+  .section[open] summary::after { transform: rotate(180deg); }
+  .section-body { padding: 0 20px 18px; color: #c9b89a; font-size: 13px; }
+  .section-body ol, .section-body ul { padding-left: 22px; margin: 10px 0; }
+  .section-body li { margin-bottom: 8px; }
+  .section-body code, .section-body pre code {
+    background: #0a0605;
+    color: var(--cream-50);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    border: 1px solid rgba(245,158,11,.15);
+    word-break: break-all;
+  }
+  .section-body pre {
+    background: #0a0605;
+    border: 1px solid rgba(245,158,11,.15);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  .section-body pre code { border: none; padding: 0; background: transparent; }
+  .section-body strong { color: var(--cream-50); }
+  .section-body a { color: var(--amber-400); }
+
+  .notice {
+    background: rgba(245,158,11,.06);
+    border: 1px solid rgba(245,158,11,.18);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--cream-100);
+    margin: 12px 0;
+  }
+
+  .foot {
+    text-align: center;
+    color: var(--dim);
+    font-size: 11px;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(245,158,11,.1);
+  }
+  .foot a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1 class="logo">StreamFusion <span class="logo-badge">BETA</span></h1>
+    <div class="tagline">Patreon Tier 3 pre-release channel · aquilo.gg</div>
+  </div>
+
+  <div class="welcome">
+    <h2>Thanks for being a Contributor 🧡</h2>
+    <p>You've unlocked access to <strong>StreamFusion Beta</strong> — early builds of features before they ship to the stable channel. You'll get updates here before anyone else, help shape what makes it into stable, and have a direct line to report anything that breaks.</p>
+    <p>The beta installs alongside stable StreamFusion — it has its own settings and icon (amber instead of blue), so you can run both side-by-side without conflicts.</p>
+  </div>
+
+  <div class="version-row">
+    <div>
+      <div class="version-label">Current version</div>
+      <div class="version-value" id="versionValue">Loading…</div>
+    </div>
+    <div class="version-meta" id="versionMeta"></div>
+  </div>
+
+  <div class="dl-row">
+    <a class="dl-btn primary" id="dlSetup" href="https://streamfusion-patreon-proxy.bisherclay.workers.dev/beta-download/latest/setup">
+      <div class="dl-label">Recommended</div>
+      <div class="dl-title">⬇ Download Installer</div>
+      <div class="dl-sub">Per-user NSIS · Windows</div>
+    </a>
+    <a class="dl-btn" id="dlPortable" href="https://streamfusion-patreon-proxy.bisherclay.workers.dev/beta-download/latest/portable">
+      <div class="dl-label">No-install option</div>
+      <div class="dl-title">⬇ Portable</div>
+      <div class="dl-sub">Single .exe · Windows</div>
+    </a>
+  </div>
+
+  <details class="section" open>
+    <summary>How to install</summary>
+    <div class="section-body">
+      <ol>
+        <li>Click <strong>Download Installer</strong> above. It'll save <code>StreamFusion-Beta-Setup-*.exe</code> (~74 MB).</li>
+        <li>Run the installer. It's per-user (no admin / UAC prompt) and installs to <code>%LOCALAPPDATA%\Programs\StreamFusion Beta\</code> — <strong>side-by-side</strong> with stable SF. Neither install will touch the other.</li>
+        <li>Launch <strong>StreamFusion Beta</strong> from your Start menu. The icon is amber/orange (stable's is blue/teal), so you can tell them apart on the taskbar.</li>
+        <li>On first launch you'll see the <strong>Tier 3 access gate</strong>. Click <strong>Sign in with Patreon</strong>, authorize in your browser, and the app unlocks as soon as Patreon confirms your tier. You only do this once.</li>
+      </ol>
+      <div class="notice">
+        ⚠️ <strong>Windows SmartScreen</strong> may warn "Unknown publisher" the first time — the build is unsigned. Click <em>More info → Run anyway</em>. Stable SF has the same warning on first install; we're working on code-signing for both.
+      </div>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Set up silent auto-updates (optional, one-time)</summary>
+    <div class="section-body">
+      <p>Without this step, the beta works fine — it just won't automatically pull new beta versions when they're published. You'll have to come back here to download new builds.</p>
+      <p>To enable silent auto-update, you need a <strong>GitHub fine-grained PAT</strong> with read access to the private beta repo:</p>
+      <ol>
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">https://github.com/settings/personal-access-tokens/new</a>. Sign in if asked.</li>
+        <li>Settings:
+          <ul>
+            <li>Token name: <code>SF Beta auto-update</code></li>
+            <li>Expiration: <strong>1 year</strong> (max allowed)</li>
+            <li>Repository access: <strong>Only select repositories</strong> → search for and pick <code>aquiloplays/StreamFusion-beta</code></li>
+            <li>Permissions → Repository permissions:
+              <ul>
+                <li><strong>Contents: Read-only</strong></li>
+                <li><strong>Metadata: Read-only</strong> (auto-added)</li>
+                <li>(leave everything else untouched)</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+        <li>Click <strong>Generate token</strong>, copy it (starts with <code>github_pat_</code>).</li>
+        <li>Close StreamFusion Beta, open PowerShell, paste:
+<pre><code># Replace github_pat_xxx with the token you just copied
+$tok = "github_pat_xxx"
+$path = "$env:APPDATA\streamfusion-beta\beta-updater-token.txt"
+New-Item -ItemType Directory -Path (Split-Path $path) -Force | Out-Null
+$tok | Out-File -NoNewline -Encoding ASCII $path
+icacls $path /inheritance:r /grant:r "$($env:USERNAME):R" | Out-Null
+Write-Host "✓ Token saved to $path" -ForegroundColor Green</code></pre>
+        </li>
+        <li>Relaunch StreamFusion Beta. From now on every new beta release installs silently on next quit — no action needed.</li>
+      </ol>
+      <div class="notice">
+        🔒 The token is stored locally on your machine only. It's scoped to <em>only</em> read this one repo — even if it leaked, the worst case is someone else could download the same beta installer you already have.
+      </div>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Report bugs / request features</summary>
+    <div class="section-body">
+      <p>Beta is where we find the rough edges before they reach the stable channel — every bug report helps.</p>
+      <ul>
+        <li>💬 <strong>Discord (fastest):</strong> <a href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener">discord.gg/PP5evzsdxP</a> — post in the beta channel (you should see it once you're verified as a Contributor).</li>
+        <li>📧 <strong>Email:</strong> <a href="mailto:aquilo@aquilo.gg">aquilo@aquilo.gg</a></li>
+      </ul>
+      <p>When reporting crashes, attach the log file from:</p>
+      <pre><code>%APPDATA%\streamfusion-beta\logs\sf.log</code></pre>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Uninstall</summary>
+    <div class="section-body">
+      <p>Start → <em>Add or remove programs</em> → search "<strong>StreamFusion Beta</strong>" → Uninstall. Stable StreamFusion is a separate entry and stays untouched.</p>
+      <p>Your beta settings live at <code>%APPDATA%\streamfusion-beta\</code> — the uninstaller doesn't delete this folder by default so a fresh install keeps your config. Delete it manually if you want a clean slate.</p>
+    </div>
+  </details>
+
+  <div class="foot">
+    StreamFusion is built by <a href="https://aquilo.gg" target="_blank" rel="noopener">aquilo_plays</a> · <a href="https://www.patreon.com/cw/aquilo" target="_blank" rel="noopener">Patreon</a> · <a href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener">Discord</a>
+  </div>
+</div>
+
+<script>
+// Pulls the latest beta release metadata from the Cloudflare Worker so
+// this page doesn't need regenerating every time a new beta ships. The
+// Worker endpoint has open CORS so this works even when the patron
+// downloaded the .html and opened it from their disk (file:// origin).
+(function() {
+  var WORKER = 'https://streamfusion-patreon-proxy.bisherclay.workers.dev';
+  var verEl  = document.getElementById('versionValue');
+  var metaEl = document.getElementById('versionMeta');
+  fetch(WORKER + '/beta-info', { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(info) {
+      verEl.textContent = 'v' + (info.version || '?');
+      var bits = [];
+      if (info.publishedAt) {
+        try {
+          var d = new Date(info.publishedAt);
+          bits.push('Released ' + d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }));
+        } catch (e) {}
+      }
+      var setup = (info.assets || []).find(function(a) { return /Setup.*\.exe$/i.test(a.name); });
+      if (setup) bits.push((setup.size / (1024 * 1024)).toFixed(1) + ' MB installer');
+      metaEl.textContent = bits.join(' · ');
+    })
+    .catch(function(err) {
+      verEl.textContent = 'Could not load';
+      metaEl.textContent = 'Check your connection or try again in a minute';
+      console.error('[sf-beta-access] /beta-info fetch failed:', err);
+    });
+})();
+</script>
+</body>
+</html>
