@@ -81,6 +81,21 @@ const REVERIFY_INTERVAL_MS =      24 * 60 * 60 * 1000;  // stale-cache threshold
 const OFFLINE_GRACE_MS     = 7 * 24 * 60 * 60 * 1000;   // honor cached "ok" for 7d if Patreon is unreachable
 const RUNTIME_CHECK_MS     =           60 * 60 * 1000;  // periodic reverify while running: every 1h
 
+// State-schema version stamp. Written to every state file via writeState,
+// read on getEntitlement. When this number increases in an app update,
+// cached state from older versions gets auto-reverified on first launch
+// — we don't wait up to 24h for the normal cache-expiry. Bump it
+// whenever the entitlement decision logic changes in a way that could
+// flip an existing user from entitled=false to entitled=true.
+//
+//   v1 (≤ 1.5.0.1) — original logic + amount_cents fallback gated by
+//                    strict patron_status='active_patron' requirement
+//   v2 (≥ 1.5.0.2) — dropped strict active_patron gate; blocks only
+//                    declined_patron / former_patron. Fixes false
+//                    negatives for brand-new pledges (null status) and
+//                    Apple-relay email signups. See verifyMembership.
+const STATE_SCHEMA_V = 2;
+
 // ── State ────────────────────────────────────────────────────────────────────
 let authResolver = null;         // { resolve, reject } for the in-flight auth flow
 let loopbackServer = null;
@@ -101,6 +116,14 @@ function statePath() { return path.join(app.getPath('userData'), 'patreon-auth.j
 
 function writeState(obj) {
   try {
+    // Stamp current schema version on every write so older cached state
+    // gets auto-reverified after an app update that changes the
+    // entitlement decision logic. Without this, a user whose 1.5.0.1
+    // sign-in wrote `entitled:false` to disk would keep seeing that
+    // cached value for up to 24h after the 1.5.0.2 auto-update lands
+    // (REVERIFY_INTERVAL_MS). Stamp-and-check forces a fresh /identity
+    // call on first launch post-update instead.
+    obj.schema_v = STATE_SCHEMA_V;
     var json = JSON.stringify(obj);
     if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()) {
       var enc = safeStorage.encryptString(json).toString('base64');
@@ -547,6 +570,16 @@ async function getEntitlement() {
 
   var age = Date.now() - (state.verified_at || 0);
   var needsReverify = age > REVERIFY_INTERVAL_MS;
+
+  // One-time migration: state written by older apps (schema_v missing
+  // or < STATE_SCHEMA_V) triggers an immediate reverify so changes to
+  // the entitlement decision logic take effect right away. Affected
+  // users don't have to wait 24h for the cache to expire on its own.
+  if (!state.schema_v || state.schema_v < STATE_SCHEMA_V) {
+    console.log('[patreon-auth] cached state schema_v=' + (state.schema_v || 'missing') +
+                ' < ' + STATE_SCHEMA_V + ' — forcing reverify to apply current logic');
+    needsReverify = true;
+  }
 
   if (!needsReverify) {
     var cached = buildPublicState(state);
