@@ -174,7 +174,10 @@ async function handleDiscordTokenProxy(request, env) {
 
   if (grant === 'authorization_code') {
     if (!body.code || !body.redirect_uri) return json({ error: 'missing_code_or_redirect' }, 400);
-    var allowed = (env.ALLOWED_REDIRECT_HOSTS || '127.0.0.1').split(',').map(function(s) { return s.trim(); });
+    // Discord rejects bare-IP redirects like 127.0.0.1 — the app uses
+    // `localhost` for Discord OAuth. Accept both by default so Patreon
+    // (which registered 127.0.0.1) and Discord (localhost) both work.
+    var allowed = (env.ALLOWED_REDIRECT_HOSTS || '127.0.0.1,localhost').split(',').map(function(s) { return s.trim(); });
     var u;
     try { u = new URL(body.redirect_uri); } catch (e) { return json({ error: 'invalid_redirect_uri' }, 400); }
     if (allowed.indexOf(u.hostname) === -1) return json({ error: 'redirect_host_not_allowed' }, 400);

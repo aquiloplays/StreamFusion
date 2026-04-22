@@ -70,12 +70,19 @@ const path = require('path');
 // client. Set up the redirect URIs on discord.com/developers under
 // the StreamFusion application → OAuth2 → Redirects.
 //
-// Required redirect URIs (add ALL on the Discord dev portal):
-//   http://127.0.0.1:17826/callback
-//   http://127.0.0.1:17827/callback
-//   http://127.0.0.1:17828/callback
-// We try ports in order at runtime (same pattern as patreon-auth.js)
-// so a conflicting dev server on 17826 doesn't block sign-in.
+// Required redirect URIs (add ALL on the Discord dev portal —
+// discord.com/developers/applications → StreamFusion → OAuth2 →
+// Redirects). Discord REJECTS bare IP addresses like 127.0.0.1 in
+// OAuth redirects even though Patreon accepts them, so these MUST
+// use the literal hostname `localhost`:
+//   http://localhost:17826/callback
+//   http://localhost:17827/callback
+//   http://localhost:17828/callback
+// The loopback server still binds to 127.0.0.1; the browser's
+// hosts-file lookup resolves `localhost` → 127.0.0.1 so the socket
+// connection works transparently. We try ports in order at runtime
+// (same pattern as patreon-auth.js) so a conflicting dev server on
+// 17826 doesn't block sign-in.
 const DISCORD_CLIENT_ID = process.env.SF_DISCORD_CLIENT_ID || '1494759611922645003';
 
 // Guild we check membership + roles against. This is aquilo.gg Discord.
@@ -314,7 +321,7 @@ function startLoopbackServer() {
       var port = attempts.shift();
       var srv = http.createServer(function(req, res) {
         if (!req.url) { res.writeHead(400); res.end('Bad request'); return; }
-        var u = new URL(req.url, 'http://127.0.0.1:' + port);
+        var u = new URL(req.url, 'http://localhost:' + port);
         if (u.pathname !== '/callback') { res.writeHead(404); res.end('Not found'); return; }
         var code = u.searchParams.get('code');
         var state = u.searchParams.get('state');
@@ -331,7 +338,7 @@ function startLoopbackServer() {
           if (errParam) authResolver.reject(new Error('OAuth error: ' + errParam));
           else if (!state || state !== expectedState) authResolver.reject(new Error('OAuth state mismatch (possible CSRF)'));
           else if (!code) authResolver.reject(new Error('OAuth callback missing code'));
-          else authResolver.resolve({ code: code, redirectUri: 'http://127.0.0.1:' + port + '/callback' });
+          else authResolver.resolve({ code: code, redirectUri: 'http://localhost:' + port + '/callback' });
           authResolver = null;
         }
       });
@@ -402,7 +409,7 @@ function onEntitlementChange(cb) {
 async function beginAuth() {
   stopLoopbackServer();
   var port = await startLoopbackServer();
-  var redirectUri = 'http://127.0.0.1:' + port + '/callback';
+  var redirectUri = 'http://localhost:' + port + '/callback';
   expectedState = crypto.randomBytes(16).toString('hex');
 
   var authUrl = 'https://discord.com/api/oauth2/authorize' +

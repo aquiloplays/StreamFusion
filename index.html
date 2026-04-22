@@ -506,7 +506,14 @@ body.has-sf-notice { padding-top: 42px !important; }
 .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--mut);text-align:center;padding:24px}
 .empty svg{opacity:.2}
 .empty p{font-size:14px;line-height:1.7;max-width:300px}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:center;justify-content:center}
+/* Generic modal container (.overlay) — used by OBS overlay previews,
+   raid finder result windows, hotkey capture, confirm dialogs, etc.
+   z-index sits ABOVE the settings modal (9000) so when the user clicks
+   something from within Settings that pops a secondary window — Preview,
+   Shoutout picker, hotkey capture — it appears on top of Settings
+   instead of behind it. Below help-popover (10000) so tooltips still
+   land on top. Same bumped rule applies to .w-overlay below. */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9500;align-items:center;justify-content:center}
 .overlay.show{display:flex}
 .modal{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:22px;width:400px;max-width:96vw;max-height:90vh;overflow-y:auto}
 .modal::-webkit-scrollbar{width:4px}
@@ -524,7 +531,7 @@ body.has-sf-notice { padding-top: 42px !important; }
 .note{font-size:11px;color:var(--mut);background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:9px 11px;line-height:1.7;margin-bottom:10px}
 .note code{background:var(--surf3);padding:1px 4px;border-radius:3px;font-size:10px}
 .ferr{color:var(--red);font-size:11px;margin-top:3px;min-height:16px}
-.w-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center}
+.w-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9500;display:flex;align-items:center;justify-content:center}
 .w-overlay.hidden{display:none}
 .w-box{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:24px;width:300px;max-width:92vw;display:flex;flex-direction:column;gap:16px}
 .w-logo{font-size:22px;font-weight:900;background:linear-gradient(135deg,var(--accent),#00E5A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center}
@@ -1692,7 +1699,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
           <div class="sec">
             <div class="sec-hd">Enabled Services</div>
             <div class="ptog" onclick="toggleUseSB()"><div class="plbl"><div class="pip tw"></div>Streamer.bot (Twitch / YT / Kick)</div><div class="tog on" id="tog-useSB"></div></div>
-            <div class="ptog" onclick="toggleUseTF()"><div class="plbl"><div class="pip tt"></div>Tikfinity (TikTok)</div><div class="tog on tt" id="tog-useTF"></div></div>
+            <div class="ptog" onclick="toggleUseTF()" title="Tikfinity is the desktop app that bridges your TikTok live chat + gifts into StreamFusion. Turn off if you don't stream on TikTok so you don't see connection errors."><div class="plbl"><div class="pip tt"></div>Tikfinity (TikTok chat bridge)</div><div class="tog on tt" id="tog-useTF"></div></div>
             <div style="font-size:10px;color:var(--mut);padding:3px 0 1px;line-height:1.5">Disable to suppress connection errors for platforms you don&apos;t use.</div>
           </div>
           <div class="sec">
@@ -1790,7 +1797,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <label class="frow"><span>Read usernames in events (follows, gifts, etc.)</span><input type="checkbox" id="ttsReadEventNames" checked onchange="saveTTSSettings()"></label>
             <label class="frow"><span>Read emoji names</span><input type="checkbox" id="ttsReadEmoji" onchange="saveTTSSettings()"></label>
             <div style="font-size:10px;color:var(--mut);padding:3px 0;line-height:1.5">When <em>off</em>, emojis are stripped before TTS speaks.</div>
-            <label class="frow"><span>Speak immediately (interrupt previous)</span><input type="checkbox" id="ttsInstant" onchange="ttsInstant=this.checked;saveSettings()"></label>
+            <label class="frow" title="When ON, a new message cancels anything currently being spoken and starts immediately. When OFF, messages queue and play in order."><span>Read new messages instantly</span><input type="checkbox" id="ttsInstant" onchange="ttsInstant=this.checked;saveSettings()"></label>
             <div style="font-size:10px;color:var(--mut);padding:3px 0;line-height:1.5">When <em>on</em>, each new message cancels any in-progress TTS so the latest message is read instantly with no queue gap.</div>
             <div class="vol-row"><label>TTS Volume</label><input type="range" id="ttsVol" min="0" max="100" step="5" value="80" oninput="ttsVolume=this.value/100;document.getElementById('ttsVolVal').textContent=this.value+'%';saveSettings()"><span class="vol-val" id="ttsVolVal">80%</span></div>
             <div class="vol-row"><label>TTS Speed</label><input type="range" id="ttsRate" min="80" max="250" step="5" value="110" oninput="ttsRate=this.value/100;document.getElementById('ttsRateVal').textContent=this.value+'%';saveSettings()"><span class="vol-val" id="ttsRateVal">110%</span></div>
@@ -1838,7 +1845,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
           <div class="sec">
             <div class="sec-hd">Discord Integration</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Send a full stream recap (stats + contributor thanks) to Discord when the stream ends.</div>
-            <input class="minput" id="discordWebhookInput" type="text" placeholder="Discord Webhook URL..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="discordWebhook=this.value.trim();saveSettings();renderDiscordStatus()" onchange="discordWebhook=this.value.trim();saveSettings();renderDiscordStatus()">
+            <input class="minput" id="discordWebhookInput" type="text" placeholder="Paste your Discord webhook URL…" title="A webhook URL is a special link you create in your Discord server that lets StreamFusion post messages to a specific channel. Create one at: Server Settings → Integrations → Webhooks → New Webhook. Pick a channel, click 'Copy Webhook URL', paste here." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="discordWebhook=this.value.trim();saveSettings();renderDiscordStatus()" onchange="discordWebhook=this.value.trim();saveSettings();renderDiscordStatus()">
             <label class="frow"><span>Auto-send stream recap to Discord when stream ends</span><input type="checkbox" id="discordEnabledChk" onchange="discordEnabled=this.checked;saveSettings();renderDiscordStatus()"></label>
             <!-- Live status indicator so users can confirm their setup works
                  BEFORE stream-end. Updated by renderDiscordStatus(). -->
@@ -1928,10 +1935,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <label class="frow"><span style="color:var(--kk)">Kick</span><input type="checkbox" id="popPlatKk" checked onchange="onPopCfgChange()"></label>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">APPEARANCE</div>
-            <div class="size-row"><label>Window opacity</label><input type="range" id="popWinOpacity" min="20" max="100" step="5" value="100" oninput="onPopCfgChange()"><span class="size-val" id="popWinOpacityVal">100%</span></div>
-            <div class="size-row"><label>Background opacity</label><input type="range" id="popBgOpacity" min="0" max="100" step="5" value="80" oninput="onPopCfgChange()"><span class="size-val" id="popBgOpacityVal">80%</span></div>
+            <div class="size-row" title="Opacity of the whole pop-out window including the title bar. Lower values let you see through the ENTIRE window."><label>Whole window opacity</label><input type="range" id="popWinOpacity" min="20" max="100" step="5" value="100" oninput="onPopCfgChange()"><span class="size-val" id="popWinOpacityVal">100%</span></div>
+            <div class="size-row" title="Opacity of just the dark background BEHIND the messages. Lower values let the desktop / game show through while keeping text fully readable."><label>Chat background opacity</label><input type="range" id="popBgOpacity" min="0" max="100" step="5" value="80" oninput="onPopCfgChange()"><span class="size-val" id="popBgOpacityVal">80%</span></div>
             <div class="size-row"><label>Text size</label><input type="range" id="popTextSize" min="10" max="24" step="1" value="13" oninput="onPopCfgChange()"><span class="size-val" id="popTextSizeVal">13px</span></div>
-            <div class="size-row"><label>Max messages</label><input type="range" id="popMaxMsgs" min="10" max="100" step="5" value="40" oninput="onPopCfgChange()"><span class="size-val" id="popMaxMsgsVal">40</span></div>
+            <div class="size-row" title="How many messages to keep visible in the pop-out at once. Older ones scroll off once this limit is reached."><label>Max messages shown</label><input type="range" id="popMaxMsgs" min="10" max="100" step="5" value="40" oninput="onPopCfgChange()"><span class="size-val" id="popMaxMsgsVal">40</span></div>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PRESET SIZES</div>
             <div style="font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.5">Quickly resize the pop-out to fit different streaming setups. Position is preserved when resizing.</div>
@@ -2109,7 +2116,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                     </label>
                     <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="16" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                     <label class="frow" style="font-size:11px" title="Per-message background opacity for the Card style. 0 = fully transparent text."><span>Card opacity</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="85" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                    <label class="frow" style="font-size:11px" title="Background opacity of the unified container for the Grey box style."><span>Box opacity</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
+                    <label class="frow" style="font-size:11px" title="Only affects the Grey-box message style. How see-through the grey background box is. 0% = invisible, 100% = solid."><span>Grey-box see-through</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
                     <label class="frow" style="font-size:11px"><span>Max messages on screen</span><input type="number" id="obsChatMaxMessages" min="3" max="80" value="30" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                   </div>
 
@@ -2122,18 +2129,18 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                     <!-- 'Legacy platform bar' was the old pre-1.4.9 left-border colored strip. The new
                          Card style already has a platform-tinted left border, so this is off by default
                          and mainly kept for the Grey box style which doesn't show any accent otherwise. -->
-                    <label class="frow" style="font-size:11px" title="Older full-height colored bar on the left of each message. Off by default — the card style already tints its left border."><span>Legacy platform bar</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="The OLD pre-1.4.9 thick colored bar on the left of each message. Mostly useful with the Grey-box style (which otherwise has no platform accent). The new Card style already has a thin tinted left edge so this is usually off."><span>Thick colored side bar (old style)</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
                   </div>
 
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Sub / gift / cheer / raid events</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
                     <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Inline = events mix into the chat feed. Above/Below = events sit in their own strip at the top/bottom of the canvas."><span>Where events appear</span>
+                    <label class="frow" style="font-size:11px" title="Where sub / gift / cheer / raid event notifications show up on your OBS overlay. 'Mixed in' blends them with chat messages so they scroll together. 'Separate bar' pins them in their own strip above or below the chat feed."><span>Event placement</span>
                       <select id="obsChatEventPlacement" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="inline">Inline in chat</option>
-                        <option value="above">Strip above chat</option>
-                        <option value="below">Strip below chat</option>
-                        <option value="off">Off</option>
+                        <option value="inline">Mixed in with chat</option>
+                        <option value="above">Separate bar, above chat</option>
+                        <option value="below">Separate bar, below chat</option>
+                        <option value="off">Don't show events</option>
                       </select>
                     </label>
                     <label class="frow" style="font-size:11px"><span>Event font size</span><input type="number" id="obsChatEventSize" min="10" max="22" value="13" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
@@ -2141,8 +2148,8 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">TikTok gifts</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Floats the real gift artwork across the top half of the canvas (never covers chat) on every incoming TT gift."><span>Floating gift rain</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Anchor position of the combo-count chip. Aggregates back-to-back gifts from the same user into a single ×30 chip."><span>Combo counter position</span>
+                    <label class="frow" style="font-size:11px" title="Every incoming TikTok gift animates the real gift artwork floating across the top half of your overlay (never covers chat)."><span>Animate gifts across screen</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="When someone sends many gifts in a row, a small counter chip appears showing the combo (×5, ×30, etc.). Pick which corner of your overlay it anchors to, or turn it off."><span>Gift combo counter corner</span>
                       <select id="obsChatTtGiftCorner" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
                         <option value="off">Off</option>
                         <option value="tl">Top-left</option>
@@ -2291,11 +2298,11 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:12px">
                 Customize StreamFusion's look. Changes apply instantly and persist across sessions.
               </div>
-              <label class="frow" style="font-size:12px"><span>Accent color</span><input type="color" id="themeAccent" value="#3A86FF" onchange="applyTheme()" style="width:36px;height:26px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf3);cursor:pointer"></label>
-              <label class="frow" style="font-size:12px"><span>Secondary accent</span><input type="color" id="themeAccent2" value="#2AD4B9" onchange="applyTheme()" style="width:36px;height:26px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf3);cursor:pointer"></label>
-              <label class="frow" style="font-size:12px"><span>Background depth</span>
+              <label class="frow" style="font-size:12px" title="Main brand color — buttons, highlights, active tabs, the StreamFusion bolt."><span>Accent color</span><input type="color" id="themeAccent" value="#3A86FF" onchange="applyTheme()" style="width:36px;height:26px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf3);cursor:pointer"></label>
+              <label class="frow" style="font-size:12px" title="Secondary highlight color — used for gradients, smaller accents, and the tail end of the logo gradient."><span>Secondary accent</span><input type="color" id="themeAccent2" value="#2AD4B9" onchange="applyTheme()" style="width:36px;height:26px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf3);cursor:pointer"></label>
+              <label class="frow" style="font-size:12px" title="How dark the app background is. Default = standard dark grey. Darker = a deeper near-black. Pure black (OLED) = true #000 for OLED displays where true black means pixels are switched off (looks incredible, saves power on OLED laptops)."><span>Background darkness</span>
                 <select id="themeBgDepth" onchange="applyTheme()" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 8px;border-radius:4px;font-size:11px">
-                  <option value="default">Default</option>
+                  <option value="default">Default dark</option>
                   <option value="darker">Darker</option>
                   <option value="pure-black">Pure black (OLED)</option>
                 </select>
@@ -2400,10 +2407,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <div style="display:flex;gap:6px;margin-bottom:8px">
                 <button class="cbtn tw" onclick="inviteSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px"><svg class="ic"><use href="#i-bolt"/></svg> Invite StreamFusion bot</button>
               </div>
-              <input class="minput" id="dcBotGuildInput" type="text" placeholder="Server (guild) ID \u2014 right-click your server name with Developer Mode on" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
+              <input class="minput" id="dcBotGuildInput" type="text" placeholder="Discord server ID (a long number)" title="To find your server ID: (1) In Discord, open User Settings → Advanced → turn on Developer Mode. (2) Right-click your server name in the server list. (3) Click 'Copy Server ID'. Paste it here." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
               <input class="minput" id="dcBotChannelInput" type="text" placeholder="Text channel ID (optional \u2014 for message events)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcBotChannelId=this.value.trim();saveDiscordSettings()" onchange="dcBotChannelId=this.value.trim();saveDiscordSettings()">
               <label class="frow" style="font-size:11px"><span>New members joining your Discord server</span><input type="checkbox" id="dcBotEvtMember" checked onchange="saveDiscordSettings()"></label>
-              <label class="frow" style="font-size:11px;color:var(--mut)"><span>Voice channel joins <span style="font-weight:400">(noisy)</span></span><input type="checkbox" id="dcBotEvtVoice" onchange="saveDiscordSettings()"></label>
+              <label class="frow" style="font-size:11px;color:var(--mut)" title="Post a note in your SF event feed every time someone joins a voice channel in your server. Leave off unless you really want this — active servers will fill your feed fast."><span>Voice channel joins <span style="font-weight:400">(noisy)</span></span><input type="checkbox" id="dcBotEvtVoice" onchange="saveDiscordSettings()"></label>
               <label class="frow" style="font-size:11px;color:var(--mut)"><span>Messages in configured channel <span style="font-weight:400">(very noisy)</span></span><input type="checkbox" id="dcBotEvtMessage" onchange="saveDiscordSettings()"></label>
               <div style="margin-top:8px;display:flex;gap:6px">
                 <button id="dcBotConnectBtn" class="cbtn tw" onclick="toggleSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Connect</button>
@@ -2411,7 +2418,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <div id="dcBotStatus" style="font-size:11px;color:var(--mut);margin-top:6px;line-height:1.5">Not connected.</div>
               <details style="margin-top:10px">
                 <summary style="cursor:pointer;font-size:11px;color:var(--mut)">Advanced: use your own bot instead</summary>
-                <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:6px">Prefer to run your own Discord application? Paste a bot token here and SF will use it instead of the shared StreamFusion bot. Requires enabling the SERVER MEMBERS privileged intent in your Discord dev portal.</div>
+                <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:6px" title="For developers: you can run your own Discord application instead of the shared StreamFusion bot.">Have your own Discord bot? Paste its token here and SF will use that instead of the shared StreamFusion bot. You'll need to enable the <em>Server Members</em> intent on your bot's page at discord.com/developers.</div>
                 <input class="minput" id="dcBotTokenInput" type="password" placeholder="Custom bot token..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-top:6px" oninput="dcBotToken=this.value.trim();saveDiscordSettings()" onchange="dcBotToken=this.value.trim();saveDiscordSettings()">
               </details>
             </div>
