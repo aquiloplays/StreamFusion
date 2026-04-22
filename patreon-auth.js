@@ -313,15 +313,43 @@ async function verifyMembership(accessToken) {
            : (entitledTierIds.length > 0 || amountCents > 0) ? 'tier1'
            : 'follower';
 
-  var active = patronStatus === 'active_patron';
-  var entitled = active && (hasTier2 || hasTier3);
+  // Patreon's patron_status lifecycle:
+  //   - active_patron       : last charge succeeded, currently paying
+  //   - declined_patron     : most recent charge failed / retrying
+  //   - former_patron       : pledge explicitly canceled or expired
+  //   - null / ''           : rare edge case — observed in the wild for
+  //     brand-new pledges before Patreon's status-sync worker runs
+  //     (minutes to hours after signup), and for SOME Apple private-
+  //     relay email signups where Patreon's internal state lags.
+  //
+  // 1.5.0.1 BEHAVIOR: required `active_patron` strictly. This blocked
+  // two real user classes:
+  //   a) brand-new supporters in the post-pledge sync window
+  //   b) Apple-relay signups whose patron_status came back null
+  // Both groups had valid pledges (currently_entitled_amount_cents set,
+  // membership on our campaign) but the strict status gate rejected
+  // them. Reported by itstojuo + wtnjb7nqfq among others.
+  //
+  // 1.5.0.2 BEHAVIOR: trust currently_entitled_amount_cents as the
+  // payment signal — if Patreon reports amount >= 600c, the user IS
+  // paying $6+ right now. Explicitly BLOCK only declined_patron /
+  // former_patron (states where Patreon definitively says "payment
+  // failed" or "pledge ended" — amount_cents will typically already
+  // be 0 in those cases, but the status is extra assurance).
+  var explicitlyInactive = patronStatus === 'declined_patron' ||
+                           patronStatus === 'former_patron';
+  var entitled = (hasTier2 || hasTier3) && !explicitlyInactive;
+  // `active` kept in the public state for renderer-side UI decisions
+  // (e.g. "Connected but inactive"). Entitlement no longer depends on it.
+  var active = patronStatus === 'active_patron' || entitled;
 
-  // Diagnostic log: if we're reporting `entitled: false` for a user who
-  // clearly has SOME pledge signal (non-null status, non-zero amount,
-  // any tier IDs), dump the key fields to the log so post-hoc debugging
-  // of support requests doesn't require repro steps. Fires AT MOST once
-  // per verifyMembership call, so normal "not a patron" paths don't
-  // spam the log.
+  // Diagnostic log: raw API dump when we reject a user who has ANY
+  // pledge signal. Fires once per verifyMembership call. The dump
+  // includes the Patreon membership + tier records (no access token,
+  // no other PII beyond what's already in the state file) so support
+  // requests can be root-caused from the log rather than "can you
+  // send me a screenshot?". Capped at 6KB so the log file doesn't
+  // explode in pathological cases.
   if (!entitled && (patronStatus || amountCents > 0 || entitledTierIds.length > 0)) {
     console.warn('[patreon-auth] verify: pledge signal present but entitled=false — ' +
                  'email=' + (userEmail || 'unknown') + ' ' +
@@ -329,13 +357,18 @@ async function verifyMembership(accessToken) {
                  'amount_cents=' + amountCents + ' ' +
                  'tier_ids=' + JSON.stringify(entitledTierIds) + ' ' +
                  '(expected tier2=' + tier2Id + ' tier3=' + tier3Id + ')');
+    try {
+      var dump = JSON.stringify(data, null, 2);
+      if (dump.length > 6144) dump = dump.slice(0, 6144) + '\n… [truncated]';
+      console.warn('[patreon-auth] verify: full response dump for ' + (userEmail || 'unknown') + ':\n' + dump);
+    } catch (e) { /* don't let the logger crash the flow */ }
   }
 
   var reason;
   if (entitled) reason = 'entitled';
-  else if (!active && patronStatus) reason = patronStatus;   // declined_patron, former_patron, etc.
-  else if (!active) reason = 'follower';
-  else reason = 'insufficient_tier';  // active, but below Tier 2 threshold
+  else if (explicitlyInactive) reason = patronStatus;       // declined_patron / former_patron
+  else if (amountCents === 0 && entitledTierIds.length === 0) reason = 'follower';
+  else reason = 'insufficient_tier';                         // has some pledge but below Tier 2 ($6)
 
   return { active: active, entitled: entitled, tier: tier, patronStatus: patronStatus, reason: reason, userName: userName };
 }
