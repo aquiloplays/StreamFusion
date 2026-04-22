@@ -544,8 +544,18 @@ function handleHealth(res) {
 //     "channelId":   "1494765819891159202",
 //     "version":     "1.5.0",
 //     "title":       "StreamFusion 1.5.0",
-//     "body":        "## Highlights ...",   // may be truncated to Discord's
-//                                           //   4096-char embed.description limit
+//     "body":        "## Highlights ...",   // full release notes (GitHub-
+//                                           //   facing). Used when `summary`
+//                                           //   is absent.
+//     "summary":     "Short user-friendly   // OPTIONAL. When set, this is
+//                    blurb for Discord.",   //   what Discord sees in the
+//                                           //   embed body instead of the
+//                                           //   raw release notes — the
+//                                           //   "user-friendly" variant.
+//                                           //   A "Full release notes on
+//                                           //   GitHub →" link is always
+//                                           //   appended when `summary` is
+//                                           //   used.
 //     "url":         "https://github.com/.../releases/tag/v1.5.0",
 //     "color":       0x3A86FF,              // optional — default SF blue
 //     "pingRoleId":  "1486090420675936488"  // optional — Discord role ID to @ping
@@ -582,9 +592,26 @@ async function handlePostRelease(req, res) {
   // Discord caps embed.description at 4096 chars. Truncate if longer so
   // we don't get 400s from the API. If somebody pastes a novel we give
   // them a link at the bottom pointing to the full release notes.
+  //
+  // Summary field: if the caller passes a separate `summary` string, use
+  // THAT for the embed body instead of the raw release notes. This is
+  // the "user-friendly" Discord variant — the community channel sees a
+  // short "what does this mean for me?" message with a link out to the
+  // full technical notes on GitHub. post-release-notes.js populates
+  // summary by extracting everything above the first `---` divider in
+  // the release body. Falls back to full body when no summary present.
   const MAX = 4096;
-  let desc = String(body.body || '');
-  if (desc.length > MAX) desc = desc.slice(0, MAX - 80).replace(/\n[^\n]*$/, '') + '\n\n… [full notes on GitHub →](' + (body.url || '#') + ')';
+  let desc = String(body.summary || body.body || '');
+  const truncSuffix = '\n\n[Full release notes on GitHub →](' + (body.url || '#') + ')';
+  if (body.summary) {
+    // Always append the full-notes link when using the short summary,
+    // even if the summary fits within the limit — the whole point is
+    // pointing readers at the full body.
+    if ((desc.length + truncSuffix.length) <= MAX) desc = desc + truncSuffix;
+    else desc = desc.slice(0, MAX - truncSuffix.length - 20).replace(/\n[^\n]*$/, '') + '\n…' + truncSuffix;
+  } else if (desc.length > MAX) {
+    desc = desc.slice(0, MAX - 80).replace(/\n[^\n]*$/, '') + '\n\n… [full notes on GitHub →](' + (body.url || '#') + ')';
+  }
 
   const embed = {
     title:       String(body.title || ('StreamFusion ' + (body.version || ''))).slice(0, 256),

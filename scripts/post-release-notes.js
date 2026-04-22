@@ -150,16 +150,38 @@ function httpJson(method, urlStr, opts) {
   console.log('ok');
 
   const version = (rel.body.tag_name || tag).replace(/^v/, '');
+  const fullBody = rel.body.body || '(no notes)';
+
+  // Extract the user-friendly Discord summary: everything above the first
+  // `---` divider line in the release notes. Convention is to write
+  // short "what does this mean for me?" copy at the top, then a `---`,
+  // then the technical details / changelog / commit-speak for GitHub
+  // readers. Discord bot shows just the top section + a link out.
+  //
+  // Falls back to full body if no divider found — which means either
+  // the release notes are already short enough, or the author didn't
+  // follow the convention. Non-catastrophic either way.
+  function extractSummary(text) {
+    // Match a line containing only `---` (with optional whitespace).
+    const m = String(text || '').match(/\n[ \t]*---[ \t]*(?:\n|$)/);
+    if (!m) return null;
+    const above = String(text).slice(0, m.index).trim();
+    return above.length > 0 ? above : null;
+  }
+  const summary = extractSummary(fullBody);
+
   const payload = {
     secret:    SECRET,
     channelId: CHANNEL,
     version:   version,
     title:     rel.body.name || ('StreamFusion ' + version),
-    body:      rel.body.body || '(no notes)',
+    body:      fullBody,
     url:       rel.body.html_url || ('https://github.com/' + REPO + '/releases/tag/' + tag)
   };
+  if (summary)       payload.summary    = summary;
   if (PING)          payload.pingRoleId = PING;
   if (COLOR != null) payload.color      = COLOR;
+  if (summary) console.log('summary: ' + summary.length + ' chars (full body is ' + fullBody.length + ' chars)');
 
   process.stdout.write('posting to ' + BOT_BASE + '/post-release → channel ' + CHANNEL + '… ');
   const post = await httpJson('POST', BOT_BASE + '/post-release', {

@@ -27,6 +27,12 @@ body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans
 .titlebar-btn:hover{background:var(--surf3);color:var(--txt)}
 .titlebar-btn.close:hover{background:#c42b1c;color:#fff}
 body:not(.is-electron) .titlebar{display:none}
+/* .sf-beta-only elements only render on the beta variant (body.is-beta
+   is toggled by the isBeta IPC resolve at boot). Use this to gate
+   beta-exclusive UI — currently the "Style" picker under OBS Alerts
+   (minimalistic variant, shipping on beta first per release policy).
+   On stable installs body.is-beta is absent so these are hidden. */
+body:not(.is-beta) .sf-beta-only { display: none !important; }
 /* Beta wordmark badge — only visible when electronAPI.isBeta() resolves true
    and boot.js adds `is-beta` to <body>. Inline next to the "StreamFusion"
    wordmark in both the titlebar and the top sidebar logo. Amber palette
@@ -2014,6 +2020,40 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                 Pledge on Patreon &rarr;
               </a>
             </div>
+
+            <!-- ═══ Discord Connect (parallel EA path) ═══ -->
+            <!-- Second way to unlock EA. Useful when Patreon OAuth hits
+                 an edge case (Apple private-relay email, brand-new
+                 pledges in status-sync window). If the user has
+                 connected Patreon to Discord (one-click in Patreon
+                 settings), they'll already have the Tier 2 or Tier 3
+                 Patron role in aquilo.gg — checking for that role is a
+                 cleaner signal than re-hitting Patreon's API. Rendered
+                 via renderDiscordEaSettings() below. -->
+            <div style="height:1px;background:var(--bdr);margin:18px 0 14px"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#5865F2;flex-shrink:0"><path d="M20.3 4.4A19.8 19.8 0 0016.6 3a13.6 13.6 0 00-.6 1.2 18.4 18.4 0 00-5.4 0A13.6 13.6 0 009.9 3a19.8 19.8 0 00-3.7 1.4A20.8 20.8 0 002.5 16 20 20 0 008.6 19a14.8 14.8 0 001.2-2 13 13 0 01-1.9-.9c.2-.1.3-.3.5-.4a14.1 14.1 0 0012.2 0c.2.1.4.3.5.4a13 13 0 01-1.9.9 14.8 14.8 0 001.2 2 20 20 0 006.1-3 20.8 20.8 0 00-3.7-11.6zM8.9 13.7c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4zm6.2 0c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4z"/></svg>
+              <div style="font-size:14px;font-weight:700;color:var(--txt)">Or connect Discord</div>
+            </div>
+            <div style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:10px">
+              If you&rsquo;ve already linked your Patreon to Discord, StreamFusion can verify your Tier 2/Tier 3 <strong style="color:var(--txt)">Patron role</strong> in aquilo.gg&rsquo;s server instead. Useful if you signed up for Patreon with Apple&rsquo;s private-relay email or hit a sync delay.
+            </div>
+            <div id="discordEaStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+              <div id="discordEaStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
+              <div id="discordEaStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Connect to check your Patron role in aquilo.gg&rsquo;s Discord.</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button id="discordEaConnectBtn" onclick="connectDiscord()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#5865F2;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><path d="M20.3 4.4A19.8 19.8 0 0016.6 3a13.6 13.6 0 00-.6 1.2 18.4 18.4 0 00-5.4 0A13.6 13.6 0 009.9 3a19.8 19.8 0 00-3.7 1.4A20.8 20.8 0 002.5 16 20 20 0 008.6 19a14.8 14.8 0 001.2-2 13 13 0 01-1.9-.9c.2-.1.3-.3.5-.4a14.1 14.1 0 0012.2 0c.2.1.4.3.5.4a13 13 0 01-1.9.9 14.8 14.8 0 001.2 2 20 20 0 006.1-3 20.8 20.8 0 00-3.7-11.6zM8.9 13.7c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4zm6.2 0c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4z"/></svg>
+                <span id="discordEaConnectBtnText">Connect Discord</span>
+              </button>
+              <button id="discordEaSignOutBtn" onclick="disconnectDiscord()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
+            </div>
+            <div style="font-size:12px;color:var(--mut);margin-top:10px;line-height:1.5;text-align:center">
+              Not in aquilo.gg&rsquo;s Discord yet?
+              <a href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" style="color:#5865F2;text-decoration:none;font-weight:700">Join here</a>,
+              then link Patreon in Discord settings.
+            </div>
           </div>
         </div>
 
@@ -2140,6 +2180,13 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                     <label class="frow" style="font-size:11px"><span>Tips</span><input type="checkbox" id="obsAlertsTip" checked onchange="updateObsConfig('alerts')"></label>
                   </div>
                   <label class="frow" style="font-size:11px;margin-top:6px"><span>Display duration (seconds)</span><input type="number" id="obsAlertsDuration" min="2" max="30" value="6" onchange="updateObsConfig('alerts')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <label class="frow sf-beta-only" style="font-size:11px;margin-top:6px" title="Default is the big card with confetti and pulse ring. Minimal is a compact single-row chip — no confetti, no ambient glow, a slim platform accent on the left edge. Use minimal if you don't want alerts to steal attention from gameplay.">
+                    <span>Style <span style="font-size:9px;font-weight:800;color:#f59e0b;margin-left:4px;padding:1px 5px;background:rgba(245,158,11,.15);border-radius:3px">BETA</span></span>
+                    <select id="obsAlertsStyle" onchange="updateObsConfig('alerts')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                      <option value="default">Default (full card, confetti)</option>
+                      <option value="minimal">Minimal (subtle, no confetti)</option>
+                    </select>
+                  </label>
                 </div>
               </div>
               <!-- Vertical overlay row — for phone-portrait streams -->
@@ -2735,27 +2782,133 @@ async function disconnectPatreon() {
 // Called by the onboarding page's "Connect Patreon" button.
 function obConnectPatreon() { connectPatreon(); }
 
-// Single point of truth: every path that changes entitlement routes here.
-// Updates the S state, the onboarding status line, and the settings panel.
-function applyPatreonState(state) {
-  if (!state) return;
-  S.patreon = state;
-  S.hasEarlyAccess = !!state.entitled;
-  renderEaOnboarding();
-  renderEaSettings();
-  // Refresh EA-gated tabs so their gate banners flip live when the user
-  // signs in or their membership lapses. No-ops if those panes aren't
-  // yet mounted (e.g. before Settings has ever been opened).
+// ── Discord connect (parallel EA path) ──────────────────────────────────────
+// Mirrors connect/disconnect Patreon. Opens the Discord OAuth flow in
+// the user's default browser, receives the code on the local loopback
+// server (main process), exchanges it through the Cloudflare Worker,
+// and runs a guild-member role lookup. If the user has Tier 2 or
+// Tier 3 Patron role in aquilo.gg, they unlock EA via this path.
+var _discordSigningInBusy = false;
+function _discordSigningIn(busy) {
+  _discordSigningInBusy = !!busy;
+  var btn = document.getElementById('discordEaConnectBtn');
+  var txt = document.getElementById('discordEaConnectBtnText');
+  if (btn) btn.disabled = _discordSigningInBusy;
+  if (txt) txt.textContent = _discordSigningInBusy ? 'Opening Discord…' : (S.discord && S.discord.signedIn ? 'Re-check roles' : 'Connect Discord');
+}
+
+async function connectDiscord() {
+  if (!window.electronAPI || !window.electronAPI.discordBeginAuth) return;
+  if (_discordSigningInBusy) return;
+  _discordSigningIn(true);
+  try {
+    var result = await window.electronAPI.discordBeginAuth();
+    applyDiscordState(result);
+  } catch (e) {
+    console.error('discord connect failed:', e);
+  } finally {
+    _discordSigningIn(false);
+  }
+}
+
+async function disconnectDiscord() {
+  if (!window.electronAPI || !window.electronAPI.discordSignOut) return;
+  var result = await window.electronAPI.discordSignOut();
+  applyDiscordState(result);
+}
+
+// Update the Discord Connect card in the EA settings pane. Reads S.discord
+// and writes the status text / button label / sign-out visibility. Called
+// from _recomputeCombinedEntitlement so it stays in sync with IPC updates.
+function renderDiscordEaSettings() {
+  var statusText = document.getElementById('discordEaStatusText');
+  var statusSub  = document.getElementById('discordEaStatusSub');
+  var btn        = document.getElementById('discordEaConnectBtn');
+  var btnText    = document.getElementById('discordEaConnectBtnText');
+  var signOut    = document.getElementById('discordEaSignOutBtn');
+  if (!statusText || !statusSub || !btn || !btnText || !signOut) return;
+
+  var st = S.discord || {};
+  var title, sub;
+  if (!st.signedIn) {
+    title = 'Not connected';
+    sub = 'Connect to check your Patron role in aquilo.gg\u2019s Discord.';
+  } else if (st.entitled) {
+    var tierLabel = st.tier === 'tier3' ? 'Tier 3' : 'Tier 2';
+    title = 'Connected as @' + (st.userName || 'you') + ' \u2014 ' + tierLabel + ' Patron';
+    sub = 'Early Access unlocked via your Discord role. Thanks for supporting!';
+  } else if (st.reason === 'not_in_guild') {
+    title = 'Connected as @' + (st.userName || 'you') + ' \u2014 not in server';
+    sub = 'You\u2019re not a member of aquilo.gg\u2019s Discord yet. Join, then re-check.';
+  } else if (st.reason === 'no_role') {
+    title = 'Connected as @' + (st.userName || 'you') + ' \u2014 no Patron role';
+    sub = 'No Tier 2 or Tier 3 Patron role detected. Link Patreon in Discord settings and re-check.';
+  } else if (st.reason === 'reverify_failed') {
+    title = 'Connected \u2014 couldn\u2019t verify right now';
+    sub = 'Discord was unreachable. We\u2019ll retry automatically.';
+  } else {
+    title = 'Connected as @' + (st.userName || 'you');
+    sub = 'Status: ' + (st.reason || 'unknown');
+  }
+  statusText.textContent = title;
+  statusSub.textContent  = sub;
+  signOut.style.display  = st.signedIn ? '' : 'none';
+  btnText.textContent    = _discordSigningInBusy ? 'Opening Discord\u2026' : (st.signedIn ? 'Re-check roles' : 'Connect Discord');
+}
+
+// Single point of truth for EA entitlement: every path that changes
+// entitlement from EITHER Patreon or Discord routes here. S.hasEarlyAccess
+// is the UNION of the two sources — either grants access. Most EA-gated
+// UI reads only S.hasEarlyAccess and doesn't care which path unlocked it.
+// Downstream renders refresh so gate banners flip live when either path
+// flips. Both applyPatreonState and applyDiscordState call into this.
+function _recomputeCombinedEntitlement() {
+  var patreonOk = !!(S.patreon && S.patreon.entitled);
+  var discordOk = !!(S.discord && S.discord.entitled);
+  var wasEntitled = S.hasEarlyAccess;
+  S.hasEarlyAccess = patreonOk || discordOk;
+  // Refresh EA-gated tabs so their gate banners flip live. No-ops if
+  // those panes aren't yet mounted.
+  try { renderEaOnboarding(); } catch (e) {}
+  try { renderEaSettings(); } catch (e) {}
+  try { renderDiscordEaSettings(); } catch (e) {}
   try { renderObsOverlaysTab(); } catch (e) {}
   try { renderThemeTab(); } catch (e) {}
   try { renderDiscordTab(); } catch (e) {}
-  // On first entitlement, re-apply saved theme so the user sees their
-  // customization immediately rather than only after opening Settings.
-  if (S.hasEarlyAccess && typeof applyTheme === 'function') {
+  // On first entitlement (from either path), re-apply saved theme so
+  // the user sees their customization immediately.
+  if (!wasEntitled && S.hasEarlyAccess && typeof applyTheme === 'function') {
     try { applyTheme(); } catch (e) {}
   }
-  // Sync the beta Tier 3 gate. No-op on stable installs (_sfIsBeta false).
-  try { _sfBetaGateSync(state); } catch (e) {}
+  // Sync the beta Tier 3 gate with whichever source is currently
+  // entitled. No-op on stable installs (_sfIsBeta false).
+  // Prefer the more specific state for messaging: if Patreon granted
+  // tier3, use that; else if Discord granted tier3, synthesize.
+  try {
+    var gateState = null;
+    if (patreonOk && S.patreon.tier === 'tier3') gateState = S.patreon;
+    else if (discordOk && S.discord.tier === 'tier3') gateState = {
+      signedIn: true, entitled: true, tier: 'tier3',
+      userName: S.discord.userName, reason: 'entitled'
+    };
+    else gateState = S.patreon;  // fall through to patreon's message for non-tier3
+    _sfBetaGateSync(gateState);
+  } catch (e) {}
+}
+
+function applyPatreonState(state) {
+  if (!state) return;
+  S.patreon = state;
+  _recomputeCombinedEntitlement();
+}
+
+// Discord entitlement update. Mirrors applyPatreonState and feeds the
+// same combined-entitlement recompute. Unlocks EA whenever the user has
+// the Tier 2 or Tier 3 Patron role in aquilo.gg's Discord.
+function applyDiscordState(state) {
+  if (!state) return;
+  S.discord = state;
+  _recomputeCombinedEntitlement();
 }
 
 // Map an entitlement state to a human message, used on both the onboarding
@@ -2844,6 +2997,17 @@ function renderEaSettings() {
   }
 })();
 
+// Same pattern for Discord: subscribe to live updates + pull initial
+// state. Idempotent re: applyDiscordState. Safe if electronAPI doesn't
+// expose Discord APIs yet (older preload / non-Electron context).
+(function initDiscordEntitlement() {
+  if (!window.electronAPI || !window.electronAPI.onDiscordEntitlementChanged) return;
+  window.electronAPI.onDiscordEntitlementChanged(function(state) { applyDiscordState(state); });
+  if (window.electronAPI.discordGetEntitlement) {
+    window.electronAPI.discordGetEntitlement().then(applyDiscordState).catch(function() {});
+  }
+})();
+
 // ── State ─────────────────────────────────────────────────────────────────────
 var S = {
   sbWS: null, tfWS: null,
@@ -2871,6 +3035,12 @@ var S = {
   // means the user is an active Tier 2 or Tier 3 supporter; gate any
   // Early Access features on this boolean.
   patreon: { signedIn: false, entitled: false, tier: 'none', patronStatus: null, reason: 'not_signed_in', userName: '', verifiedAt: null },
+  // Second entitlement source. Populated by applyDiscordState on IPC
+  // updates from discord-auth.js. If user has Tier 2 or Tier 3 Patron
+  // role in aquilo.gg Discord, this unlocks EA regardless of Patreon
+  // state. _recomputeCombinedEntitlement ORs patreon.entitled with
+  // discord.entitled to set hasEarlyAccess.
+  discord: { signedIn: false, entitled: false, tier: 'none', reason: 'not_signed_in', userName: '', userId: '', verifiedAt: null },
   hasEarlyAccess: false,
   // Theme customization (EA-only). Serialized with the rest of S so it
   // survives restarts like every other setting.
@@ -6748,6 +6918,7 @@ function renderObsOverlaysTab() {
     if (get('obsAlertsRaid'))   get('obsAlertsRaid').checked   = en.raid !== false && en.host !== false;
     if (get('obsAlertsTip'))    get('obsAlertsTip').checked    = en.tip !== false;
     if (get('obsAlertsDuration')) get('obsAlertsDuration').value = Math.round((c.alerts.duration || 6000) / 1000);
+    if (get('obsAlertsStyle'))    get('obsAlertsStyle').value    = c.alerts.style === 'minimal' ? 'minimal' : 'default';
   }
   if (c.shoutout) {
     if (get('obsShoutoutShowRecentEvent')) get('obsShoutoutShowRecentEvent').checked = c.shoutout.showRecentEvent !== false;
@@ -6989,7 +7160,12 @@ function updateObsConfig(which) {
         host:   raidOn,
         tip:    !!(get('obsAlertsTip') && get('obsAlertsTip').checked)
       },
-      duration: (parseInt((get('obsAlertsDuration') || {}).value, 10) || 6) * 1000
+      duration: (parseInt((get('obsAlertsDuration') || {}).value, 10) || 6) * 1000,
+      // 'default' (big card + confetti) or 'minimal' (compact chip, no
+      // confetti, no pulse). Additive — leaving this as 'default'
+      // preserves the pre-1.5.2 look. alerts.html's CFG.style field
+      // drives which class gets applied at render time.
+      style: (get('obsAlertsStyle') && get('obsAlertsStyle').value) === 'minimal' ? 'minimal' : 'default'
     };
     S.obsCfg.alerts = cfg;
   } else if (which === 'shoutout') {

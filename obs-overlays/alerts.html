@@ -260,6 +260,98 @@
     0%   { opacity: 1; transform: translate(0,0) rotate(0deg) scale(1); }
     100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--r)) scale(.5); }
   }
+
+  /* ──────────────────────────────────────────────────────────────────
+     Minimalistic variant — opt-in via CFG.style === 'minimal'.
+     Additive: lives alongside the default styling; the renderer just
+     appends `.minimal` to the .alert root when the streamer has picked
+     this style. Designed for subtle on-stream alerts that don't steal
+     attention from gameplay: small single-row chip, slim platform
+     accent line on the left edge, no confetti burst, no pulse ring
+     on the icon. Still respects platform tint + event type.
+     ──────────────────────────────────────────────────────────────── */
+  .alert.minimal {
+    min-width: 240px;
+    max-width: 480px;
+    padding: 10px 16px 10px 14px;
+    border-radius: 10px;
+    gap: 10px;
+    background: linear-gradient(135deg, rgba(14,14,16,.88), rgba(24,24,27,.88));
+    box-shadow: 0 8px 24px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.06);
+    backdrop-filter: blur(10px);
+  }
+  /* Replace the top accent bar with a slimmer left-edge stripe. */
+  .alert.minimal::before {
+    content: '';
+    left: 0; top: 0; bottom: 0;
+    right: auto;
+    width: 3px;
+    height: auto;
+    border-radius: 10px 0 0 10px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+  }
+  .alert.minimal.tw::before { background: linear-gradient(180deg, var(--tw), #7d3fff); }
+  .alert.minimal.yt::before { background: linear-gradient(180deg, var(--yt), #ff7373); }
+  .alert.minimal.tt::before { background: linear-gradient(180deg, var(--tt), #25f4ee); }
+  .alert.minimal.kk::before { background: linear-gradient(180deg, var(--kk), #00e573); }
+  .alert.minimal.se::before { background: linear-gradient(180deg, var(--se), #a0ff8b); }
+  .alert.minimal.pa::before { background: linear-gradient(180deg, var(--pa), #ff8a95); }
+  .alert.minimal.fw::before { background: linear-gradient(180deg, var(--fw), #f5c860); }
+  .alert.minimal.kf::before { background: linear-gradient(180deg, var(--kf), #5bd0ff); }
+  /* Kill the ambient platform glow — the whole point is subtle. */
+  .alert.minimal.tw, .alert.minimal.yt, .alert.minimal.tt, .alert.minimal.kk {
+    box-shadow: 0 8px 24px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .alert.minimal .icon {
+    width: 32px; height: 32px;
+    font-size: 17px;
+    box-shadow: none;
+  }
+  .alert.minimal .icon img { width: 85% !important; height: 85% !important; }
+  /* No pulse ring in minimal mode, even for "big" events. */
+  .alert.minimal .icon.pulse::after { display: none; }
+  .alert.minimal .kicker {
+    display: none;
+  }
+  .alert.minimal .body {
+    gap: 1px;
+  }
+  .alert.minimal .primary {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-shadow: none;
+    gap: 5px;
+    margin-top: 0;
+  }
+  .alert.minimal .primary .u {
+    font-weight: 800;
+  }
+  .alert.minimal .secondary {
+    font-size: 11px;
+    margin-top: 1px;
+    opacity: .7;
+  }
+  .alert.minimal .amt {
+    padding: 1px 7px;
+    font-size: 12px;
+    box-shadow: none;
+  }
+  .alert.minimal .primary .giftname {
+    padding: 0 6px;
+    font-size: 11px;
+  }
+  /* Gentler motion — small slide + fade, no overshoot. */
+  .alert.minimal.in  { animation: alertInMini  .32s cubic-bezier(.25,.7,.4,1) forwards; }
+  .alert.minimal.out { animation: alertOutMini .24s cubic-bezier(.55,0,.7,.2) forwards; }
+  @keyframes alertInMini {
+    0%   { opacity: 0; transform: translateY(-8px) scale(.98); }
+    100% { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  @keyframes alertOutMini {
+    0%   { opacity: 1; transform: translateY(0)    scale(1); }
+    100% { opacity: 0; transform: translateY(-4px) scale(.98); }
+  }
 </style>
 </head>
 <body>
@@ -284,7 +376,13 @@
     bigGiftThreshold: 5,    // gift count that triggers confetti + pulse ring
     bigCheerThreshold: 500, // bits
     bigTipThreshold:   10,  // USD
-    showEmotes:        true // render <img> emotes in the secondary message line
+    showEmotes:        true, // render <img> emotes in the secondary message line
+    // 'default' = the full card with confetti + pulse + ambient glow.
+    // 'minimal' = compact single-row chip with left-edge platform
+    // accent, no confetti, no pulse, shorter transitions. Additive —
+    // the renderer picks which class to apply. Default stays the
+    // existing look so upgrades don't change behavior.
+    style: 'default'
   };
 
   var stage = document.getElementById('stage');
@@ -408,9 +506,11 @@
     }
 
     var card = document.createElement('div');
-    card.className = 'alert ' + (ev.platform || '');
+    var isMinimal = CFG.style === 'minimal';
+    card.className = 'alert ' + (ev.platform || '') + (isMinimal ? ' minimal' : '');
 
-    var iconCls = 'icon' + (meta.pulse || isBig(ev) ? ' pulse' : '');
+    // Minimal mode suppresses pulse + confetti regardless of event size.
+    var iconCls = 'icon' + (!isMinimal && (meta.pulse || isBig(ev)) ? ' pulse' : '');
     // If the event carries a gift image (TikTok gifts do), render the
     // actual artwork inside the icon chip. Falls back to the emoji meta
     // icon if the CDN URL fails to load.
@@ -435,7 +535,9 @@
     // transform sticks before the class flip.
     requestAnimationFrame(function() { card.classList.add('in'); });
 
-    if (meta.confetti || isBig(ev)) {
+    // Confetti is suppressed entirely in minimal mode — the whole
+    // point of the style is subtle alerts.
+    if (!isMinimal && (meta.confetti || isBig(ev))) {
       spawnConfetti(card, ev.colors);
     }
 

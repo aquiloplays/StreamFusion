@@ -140,6 +140,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // entitlement shape documented above.
   onPatreonEntitlementChanged:   (fn) => ipcRenderer.on('patreon-entitlement-changed', (e, state) => fn(state)),
 
+  // ── Discord entitlement (parallel EA path, see discord-auth.js) ─────────
+  // Second route to EA features: if the user connects their Discord and
+  // has Tier 2 or Tier 3 Patron role in aquilo.gg, they're entitled.
+  // Useful when Patreon OAuth misses (Apple private-relay emails, new-
+  // pledge sync lag). Either path alone is enough — renderer ORs them.
+  //
+  // Public entitlement shape returned by discordGetEntitlement() + payload
+  // of `discord-entitlement-changed` event:
+  //   {
+  //     signedIn:     bool,            // a Discord token is cached
+  //     entitled:     bool,            // signedIn AND Tier 2/3 role in guild
+  //     tier:         'tier3' | 'tier2' | 'none',
+  //     reason:       'entitled' | 'no_role' | 'not_in_guild'
+  //                   | 'reverify_failed' | 'offline_grace' | 'not_signed_in',
+  //     userName:     string,          // Discord global_name or username
+  //     userId:       string,          // Discord snowflake
+  //     verifiedAt:   number | null
+  //   }
+  discordBeginAuth:              ()  => ipcRenderer.invoke('discord-begin-auth'),
+  discordGetEntitlement:         ()  => ipcRenderer.invoke('discord-get-entitlement'),
+  discordSignOut:                ()  => ipcRenderer.invoke('discord-sign-out'),
+  onDiscordEntitlementChanged:   (fn) => ipcRenderer.on('discord-entitlement-changed', (e, state) => fn(state)),
+
   // ── OBS overlays (EA-only — broadcasts are no-ops until entitled) ───────
   // Renderer-side fan-out: anything the main app learns (chat msg, event,
   // shoutout click) goes to the OBS overlay server, which forwards to

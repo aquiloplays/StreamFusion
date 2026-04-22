@@ -34,6 +34,15 @@
 //      security-through-obscurity rather than authenticated. If abuse
 //      shows up in logs, swap in a Patreon-token check.
 //
+//   5. /discord-token
+//      Discord OAuth token exchange proxy — same pattern as the Patreon
+//      proxy, but for the StreamFusion Discord OAuth application. Lets
+//      supporters Connect Discord inside SF as a second path to EA
+//      entitlement (see discord-auth.js in the app). Holds the Discord
+//      client_secret server-side. Accepts POSTs with grant_type of
+//      authorization_code or refresh_token. Redirect URIs restricted
+//      to 127.0.0.1 for the loopback-auth pattern.
+//
 // Deploy:
 //   1. wrangler init or create a Worker in the Cloudflare dashboard
 //   2. Paste this file as the Worker script
@@ -43,6 +52,10 @@
 //        COMMUNITY_RECAP_WEBHOOK     ← Discord webhook URL for #stream-recaps
 //        GITHUB_BETA_TOKEN           ← Fine-grained PAT with Contents: Read on
 //                                      aquiloplays/StreamFusion-beta (only)
+//        DISCORD_CLIENT_ID           ← StreamFusion Discord app client ID
+//                                      (same as the bot's application ID)
+//        DISCORD_CLIENT_SECRET       ← StreamFusion Discord app client secret
+//                                      (from discord.com/developers → OAuth2)
 //      Optional plaintext vars:
 //        ALLOWED_REDIRECT_HOSTS = "127.0.0.1"
 //        BETA_REPO_OWNER = "aquiloplays"          (default)
@@ -70,6 +83,9 @@ export default {
     }
     if (path.indexOf('/beta-download/') === 0) {
       return handleBetaDownload(request, env, path);
+    }
+    if (path === '/discord-token') {
+      return handleDiscordTokenProxy(request, env);
     }
     // Default: Patreon token proxy (unchanged behavior from before).
     return handlePatreonTokenProxy(request, env);
@@ -126,6 +142,64 @@ async function handlePatreonTokenProxy(request, env) {
   var text = await patreonResp.text();
   return new Response(text, {
     status: patreonResp.status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// ── Discord OAuth token exchange proxy ─────────────────────────────────────
+// Mirrors handlePatreonTokenProxy for the StreamFusion Discord OAuth
+// application. Injects DISCORD_CLIENT_ID + DISCORD_CLIENT_SECRET server-
+// side so the app binary never ships the secret. Same 127.0.0.1 redirect
+// allowlist as the Patreon proxy.
+async function handleDiscordTokenProxy(request, env) {
+  if (request.method !== 'POST') {
+    return json({ error: 'method_not_allowed' }, 405);
+  }
+  var body;
+  try { body = await request.json(); }
+  catch (e) { return json({ error: 'invalid_json' }, 400); }
+
+  var grant = body && body.grant_type;
+  if (grant !== 'authorization_code' && grant !== 'refresh_token') {
+    return json({ error: 'unsupported_grant_type' }, 400);
+  }
+  if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET) {
+    return json({ error: 'discord_proxy_not_configured' }, 500);
+  }
+
+  var form = new URLSearchParams();
+  form.set('grant_type', grant);
+  form.set('client_id', env.DISCORD_CLIENT_ID);
+  form.set('client_secret', env.DISCORD_CLIENT_SECRET);
+
+  if (grant === 'authorization_code') {
+    if (!body.code || !body.redirect_uri) return json({ error: 'missing_code_or_redirect' }, 400);
+    var allowed = (env.ALLOWED_REDIRECT_HOSTS || '127.0.0.1').split(',').map(function(s) { return s.trim(); });
+    var u;
+    try { u = new URL(body.redirect_uri); } catch (e) { return json({ error: 'invalid_redirect_uri' }, 400); }
+    if (allowed.indexOf(u.hostname) === -1) return json({ error: 'redirect_host_not_allowed' }, 400);
+    form.set('code', body.code);
+    form.set('redirect_uri', body.redirect_uri);
+  } else {
+    if (!body.refresh_token) return json({ error: 'missing_refresh_token' }, 400);
+    form.set('refresh_token', body.refresh_token);
+  }
+
+  var discordResp;
+  try {
+    discordResp = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':   'StreamFusion-EA-Proxy'
+      },
+      body: form.toString()
+    });
+  } catch (e) { return json({ error: 'upstream_unreachable', detail: String(e) }, 502); }
+
+  var text = await discordResp.text();
+  return new Response(text, {
+    status: discordResp.status,
     headers: { 'Content-Type': 'application/json' }
   });
 }

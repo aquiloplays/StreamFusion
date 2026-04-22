@@ -9,6 +9,17 @@ const { spawn } = require('child_process');
 // supporters unlock Early Access (EA) features live. See patreon-auth.js.
 const patreonAuth = require('./patreon-auth');
 
+// ── Discord entitlement service (parallel path to EA) ───────────────────────
+// Second way to unlock EA for users whose Patreon OAuth has edge cases
+// (new-pledge sync lag, Apple private-relay email quirks where patron_status
+// returns null). Patreon ↔ Discord integration assigns Tier 2 / Tier 3
+// Patron roles automatically in aquilo.gg's Discord when someone pledges
+// — checking those roles is a more reliable signal than hitting Patreon's
+// /identity endpoint for edge-case accounts. Entitlement from EITHER path
+// grants EA (renderer OR's them: S.hasEarlyAccess = patreon.entitled ||
+// discord.entitled). See discord-auth.js.
+const discordAuth = require('./discord-auth');
+
 // ── OBS overlay server (EA-only) ────────────────────────────────────────────
 // Local HTTP + SSE server that powers browser-source overlays (chat feed,
 // alerts, shoutouts) for OBS. Starts on app launch and stays up regardless
@@ -566,13 +577,17 @@ app.whenReady().then(() => {
   createWindow();
   startCtrlPoller();
 
-  // Patreon entitlement service. Register IPC handlers and point it at the
-  // main window so entitlement changes reach the renderer. Kick off a
+  // Patreon + Discord entitlement services. Both are optional sign-ins;
+  // the app boots for everyone. Users get EA features if EITHER path
+  // reports entitled. Register IPC handlers and point both at the main
+  // window so entitlement changes reach the renderer. Kick off a
   // launch-time check on a small delay so the renderer has had time to
-  // wire up its listener. If the user is already signed in, start the
-  // hourly re-verification loop too.
+  // wire up its listeners. If the user is already signed in to either,
+  // each service starts its own hourly re-verification loop.
   patreonAuth.setMainWindow(mainWindow);
   patreonAuth.registerIpcHandlers();
+  discordAuth.setMainWindow(mainWindow);
+  discordAuth.registerIpcHandlers();
 
   // OBS overlay server comes up alongside the main window. It always
   // listens (so the streamer can bookmark the URLs without worrying about
@@ -584,18 +599,30 @@ app.whenReady().then(() => {
     logToFile('OBS-SERVER-ERR', 'start threw: ' + (e && e.message));
   });
 
-  // Entitlement flips update the server's gate flag so overlays show /
-  // hide without an OBS-side refresh. Subscribing here ensures this is
-  // wired up before the first getEntitlement() call below returns.
-  patreonAuth.onEntitlementChange(function(state) {
-    var entitled = !!(state && state.entitled);
-    obsServer.setEntitled(entitled);
-    // If a Discord bot connection is active and the user loses EA access,
-    // drop the connection. When they re-authenticate at Tier 2/3 the
-    // renderer re-issues the connect command.
+  // Union-of-sources entitlement gate. Either Patreon OR Discord says
+  // entitled ⇒ user is entitled. Track the last emitted state from each
+  // source and recompute the combined flag on every change. Drives:
+  //   - obs-server's gated-page flag
+  //   - auto-disconnect of the Discord bot when BOTH sources lose access
+  var _lastPatreonEntitled = false;
+  var _lastDiscordEntitled = false;
+  function _syncCombinedEntitlement() {
+    var entitled = _lastPatreonEntitled || _lastDiscordEntitled;
+    try { obsServer.setEntitled(entitled); } catch (e) {}
     if (!entitled) {
+      // Neither path is entitled — drop the discord-bot Gateway connection.
+      // When either source re-activates, the renderer re-issues the
+      // connect command via its existing IPC flow.
       try { discordBot.disconnectBot(); } catch (e) {}
     }
+  }
+  patreonAuth.onEntitlementChange(function(state) {
+    _lastPatreonEntitled = !!(state && state.entitled);
+    _syncCombinedEntitlement();
+  });
+  discordAuth.onEntitlementChange(function(state) {
+    _lastDiscordEntitled = !!(state && state.entitled);
+    _syncCombinedEntitlement();
   });
   discordBot.setMainWindow(mainWindow);
 
@@ -603,7 +630,12 @@ app.whenReady().then(() => {
     patreonAuth.getEntitlement().then(function(state) {
       if (state && state.signedIn) patreonAuth.startRuntimeChecks();
     }).catch(function(e) {
-      logToFile('AUTH-ERR', 'launch entitlement check failed: ' + (e && e.message));
+      logToFile('AUTH-ERR', 'launch patreon entitlement check failed: ' + (e && e.message));
+    });
+    discordAuth.getEntitlement().then(function(state) {
+      if (state && state.signedIn) discordAuth.startRuntimeChecks();
+    }).catch(function(e) {
+      logToFile('AUTH-ERR', 'launch discord entitlement check failed: ' + (e && e.message));
     });
   }, 2500);
 
@@ -697,6 +729,7 @@ app.on('before-quit', () => {
   try { globalShortcut.unregisterAll(); } catch (e) {}
   stopCtrlPoller();
   try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
+  try { discordAuth.stopRuntimeChecks(); } catch (e) {}
   try { obsServer.stopServer(); } catch (e) {}
   try { discordBot.disconnectBot(); } catch (e) {}
 });
