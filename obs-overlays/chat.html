@@ -72,15 +72,40 @@
     pointer-events: none;
   }
 
-  /* Unified-box theme: one translucent container wraps every message.
-     Per-msg chrome disappears. Text reads as a flowing transcript. */
+  /* Box theme: gradient container wraps every message. Per-msg chrome
+     disappears. Text reads as a flowing transcript inside a single bordered
+     panel. The container auto-sizes to the message count (maxMessages
+     setting drives content height) so the streamer's overlay isn't a fat
+     empty rectangle when chat is quiet. Capped at 95vh as a safety so a
+     wildly-high maxMessages can't push the bottom of the box off-screen.
+     overflow:hidden ensures messages can never appear *outside* the
+     gradient frame mid-animation. */
   body.theme-box #feed {
     left: 10px; right: 10px; bottom: 10px;
-    max-height: calc(var(--feed-max, 55vh) - 10px);
-    padding: 12px 14px 10px;
-    background: rgba(var(--box-color), var(--box-op));
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    max-height: 95vh;
+    padding: 14px 16px 12px;
+    background:
+      linear-gradient(135deg,
+        rgba(58, 134, 255, 0.16),
+        rgba(0, 229, 160, 0.10) 55%,
+        rgba(58, 134, 255, 0.06)),
+      rgba(var(--box-color), var(--box-op));
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
+  }
+
+  /* No-background variant: same auto-size and inner flat-message styling
+     as theme-box, but no gradient frame. For streamers who want the
+     transcript style on a transparent overlay (or layered under a custom
+     OBS background source). */
+  body.theme-nobg #feed {
+    left: 10px; right: 10px; bottom: 10px;
+    max-height: 95vh;
+    padding: 6px 10px 8px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
   }
 
   /* ──────────────────────────────────────────────────────────────────
@@ -117,13 +142,25 @@
   .msg.tt { border-left-color: var(--tt); }
   .msg.kk { border-left-color: var(--kk); }
 
-  body.theme-box .msg {
+  body.theme-box .msg,
+  body.theme-nobg .msg {
     padding: 3px 2px;
     margin-top: 2px;
     border-radius: 0;
     border-left: none;
     background: transparent !important;
   }
+  /* In theme-nobg, restore a thin platform-tint left border so the user
+     still has *some* visual separator between platforms when there's no
+     wrapper frame to provide context. */
+  body.theme-nobg .msg {
+    padding-left: 9px;
+    border-left: 2px solid rgba(255, 255, 255, 0.18);
+  }
+  body.theme-nobg .msg.tw { border-left-color: var(--tw); }
+  body.theme-nobg .msg.yt { border-left-color: var(--yt); }
+  body.theme-nobg .msg.tt { border-left-color: var(--tt); }
+  body.theme-nobg .msg.kk { border-left-color: var(--kk); }
 
   .msg.leaving { animation: msgOut .22s cubic-bezier(.4,0,1,1) forwards; }
   @keyframes msgIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -899,8 +936,16 @@
     root.style.setProperty('--box-op', String(CFG.boxOpacity != null ? CFG.boxOpacity : 0.8));
     root.style.setProperty('--font-size', (CFG.fontSize || 16) + 'px');
     root.style.setProperty('--event-size', (CFG.eventSize || 13) + 'px');
-    document.body.classList.toggle('theme-box', CFG.theme === 'box');
-    // If gift animations are off, let chat reclaim full height.
+    // Theme is now a 3-way enum: 'card' (default per-message bubbles),
+    // 'box' (single gradient container), 'nobg' (transparent transcript).
+    // Pre-1.5.3 settings only know 'card'/'box', so unknown values fall
+    // back to card.
+    document.body.classList.remove('theme-card', 'theme-box', 'theme-nobg');
+    var themeName = (CFG.theme === 'box' || CFG.theme === 'nobg') ? CFG.theme : 'card';
+    document.body.classList.add('theme-' + themeName);
+    // --feed-max ONLY affects theme-card. theme-box and theme-nobg auto-
+    // size to content (capped via CSS max-height: 95vh) so maxMessages
+    // becomes the de-facto height limit for those themes.
     root.style.setProperty('--feed-max', CFG.showGiftAnimations ? '55vh' : '100vh');
     document.body.classList.remove('placement-above', 'placement-below', 'placement-inline', 'placement-off');
     document.body.classList.add('placement-' + (CFG.showEvents ? (CFG.eventPlacement || 'inline') : 'off'));
