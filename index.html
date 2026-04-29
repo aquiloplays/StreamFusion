@@ -1600,6 +1600,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
   <button class="tbtn" id="ttsPauseBtn" onclick="toggleTTSPause()" style="display:none"><svg class="ic"><use href="#i-pause"/></svg>Pause TTS</button>
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
+  <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
   <a class="tbtn tbtn-discord" href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" title="Join the StreamFusion Discord"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
@@ -1855,6 +1856,72 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <button onclick="sendDiscordRecap(true)" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg class="ic"><use href="#i-send"/></svg>Send Recap Now</button>
             </div>
           </div>
+
+          <!-- Discord Live-Announce (Tier 2 EA) — reuses the recap webhook
+               above. When you go live, SF posts a "🔴 Live now" message; on
+               stream-end the same message gets edited (or deleted) so your
+               server doesn't accumulate stale "live" posts. -->
+          <div class="sec">
+            <div class="sec-hd">Discord Live-Announce <span style="font-size:10px;font-weight:600;color:var(--accent);margin-left:4px">EARLY ACCESS</span></div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">When you go live, post "<strong style="color:var(--txt)">🔴 Live now</strong>" to the same Discord channel. When the stream ends, SF auto-edits or deletes the message so your channel stays tidy.</div>
+            <label class="frow"><span>Enable live announcements</span><input type="checkbox" id="daEnabled" onchange="S.discordAnnounce.enabled=this.checked;saveSettings()"></label>
+            <div style="margin-top:8px">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px">Live message template <span style="color:#888">— placeholders: {streamer} {game} {title} {url} {role}</span></div>
+              <textarea id="daLiveTemplate" style="width:100%;min-height:54px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:6px 8px;font-size:11px;resize:vertical;font-family:inherit" onchange="S.discordAnnounce.liveTemplate=this.value;saveSettings()"></textarea>
+            </div>
+            <div style="margin-top:8px">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px">When stream ends <span style="color:#888">— placeholders: {streamer} {duration} {url}</span></div>
+              <select id="daEndBehavior" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px;margin-bottom:6px" onchange="S.discordAnnounce.endBehavior=this.value;saveSettings();document.getElementById('daEndTplWrap').style.display=this.value==='edit'?'block':'none'">
+                <option value="edit">Edit message → end template</option>
+                <option value="delete">Delete the live message</option>
+                <option value="keep">Keep the live message untouched</option>
+              </select>
+              <div id="daEndTplWrap">
+                <textarea id="daEndTemplate" style="width:100%;min-height:46px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:6px 8px;font-size:11px;resize:vertical;font-family:inherit" onchange="S.discordAnnounce.endTemplate=this.value;saveSettings()"></textarea>
+              </div>
+            </div>
+            <div style="margin-top:8px">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px">Role to ping <span style="color:#888">— Discord role ID (right-click role with Developer Mode on)</span></div>
+              <input id="daPingRole" type="text" placeholder="e.g. 1234567890123456789" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px;font-family:Consolas,monospace" onchange="S.discordAnnounce.pingRole=this.value.replace(/[^0-9]/g,'');saveSettings()">
+              <div style="font-size:10px;color:var(--mut);margin-top:4px">Use <code>{role}</code> in the live template to insert the @ping. Leave blank for no ping.</div>
+            </div>
+            <div style="display:flex;gap:5px;margin-top:8px">
+              <button onclick="_discordAnnounceTestFire()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg class="ic"><use href="#i-send"/></svg>Test Live-Post</button>
+            </div>
+          </div>
+
+          <!-- Aquilo Products — companion products that registered with
+               StreamFusion's local /api/integrations endpoint. Spotify
+               widget, Streamer.Bot kit, future products. Detection is
+               live: connect / disconnect events flow over SSE so the
+               panel updates without refresh. Empty by default. -->
+          <div class="sec">
+            <div class="sec-hd">Aquilo Products</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">Companion products from <strong style="color:var(--txt)">aquilo.gg</strong> that register with this StreamFusion instance show up here. The Streamer.Bot kit and Spotify widget will appear automatically when installed and running.</div>
+            <div id="aquiloProductsList" style="display:flex;flex-direction:column;gap:6px"></div>
+            <div id="aquiloProductsEmpty" style="font-size:11px;color:var(--mut);background:var(--surf3);border:1px dashed var(--bdr);border-radius:6px;padding:14px;text-align:center;line-height:1.6">
+              No Aquilo products connected yet.<br>
+              <span style="font-size:10px">Spotify widget &bull; Streamer.Bot kit &bull; more coming</span>
+            </div>
+          </div>
+
+          <!-- Smart Shoutout Queue (Tier 2 EA) — settings only; the queue
+               itself opens from the Shoutouts toolbar button. -->
+          <div class="sec">
+            <div class="sec-hd">Smart Shoutouts <span style="font-size:10px;font-weight:600;color:var(--accent);margin-left:4px">EARLY ACCESS</span></div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">When a Twitch chatter is themselves a live streamer, SF queues them in the <strong style="color:var(--txt)">Shoutouts</strong> toolbar button for one-click <code>/shoutout</code>. Auto-fire skips the click and dispatches as soon as a fellow streamer\u2019s detected.</div>
+            <label class="frow"><span>Enable smart shoutout detection</span><input type="checkbox" id="soEnabled" onchange="S.shoutout.enabled=this.checked;saveSettings()"></label>
+            <label class="frow"><span>Auto-fire shoutouts (no manual click)</span><input type="checkbox" id="soAutoFire" onchange="S.shoutout.autoFire=this.checked;saveSettings()"></label>
+            <div style="margin-top:8px">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px">Shoutout command <span style="color:#888">— placeholders: {target} {name}</span></div>
+              <input id="soCmdTemplate" type="text" placeholder="/shoutout {target}" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px;font-family:Consolas,monospace" onchange="S.shoutout.cmdTemplate=this.value;saveSettings()">
+              <div style="font-size:10px;color:var(--mut);margin-top:4px;line-height:1.5">Default uses Twitch\u2019s native <code>/shoutout</code>. Custom templates (e.g. <code>!so {target}</code> or <code>Welcome @{target}!</code>) are sent as plain chat.</div>
+            </div>
+            <div style="margin-top:8px">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px">Exclude these usernames <span style="color:#888">— newline / comma / space separated</span></div>
+              <textarea id="soExcludeList" style="width:100%;min-height:50px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:6px 8px;font-size:11px;resize:vertical;font-family:Consolas,monospace" placeholder="nightbot streamlabs ..." onchange="S.shoutout.excludeList=this.value;saveSettings()"></textarea>
+            </div>
+          </div>
         </div>
 
         <!-- ═══ GOALS TAB ═══ -->
@@ -2108,16 +2175,17 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Look</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Grey box = single container around the whole feed, no per-message backgrounds."><span>Style</span>
+                    <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Box (gradient) = single gradient-bordered container around the whole feed; the box auto-sizes to the Max Messages count so it never looks empty when chat is quiet. Box (no background) = same auto-sizing transcript style with NO frame, for streamers who layer chat over a custom OBS background."><span>Style</span>
                       <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
                         <option value="card">Card (default)</option>
-                        <option value="box">Grey box</option>
+                        <option value="box">Box (gradient)</option>
+                        <option value="nobg">Box (no background)</option>
                       </select>
                     </label>
                     <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="16" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                     <label class="frow" style="font-size:11px" title="Per-message background opacity for the Card style. 0 = fully transparent text."><span>Card opacity</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="85" onchange="updateObsConfig('chat')" style="width:80px"></label>
                     <label class="frow" style="font-size:11px" title="Only affects the Grey-box message style. How see-through the grey background box is. 0% = invisible, 100% = solid."><span>Grey-box see-through</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                    <label class="frow" style="font-size:11px"><span>Max messages on screen</span><input type="number" id="obsChatMaxMessages" min="3" max="80" value="30" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px" title="How many messages stay visible in the overlay before old ones drop off. For Box / Box (no background) styles, this also controls the height of the overlay — the box only grows tall enough for this many messages, never the full browser-source height."><span>Max messages on screen</span><input type="number" id="obsChatMaxMessages" min="3" max="80" value="30" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
                   </div>
 
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Who &amp; what shows</div>
@@ -3099,7 +3167,41 @@ var S = {
     // Message the streamer wants posted to THEIR OWN chat right before
     // the raid fires, so viewers can copy-paste it into the target
     // channel. Placeholders: {target}, {game}, {channel}.
-    preRaidMessage: 'Going to raid {target}! Copy & paste this into their chat: Hey {target} chat! {channel} sent us! 💜'
+    preRaidMessage: 'Going to raid {target}! Copy & paste this into their chat: Hey {target} chat! {channel} sent us! 💜',
+    // Outgoing Raid Scheduler — null when no schedule, else
+    // { login, displayName, fireAt (unix-ms), timer (timeout id, NOT persisted) }.
+    // Persisted across reloads via fireAt; on load we re-arm or discard if past.
+    scheduled: null
+  },
+  // Smart Shoutout Queue (Tier 2 EA) — auto-detects when a fellow streamer
+  // chats and queues a `/shoutout` candidate. State is per-stream-session
+  // so it resets when the stream ends.
+  shoutout: {
+    enabled: true,
+    autoFire: false,                      // auto-/shoutout the moment we confirm live
+    cmdTemplate: '/shoutout {target}',    // streamer can swap for /so or a custom thank-you
+    excludeList: 'nightbot\nstreamlabs\nstreamelements\nmoobot\nfossabot\nsoundalerts\ntangiabot',
+    minViewersToShoutout: 0,              // skip <N viewer streamers (set 0 = all live streamers)
+    queue: [],                            // [{ login, displayName, game, viewers, queuedAt, status }]
+    knownLogins: {},                      // login -> 'live'|'offline'|'pending' for this session
+    shoutedThisStream: {}                 // login -> fired-timestamp (so we don't re-queue)
+  },
+  // Discord Live-Announce — reuses the existing discordWebhook (set in
+  // Settings → Discord). When the streamer goes live we POST a "🔴 Live now"
+  // message and store the message id. When the stream ends we either edit
+  // or delete it depending on endBehavior. Independent of the existing
+  // recap webhook flow (recap fires too, as a separate post).
+  discordAnnounce: {
+    enabled: false,
+    liveTemplate: '🔴 **{streamer}** is live now!\nPlaying **{game}**\n{title}\n\n{url}',
+    endTemplate: '⏹ Stream ended after {duration}. Thanks everyone! See you next time. 💜',
+    endBehavior: 'edit',                  // 'edit' | 'delete' | 'keep'
+    pingRole: '',                         // raw role id; rendered as <@&id> at the top of liveTemplate
+    // runtime state — not persisted (so a freshly-launched SF after a
+    // crash doesn't think a stale go-live is still live)
+    currentMessageId: null,
+    currentWebhookUrl: null,              // remember which webhook we posted to so edit goes to the right one
+    liveStartedAt: null
   }
 };
 
@@ -3215,6 +3317,27 @@ function loadSettings() {
     if (d.rfGameOverride !== undefined)   S.raidFinder.gameOverride   = d.rfGameOverride;
     if (d.rfGameIdOverride !== undefined) S.raidFinder.gameIdOverride = d.rfGameIdOverride;
     if (d.rfPreRaidMessage !== undefined) S.raidFinder.preRaidMessage = d.rfPreRaidMessage;
+    // Outgoing Raid Scheduler — only restore if it's still in the future.
+    // A stale schedule (app was closed past the fire time) is silently dropped.
+    if (d.rfScheduled && d.rfScheduled.fireAt && d.rfScheduled.fireAt > Date.now()) {
+      S.raidFinder.scheduled = { login: d.rfScheduled.login, displayName: d.rfScheduled.displayName, fireAt: d.rfScheduled.fireAt };
+    }
+    // Smart Shoutout Queue
+    if (d.shoutout) {
+      if (d.shoutout.enabled !== undefined) S.shoutout.enabled = !!d.shoutout.enabled;
+      if (d.shoutout.autoFire !== undefined) S.shoutout.autoFire = !!d.shoutout.autoFire;
+      if (d.shoutout.cmdTemplate !== undefined) S.shoutout.cmdTemplate = d.shoutout.cmdTemplate;
+      if (d.shoutout.excludeList !== undefined) S.shoutout.excludeList = d.shoutout.excludeList;
+      if (d.shoutout.minViewersToShoutout !== undefined) S.shoutout.minViewersToShoutout = d.shoutout.minViewersToShoutout;
+    }
+    // Discord Live-Announce
+    if (d.discordAnnounce) {
+      if (d.discordAnnounce.enabled !== undefined) S.discordAnnounce.enabled = !!d.discordAnnounce.enabled;
+      if (d.discordAnnounce.liveTemplate !== undefined) S.discordAnnounce.liveTemplate = d.discordAnnounce.liveTemplate;
+      if (d.discordAnnounce.endTemplate !== undefined) S.discordAnnounce.endTemplate = d.discordAnnounce.endTemplate;
+      if (d.discordAnnounce.endBehavior !== undefined) S.discordAnnounce.endBehavior = d.discordAnnounce.endBehavior;
+      if (d.discordAnnounce.pingRole !== undefined) S.discordAnnounce.pingRole = d.discordAnnounce.pingRole;
+    }
   } catch(e) {}
 }
 
@@ -3240,7 +3363,22 @@ function saveSettings() {
     rfRangeHighPct: S.raidFinder.rangeHighPct, rfRangeLowAbs: S.raidFinder.rangeLowAbs,
     rfRangeHighAbs: S.raidFinder.rangeHighAbs, rfWantCount: S.raidFinder.wantCount,
     rfGameOverride: S.raidFinder.gameOverride, rfGameIdOverride: S.raidFinder.gameIdOverride,
-    rfPreRaidMessage: S.raidFinder.preRaidMessage
+    rfPreRaidMessage: S.raidFinder.preRaidMessage,
+    rfScheduled: S.raidFinder.scheduled ? {
+      login: S.raidFinder.scheduled.login,
+      displayName: S.raidFinder.scheduled.displayName,
+      fireAt: S.raidFinder.scheduled.fireAt
+    } : null,
+    shoutout: {
+      enabled: S.shoutout.enabled, autoFire: S.shoutout.autoFire,
+      cmdTemplate: S.shoutout.cmdTemplate, excludeList: S.shoutout.excludeList,
+      minViewersToShoutout: S.shoutout.minViewersToShoutout
+    },
+    discordAnnounce: {
+      enabled: S.discordAnnounce.enabled, liveTemplate: S.discordAnnounce.liveTemplate,
+      endTemplate: S.discordAnnounce.endTemplate, endBehavior: S.discordAnnounce.endBehavior,
+      pingRole: S.discordAnnounce.pingRole
+    }
   }));
 }
 
@@ -3270,7 +3408,33 @@ loadSettings();
   var ttsInstantEl = document.getElementById('ttsInstant'); if (ttsInstantEl) ttsInstantEl.checked = ttsInstant;
   var ttsGcm = document.getElementById('ttsGiftCoinMin'); if (ttsGcm) ttsGcm.value = ttsGiftCoinMin;
   var haChk = document.getElementById('hideAnimationsChk'); if (haChk) haChk.checked = hideMainAnimations;
+  // Smart Shoutouts
+  var soEn = document.getElementById('soEnabled'); if (soEn) soEn.checked = S.shoutout.enabled;
+  var soAf = document.getElementById('soAutoFire'); if (soAf) soAf.checked = S.shoutout.autoFire;
+  var soTpl = document.getElementById('soCmdTemplate'); if (soTpl) soTpl.value = S.shoutout.cmdTemplate;
+  var soXc = document.getElementById('soExcludeList'); if (soXc) soXc.value = S.shoutout.excludeList;
+  // Discord Live-Announce
+  var daEn = document.getElementById('daEnabled'); if (daEn) daEn.checked = S.discordAnnounce.enabled;
+  var daLT = document.getElementById('daLiveTemplate'); if (daLT) daLT.value = S.discordAnnounce.liveTemplate;
+  var daET = document.getElementById('daEndTemplate'); if (daET) daET.value = S.discordAnnounce.endTemplate;
+  var daEB = document.getElementById('daEndBehavior'); if (daEB) {
+    daEB.value = S.discordAnnounce.endBehavior;
+    var daETW = document.getElementById('daEndTplWrap');
+    if (daETW) daETW.style.display = S.discordAnnounce.endBehavior === 'edit' ? 'block' : 'none';
+  }
+  var daPR = document.getElementById('daPingRole'); if (daPR) daPR.value = S.discordAnnounce.pingRole || '';
 })();
+
+// Re-arm Raid Finder schedule + render toolbar countdown chip on startup.
+// Deferred via setTimeout(0) because the scheduler functions are defined
+// later in this script — by the time the timeout fires, everything's
+// hoisted and ready.
+setTimeout(function() {
+  if (S.raidFinder.scheduled && typeof _rfArmScheduledTimer === 'function') {
+    _rfArmScheduledTimer();
+    _rfUpdateToolbarChip();
+  }
+}, 0);
 
 // ── Resize handle ─────────────────────────────────────────────────────────────
 var _resizeDragging = false, _resizeStartX = 0, _resizeStartW = 0;
@@ -4442,9 +4606,23 @@ function renameHotbarAction(idx, label) {
 // Searches Twitch via Streamer.bot C# actions for live streamers playing the
 // same game at a similar viewer count. Uses the existing SB WebSocket — no
 // separate Twitch OAuth required from the user.
-var SF_RF_IMPORT = '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';
+//
+// IMPORT REFERENCES — keep in sync with scripts/build-rf-sbae.py.
+// Find Targets needs System.Core (LINQ) + System.Net.Http (HttpClient) +
+// Newtonsoft.Json + System.dll on top of mscorlib. The original 1.2.5
+// import shipped with mscorlib only, which silently failed to compile in
+// SB and surfaced as a 15s timeout. UUIDs were bumped in the regenerated
+// import so re-importing creates fresh actions instead of conflicting
+// with any pre-existing broken copy.
+var SF_RF_IMPORT = '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';
 var SF_RF_FIND_NAME = 'StreamFusion Raid Finder \u2014 Find Targets';
 var SF_RF_RAID_NAME = 'StreamFusion Raid Finder \u2014 Start Raid';
+// UUIDs of the FIXED import (with proper System.Core / Net.Http / Json
+// references). When a user has both the old broken import AND the new
+// fixed one in SB, we want to dispatch to the fixed one. _rfCheckActions
+// preferentially picks these IDs by name; falls back to last match.
+var SF_RF_FIND_UUID = '0ff67a25-0306-450c-8cb7-30f6ea072fc7';
+var SF_RF_RAID_UUID = '78a43121-5d46-4bc4-8021-66ad9f7c318b';
 
 function openRaidFinder() {
   if (!S.hasEarlyAccess) { _rfShowUpsell(); return; }
@@ -4545,18 +4723,34 @@ function _rfFallbackChannelInfo(broadcasterUserId) {
 }
 
 // ── Action detection ─────────────────────────────────────────────────────────
+// Two-pass match: first prefer the FIXED-import UUIDs (so users who didn't
+// delete their old broken import still hit the working action), then fall
+// back to the last name match. The fallback path also matters for users
+// who manually re-created the action from the source — they get the
+// custom-UUID one.
 function _rfCheckActions(done) {
   var reqId = 'sf-rf-chk-' + Date.now();
   sbPending[reqId] = function(resp) {
     var actions = resp.actions || [];
-    var find = null, raid = null;
+    // Cache for the Aquilo Products panel — also lets other features
+    // (future SB-kit aware code) inspect installed actions without
+    // re-querying SB. Refreshed every time we run this handshake.
+    S._sbActionsCache = actions;
+    if (typeof renderAquiloProducts === 'function') { try { renderAquiloProducts(); } catch (e) {} }
+    var findById = null, raidById = null;
+    var findByName = null, raidByName = null;
     for (var i = 0; i < actions.length; i++) {
-      if (actions[i].name === SF_RF_FIND_NAME) find = { id: actions[i].id, name: actions[i].name };
-      if (actions[i].name === SF_RF_RAID_NAME) raid = { id: actions[i].id, name: actions[i].name };
+      var a = actions[i];
+      if (a.id === SF_RF_FIND_UUID) findById = { id: a.id, name: a.name };
+      if (a.id === SF_RF_RAID_UUID) raidById = { id: a.id, name: a.name };
+      if (a.name === SF_RF_FIND_NAME) findByName = { id: a.id, name: a.name };
+      if (a.name === SF_RF_RAID_NAME) raidByName = { id: a.id, name: a.name };
     }
+    var find = findById || findByName;
+    var raid = raidById || raidByName;
     S.raidFinder.actions.find = find;
     S.raidFinder.actions.startRaid = raid;
-    console.log('[SF rf] GetActions ' + actions.length + ' total; find=' + (find && find.id) + ', startRaid=' + (raid && raid.id));
+    console.log('[SF rf] GetActions ' + actions.length + ' total; find=' + (find && find.id) + ' (matched-by-uuid=' + !!findById + '), startRaid=' + (raid && raid.id) + ' (matched-by-uuid=' + !!raidById + ')');
     done(!!(find && raid));
   };
   S.sbWS.send(JSON.stringify({ request: 'GetActions', id: reqId }));
@@ -4586,6 +4780,15 @@ function _rfShowInstall() {
   document.getElementById('overlay').classList.add('show');
   m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder &mdash; Install Actions</div>'
     + '<p class="mp">StreamFusion needs two small actions in Streamer.bot to search Twitch and start raids. Your existing SB Twitch login is used &mdash; no extra tokens needed.</p>'
+    // Older StreamFusion releases shipped an import that referenced only
+    // mscorlib.dll, so the C# silently failed to compile in SB and Find
+    // Targets always timed out. The import below is the fixed version
+    // (System.Core / System.Net.Http / Newtonsoft.Json refs added). If a
+    // user already imported the broken copy they need to delete it first
+    // or SB ends up with two actions of the same name.
+    + '<div style="background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.35);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;line-height:1.5;color:var(--txt)">'
+    +   '<strong>Already imported before?</strong> If Find Targets used to time out, the older import was broken. In Streamer.bot, expand the <em>StreamFusion</em> action group and delete any existing <em>StreamFusion Raid Finder &mdash; Find Targets</em> / <em>&mdash; Start Raid</em> actions before importing the new ones below.'
+    + '</div>'
     + '<div style="margin-bottom:10px">'
     + '<textarea id="rfImportStr" readonly onclick="this.select()" style="width:100%;height:60px;font-size:10px;font-family:monospace;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:8px;resize:none">' + SF_RF_IMPORT + '</textarea>'
     + '</div>'
@@ -4641,7 +4844,29 @@ function _rfRenderPanel() {
     highVal = rf.rangeHighAbs;
   }
 
+  // Active-schedule banner — shows the streamer their pending scheduled
+  // raid at the top of the panel, with a one-click cancel. Lives above
+  // the game row so it's the first thing they see when reopening Raid
+  // Finder during a wait.
+  var schedBannerHtml = '';
+  if (rf.scheduled) {
+    var schMs = rf.scheduled.fireAt - Date.now();
+    var schSec = Math.max(0, Math.ceil(schMs / 1000));
+    var schMm = Math.floor(schSec / 60), schSs = schSec % 60;
+    var schStr = schMm > 0 ? (schMm + 'm ' + schSs + 's') : (schSs + 's');
+    schedBannerHtml = '<div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(58,134,255,.16),rgba(0,229,160,.12));border:1px solid rgba(58,134,255,.4);border-radius:6px;padding:8px 12px;margin-bottom:10px">'
+      +   '<svg class="ic" style="width:16px;height:16px;color:var(--accent);flex-shrink:0"><use href="#i-clock"/></svg>'
+      +   '<div style="flex:1;min-width:0">'
+      +     '<div style="font-size:12px;font-weight:700">Scheduled raid: ' + esc(rf.scheduled.displayName || rf.scheduled.login) + '</div>'
+      +     '<div style="font-size:11px;color:var(--mut)" id="rfSchedCountdown">Fires in ' + schStr + '</div>'
+      +   '</div>'
+      +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 10px;font-size:11px" onclick="_rfFireScheduledNow()">Fire now</button>'
+      +   '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 10px;font-size:11px" onclick="_rfCancelSchedule()">Cancel</button>'
+      + '</div>';
+  }
+
   m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder</div>'
+    + schedBannerHtml
     // Game + viewers row
     + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">'
     + '<div style="flex:1;background:var(--surf2);border-radius:6px;padding:8px 12px">'
@@ -4835,12 +5060,27 @@ function _rfRenderResults() {
   if (!res) { el.innerHTML = ''; return; }
 
   if (res.error) {
+    // Timeout = action either didn't run, or ran but never broadcast back.
+    // The historical cause is a missing-references compile failure on the
+    // old broken import; offer the re-install flow as the next step.
     var errMsg = {
-      timeout: 'Search timed out. Make sure Streamer.bot is connected and the Raid Finder actions are enabled.',
+      timeout: 'Search timed out. The Streamer.bot action didn\u2019t respond.',
       twitch_not_connected: 'Twitch is not connected in Streamer.bot. Sign in to Twitch inside SB first.',
       missing_gameId: 'No game detected. Make sure your stream is live.'
     }[res.error] || 'Error: ' + res.error;
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--err,#ef4444);font-size:12px"><svg class="ic" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-warn"/></svg> ' + esc(errMsg) + '</div>';
+    var helpHtml = '';
+    if (res.error === 'timeout') {
+      helpHtml = '<div style="margin-top:8px;color:var(--mut);line-height:1.5">'
+        + 'If this is happening on every search, your imported SB action may be the older broken version. '
+        + '<a onclick="_rfShowInstall();return false" style="color:var(--accent);cursor:pointer;text-decoration:underline">Re-install the Raid Finder actions</a> to get the fixed copy.'
+        + '</div>';
+    } else if (res.error.indexOf('helix_') === 0) {
+      helpHtml = '<div style="margin-top:8px;color:var(--mut);line-height:1.5">Twitch Helix returned ' + esc(res.error.replace('helix_', 'HTTP ')) + '. Try again in a moment, or re-authenticate Twitch inside Streamer.bot.</div>';
+    }
+    el.innerHTML = '<div style="padding:14px;color:var(--err,#ef4444);font-size:12px;text-align:center">'
+      + '<svg class="ic" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-warn"/></svg> ' + esc(errMsg)
+      + helpHtml
+      + '</div>';
     return;
   }
 
@@ -4868,15 +5108,25 @@ function _rfRenderResults() {
       + '<div style="font-size:13px;font-weight:600">' + (s.viewer_count || 0) + ' <span style="font-size:10px;color:var(--mut);font-weight:400">viewers</span></div>'
       + (uptime ? '<div style="font-size:10px;color:var(--mut)">' + uptime + '</div>' : '')
       + '</div>'
+      + '<button class="cbtn" style="flex-shrink:0;padding:5px 8px;font-size:11px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)" title="Schedule a raid for later" onclick="_rfShowSchedulePicker(\'' + escA(s.user_login || '') + '\',\'' + escA(s.user_name || s.user_login || '') + '\')"><svg class="ic" style="width:12px;height:12px"><use href="#i-clock"/></svg></button>'
       + '<button class="btn-tw" style="flex-shrink:0;padding:5px 10px;font-size:11px" onclick="_rfStartRaid(\'' + escA(s.user_login || '') + '\',\'' + escA(s.user_name || s.user_login || '') + '\')">Raid &rarr;</button>'
       + '</div>';
   }).join('');
 }
 
 // ── Fire raid ────────────────────────────────────────────────────────────────
-function _rfStartRaid(login, displayName) {
+// opts.skipConfirm bypasses the confirm() dialog — used by the scheduler
+// when the timer fires (the user already confirmed at scheduling time).
+// opts.fromSchedule changes the toast wording so the streamer sees that
+// the scheduled raid is the one firing.
+function _rfStartRaid(login, displayName, opts) {
+  opts = opts || {};
   if (!S.raidFinder.actions.startRaid) { sysMsg('tw', 'Raid action not installed.'); return; }
-  if (!confirm('Raid ' + (displayName || login) + ' now?')) return;
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
+    sysMsg('tw', 'Streamer.bot is not connected. Reconnect and try again.');
+    return;
+  }
+  if (!opts.skipConfirm && !confirm('Raid ' + (displayName || login) + ' now?')) return;
 
   // Pre-raid message: post to streamer's own Twitch chat so viewers can
   // copy + paste into the target channel's chat. Fires BEFORE the raid
@@ -4900,8 +5150,334 @@ function _rfStartRaid(login, displayName) {
     action: S.raidFinder.actions.startRaid,
     args: { raidTarget: login }
   }));
-  sysMsg('tw', 'Raiding ' + (displayName || login) + '\u2026 give Twitch a few seconds.');
-  closeModal();
+  var prefix = opts.fromSchedule ? 'Scheduled raid firing now: ' : 'Raiding ';
+  sysMsg('tw', prefix + (displayName || login) + '\u2026 give Twitch a few seconds.');
+  if (!opts.skipConfirm) closeModal();
+}
+
+// ── Outgoing Raid Scheduler ──────────────────────────────────────────────────
+// Lets the streamer queue a raid for X minutes from now (e.g. at end of
+// stream) instead of firing it instantly. State is persisted via fireAt
+// so closing/reopening SF doesn't drop a pending schedule. A countdown
+// chip appears on the toolbar Raid button while a schedule is armed.
+var _rfScheduledTimerId = null;
+var _rfChipTickTimer = null;
+
+function _rfShowSchedulePicker(login, displayName) {
+  var m = document.getElementById('modal');
+  if (!m) return;
+  document.getElementById('overlay').classList.add('show');
+  var presets = [5, 10, 15, 30, 45, 60];
+  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Schedule raid to ' + esc(displayName || login) + '</div>'
+    + '<p class="mp">Pick when to fire the raid. The countdown shows on the toolbar Raid button.</p>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">'
+    + presets.map(function(n) {
+        return '<button class="btn-tw" style="padding:8px;font-size:12px" onclick="_rfScheduleRaid(\'' + escA(login) + '\',\'' + escA(displayName) + '\',' + n + ')">in ' + n + ' min</button>';
+      }).join('')
+    + '</div>'
+    + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:11px;color:var(--mut)">'
+    +   '<span>Or pick a custom time:</span>'
+    +   '<input id="rfSchedCustom" type="number" min="1" max="240" placeholder="min" style="width:60px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:4px 6px;font-size:12px">'
+    +   '<button class="cbtn" style="padding:4px 8px;font-size:11px" onclick="_rfScheduleRaid(\'' + escA(login) + '\',\'' + escA(displayName) + '\',parseInt(document.getElementById(\'rfSchedCustom\').value)||0)">Set</button>'
+    + '</div>'
+    + '<div class="mbtns">'
+    +   '<button class="btn-x" onclick="_rfRenderPanel()">&larr; Back to results</button>'
+    + '</div>';
+}
+
+function _rfScheduleRaid(login, displayName, mins) {
+  mins = parseInt(mins) || 0;
+  if (mins < 1 || mins > 240) { sysMsg('tw', 'Schedule minutes must be between 1 and 240.'); return; }
+  if (!login) { sysMsg('tw', 'Cannot schedule \u2014 missing target.'); return; }
+  // Replace any existing schedule (one in-flight at a time keeps the
+  // countdown chip unambiguous).
+  _rfClearScheduledTimer();
+  S.raidFinder.scheduled = {
+    login: String(login),
+    displayName: String(displayName || login),
+    fireAt: Date.now() + mins * 60000
+  };
+  _rfArmScheduledTimer();
+  try { saveSettings(); } catch (e) {}
+  _rfUpdateToolbarChip();
+  sysMsg('tw', 'Raid to ' + (displayName || login) + ' scheduled in ' + mins + ' minute' + (mins > 1 ? 's' : '') + '.');
+  // Bounce back to the result list so the streamer sees the chip + schedule banner.
+  _rfRenderPanel();
+}
+
+function _rfArmScheduledTimer() {
+  _rfClearScheduledTimer();
+  var s = S.raidFinder.scheduled;
+  if (!s || !s.fireAt) return;
+  var ms = s.fireAt - Date.now();
+  if (ms <= 0) { _rfFireScheduledNow(); return; }
+  // setTimeout int max is ~24.8 days; clamped well below since we cap mins=240.
+  _rfScheduledTimerId = setTimeout(_rfFireScheduledNow, ms);
+  console.log('[SF rf] scheduler armed: target=' + s.login + ' fires in ' + Math.round(ms / 1000) + 's');
+}
+
+function _rfClearScheduledTimer() {
+  if (_rfScheduledTimerId) { clearTimeout(_rfScheduledTimerId); _rfScheduledTimerId = null; }
+}
+
+function _rfFireScheduledNow() {
+  var s = S.raidFinder.scheduled;
+  if (!s) return;
+  S.raidFinder.scheduled = null;
+  _rfClearScheduledTimer();
+  try { saveSettings(); } catch (e) {}
+  _rfUpdateToolbarChip();
+  // If SB isn't connected at fire time, the user gets a sysMsg from
+  // _rfStartRaid and the schedule is forfeited (no auto-retry — better
+  // to fail loudly than fire a raid much later than expected).
+  _rfStartRaid(s.login, s.displayName, { skipConfirm: true, fromSchedule: true });
+}
+
+function _rfCancelSchedule(opts) {
+  opts = opts || {};
+  var s = S.raidFinder.scheduled;
+  S.raidFinder.scheduled = null;
+  _rfClearScheduledTimer();
+  try { saveSettings(); } catch (e) {}
+  _rfUpdateToolbarChip();
+  if (!opts.silent && s) sysMsg('tw', 'Cancelled scheduled raid to ' + (s.displayName || s.login) + '.');
+  // Re-render Raid Finder panel if it's currently open
+  var modalEl = document.getElementById('modal');
+  if (modalEl && modalEl.innerHTML.indexOf('Raid Finder') !== -1) {
+    try { _rfRenderPanel(); } catch (e) {}
+  }
+}
+
+// Renders / refreshes the small countdown badge on the toolbar Raid button.
+// Idempotent: each call clears the existing chip + tick timer first, so it's
+// safe to call from anywhere (load, schedule, cancel, fire).
+function _rfUpdateToolbarChip() {
+  var btn = document.getElementById('raidBtn');
+  if (!btn) return;
+  var existing = btn.querySelector('.rf-sched-chip');
+  if (existing) existing.remove();
+  if (_rfChipTickTimer) { clearInterval(_rfChipTickTimer); _rfChipTickTimer = null; }
+  var s = S.raidFinder.scheduled;
+  if (!s) { btn.title = 'Raid Finder'; return; }
+  var chip = document.createElement('span');
+  chip.className = 'rf-sched-chip';
+  chip.setAttribute('style', 'display:inline-block;background:linear-gradient(135deg,#3A86FF,#00E5A0);color:#001022;border-radius:8px;padding:1px 6px;margin-left:5px;font-size:9px;font-weight:800;letter-spacing:.02em;vertical-align:1px');
+  btn.appendChild(chip);
+  function tick() {
+    var ms = s.fireAt - Date.now();
+    if (ms <= 0) { chip.textContent = 'NOW'; return; }
+    var totalSec = Math.ceil(ms / 1000);
+    var mm = Math.floor(totalSec / 60), ss = totalSec % 60;
+    chip.textContent = mm > 0 ? (mm + 'm' + (ss < 10 ? '0' : '') + ss + 's') : (ss + 's');
+    btn.title = 'Scheduled raid: ' + (s.displayName || s.login) + ' in ' + chip.textContent;
+    // Mirror countdown into the Raid Finder panel banner if it's open.
+    var pBanner = document.getElementById('rfSchedCountdown');
+    if (pBanner) pBanner.textContent = 'Fires in ' + chip.textContent;
+  }
+  tick();
+  _rfChipTickTimer = setInterval(tick, 1000);
+}
+
+// ── Smart Shoutout Queue (Tier 2 EA) ─────────────────────────────────────────
+// When a Twitch chatter is themselves a live streamer, queue them for a
+// /shoutout. Detection uses decapi.me (no SB action needed, no auth) and
+// per-stream-session dedup so a regular doesn't trigger a re-check every
+// stream. Manual fire by default; auto-fire is opt-in via settings.
+//
+// State (S.shoutout) lives in the renderer; queue + per-session caches
+// reset on stream-session start (hook is wired in startStreamSession).
+
+function _shoutoutCheckChatter(login, displayName) {
+  var s = S.shoutout;
+  if (!s.enabled) return;
+  if (!S.hasEarlyAccess) return; // Tier 2+ feature
+  if (!login) return;
+  var key = String(login).toLowerCase();
+  // Skip the broadcaster themselves
+  if (S.twLogin && key === S.twLogin.toLowerCase()) return;
+  // Skip excluded users (newline / comma / space separated)
+  var excludes = (s.excludeList || '').toLowerCase().split(/[\s,]+/).filter(Boolean);
+  if (excludes.indexOf(key) >= 0) return;
+  // Skip if already checked this session OR already shouted
+  if (s.knownLogins[key]) return;
+  if (s.shoutedThisStream[key]) return;
+  // Skip obvious-bot patterns even if not in exclude list — these
+  // hammer chat and would trip the lookup pointlessly.
+  if (/bot$/.test(key)) return;
+
+  s.knownLogins[key] = 'pending';
+
+  // decapi.me/twitch/uptime/{login} is plain text. Live → returns a
+  // duration string ("2 hours, 13 minutes"). Offline → contains "offline".
+  // Unknown user → contains "user" + "not found" or similar.
+  fetch('https://decapi.me/twitch/uptime/' + encodeURIComponent(key))
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(txt) {
+      txt = String(txt || '').trim();
+      // Live signal: a non-error response that doesn't say offline.
+      if (!txt
+          || /is offline/i.test(txt)
+          || /no.*user/i.test(txt)
+          || /not found/i.test(txt)
+          || /unable/i.test(txt)) {
+        s.knownLogins[key] = 'offline';
+        return;
+      }
+      s.knownLogins[key] = 'live';
+      var entry = {
+        login: key,
+        displayName: displayName || login,
+        game: '',
+        viewers: 0,
+        queuedAt: Date.now(),
+        status: 'live'
+      };
+      s.queue.push(entry);
+      _shoutoutRefreshUI();
+      // Enrich game name in background — non-critical, no retry.
+      fetch('https://decapi.me/twitch/game/' + encodeURIComponent(key))
+        .then(function(r) { return r.ok ? r.text() : ''; })
+        .then(function(g) {
+          var gameName = String(g || '').trim();
+          // decapi sometimes returns "Unknown" / "(no game)" — treat as missing
+          if (gameName && !/unknown|^no game|not found/i.test(gameName)) entry.game = gameName;
+          _shoutoutRefreshUI();
+        })
+        .catch(function() {});
+      // Auto-fire if enabled AND viewer threshold satisfied (best-effort —
+      // we don't have viewers from decapi unless we add another endpoint).
+      if (s.autoFire) _shoutoutFire(key, displayName || login);
+    })
+    .catch(function() {
+      // Network failure — clear pending so a future message can retry.
+      delete s.knownLogins[key];
+    });
+}
+
+function _shoutoutFire(login, displayName) {
+  if (!login) return;
+  var key = String(login).toLowerCase();
+  var tmpl = (S.shoutout.cmdTemplate || '/shoutout {target}').trim();
+  var msg = tmpl
+    .replace(/\{target\}/g, key)
+    .replace(/\{name\}/g, displayName || key);
+  // If the template starts with /so or /shoutout, route through the
+  // existing quickShoutout helper so its 2-min cooldown applies. Custom
+  // templates (e.g. "Welcome @{target} — they stream {game}!") fall
+  // through to the raw chat command path.
+  if (/^\/(so|shoutout)\b/i.test(msg)) {
+    if (typeof quickShoutout === 'function') quickShoutout(key);
+    else if (typeof handleTwitchCommand === 'function') handleTwitchCommand('/shoutout ' + key);
+  } else {
+    if (typeof handleTwitchCommand === 'function') handleTwitchCommand(msg);
+  }
+  S.shoutout.shoutedThisStream[key] = Date.now();
+  for (var i = 0; i < S.shoutout.queue.length; i++) {
+    if (S.shoutout.queue[i].login === key) S.shoutout.queue[i].status = 'shouted';
+  }
+  _shoutoutRefreshUI();
+}
+
+function _shoutoutDismiss(login) {
+  var key = String(login || '').toLowerCase();
+  S.shoutout.queue = S.shoutout.queue.filter(function(q) { return q.login !== key; });
+  _shoutoutRefreshUI();
+}
+
+// Called from startStreamSession — fresh stream means fresh chatter
+// universe, so re-discovery is desirable.
+function _shoutoutResetSession() {
+  S.shoutout.queue = [];
+  S.shoutout.knownLogins = {};
+  S.shoutout.shoutedThisStream = {};
+  _shoutoutRefreshUI();
+}
+
+function _shoutoutOpen() {
+  var m = document.getElementById('modal');
+  if (!m) return;
+  document.getElementById('overlay').classList.add('show');
+  if (!S.hasEarlyAccess) {
+    var msg = (typeof _eaMessages === 'function') ? _eaMessages(S.patreon) : { title: 'Early Access feature', sub: '' };
+    m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-megaphone"/></svg> Smart Shoutout Queue &mdash; Early Access</div>'
+      + '<p class="mp">Auto-detects when a fellow Twitch streamer chats, looks up their game, and queues a one-click shoutout. Optional auto-fire mode.</p>'
+      + '<p class="mp" style="color:var(--mut);font-size:12px">Available for Patreon Tier 2+ supporters.</p>'
+      + '<div style="background:var(--surf2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">'
+      +   '<div style="font-weight:600">' + esc(msg.title) + '</div>'
+      +   (msg.sub ? '<div style="color:var(--mut);margin-top:4px">' + esc(msg.sub) + '</div>' : '')
+      + '</div>'
+      + '<div class="mbtns">'
+      +   '<button class="btn-tw" onclick="connectPatreon();closeModal()"><svg class="ic"><use href="#i-bolt"/></svg> Connect Patreon</button>'
+      +   '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
+      + '</div>';
+    return;
+  }
+  _shoutoutRenderPanel();
+}
+
+function _shoutoutRenderPanel() {
+  var m = document.getElementById('modal');
+  if (!m) return;
+  document.getElementById('overlay').classList.add('show');
+  var s = S.shoutout;
+  var queueHtml;
+  if (!s.queue.length) {
+    queueHtml = '<div style="text-align:center;padding:24px;color:var(--mut);font-size:12px;line-height:1.6">'
+      + (s.enabled
+          ? 'No live streamers detected in chat yet.<br>Once a fellow streamer chats in, they\u2019ll show up here.'
+          : 'Smart Shoutouts is currently <strong style="color:var(--txt)">disabled</strong>. Enable it in Settings &rarr; Smart Shoutouts.')
+      + '</div>';
+  } else {
+    queueHtml = s.queue.map(function(q) {
+      var ago = Math.max(0, Math.round((Date.now() - q.queuedAt) / 1000));
+      var agoStr = ago < 60 ? ago + 's ago' : (Math.floor(ago / 60) + 'm ago');
+      var doneState = q.status === 'shouted';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surf2);border-radius:6px;margin-bottom:4px' + (doneState ? ';opacity:.5' : '') + '">'
+        + '<img src="https://unavatar.io/twitch/' + esc(q.login) + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0;background:var(--surf3)" onerror="this.style.display=\'none\'">'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(q.displayName || q.login) + '</div>'
+        +   '<div style="font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (q.game ? 'Playing ' + esc(q.game) + ' \u00b7 ' : '') + agoStr + '</div>'
+        + '</div>'
+        + (doneState
+            ? '<span style="font-size:11px;color:var(--ok,#22c55e);padding:5px 10px;flex-shrink:0">\u2713 Sent</span>'
+            : '<button class="btn-tw" style="padding:5px 10px;font-size:11px;flex-shrink:0" onclick="_shoutoutFire(\'' + escA(q.login) + '\',\'' + escA(q.displayName || q.login) + '\')">Shoutout</button>')
+        + '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--mut);padding:5px 8px;font-size:11px;flex-shrink:0" onclick="_shoutoutDismiss(\'' + escA(q.login) + '\')" title="Dismiss">&times;</button>'
+        + '</div>';
+    }).join('');
+  }
+  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-megaphone"/></svg> Smart Shoutout Queue</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.5">When a Twitch chatter is themselves a live streamer, they show up here. Click <strong style="color:var(--txt)">Shoutout</strong> to fire your configured command. Auto-fire + template are in Settings.</div>'
+    + '<div style="max-height:340px;overflow-y:auto;margin-bottom:10px">' + queueHtml + '</div>'
+    + '<div class="mbtns" style="justify-content:space-between">'
+    +   '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);cursor:pointer">'
+    +     '<input type="checkbox" ' + (s.autoFire ? 'checked' : '') + ' onchange="S.shoutout.autoFire=this.checked;saveSettings()">'
+    +     'Auto-fire shoutouts'
+    +   '</label>'
+    +   '<button class="btn-x" onclick="closeModal()">Close</button>'
+    + '</div>';
+}
+
+function _shoutoutRefreshUI() {
+  var btn = document.getElementById('soQueueBtn');
+  if (btn) {
+    var pending = S.shoutout.queue.filter(function(q) { return q.status !== 'shouted'; }).length;
+    var existing = btn.querySelector('.so-badge');
+    if (existing) existing.remove();
+    if (pending > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'so-badge';
+      badge.setAttribute('style', 'display:inline-block;background:#ef4444;color:#fff;border-radius:8px;padding:1px 5px;margin-left:4px;font-size:9px;font-weight:800;vertical-align:1px');
+      badge.textContent = pending > 99 ? '99+' : String(pending);
+      btn.appendChild(badge);
+    }
+  }
+  // Re-render the modal if the Shoutout panel is open (and not the upsell variant).
+  var modalEl = document.getElementById('modal');
+  if (modalEl
+      && modalEl.innerHTML.indexOf('Smart Shoutout Queue</div>') >= 0
+      && modalEl.innerHTML.indexOf('Early Access</div>') < 0) {
+    _shoutoutRenderPanel();
+  }
 }
 
 // ── Demo Mode ────────────────────────────────────────────────────────────────
@@ -5444,6 +6020,11 @@ function handleSBEvent(event, data) {
       _avatarCache[_twLoginKey] = _twAvatar;
     }
     var _isFirstMsg = !!(data.isFirstMessage || (data.message && data.message.isFirstMessage) || u.isFirstMessage || data.firstMessage);
+    // Smart Shoutout Queue probe — fire-and-forget per-chatter live check.
+    // Internal de-dup + EA gating + bot filtering live in the helper.
+    if (_twLoginKey && typeof _shoutoutCheckChatter === 'function') {
+      _shoutoutCheckChatter(_twLoginKey, u.displayName || u.name || _twLoginKey);
+    }
     // Detect Twitch announcement messages — they arrive as chat messages but
     // carry an announcement marker (msg-id tag, messageType, isAnnouncement,
     // or an "announcement" field). When the user has hidden announcements via
@@ -6884,6 +7465,13 @@ function renderObsOverlaysTab() {
       setVal('obsUrlAlerts',   u.alerts);
       setVal('obsUrlShoutout', u.shoutout);
       setVal('obsUrlVertical', u.vertical);
+      // Boot the Aquilo product registry tracker now that we know the
+      // obs-server base URL. Snapshot once, then keep an SSE connection
+      // open so registered/unregistered events update the panel live.
+      try {
+        var base = (u.root || '').replace(/\/$/, '');
+        if (base) startAquiloProductsWatch(base);
+      } catch (e) {}
       var st = document.getElementById('obsServerStatus');
       if (st) {
         if (s.running) {
@@ -6899,8 +7487,9 @@ function renderObsOverlaysTab() {
   var c = S.obsCfg || {};
   var get = function(id) { return document.getElementById(id); };
   if (c.chat) {
-    // 1.4.9 removed the 'hud' theme. Migrate any leftover value to 'card'.
-    if (get('obsChatTheme'))                get('obsChatTheme').value = (c.chat.theme === 'box' ? 'box' : 'card');
+    // 1.4.9 removed the 'hud' theme. 1.5.3 added 'nobg'. Migrate
+    // unknown values to 'card' so legacy settings don't break the picker.
+    if (get('obsChatTheme'))                get('obsChatTheme').value = (c.chat.theme === 'box' || c.chat.theme === 'nobg') ? c.chat.theme : 'card';
     if (get('obsChatFontSize'))             get('obsChatFontSize').value = c.chat.fontSize || 18;
     if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
     if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
@@ -7127,6 +7716,92 @@ function fireObsDemo(which) {
     ];
   }
   queue.forEach(function(fn, i) { setTimeout(fn, i * 1100); });
+}
+
+// ── Aquilo Products registry watcher ────────────────────────────────────────
+// Reads /api/integrations/list once, then subscribes to /api/integrations/events
+// so the Settings → Integrations panel updates live as companion products
+// (Spotify widget, SB kit, etc.) come and go. Protocol contract lives in
+// INTEGRATIONS.md at the repo root.
+var _aquiloProducts = [];
+var _aquiloEventSrc = null;
+var _aquiloBase = '';
+
+function _aquiloRefreshList() {
+  if (!_aquiloBase) return;
+  fetch(_aquiloBase + '/api/integrations/list')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(j) {
+      if (j && Array.isArray(j.products)) { _aquiloProducts = j.products; renderAquiloProducts(); }
+    })
+    .catch(function() {});
+}
+
+function startAquiloProductsWatch(baseUrl) {
+  _aquiloBase = baseUrl;
+  _aquiloRefreshList();
+  // Periodic re-poll as a safety net for SSE drops + to refresh lastSeen
+  // ages so "stale" products get pruned visually.
+  setInterval(_aquiloRefreshList, 30000);
+  // SSE subscription for live updates.
+  if (_aquiloEventSrc) { try { _aquiloEventSrc.close(); } catch (e) {} _aquiloEventSrc = null; }
+  try {
+    _aquiloEventSrc = new EventSource(baseUrl + '/api/integrations/events');
+    _aquiloEventSrc.addEventListener('hello', function(e) {
+      try { var d = JSON.parse(e.data); if (Array.isArray(d.products)) { _aquiloProducts = d.products; renderAquiloProducts(); } } catch (err) {}
+    });
+    _aquiloEventSrc.addEventListener('registered', function() { _aquiloRefreshList(); });
+    _aquiloEventSrc.addEventListener('unregistered', function() { _aquiloRefreshList(); });
+  } catch (e) {}
+}
+
+function renderAquiloProducts() {
+  var listEl = document.getElementById('aquiloProductsList');
+  var emptyEl = document.getElementById('aquiloProductsEmpty');
+  if (!listEl || !emptyEl) return;
+  var products = (_aquiloProducts || []).filter(Boolean);
+  // Augment with SB-kit pseudo-product if the kit's group is detected in
+  // SB's action list. The kit doesn't register over HTTP — it's pure SB
+  // actions — so we treat its presence as a virtual integration entry.
+  if (S && S.sbConnected && Array.isArray(S._sbActionsCache)) {
+    var hasKit = S._sbActionsCache.some(function(a) { return (a.group || '').toLowerCase() === 'aquilo streamer.bot kit'; });
+    if (hasKit && !products.some(function(p) { return p.product === 'aquilo-sb-kit'; })) {
+      products.unshift({
+        product: 'aquilo-sb-kit',
+        version: '',
+        capabilities: ['sb-actions'],
+        meta: { detectedVia: 'sb-getactions' },
+        lastSeen: Date.now()
+      });
+    }
+  }
+  if (!products.length) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = '';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  var prettyName = function(id) {
+    if (id === 'aquilo-spotify-widget') return 'Aquilo Spotify Widget';
+    if (id === 'aquilo-sb-kit') return 'Aquilo Streamer.Bot Kit';
+    return id || '(unnamed product)';
+  };
+  listEl.innerHTML = products.map(function(p) {
+    var cap = (p.capabilities || []).slice(0, 6).map(function(c) {
+      return '<span style="display:inline-block;background:var(--surf3);border-radius:8px;padding:1px 7px;font-size:9px;font-weight:700;letter-spacing:.02em;color:var(--mut);margin-right:3px;text-transform:uppercase">' + esc(c) + '</span>';
+    }).join('');
+    var ago = p.lastSeen ? Math.max(0, Math.round((Date.now() - p.lastSeen) / 1000)) : null;
+    var agoStr = ago == null ? '' : (ago < 5 ? 'live' : ago < 60 ? (ago + 's ago') : (Math.floor(ago / 60) + 'm ago'));
+    return '<div style="display:flex;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">'
+      + '<div style="width:8px;height:8px;border-radius:50%;background:' + (ago != null && ago < 60 ? 'var(--ok,#22c55e)' : '#f0b429') + ';flex-shrink:0;box-shadow:0 0 6px currentColor"></div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:12px;font-weight:700">' + esc(prettyName(p.product)) + (p.version ? ' <span style="font-size:10px;color:var(--mut);font-weight:600">v' + esc(p.version) + '</span>' : '') + '</div>'
+      +   (cap ? '<div style="margin-top:4px">' + cap + '</div>' : '')
+      +   (p.meta && p.meta.track ? '<div style="font-size:10px;color:var(--mut);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">♫ ' + esc(p.meta.track) + (p.meta.artist ? ' — ' + esc(p.meta.artist) : '') + '</div>' : '')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mut);flex-shrink:0">' + esc(agoStr) + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 function updateObsConfig(which) {
@@ -8067,6 +8742,11 @@ function startStreamSession() {
   // Snapshot current stats so recap shows only THIS session
   _streamSession.startStats = JSON.parse(JSON.stringify(S.stats));
   _lastRevenueMilestone = 0;
+  // Fresh stream session = fresh shoutout queue (so a chatter who was
+  // live last time gets re-evaluated this time) + try to fire the live
+  // Discord announcement.
+  if (typeof _shoutoutResetSession === 'function') _shoutoutResetSession();
+  if (typeof _discordAnnounceFireGoLive === 'function') _discordAnnounceFireGoLive();
   addEvHistory('StreamFusion', 'Stream session started \u2014 recap will be generated when you go offline.', 'tw', false);
   if (typeof updateLiveBar === 'function') updateLiveBar();
   if (typeof sendOverlayLive === 'function') sendOverlayLive();
@@ -8125,6 +8805,10 @@ function endStreamSession() {
   // sendDiscordRecap reads from window._lastRecapData which generateRecap()
   // populates, so it must run after generateRecap.
   sendDiscordRecap();
+  // Discord live-announce: edit/delete the original "🔴 Live" message.
+  // Runs alongside the recap (they post to the same webhook by design —
+  // first the live message gets recalled, then the recap embed lands).
+  if (typeof _discordAnnounceFireGoOffline === 'function') _discordAnnounceFireGoOffline();
 }
 // Build a recap snapshot from the *currently active* (or just-ended) session
 // without depending on window._lastRecapData. Used by both the modal recap
@@ -8352,6 +9036,167 @@ function sendDiscordRecap(manual) {
     }).catch(function() {});
   }
 }
+// ── Discord Live-Announce + Auto-Recall (Tier 2 EA) ─────────────────────────
+// On stream-start, posts "🔴 Live now" via the existing discordWebhook and
+// stores the returned message id. On stream-end, edits or deletes that
+// message based on endBehavior. Reuses the same webhook the recap uses,
+// which keeps setup to a single field for the streamer.
+//
+// Discord webhook semantics:
+//   POST {url}?wait=true     → returns Message {id, ...} so we can edit later
+//   PATCH {url}/messages/{id} → edit
+//   DELETE {url}/messages/{id} → delete
+//
+// Failures (network, 404, etc.) fail silent in the chat feed but log to the
+// event history so the streamer can self-diagnose.
+
+function _discordAnnounceRenderTemplate(template, ctx) {
+  return String(template || '')
+    .replace(/\{streamer\}/g, ctx.streamer || '')
+    .replace(/\{game\}/g,     ctx.game || '')
+    .replace(/\{title\}/g,    ctx.title || '')
+    .replace(/\{url\}/g,      ctx.url || '')
+    .replace(/\{duration\}/g, ctx.duration || '')
+    .replace(/\{role\}/g,     ctx.role || '');
+}
+
+function _discordAnnounceWebhookMsgUrl(webhookUrl, msgId) {
+  if (!webhookUrl || !msgId) return '';
+  // Strip any query string + trailing slash, then append /messages/{id}.
+  return webhookUrl.split('?')[0].replace(/\/+$/, '') + '/messages/' + encodeURIComponent(msgId);
+}
+
+function _discordAnnounceFireGoLive() {
+  var da = S.discordAnnounce;
+  if (!da.enabled) return;
+  if (!S.hasEarlyAccess) return; // EA-gated
+  if (!discordWebhook) {
+    addEvHistory('StreamFusion', 'Live-announce skipped: no Discord webhook URL set.', 'tw', false);
+    return;
+  }
+  // Best-effort title fetch — Twitch title isn't in S, decapi.me knows it.
+  // Fire the announce with whatever we have if title fetch fails.
+  var ctx = {
+    streamer: S.twLogin || (S.patreon && S.patreon.userName) || 'streamer',
+    game: S.raidFinder.gameOverride || S.twGame || '',
+    title: '',
+    url: S.twLogin ? ('https://twitch.tv/' + S.twLogin) : '',
+    duration: '',
+    role: da.pingRole ? '<@&' + String(da.pingRole).replace(/[^0-9]/g, '') + '>' : ''
+  };
+  function _post() {
+    var content = _discordAnnounceRenderTemplate(da.liveTemplate, ctx).trim();
+    if (!content) return;
+    var body = {
+      content: content,
+      // Allow only the configured role ping — never @everyone / @here from
+      // a templated message accident.
+      allowed_mentions: da.pingRole
+        ? { parse: [], roles: [String(da.pingRole).replace(/[^0-9]/g, '')] }
+        : { parse: [] }
+    };
+    var url = discordWebhook + (discordWebhook.indexOf('?') >= 0 ? '&' : '?') + 'wait=true';
+    fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(j) {
+        if (j && j.id) {
+          da.currentMessageId = j.id;
+          da.currentWebhookUrl = discordWebhook;
+          da.liveStartedAt = Date.now();
+          addEvHistory('StreamFusion', 'Discord live-announce posted.', 'tw', false);
+        } else {
+          addEvHistory('StreamFusion', 'Live-announce posted but Discord didn\u2019t return a message id (auto-recall on end disabled for this stream).', 'tw', false);
+        }
+      })
+      .catch(function(e) {
+        addEvHistory('StreamFusion', 'Live-announce failed: ' + ((e && e.message) || 'network error'), 'tw', false);
+      });
+  }
+  if (S.twLogin) {
+    fetch('https://decapi.me/twitch/title/' + encodeURIComponent(S.twLogin))
+      .then(function(r) { return r.ok ? r.text() : ''; })
+      .then(function(t) {
+        var title = String(t || '').trim();
+        if (title && !/not found|offline|unable/i.test(title)) ctx.title = title;
+        _post();
+      })
+      .catch(function() { _post(); });
+  } else {
+    _post();
+  }
+}
+
+function _discordAnnounceFireGoOffline() {
+  var da = S.discordAnnounce;
+  if (!da.enabled) return;
+  if (!da.currentMessageId || !da.currentWebhookUrl) {
+    // Nothing to recall — either we never posted (disabled / no webhook /
+    // returned no id) or the streamer relaunched SF mid-stream and the
+    // runtime state was wiped. Either way, no-op silently.
+    return;
+  }
+  var msgUrl = _discordAnnounceWebhookMsgUrl(da.currentWebhookUrl, da.currentMessageId);
+  // Snapshot then clear so a re-fired stream-end (e.g. live-monitor flap)
+  // doesn't re-attempt against an already-deleted message.
+  var snapshot = {
+    msgId: da.currentMessageId,
+    webhookUrl: da.currentWebhookUrl,
+    startedAt: da.liveStartedAt || Date.now(),
+    behavior: da.endBehavior || 'edit'
+  };
+  da.currentMessageId = null;
+  da.currentWebhookUrl = null;
+  da.liveStartedAt = null;
+
+  if (snapshot.behavior === 'keep') {
+    addEvHistory('StreamFusion', 'Live-announce kept (per setting).', 'tw', false);
+    return;
+  }
+  if (snapshot.behavior === 'delete') {
+    fetch(msgUrl, { method: 'DELETE' })
+      .then(function(r) {
+        if (r.ok) addEvHistory('StreamFusion', 'Live-announce deleted on stream end.', 'tw', false);
+        else addEvHistory('StreamFusion', 'Live-announce delete failed (HTTP ' + r.status + ').', 'tw', false);
+      })
+      .catch(function() {});
+    return;
+  }
+  // Default: edit
+  var ms = Date.now() - snapshot.startedAt;
+  var hrs = Math.floor(ms / 3600000), mins = Math.floor((ms % 3600000) / 60000);
+  var durStr = hrs > 0 ? (hrs + 'h ' + mins + 'm') : (mins + 'm');
+  var ctx = {
+    streamer: S.twLogin || '',
+    game: S.raidFinder.gameOverride || S.twGame || '',
+    title: '',
+    url: S.twLogin ? ('https://twitch.tv/' + S.twLogin) : '',
+    duration: durStr,
+    role: '' // never re-ping on edit
+  };
+  var content = _discordAnnounceRenderTemplate(da.endTemplate, ctx).trim();
+  fetch(msgUrl, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ content: content, allowed_mentions: { parse: [] } })
+  })
+    .then(function(r) {
+      if (r.ok) addEvHistory('StreamFusion', 'Live-announce updated to "stream ended".', 'tw', false);
+      else addEvHistory('StreamFusion', 'Live-announce edit failed (HTTP ' + r.status + ').', 'tw', false);
+    })
+    .catch(function() {});
+}
+
+// Manual fire button — useful for testing the template / role-ping setup
+// without waiting for a real stream-start signal.
+function _discordAnnounceTestFire() {
+  if (!S.hasEarlyAccess) { sysMsg('tw', 'Live-announce is an Early Access feature.'); return; }
+  if (!discordWebhook) { sysMsg('tw', 'Set a Discord webhook URL first.'); return; }
+  var wasEnabled = S.discordAnnounce.enabled;
+  S.discordAnnounce.enabled = true;
+  _discordAnnounceFireGoLive();
+  S.discordAnnounce.enabled = wasEnabled;
+}
+
 // Live diagnostic for the Discord recap setup — shown in the Integrations
 // tab so the streamer can confirm everything's wired up BEFORE trying to
 // go live. Reflects: webhook URL presence, auto-send toggle, last-post
