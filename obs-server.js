@@ -36,6 +36,46 @@ let heartbeatTimer = null;
 // live event. Covers the "streamer reloads OBS scene" case gracefully.
 let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {} };
 
+// ── Aquilo product integration registry ────────────────────────────────────
+// Companion products (Aquilo Spotify widget, Aquilo Streamer.Bot kit, future
+// products) POST to /api/integrations/register on startup. Their entry stays
+// alive as long as they heartbeat at least every 60s; otherwise they're
+// pruned. SF's renderer queries /api/integrations/list to surface what's
+// connected in Settings → Integrations → Aquilo Products.
+//
+// Registry is in-memory only — every product is expected to re-register on
+// SF restart or its own restart. Keeps stale entries from accumulating.
+const INTEGRATIONS_STALE_MS = 60000;
+let integrations = new Map();      // clientId -> {clientId, product, version, capabilities, port, urls, lastSeen, meta}
+let integrationsSseClients = new Set();
+let integrationsCounter = 0;
+
+function _newClientId() {
+  integrationsCounter += 1;
+  return 'sf-int-' + Date.now().toString(36) + '-' + integrationsCounter;
+}
+
+function _broadcastIntegrationsEvent(eventName, payload) {
+  const line = 'event: ' + eventName + '\ndata: ' + JSON.stringify(payload) + '\n\n';
+  integrationsSseClients.forEach(function(c) {
+    try { c.res.write(line); } catch (e) { integrationsSseClients.delete(c); }
+  });
+}
+
+function _pruneStaleIntegrations() {
+  const cutoff = Date.now() - INTEGRATIONS_STALE_MS;
+  let pruned = false;
+  integrations.forEach(function(v, k) {
+    if (v.lastSeen < cutoff) { integrations.delete(k); pruned = true; _broadcastIntegrationsEvent('unregistered', { clientId: k, reason: 'stale' }); }
+  });
+  return pruned;
+}
+
+function listIntegrations() {
+  _pruneStaleIntegrations();
+  return Array.from(integrations.values());
+}
+
 // Read an overlay file from disk each request. File reads are cheap and
 // reading fresh means dev-mode hot-editing of the HTML works without an
 // app restart (electron-builder bundles the files into the asar for prod;
@@ -148,6 +188,107 @@ function handleRequest(req, res) {
     return;
   }
 
+  // ── /api/integrations/* ──────────────────────────────────────────────────
+  // Aquilo companion-product handshake. Lightweight HTTP — no auth besides
+  // the loopback bind, since localhost-only. Spotify widget + SB kit + any
+  // future Aquilo product connect here so the streamer sees them in SF.
+
+  if (p === '/api/integrations/list' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ products: listIntegrations() }));
+    return;
+  }
+
+  if (p === '/api/integrations/events' && req.method === 'GET') {
+    // SSE channel for live registered/unregistered updates. SF UI listens
+    // here so the Aquilo Products panel stays current without polling.
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.write('event: hello\ndata: ' + JSON.stringify({ products: listIntegrations() }) + '\n\n');
+    var ic = { res: res };
+    integrationsSseClients.add(ic);
+    req.on('close', function() { integrationsSseClients.delete(ic); });
+    return;
+  }
+
+  if ((p === '/api/integrations/register' || p === '/api/integrations/heartbeat' || p === '/api/integrations/unregister') && req.method === 'POST') {
+    var chunks = [];
+    req.on('data', function(d) {
+      chunks.push(d);
+      if (chunks.reduce(function(n, b) { return n + b.length; }, 0) > 16384) { req.destroy(); }
+    });
+    req.on('end', function() {
+      var body = {};
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf-8') || '{}'); } catch (e) {}
+
+      if (p === '/api/integrations/register') {
+        if (!body.product || typeof body.product !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ error: 'product field required' }));
+          return;
+        }
+        var clientId = body.clientId && integrations.has(body.clientId) ? body.clientId : _newClientId();
+        var entry = {
+          clientId:     clientId,
+          product:      String(body.product).slice(0, 64),
+          version:      String(body.version || '').slice(0, 32),
+          capabilities: Array.isArray(body.capabilities) ? body.capabilities.slice(0, 32).map(function(c) { return String(c).slice(0, 64); }) : [],
+          port:         (typeof body.port === 'number' && body.port > 0) ? body.port : null,
+          urls:         (body.urls && typeof body.urls === 'object') ? body.urls : {},
+          meta:         (body.meta && typeof body.meta === 'object') ? body.meta : {},
+          lastSeen:     Date.now()
+        };
+        integrations.set(clientId, entry);
+        _broadcastIntegrationsEvent('registered', { product: entry });
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: true, clientId: clientId, heartbeatMs: 30000 }));
+        return;
+      }
+
+      if (p === '/api/integrations/heartbeat') {
+        var hbId = body.clientId;
+        if (!hbId || !integrations.has(hbId)) {
+          res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ error: 'unknown clientId — re-register' }));
+          return;
+        }
+        var rec = integrations.get(hbId);
+        rec.lastSeen = Date.now();
+        if (body.meta && typeof body.meta === 'object') Object.assign(rec.meta, body.meta);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+
+      if (p === '/api/integrations/unregister') {
+        if (body.clientId && integrations.has(body.clientId)) {
+          integrations.delete(body.clientId);
+          _broadcastIntegrationsEvent('unregistered', { clientId: body.clientId });
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+    });
+    return;
+  }
+
+  // CORS preflight for /api/integrations/* — companion products on a
+  // different origin (e.g. widgets.aquilo.gg) need this to fetch.
+  if (p.indexOf('/api/integrations') === 0 && req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+    res.end();
+    return;
+  }
+
   res.writeHead(404, { 'Access-Control-Allow-Origin': '*' });
   res.end('Not found');
 }
@@ -166,11 +307,16 @@ function startServer(port) {
       console.log('[obs-server] listening on http://' + BIND_HOST + ':' + serverPort);
       // Periodic heartbeat keeps proxies / NAT / OBS from silently dropping
       // idle SSE connections (a long quiet stream would eventually look
-      // dead to some intermediate layer).
+      // dead to some intermediate layer). Same timer also prunes Aquilo
+      // companion products that stopped heartbeating.
       heartbeatTimer = setInterval(function() {
         sseClients.forEach(function(c) {
           try { c.res.write(': hb\n\n'); } catch (e) { sseClients.delete(c); }
         });
+        integrationsSseClients.forEach(function(c) {
+          try { c.res.write(': hb\n\n'); } catch (e) { integrationsSseClients.delete(c); }
+        });
+        _pruneStaleIntegrations();
       }, HEARTBEAT_MS);
       resolve(true);
     });
@@ -258,5 +404,7 @@ module.exports = {
   setEntitled:      setEntitled,
   getUrls:          getUrls,
   isRunning:        isRunning,
-  connectedClients: connectedClients
+  connectedClients: connectedClients,
+  // Aquilo product registry
+  listIntegrations: listIntegrations
 };
