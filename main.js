@@ -138,6 +138,39 @@ let bannerWindow = null;
 let promoWindow = null;
 let tray = null;
 let isQuitting = false;
+// Set true once electron-updater fires update-downloaded for the current
+// session. Drives the close-dialog default (becomes "Install & Restart"
+// when pending) and the tray menu entry. Cleared after install fires.
+let _pendingUpdateVersion = null;
+
+// Rebuilds the tray context menu so it reflects the current pending-update
+// state. Called from the tray-create path AND whenever the pending state
+// changes (download arrives / install fires) so the menu stays accurate
+// without forcing a tray-icon recreation.
+function _rebuildTrayMenu() {
+  if (!tray || tray.isDestroyed?.()) return;
+  const items = [
+    { label: 'StreamFusion v' + app.getVersion(), enabled: false },
+    { type: 'separator' },
+    { label: 'Show StreamFusion', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+  ];
+  if (_pendingUpdateVersion) {
+    items.push({ type: 'separator' });
+    items.push({
+      label: 'Install Update v' + _pendingUpdateVersion + ' & Restart',
+      click: () => {
+        try { logToFile('UPDATE', 'tray: user clicked Install Update Now'); } catch (e) {}
+        ipcMain.emit('install-update');
+      },
+    });
+  }
+  items.push({ type: 'separator' });
+  items.push({
+    label: 'Quit',
+    click: () => { isQuitting = true; app.quit(); },
+  });
+  tray.setContextMenu(Menu.buildFromTemplate(items));
+}
 let overlayHotkeyAccel = 'CommandOrControl+Shift+L';
 // Mouse4/Mouse5 cannot be registered via Electron globalShortcut. When the
 // user picks one of those, we record it here and the PowerShell input poller
@@ -439,25 +472,65 @@ function createWindow() {
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
-      dialog.showMessageBox(mainWindow, {
-        type: 'question',
-        buttons: ['Minimize to Tray', 'Exit StreamFusion', 'Cancel'],
-        defaultId: 0,
-        cancelId: 2,
-        title: 'StreamFusion',
-        message: 'What would you like to do?',
-        detail: 'Minimize keeps StreamFusion running in the background.',
-      }).then(({ response }) => {
-        if (response === 0) {
-          mainWindow.hide();
-          if (tray && process.platform === 'win32') {
-            tray.displayBalloon({ iconType: 'info', title: 'StreamFusion', content: 'Still running. Right-click the tray icon to quit.' });
+      // When a downloaded update is sitting in the wings, change the
+      // default action so a user clicking X actually gets the update
+      // installed. Previously the dialog defaulted to "Minimize to Tray"
+      // which kept the app alive → autoInstallOnAppQuit never fired →
+      // user reopened to find the same old version. Now the dialog
+      // primary button is "Install Update & Restart" and fires the same
+      // silent quitAndInstall(true, true) the toolbar Update Now button
+      // uses.
+      var hasPendingUpdate = !!_pendingUpdateVersion;
+      var dialogOpts = hasPendingUpdate
+        ? {
+            type: 'question',
+            buttons: ['Install Update v' + _pendingUpdateVersion + ' & Restart', 'Minimize to Tray', 'Exit Without Updating', 'Cancel'],
+            defaultId: 0,
+            cancelId: 3,
+            title: 'StreamFusion',
+            message: 'A StreamFusion update is ready.',
+            detail: 'Install + restart now (silent, ~10 seconds), keep the app running in the tray, or exit and apply the update on next launch.',
           }
-        } else if (response === 1) {
-          isQuitting = true;
-          app.quit();
+        : {
+            type: 'question',
+            buttons: ['Minimize to Tray', 'Exit StreamFusion', 'Cancel'],
+            defaultId: 0,
+            cancelId: 2,
+            title: 'StreamFusion',
+            message: 'What would you like to do?',
+            detail: 'Minimize keeps StreamFusion running in the background.',
+          };
+      dialog.showMessageBox(mainWindow, dialogOpts).then(({ response }) => {
+        if (hasPendingUpdate) {
+          if (response === 0) {
+            // Install & Restart — fire the same path the toolbar button uses.
+            logToFile('UPDATE', 'close-dialog: user chose Install & Restart — invoking install-update path');
+            ipcMain.emit('install-update');
+          } else if (response === 1) {
+            // Minimize to Tray (update stays pending — autoInstallOnAppQuit
+            // will still fire on a real exit later).
+            mainWindow.hide();
+            if (tray && process.platform === 'win32') {
+              tray.displayBalloon({ iconType: 'info', title: 'StreamFusion', content: 'Update v' + _pendingUpdateVersion + ' will install when you fully exit.' });
+            }
+          } else if (response === 2) {
+            // Exit without updating — let autoInstallOnAppQuit fire on quit.
+            isQuitting = true;
+            app.quit();
+          }
+          // response === 3 → Cancel, do nothing
+        } else {
+          if (response === 0) {
+            mainWindow.hide();
+            if (tray && process.platform === 'win32') {
+              tray.displayBalloon({ iconType: 'info', title: 'StreamFusion', content: 'Still running. Right-click the tray icon to quit.' });
+            }
+          } else if (response === 1) {
+            isQuitting = true;
+            app.quit();
+          }
+          // response === 2 → Cancel, do nothing
         }
-        // response === 2 → Cancel, do nothing
       });
     }
   });
@@ -498,24 +571,9 @@ function createTray() {
   tray = new Tray(trayIcon);
   tray.setToolTip('StreamFusion v' + app.getVersion() + ' — Running');
 
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'StreamFusion v' + app.getVersion(), enabled: false },
-    { type: 'separator' },
-    {
-      label: 'Show StreamFusion',
-      click: () => { mainWindow?.show(); mainWindow?.focus(); },
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      },
-    },
-  ]);
-
-  tray.setContextMenu(contextMenu);
+  // Tray menu is rebuilt whenever a downloaded update arrives so the
+  // "Install Update Now" item can appear without restarting the app.
+  _rebuildTrayMenu();
   tray.on('click', () => {
     if (mainWindow) {
       mainWindow.isVisible() ? mainWindow.focus() : mainWindow.show();
@@ -659,10 +717,14 @@ app.whenReady().then(() => {
       if (p && p.percent != null) logToFile('UPDATE', 'download ' + Math.round(p.percent) + '% (' + Math.round((p.bytesPerSecond||0)/1024) + ' KB/s)');
     });
     autoUpdater.on('update-downloaded', (info) => {
-      logToFile('UPDATE', 'update DOWNLOADED: ' + (info && info.version) + ' — will auto-install on next app quit (autoInstallOnAppQuit=true)');
+      _pendingUpdateVersion = (info && info.version) || 'pending';
+      logToFile('UPDATE', 'update DOWNLOADED: ' + _pendingUpdateVersion + ' — will auto-install on next app quit, OR sooner if user clicks Update Now');
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('update-downloaded', { version: info.version });
       }
+      // Refresh tray menu so the "Install Update Now" item appears
+      // without waiting for a tray event.
+      try { _rebuildTrayMenu(); } catch (e) {}
     });
     autoUpdater.on('error', (err) => {
       logToFile('UPDATE-ERR', 'autoUpdater error: ' + (err && err.stack || err));
@@ -1410,9 +1472,42 @@ ipcMain.on('download-update', () => {
 // flow Slack/Discord/VS Code use for their auto-updates.
 ipcMain.on('install-update', () => {
   if (!autoUpdater) { logToFile('UPDATE-ERR', 'install-update IPC but autoUpdater missing'); return; }
-  logToFile('UPDATE', 'install-update IPC received — calling quitAndInstall(silent=true, forceRunAfter=true)');
-  try { autoUpdater.quitAndInstall(true, true); }
-  catch (e) { logToFile('UPDATE-ERR', 'quitAndInstall threw: ' + (e && e.message)); }
+  logToFile('UPDATE', 'install-update IPC received — tearing down child processes then calling quitAndInstall(silent=true, forceRunAfter=true)');
+  // Mark quitting BEFORE teardown so the main-window close handler doesn't
+  // pop the "Minimize to Tray?" dialog and trap us. Manually shut down
+  // every long-lived child so electron-updater's installer-spawn isn't
+  // blocked by an open file lock or socket on the SF binary.
+  isQuitting = true;
+  try { obsServer.stopServer(); }    catch (e) { logToFile('UPDATE-ERR', 'obsServer.stopServer threw: ' + (e && e.message)); }
+  try { discordBot.disconnectBot(); } catch (e) { logToFile('UPDATE-ERR', 'discordBot.disconnectBot threw: ' + (e && e.message)); }
+  try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
+  try { discordAuth.stopRuntimeChecks(); } catch (e) {}
+  try { globalShortcut.unregisterAll(); } catch (e) {}
+  // quitAndInstall is a no-op if the update isn't downloaded yet, but
+  // we surface the case to the log so we can diagnose post-mortem.
+  try {
+    autoUpdater.quitAndInstall(true, true);
+    logToFile('UPDATE', 'quitAndInstall returned — installer should be spawning. App should exit shortly.');
+  } catch (e) {
+    logToFile('UPDATE-ERR', 'quitAndInstall threw: ' + (e && e.message));
+    // If the spawn failed, restore isQuitting so the app keeps running
+    // and surface the failure to the renderer.
+    isQuitting = false;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-install-failed', { error: String(e && e.message || e) });
+    }
+  }
+});
+
+// Renderer tells main: an update has been downloaded. Cached so the
+// main-window close handler can change its dialog default to "Install
+// Update & Restart" instead of "Minimize to Tray". Without this, users
+// who click X expecting an install end up minimised-to-tray and the
+// app never quits → autoInstallOnAppQuit never fires → no update.
+ipcMain.on('update-downloaded-notify', (event, version) => {
+  _pendingUpdateVersion = version || _pendingUpdateVersion || 'pending';
+  logToFile('UPDATE', 'renderer-notify: update v' + _pendingUpdateVersion + ' marked as ready — close-dialog default switched to Install & Restart');
+  try { _rebuildTrayMenu(); } catch (e) {}
 });
 
 // Manual "Check for updates" button in Settings → About → Updates. Lets

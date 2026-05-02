@@ -13,7 +13,11 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:transparent}
-body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;padding-bottom:108px;box-sizing:border-box}
+/* No bottom padding reservation needed: .ov-event-area used to be
+   fixed-position at bottom:0 (covering chat when stacked beyond its 96px
+   min-height); it's now an in-flow flex item placed between the feed and
+   the chat input, so chat can never be visually overlapped. */
+body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;box-sizing:border-box}
 
 /* ── Drag bar ─────────────────────────────────────────────────── */
 .ov-drag{height:28px;background:var(--surf);display:flex;align-items:center;padding:0 8px;flex-shrink:0;-webkit-app-region:drag;user-select:none;border-bottom:1px solid var(--bdr);gap:6px;border-radius:8px 8px 0 0}
@@ -210,10 +214,18 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 /* Event area is fixed at the bottom inside the reserved padding-bottom space
    so it never covers chat and never shifts the flex layout. Height auto-
    expands upward for tall events (e.g. gift+message toasts) so the bottom
-   row never gets clipped — min-height keeps the empty-state reservation.
-   NOTE: if you bump min-height here, also bump the body's padding-bottom
-   so chat can always scroll clear of the event zone. */
-.ov-event-area{position:fixed;bottom:0;left:0;right:0;min-height:96px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;z-index:180;pointer-events:none;padding:6px 8px 10px;box-sizing:border-box;overflow:visible;gap:6px;max-height:60vh}
+   row never gets clipped.
+   1.5.4 layout fix: this used to be `position:fixed;bottom:0` with a
+   matching `padding-bottom:108px` reservation on body. That worked at
+   1-2 events but covered the chat when stacked taller than 108px (the
+   area's max-height was 60vh, so a burst of subs/raids would overlap
+   the chat feed despite z-index=180). The event area is now an in-flow
+   flex item between the feed and the chat input — chat-feed (flex:1)
+   shrinks naturally to make room and can never be overlapped. When no
+   events exist the container collapses to 0px so the feed reclaims the
+   full height. */
+.ov-event-area{flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;pointer-events:none;padding:0 8px 6px;box-sizing:border-box;overflow:visible;gap:6px;max-height:50vh}
+.ov-event-area:empty{display:none}
 .ov-event-area .ov-event{pointer-events:auto}
 /* Wide event cards — full pop-out width so text breathes and multiple
    stacked events share the same visual column (was width:max-content,
@@ -264,8 +276,21 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-event.se{border-color:var(--se);background:linear-gradient(135deg,rgba(124,223,33,.18),rgba(124,223,33,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(124,223,33,.25)}
 .ov-event.cc{border-color:var(--cc);background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(245,165,36,.06));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px rgba(245,165,36,.25)}
 .ov-event.out{animation:evToastOut .35s cubic-bezier(.4,0,.6,1) forwards}
-.ov-ev-head{display:block}
+.ov-ev-head{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap}
 .ov-ev-user{color:var(--ev);font-weight:900;font-size:20px;text-shadow:0 0 12px currentColor;margin-right:6px}
+/* Pop-out event toast avatar — small round chip aligned with the head
+   line so big stacked events stay vertically compact. <img>'s onerror
+   swaps to a same-sized .ov-ev-avatar-fb pico circle so a missing or
+   blocked avatar URL still renders something on-brand. */
+.ov-ev-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.55);box-shadow:0 1px 4px rgba(0,0,0,.5);background:rgba(255,255,255,.08)}
+.ov-event.big .ov-ev-avatar{width:40px;height:40px}
+.ov-ev-avatar-fb{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--ev);font-weight:900;font-size:13px;color:#fff;border:2px solid rgba(255,255,255,.55)}
+.ov-event.tw .ov-ev-avatar-fb{background:var(--tw)}
+.ov-event.yt .ov-ev-avatar-fb{background:var(--yt)}
+.ov-event.tt .ov-ev-avatar-fb{background:var(--tt)}
+.ov-event.kk .ov-ev-avatar-fb{background:var(--kk)}
+.ov-event.se .ov-ev-avatar-fb{background:var(--se)}
+.ov-event.cc .ov-ev-avatar-fb{background:var(--cc)}
 .ov-ev-msg{margin-top:7px;padding:7px 12px;font-size:15px;font-style:italic;color:#e9e9ef;background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.35);border-radius:5px;line-height:1.45;word-break:break-word;animation:ovEvMsgIn .35s .1s ease-out both}
 .ov-ev-msg::before{content:'\201C';opacity:.55;margin-right:2px}
 .ov-ev-msg::after{content:'\201D';opacity:.55;margin-left:2px}
@@ -712,6 +737,11 @@ body.layout-hud::before {
   <div class="ov-pred-outcomes" id="ovPredOutcomes"></div>
 </div>
 <div class="ov-feed" id="ovFeed"></div>
+<!-- Event area sits between the feed and the chat input. It's flex-flow
+     (no longer position:fixed) so a stack of incoming subs/gifts/raids
+     pushes the feed UP instead of covering it. Empty state collapses to
+     0px via .ov-event-area:empty. -->
+<div class="ov-event-area" id="ovEventArea"></div>
 <div class="ov-chat-bar" id="ovChatBar">
   <textarea class="ov-chat-input" id="ovChatInput" rows="1" placeholder="Send to chat…"></textarea>
   <button class="ov-chat-send" id="ovChatSend" type="button">Send</button>
@@ -720,7 +750,6 @@ body.layout-hud::before {
   <span class="ov-hotbar-lbl">Actions</span>
   <div id="ovHotbarBtns" style="display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0"></div>
 </div>
-<div class="ov-event-area" id="ovEventArea"></div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -1085,13 +1114,33 @@ function showEvent(d) {
   if (!platAllowed(d.plat)) return;
   var el = document.createElement('div');
   el.className = 'ov-event ' + (d.plat || '');
+  // Mark "big" so the larger avatar size kicks in for hot events. Gift
+  // bombs / subs / raids historically render slightly larger; this just
+  // mirrors that in the avatar dimension.
+  if (d.big) el.classList.add('big');
   var evText = d.text || '';
   if (d.user && evText.toLowerCase().indexOf(d.user.toLowerCase()) === 0) {
     evText = evText.slice(d.user.length).replace(/^\s+/, '');
   }
+  // Avatar block — only renders when the streamer enabled pfps in pop-out
+  // settings (cfg.showAvatars, default true). When we have a URL we mount
+  // an <img> followed by a hidden .ov-ev-avatar-fb pico; img.onerror flips
+  // the visibility so a 404 / blocked CDN never leaves a broken-image icon
+  // on stream. Same pattern used by the main events panel.
+  var avHtml = '';
+  if (cfg.showAvatars !== false) {
+    var initial = esc((d.user || 'E').charAt(0).toUpperCase());
+    if (d.avatar) {
+      avHtml = '<img class="ov-ev-avatar" src="' + esc(d.avatar) + '" referrerpolicy="no-referrer" '
+             + 'onerror="this.style.display=\'none\';var s=this.nextElementSibling;if(s)s.style.display=\'inline-flex\'">'
+             + '<span class="ov-ev-avatar-fb" style="display:none">' + initial + '</span>';
+    } else {
+      avHtml = '<span class="ov-ev-avatar-fb">' + initial + '</span>';
+    }
+  }
   var msgHtml = d.evMessage ? '<div class="ov-ev-msg">' + esc(d.evMessage) + '</div>' : '';
   var giftBlock = d.giftHtml ? '<div class="ov-ev-gift">' + d.giftHtml + '</div>' : '';
-  el.innerHTML = '<div class="ov-ev-head"><span class="ov-ev-user">' + esc(d.user || 'Event') + '</span> ' + esc(evText) + '</div>' + msgHtml + giftBlock;
+  el.innerHTML = '<div class="ov-ev-head">' + avHtml + '<span class="ov-ev-user">' + esc(d.user || 'Event') + '</span> ' + esc(evText) + '</div>' + msgHtml + giftBlock;
   eventArea.appendChild(el);
   triggerActivityPulse(d.plat || 'ev');
 

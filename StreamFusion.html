@@ -77,7 +77,7 @@
   .card {
     position: relative;
     width: 100%;
-    max-width: 480px;
+    max-width: 540px;
     background: var(--surf);
     border: 1px solid var(--bdr);
     border-radius: 16px;
@@ -153,8 +153,45 @@
     display: flex;
     justify-content: center;
     gap: 8px;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
     flex-wrap: wrap;
+  }
+
+  /* Visual proof strip — three thumbnails so cold visitors see what
+     they're downloading before they click. Hosted from the
+     marketing/screenshots/ folder of the StreamFusion repo. */
+  .preview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+  .preview a {
+    display: block;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--bdr);
+    background: var(--surf2);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+    line-height: 0;
+  }
+  .preview a:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .preview img {
+    width: 100%;
+    height: 86px;
+    object-fit: cover;
+    display: block;
+  }
+  .preview-caption {
+    margin: -16px 0 22px;
+    font-size: 11.5px;
+    color: var(--sub);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
 
   .platform-chip {
@@ -402,6 +439,23 @@
       <span class="platform-chip">TikTok</span>
       <span class="platform-chip">Kick</span>
     </div>
+
+    <!-- Visual proof: three live demo screenshots. Click any to view
+         full-size on GitHub. Hosted from the StreamFusion repo's
+         marketing/screenshots/ folder so they auto-update with each
+         new screenshot push. -->
+    <div class="preview">
+      <a href="https://raw.githubusercontent.com/aquiloplays/StreamFusion/main/marketing/screenshots/02-demo-mode-populated.png" target="_blank" rel="noopener" title="Unified chat + events panel + milestone overlay">
+        <img src="https://raw.githubusercontent.com/aquiloplays/StreamFusion/main/marketing/screenshots/02-demo-mode-populated.png" alt="StreamFusion main window with milestone overlay" loading="lazy">
+      </a>
+      <a href="https://raw.githubusercontent.com/aquiloplays/StreamFusion/main/marketing/screenshots/01-demo-mode-main.png" target="_blank" rel="noopener" title="Tier-1 sub alert across multiple platforms">
+        <img src="https://raw.githubusercontent.com/aquiloplays/StreamFusion/main/marketing/screenshots/01-demo-mode-main.png" alt="StreamFusion sub alert overlay" loading="lazy">
+      </a>
+      <a href="https://raw.githubusercontent.com/aquiloplays/StreamFusion/main/marketing/screenshots/07-rich-feed.png" target="_blank" rel="noopener" title="Hype Train Level Up animation">
+        <img src="https://raw.githubusercontent.com/aquiloplays/StreamFusion/main/marketing/screenshots/07-rich-feed.png" alt="StreamFusion hype train overlay" loading="lazy">
+      </a>
+    </div>
+    <div class="preview-caption">Live demo mode — click to enlarge</div>
 
     <!-- The button points at GitHub's /releases/latest URL, which is a
          permanent redirect GitHub maintains to whatever the current

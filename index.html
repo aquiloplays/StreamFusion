@@ -2177,8 +2177,8 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
                     <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Box (gradient) = single gradient-bordered container around the whole feed; the box auto-sizes to the Max Messages count so it never looks empty when chat is quiet. Box (no background) = same auto-sizing transcript style with NO frame, for streamers who layer chat over a custom OBS background."><span>Style</span>
                       <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="card">Card (default)</option>
-                        <option value="box">Box (gradient)</option>
+                        <option value="box">Box (default)</option>
+                        <option value="card">Card</option>
                         <option value="nobg">Box (no background)</option>
                       </select>
                     </label>
@@ -3129,10 +3129,11 @@ var S = {
       fontSize: 18, maxMessages: 20, bgOpacity: 0,
       showPlatformBadge: false, showUserBadges: true, showEmotes: true,
       showEvents: false, showGiftAnimations: false,
-      // New in 1.4.4 — grey-box theme (single wrapping box, no per-msg
-      // bubbles), pfp/platform-icon toggles, configurable event
-      // placement, TikTok gift combo counter at a chosen corner.
-      theme: 'card',                 // 'card' | 'box'
+      // 1.5.4: default to the unified grey-box theme — a single wrapping
+      // panel that auto-sizes to maxMessages, instead of per-message
+      // bubble cards. Streamers preferred the transcript look so much
+      // it's now the default. Card / no-bg are still selectable.
+      theme: 'box',                  // 'card' | 'box' | 'nobg'
       boxOpacity: 0.8,
       showProfilePics: false,
       showPlatformIcon: false,
@@ -3732,10 +3733,22 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
   el.className = 'ev-item' + (big ? ' big' : '') + (plat ? ' ' + plat : '') + (isModEvent ? ' mod-event' : '');
   var giftBlock = giftHtml ? '<div class="ev-gift-wrap">' + giftHtml + '</div>' : '';
   var msgBlock = evMessage ? '<div class="ev-item-msg">' + esc(evMessage) + '</div>' : '';
-  // Avatar: use passed URL, then cache lookup, then unavatar.io for Twitch, else platform icon
+  // Avatar: use passed URL, then cache lookup, then unavatar.io for the
+  // platform if the username looks valid, else fall back to a platform
+  // pico icon. unavatar.io covers twitch / tiktok / youtube — all benefit
+  // from a real face on every event row instead of a generic platform
+  // chip. img.onerror in the rendered HTML still pico-falls-back if the
+  // resolver fails (suspended/banned/private profiles).
   var avSrc = avatar || '';
-  if (!avSrc && user) avSrc = _avatarCache[(user || '').toLowerCase()] || '';
-  if (!avSrc && user && plat === 'tw' && user !== 'System' && user !== 'Moderation') avSrc = 'https://unavatar.io/twitch/' + encodeURIComponent(user.toLowerCase());
+  var _evUserKey = (user || '').toLowerCase();
+  if (!avSrc && user) avSrc = _avatarCache[_evUserKey] || '';
+  if (!avSrc && user && user !== 'System' && user !== 'Moderation' && user !== 'Stream' && user !== 'Hype Train' && user !== 'StreamFusion') {
+    var _unaSlug = null;
+    if (plat === 'tw' && /^[a-z0-9_]{1,30}$/.test(_evUserKey)) _unaSlug = 'twitch/' + encodeURIComponent(_evUserKey);
+    else if (plat === 'tt' && /^[a-z0-9._]{1,40}$/.test(_evUserKey)) _unaSlug = 'tiktok/' + encodeURIComponent(_evUserKey.replace(/^@/, ''));
+    else if (plat === 'yt' && /^[a-z0-9_-]{1,40}$/.test(_evUserKey)) _unaSlug = 'youtube/' + encodeURIComponent(_evUserKey);
+    if (_unaSlug) avSrc = 'https://unavatar.io/' + _unaSlug;
+  }
   var _evPlatSvgs = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>'};
   var _sfBoltSvg = '<svg viewBox="0 0 24 24"><defs><linearGradient id="sfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3A86FF"/><stop offset="100%" stop-color="#00E5A0"/></linearGradient></defs><path fill="url(#sfg)" d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></svg>';
   var isSFSystem = (user === 'StreamFusion');
@@ -3759,7 +3772,10 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
   el.innerHTML = avHtml + '<div class="ev-body"><div class="ev-item-user">' + esc(user) + '</div><div class="ev-item-text">' + esc(text) + '</div>' + msgBlock + giftBlock + actHtml + '<div class="ev-item-time">' + t + '</div></div>';
   feed.insertBefore(el, feed.firstChild);
   while (feed.children.length > 100) feed.removeChild(feed.lastChild);
-  sendOverlayEvent(plat, user, text, evMessage, giftHtml);
+  // Pass the resolved avSrc (cache hit / unavatar / passed-in URL) to
+  // the pop-out so its event toast renders the same pfp the panel does.
+  // Pop-out side has its own onerror fallback to a platform pico.
+  sendOverlayEvent(plat, user, text, evMessage, giftHtml, avSrc);
 
   // OBS alerts overlay (EA-only). Only big events get an alert banner —
   // routine follows are noisy and would flood the stream. We derive the
@@ -4614,15 +4630,21 @@ function renameHotbarAction(idx, label) {
 // SB and surfaced as a 15s timeout. UUIDs were bumped in the regenerated
 // import so re-importing creates fresh actions instead of conflicting
 // with any pre-existing broken copy.
-var SF_RF_IMPORT = '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';
+var SF_RF_IMPORT = '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';
 var SF_RF_FIND_NAME = 'StreamFusion Raid Finder \u2014 Find Targets';
 var SF_RF_RAID_NAME = 'StreamFusion Raid Finder \u2014 Start Raid';
 // UUIDs of the FIXED import (with proper System.Core / Net.Http / Json
 // references). When a user has both the old broken import AND the new
 // fixed one in SB, we want to dispatch to the fixed one. _rfCheckActions
 // preferentially picks these IDs by name; falls back to last match.
-var SF_RF_FIND_UUID = '0ff67a25-0306-450c-8cb7-30f6ea072fc7';
-var SF_RF_RAID_UUID = '78a43121-5d46-4bc4-8021-66ad9f7c318b';
+// v4 (1.5.4): smart pagination — pages up to 25× (was 3) and breaks
+// early when sorted past the user's viewer range, so popular games
+// like LoL / Just Chatting actually return small streamers instead
+// of the top-300 cap missing them entirely. Also oversamples 4× then
+// sorts by mid-of-range so results aren't all from the high end.
+// UUIDs bumped again so re-import creates fresh actions.
+var SF_RF_FIND_UUID = 'a33f0c26-a7dd-49e8-a707-63aaf23fb4e2';
+var SF_RF_RAID_UUID = '7fafc95d-4e7a-4111-ad7c-b5f7713d2e7f';
 
 function openRaidFinder() {
   if (!S.hasEarlyAccess) { _rfShowUpsell(); return; }
@@ -4780,14 +4802,15 @@ function _rfShowInstall() {
   document.getElementById('overlay').classList.add('show');
   m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder &mdash; Install Actions</div>'
     + '<p class="mp">StreamFusion needs two small actions in Streamer.bot to search Twitch and start raids. Your existing SB Twitch login is used &mdash; no extra tokens needed.</p>'
-    // Older StreamFusion releases shipped an import that referenced only
-    // mscorlib.dll, so the C# silently failed to compile in SB and Find
-    // Targets always timed out. The import below is the fixed version
-    // (System.Core / System.Net.Http / Newtonsoft.Json refs added). If a
-    // user already imported the broken copy they need to delete it first
-    // or SB ends up with two actions of the same name.
+    // 1.5.4 ships a v3 of the action — same references as v2 (which fixed
+    // the original compile-failure bug) but now accepts a gameName arg
+    // and resolves it to a real Twitch game id server-side via
+    // /helix/games?name=. v2 needed an explicit game id, so users whose
+    // SB couldn't surface one were stuck. UUIDs bumped again so SB
+    // creates fresh actions on import — old v1/v2 copies should be
+    // deleted to keep the action list clean.
     + '<div style="background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.35);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;line-height:1.5;color:var(--txt)">'
-    +   '<strong>Already imported before?</strong> If Find Targets used to time out, the older import was broken. In Streamer.bot, expand the <em>StreamFusion</em> action group and delete any existing <em>StreamFusion Raid Finder &mdash; Find Targets</em> / <em>&mdash; Start Raid</em> actions before importing the new ones below.'
+    +   '<strong>Already imported before?</strong> Open the <em>StreamFusion</em> action group in Streamer.bot and delete any existing <em>Raid Finder &mdash; Find Targets</em> / <em>&mdash; Start Raid</em> actions, then paste this new import string. The 1.5.4 action adds game-name &rarr; game-ID resolution so Find Targets works even when SB can’t detect your game.'
     + '</div>'
     + '<div style="margin-bottom:10px">'
     + '<textarea id="rfImportStr" readonly onclick="this.select()" style="width:100%;height:60px;font-size:10px;font-family:monospace;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:8px;resize:none">' + SF_RF_IMPORT + '</textarea>'
@@ -4912,16 +4935,15 @@ function _rfRenderPanel() {
     + (rf.rangeMode === 'percent' ? '<span id="rfPctHint" style="font-size:10px;color:var(--mut)">' + Math.round(rf.rangeLowPct * 100) + '% \u2013 ' + Math.round(rf.rangeHighPct * 100) + '%</span>' : '')
     + '</div>'
     + '</div>'
-    // Search button + results
+    // Search button + results \u2014 v3: enabled when EITHER a gameId OR a
+    // gameName is known (action resolves name \u2192 id server-side).
     + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
-    + '<button class="btn-tw" id="rfSearchBtn" onclick="_rfFindTargets()"' + (!gameId ? ' disabled title="No game ID detected yet. Click the refresh icon, or paste a game ID under Advanced"' : '') + '><svg class="ic"><use href="#i-eye"/></svg> Find Targets</button>'
-    + (!gameId
-        ? '<span style="font-size:11px;color:var(--warn,#f59e0b);line-height:1.4">'
-          + (S.twGame
-              ? 'Game name detected (<strong>' + esc(S.twGame) + '</strong>) but no ID \u2014 click <svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-refresh"/></svg> to retry, or open Advanced and paste a Game ID from <a onclick="window.open(\'https://twitchtracker.com/games\',\'_blank\');return false" style="color:var(--accent);cursor:pointer">twitchtracker.com/games</a>.'
-              : 'No game detected. Start streaming, then click <svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-refresh"/></svg> to refresh.')
-          + '</span>'
-        : '')
+    + '<button class="btn-tw" id="rfSearchBtn" onclick="_rfFindTargets()"' + (_rfHasGameSignal() ? '' : ' disabled title="No game info yet. Start streaming, then click the refresh icon."') + '><svg class="ic"><use href="#i-eye"/></svg> Find Targets</button>'
+    + (!_rfHasGameSignal()
+        ? '<span style="font-size:11px;color:var(--warn,#f59e0b);line-height:1.4">No game detected. Start streaming, then click <svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-refresh"/></svg> to refresh.</span>'
+        : !gameId
+          ? '<span style="font-size:11px;color:var(--mut);line-height:1.4">Searching by name <strong style="color:var(--txt)">' + esc(S.raidFinder.gameOverride || S.twGame) + '</strong> \u2014 SB will resolve the ID.</span>'
+          : '')
     + '</div>'
     + '<div id="rfResults" style="max-height:300px;overflow-y:auto"></div>'
     + '<div class="mbtns" style="margin-top:8px"><button class="btn-x" onclick="closeModal()">Close</button></div>';
@@ -4954,36 +4976,93 @@ function _rfUpdateRange() {
 }
 
 function _rfRefreshGame() {
-  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) return;
-  console.log('[SF rf] _rfRefreshGame \u2014 firing GetBroadcaster + chaining TwitchGetChannelInfo fallback');
-  S.sbWS.send(JSON.stringify({ request: 'GetBroadcaster', id: 'sf-broadcaster' }));
+  console.log('[SF rf] _rfRefreshGame \u2014 firing GetBroadcaster + TwitchGetChannelInfo fallback + decapi fallback');
+  if (S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) {
+    S.sbWS.send(JSON.stringify({ request: 'GetBroadcaster', id: 'sf-broadcaster' }));
+    // Parallel fallback: if we already know the broadcaster user id (from a
+    // previous GetBroadcaster), fire TwitchGetChannelInfo immediately so we
+    // don't wait for GetBroadcaster's ~100-500ms round-trip. The fallback's
+    // response handler checks for an empty gameId before overwriting, so a
+    // fresh GetBroadcaster win-the-race scenario still works.
+    if (S.twUserId) _rfFallbackChannelInfo(S.twUserId);
+  }
   var el = document.getElementById('rfGameName');
   if (el) el.textContent = 'Refreshing...';
-  // Parallel fallback: if we already know the broadcaster user id (from a
-  // previous GetBroadcaster), fire TwitchGetChannelInfo immediately so we
-  // don't wait for GetBroadcaster's ~100-500ms round-trip. The fallback's
-  // response handler checks for an empty gameId before overwriting, so a
-  // fresh GetBroadcaster win-the-race scenario still works.
-  if (S.twUserId) _rfFallbackChannelInfo(S.twUserId);
+  // Third fallback: decapi.me/twitch/game/{login}. This works even when
+  // SB hasn't surfaced the category to its event bus yet (newly-live
+  // streamers, or SB versions that drop the field shape). decapi gives
+  // us the game NAME but not the id \u2014 that's fine, the v3 SB action
+  // resolves name \u2192 id server-side via /helix/games?name= so a name
+  // alone is enough to fire a search.
+  _rfDecapiFallback();
   setTimeout(function() {
     var el2 = document.getElementById('rfGameName');
     if (el2 && el2.textContent === 'Refreshing...') {
       el2.textContent = S.twGame || '(not detected)';
-      var btn = document.getElementById('rfSearchBtn');
-      if (btn) btn.disabled = !S.twGameId;
     }
-    console.log('[SF rf] refresh settled \u2014 gameName=' + S.twGame + ', gameId=' + S.twGameId);
+    // Find Targets is now enabled when EITHER an id OR a name is known
+    // (manual override still wins). Server-side resolves the missing piece.
+    var btn = document.getElementById('rfSearchBtn');
+    if (btn) btn.disabled = !_rfHasGameSignal();
+    console.log('[SF rf] refresh settled \u2014 gameName=' + S.twGame + ', gameId=' + S.twGameId + ', hasSignal=' + _rfHasGameSignal());
   }, 3000);
+}
+
+// True if the search has *any* lead \u2014 explicit ID, manual override, or
+// just a game name. v3 of the SB action resolves name \u2192 id via
+// /helix/games?name=, so name alone is sufficient.
+function _rfHasGameSignal() {
+  var rf = S.raidFinder;
+  return !!(rf.gameIdOverride || S.twGameId || rf.gameOverride || S.twGame);
+}
+
+function _rfDecapiFallback() {
+  if (!S.twLogin) {
+    console.log('[SF rf] decapi fallback skipped \u2014 no S.twLogin yet');
+    return;
+  }
+  // Skip the network call entirely if SF already has a game id from
+  // SB \u2014 decapi adds latency and we'd just discard the result.
+  if (S.twGameId) return;
+  var login = String(S.twLogin).toLowerCase();
+  if (!/^[a-z0-9_]{1,30}$/.test(login)) return;
+  console.log('[SF rf] decapi GET /twitch/game/' + login);
+  fetch('https://decapi.me/twitch/game/' + encodeURIComponent(login))
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(txt) {
+      var name = String(txt || '').trim();
+      // decapi returns "Unknown" / "(no game)" / error strings on misses
+      if (!name || /unknown|^no game|not found|user/i.test(name)) {
+        console.log('[SF rf] decapi miss: ' + JSON.stringify(name));
+        return;
+      }
+      // Don't clobber a real value SB later returned in the meantime.
+      if (!S.twGame) S.twGame = name;
+      console.log('[SF rf] decapi got gameName=' + JSON.stringify(name));
+      // Re-render Raid Finder panel if it's open so the streamer sees the
+      // refreshed name + the now-enabled Find Targets button.
+      var modalEl = document.getElementById('modal');
+      if (modalEl && modalEl.innerHTML.indexOf('Raid Finder</div>') >= 0) {
+        try { _rfRenderPanel(); } catch (e) {}
+      }
+    })
+    .catch(function() { /* silent */ });
 }
 
 // ── Search ───────────────────────────────────────────────────────────────────
 function _rfFindTargets() {
   var rf = S.raidFinder;
   if (!rf.actions.find) { sysMsg('tw', 'Raid Finder SB action not installed.'); return; }
-  // Override wins so the user can search by a pasted Game ID even when
-  // SB didn't detect one.
-  var gameId = rf.gameIdOverride || S.twGameId;
-  if (!gameId) return;
+  // v3: search fires with whatever signal we have. The SB action resolves
+  // a missing gameId server-side via /helix/games?name=. Manual overrides
+  // win; SB-detected values are the next layer; decapi-detected name is
+  // the final fallback. Empty out only if BOTH id and name are blank.
+  var gameId   = rf.gameIdOverride   || S.twGameId || '';
+  var gameName = rf.gameOverride     || S.twGame   || '';
+  if (!gameId && !gameName) {
+    sysMsg('tw', 'Raid Finder: still no game info. Start streaming, then click Refresh.');
+    return;
+  }
 
   var viewers = Math.max(1, S.viewers.tw || 1);
   var low, high;
@@ -4993,6 +5072,17 @@ function _rfFindTargets() {
   } else {
     low = Math.max(0, rf.rangeLowAbs);
     high = Math.max(low, rf.rangeHighAbs);
+  }
+  // Range floor: for an offline / just-live streamer (S.viewers.tw is
+  // 0 or 1), percent mode collapses to [0,2] which matches almost no
+  // streamers on Twitch. Floor to a small-streamer window so the search
+  // returns useful results. Manual range edits still win — this only
+  // applies when the computed window is unreasonably narrow.
+  if (high < 30) {
+    var origLow = low, origHigh = high;
+    low = Math.min(low, 1);
+    high = Math.max(high, 30);
+    console.log('[SF rf] range floor applied: was [' + origLow + ',' + origHigh + '] now [' + low + ',' + high + '] (viewers=' + viewers + ')');
   }
 
   var reqId = 'sf-rf-find-' + Date.now();
@@ -5005,17 +5095,18 @@ function _rfFindTargets() {
   var resEl = document.getElementById('rfResults');
   if (resEl) resEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mut);font-size:12px">Searching Twitch for streamers...</div>';
 
-  console.log('[SF rf] DoAction find: gameId=' + gameId + ' range=[' + low + ',' + high + '] want=' + rf.wantCount + ' reqId=' + reqId);
+  console.log('[SF rf] DoAction find: gameId=' + gameId + ' gameName=' + JSON.stringify(gameName) + ' range=[' + low + ',' + high + '] want=' + rf.wantCount + ' reqId=' + reqId);
   S.sbWS.send(JSON.stringify({
     request: 'DoAction',
     id: reqId,
     action: rf.actions.find,
     args: {
-      gameId: String(gameId),
+      gameId:     String(gameId),
+      gameName:   String(gameName),
       minViewers: String(low),
       maxViewers: String(high),
-      wantCount: String(rf.wantCount),
-      sfReqId: reqId
+      wantCount:  String(rf.wantCount),
+      sfReqId:    reqId
     }
   }));
 
@@ -5032,20 +5123,38 @@ function _rfFindTargets() {
 
 function _rfResetSearchBtn() {
   var btn = document.getElementById('rfSearchBtn');
-  if (btn) { btn.disabled = !S.twGameId; btn.innerHTML = '<svg class="ic"><use href="#i-eye"/></svg> Find Targets'; }
+  // Match _rfRenderPanel: enable when ANY signal exists (id, name, override).
+  if (btn) { btn.disabled = !_rfHasGameSignal(); btn.innerHTML = '<svg class="ic"><use href="#i-eye"/></svg> Find Targets'; }
 }
 
 // ── Response handler (called from handleSBEvent) ─────────────────────────────
 function _handleRaidFinderResponse(data) {
   var rf = S.raidFinder;
-  console.log('[SF rf] response received: kind=' + (data && data.kind) + ' reqId=' + (data && data.reqId) + ' streams=' + (data && data.streams ? data.streams.length : 0) + ' matches-last=' + (data && data.reqId === rf.lastReqId));
+  console.log('[SF rf] response received: kind=' + (data && data.kind) + ' reqId=' + (data && data.reqId) + ' streams=' + (data && data.streams ? data.streams.length : 0) + ' resolvedGameId=' + (data && data.gameId) + ' matches-last=' + (data && data.reqId === rf.lastReqId));
   if (!data.reqId || data.reqId !== rf.lastReqId) return;
   rf.searching = false;
   if (data.kind === 'error') {
     rf.lastResults = { error: data.code || 'unknown' };
     console.warn('[SF rf] action error:', data.code, data.message || '');
   } else {
-    rf.lastResults = { streams: data.streams || [] };
+    rf.lastResults = {
+      streams: data.streams || [],
+      // v4 diagnostics — surfaced in the empty-results message so the
+      // streamer can tell "I scanned X streamers, none in range" from
+      // "API issue / nothing playing this game". Always present in v4
+      // responses; absent in v3, which is fine (renderer guards).
+      scanned:  data.scanned,
+      pages:    data.pages,
+      pagesCap: data.pagesCap,
+      hitCap:   data.hitCap,
+      inRange:  data.inRange
+    };
+    // v3+: action echoes the resolved gameId/gameName (after running a
+    // /helix/games?name= lookup if it had to). Cache them on S so the
+    // next search skips the resolution round-trip and the panel
+    // reflects the canonical Twitch values.
+    if (data.gameId   && !S.twGameId)   { S.twGameId = String(data.gameId);   try { saveSettings(); } catch (e) {} }
+    if (data.gameName && !S.twGame)     { S.twGame   = String(data.gameName); try { saveSettings(); } catch (e) {} }
   }
   _rfRenderResults();
   _rfResetSearchBtn();
@@ -5086,7 +5195,29 @@ function _rfRenderResults() {
 
   var streams = res.streams || [];
   if (!streams.length) {
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--mut);font-size:12px">No streamers found in this range. Try widening it.</div>';
+    // Diagnostic-aware empty message (v4+). When the action echoes the
+    // scan counters we tell the streamer exactly what happened: did we
+    // page through plenty of live streamers and find none in range, or
+    // did we hit the page cap on a wildly popular game?
+    var emptyMsg, emptyHint;
+    if (typeof res.scanned === 'number' && res.scanned > 0) {
+      emptyMsg = 'No streamers in your viewer range.';
+      if (res.hitCap) {
+        emptyHint = 'Scanned the top ' + res.scanned + ' streamers (page cap hit) — your range is below that. Try a higher range or pick a less popular game.';
+      } else {
+        emptyHint = 'Scanned ' + res.scanned + ' streamer' + (res.scanned === 1 ? '' : 's') + ' across ' + (res.pages || '?') + ' page' + (res.pages === 1 ? '' : 's') + '. Widen the range to catch more.';
+      }
+    } else if (typeof res.scanned === 'number' && res.scanned === 0) {
+      emptyMsg = 'No streamers live in this game right now.';
+      emptyHint = 'Pick a busier game or check back later.';
+    } else {
+      emptyMsg = 'No streamers found in this range.';
+      emptyHint = 'Try widening it.';
+    }
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--mut);font-size:12px;line-height:1.6">'
+      + '<div style="color:var(--txt);font-weight:600;margin-bottom:4px">' + esc(emptyMsg) + '</div>'
+      + '<div>' + esc(emptyHint) + '</div>'
+      + '</div>';
     return;
   }
 
@@ -7475,9 +7606,26 @@ function renderObsOverlaysTab() {
       var st = document.getElementById('obsServerStatus');
       if (st) {
         if (s.running) {
-          st.innerHTML = '<span style="color:var(--ok,#22c55e)">&#9679; Running</span> on <code style="color:var(--accent)">' + (u.root || '').replace(/\/$/, '') + '</code> &mdash; <strong>' + s.clients + '</strong> connected browser source' + (s.clients === 1 ? '' : 's');
+          var statusHtml = '<span style="color:var(--ok,#22c55e)">&#9679; Running</span> on <code style="color:var(--accent)">' + (u.root || '').replace(/\/$/, '') + '</code> &mdash; <strong>' + s.clients + '</strong> connected browser source' + (s.clients === 1 ? '' : 's');
+          // Port-fallback banner: if obs-server couldn't bind the default
+          // port (Windows excluded-port range, leftover socket from a
+          // previous SF instance, etc.) and shifted to a fallback, the
+          // streamer's existing OBS browser-source URLs are pointing at
+          // the wrong port and showing blank. Make it loud.
+          if (u.port && u.defaultPort && u.port !== u.defaultPort) {
+            statusHtml += '<div style="margin-top:8px;padding:8px 12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-radius:6px;font-size:11px;line-height:1.5;color:var(--txt)">'
+              + '<strong>&#9888; Port changed from ' + u.defaultPort + ' to ' + u.port + '.</strong> '
+              + 'Your OBS browser sources are still pointing at <code>:' + u.defaultPort + '</code> &mdash; that’s why they’re blank. '
+              + 'Copy the URLs above and paste them into each browser source in OBS to fix it. '
+              + '(This usually means port ' + u.defaultPort + ' got reserved by Windows after a Hyper-V / Docker / WSL change.)'
+              + '</div>';
+          }
+          st.innerHTML = statusHtml;
         } else {
-          st.innerHTML = '<span style="color:#ff424d">&#9679; Stopped</span> &mdash; restart StreamFusion if this persists.';
+          st.innerHTML = '<span style="color:#ff424d">&#9679; Stopped</span> &mdash; the OBS overlay server failed to start. '
+            + 'Most likely cause: every fallback port (' + 8787 + '–8791) is reserved by Windows or another app. '
+            + 'Run <code>netsh interface ipv4 show excludedportrange protocol=tcp</code> in PowerShell to confirm, '
+            + 'then either close the conflicting app or restart Windows.';
         }
       }
     }).catch(function() {});
@@ -7810,7 +7958,7 @@ function updateObsConfig(which) {
   var cfg = {};
   if (which === 'chat') {
     cfg = {
-      theme:                ((get('obsChatTheme') || {}).value) || 'card',
+      theme:                ((get('obsChatTheme') || {}).value) || 'box',
       fontSize:             parseInt((get('obsChatFontSize') || {}).value, 10) || 18,
       maxMessages:          parseInt((get('obsChatMaxMessages') || {}).value, 10) || 20,
       bgOpacity:            (parseInt((get('obsChatBgOpacity') || {}).value, 10) || 0) / 100,
@@ -10868,8 +11016,8 @@ function sendObsShoutout(user, plat) {
     duration:     cfg.duration || 8000
   });
 }
-function sendOverlayEvent(plat, user, text, evMessage, giftHtml) {
-  sendToOverlay({ type: 'event', plat: plat, user: user, text: text, evMessage: evMessage || '', giftHtml: giftHtml || '' });
+function sendOverlayEvent(plat, user, text, evMessage, giftHtml, avatar) {
+  sendToOverlay({ type: 'event', plat: plat, user: user, text: text, evMessage: evMessage || '', giftHtml: giftHtml || '', avatar: avatar || '' });
 }
 function sendOverlayStats() {
   var sh = S.show;
@@ -11244,6 +11392,25 @@ function checkForUpdatesManual() {
 
 function initUpdateListeners() {
   if (!window.electronAPI) return;
+  // Install attempts can fail (NSIS spawn blocked by AV, file lock,
+  // permission). Surface the error so the toolbar Update Now button
+  // re-enables and the user sees what happened in Settings.
+  if (electronAPI.onUpdateInstallFailed) {
+    electronAPI.onUpdateInstallFailed(function(d) {
+      var msg = (d && d.error) || 'Unknown error';
+      var topBtn = document.getElementById('updateAvailBtn');
+      if (topBtn) {
+        topBtn.disabled = false;
+        topBtn.innerHTML = '<svg class="ic"><use href="#i-download"/></svg>Update Now';
+      }
+      var st = document.getElementById('updateStatus');
+      if (st) {
+        st.innerHTML = '<span style="color:#ef4444;font-weight:700">Install failed:</span> ' + esc(msg)
+          + '<br><span style="color:var(--mut)">Try again, or close StreamFusion fully (Tray → Quit) and let it auto-install on quit. If the issue persists, check the log folder for details.</span>';
+      }
+      try { addEvHistory('StreamFusion', 'Update install failed: ' + msg + '. See Settings → About → Updates.', 'tw', false); } catch (e) {}
+    });
+  }
   if (electronAPI.onUpdateAvailable) {
     electronAPI.onUpdateAvailable(function(d) {
       _pendingUpdateVersion = d && d.version || '?';
@@ -11270,19 +11437,51 @@ function initUpdateListeners() {
     electronAPI.onUpdateDownloaded(function(d) {
       _pendingUpdateVersion = d && d.version || _pendingUpdateVersion || '?';
       _updateReady = true;
+      // Tell main.js the download is ready so the close-dialog can change
+      // its default action to "Install Update & Restart". This makes the
+      // X-button \u2192 minimize-to-tray flow no longer silently swallow the
+      // pending install (the previous behaviour that left users stuck on
+      // the old version after closing+reopening).
+      try { electronAPI.notifyUpdateDownloaded && electronAPI.notifyUpdateDownloaded(_pendingUpdateVersion); } catch (e) {}
+      // Settings \u2192 About \u2192 Updates: status + the Install & Restart button
+      // are now BOTH visible. The auto-install-on-quit path still works
+      // for users who actually pick Exit; the manual button is for
+      // everyone else (most users).
       var st = document.getElementById('updateStatus');
-      // Once downloaded, electron-updater will auto-install on next
-      // app quit. We surface a tiny note in Settings so users who look
-      // know their next restart will pick up the new build, but we
-      // never pop a modal or ask them to click anything.
-      if (st) st.innerHTML = 'Update <strong>v' + _pendingUpdateVersion + '</strong> ready \u2014 will apply automatically the next time you close StreamFusion.';
+      if (st) {
+        st.innerHTML = '<span style="color:var(--ok,#22c55e);font-weight:700">Update v' + esc(_pendingUpdateVersion) + ' ready to install.</span>'
+          + '<br><span style="color:var(--mut)">Click <strong style="color:var(--txt)">Update Now</strong> to silently install and relaunch (~10 seconds), or it will apply the next time you fully exit StreamFusion.</span>';
+      }
+      var actsWrap = document.getElementById('updateActions');
+      if (actsWrap) actsWrap.style.display = 'flex';
       var dlBtn = document.getElementById('updateDownloadBtn');
-      var instBtn = document.getElementById('updateInstallBtn');
       if (dlBtn) dlBtn.style.display = 'none';
-      if (instBtn) instBtn.style.display = 'none';
-      // Also surface once in the Events panel so users who never open
-      // Settings still know it happened. Stays a plain system note.
-      try { addEvHistory('StreamFusion', 'Update v' + _pendingUpdateVersion + ' downloaded. Will apply automatically when you close StreamFusion.', 'tw', false); } catch (e) {}
+      var instBtn = document.getElementById('updateInstallBtn');
+      if (instBtn) {
+        instBtn.style.display = '';
+        instBtn.textContent = 'Update Now';
+      }
+      // Toolbar pill: surface a prominent Update-Now button so the user
+      // doesn't have to dig into Settings. Click \u2192 installUpdate IPC \u2192
+      // quitAndInstall(silent=true, forceRunAfter=true).
+      var topBtn = document.getElementById('updateAvailBtn');
+      if (topBtn) {
+        topBtn.style.display = '';
+        topBtn.title = 'Update v' + _pendingUpdateVersion + ' is downloaded. Click to install + relaunch.';
+        topBtn.innerHTML = '<svg class="ic"><use href="#i-download"/></svg>Update Now';
+        topBtn.onclick = function() {
+          try { electronAPI.installUpdate(); } catch (e) {}
+          topBtn.disabled = true;
+          topBtn.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg>Installing\u2026';
+        };
+      }
+      // Events panel: drop a one-time clickable note so users see it on
+      // any tab. The link fires installUpdate() directly.
+      try {
+        addEvHistory('StreamFusion',
+          'Update v' + _pendingUpdateVersion + ' is ready \u2014 click "Update Now" in the toolbar (top right) to install. Or wait until you fully exit StreamFusion and it will apply automatically.',
+          'tw', true);
+      } catch (e) {}
     });
   }
 }

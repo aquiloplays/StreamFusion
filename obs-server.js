@@ -293,18 +293,53 @@ function handleRequest(req, res) {
   res.end('Not found');
 }
 
-function startServer(port) {
-  if (server) return true;
-  serverPort = typeof port === 'number' && port > 0 ? port : DEFAULT_PORT;
+// Try the requested port first, then fall back to the next 4 ports if
+// EADDRINUSE. This protects against the common "auto-update restarted SF
+// while OBS still held the SSE socket open" case — the new process would
+// otherwise fail to bind to 8787 and ALL overlays would silently die.
+// On a successful bind the actual port is stored in `serverPort`, so
+// getUrls() always returns the URL OBS should be using.
+function _attemptListen(port) {
   return new Promise(function(resolve) {
-    server = http.createServer(handleRequest);
-    server.on('error', function(err) {
-      console.error('[obs-server] listen error:', err && err.message);
-      server = null;
-      resolve(false);
+    var srv = http.createServer(handleRequest);
+    var settled = false;
+    srv.once('error', function(err) {
+      if (settled) return;
+      settled = true;
+      try { srv.close(); } catch (e) {}
+      resolve({ ok: false, code: err && err.code, msg: err && err.message });
     });
-    server.listen(serverPort, BIND_HOST, function() {
-      console.log('[obs-server] listening on http://' + BIND_HOST + ':' + serverPort);
+    srv.listen(port, BIND_HOST, function() {
+      if (settled) return;
+      settled = true;
+      resolve({ ok: true, srv: srv, port: port });
+    });
+  });
+}
+
+function startServer(port) {
+  if (server) return Promise.resolve(true);
+  var requested = (typeof port === 'number' && port > 0) ? port : DEFAULT_PORT;
+  // First requested port + four fallbacks. Picked in a small fixed range
+  // so the streamer's OBS browser-source URL is at most a few ports off
+  // the documented one (and getUrls() / Settings UI reflect the actual
+  // live port either way).
+  var candidates = [requested, requested + 1, requested + 2, requested + 3, requested + 4];
+  return (async function tryNext(i) {
+    if (i >= candidates.length) {
+      console.error('[obs-server] all candidate ports busy: ' + candidates.join(', '));
+      return false;
+    }
+    var p = candidates[i];
+    var attempt = await _attemptListen(p);
+    if (attempt.ok) {
+      server = attempt.srv;
+      serverPort = attempt.port;
+      // Re-attach the listener handlers main.js relies on.
+      server.on('error', function(err) {
+        console.error('[obs-server] runtime error:', err && err.message);
+      });
+      console.log('[obs-server] listening on http://' + BIND_HOST + ':' + serverPort + (p !== requested ? ' (fallback from ' + requested + ')' : ''));
       // Periodic heartbeat keeps proxies / NAT / OBS from silently dropping
       // idle SSE connections (a long quiet stream would eventually look
       // dead to some intermediate layer). Same timer also prunes Aquilo
@@ -318,9 +353,23 @@ function startServer(port) {
         });
         _pruneStaleIntegrations();
       }, HEARTBEAT_MS);
-      resolve(true);
-    });
-  });
+      return true;
+    }
+    // Retry on either common failure mode:
+    //   EADDRINUSE — another process is bound (most common: SF's previous
+    //                instance still holding the socket through TIME_WAIT
+    //                after auto-update restart).
+    //   EACCES     — port is in a Windows excluded-port range (Hyper-V /
+    //                Docker Desktop / WSL2 carve these out on install or
+    //                Windows-update reboot, and a port that worked
+    //                yesterday silently fails today).
+    if (attempt.code === 'EADDRINUSE' || attempt.code === 'EACCES') {
+      console.warn('[obs-server] port ' + p + ' unavailable (' + attempt.code + '), trying ' + candidates[i + 1]);
+      return tryNext(i + 1);
+    }
+    console.error('[obs-server] listen error on ' + p + ': ' + attempt.msg + ' (code ' + attempt.code + ')');
+    return false;
+  })(0);
 }
 
 function stopServer() {
@@ -385,11 +434,16 @@ function setEntitled(v) {
 function getUrls() {
   var base = 'http://' + BIND_HOST + ':' + serverPort;
   return {
-    root:     base + '/',
-    chat:     base + '/chat',
-    alerts:   base + '/alerts',
-    shoutout: base + '/shoutout',
-    vertical: base + '/vertical'
+    root:        base + '/',
+    chat:        base + '/chat',
+    alerts:      base + '/alerts',
+    shoutout:    base + '/shoutout',
+    vertical:    base + '/vertical',
+    // The renderer compares port vs defaultPort to decide whether to
+    // show a "port shifted — update your OBS sources" banner. Set after
+    // a successful bind so the value is always live.
+    port:        serverPort,
+    defaultPort: DEFAULT_PORT
   };
 }
 

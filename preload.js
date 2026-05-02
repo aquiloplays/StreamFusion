@@ -79,6 +79,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (fn)      => ipcRenderer.on('update-downloaded', (e, d) => fn(d)),
   downloadUpdate:     ()        => ipcRenderer.send('download-update'),
   installUpdate:      ()        => ipcRenderer.send('install-update'),
+  // Renderer tells main: a pending update has been downloaded. Main uses
+  // this so the close-dialog can change its default action to "Install
+  // Update & Restart" instead of the usual Minimize-to-Tray default,
+  // which silently swallowed updates when users clicked X expecting an
+  // install.
+  notifyUpdateDownloaded: (ver)  => ipcRenderer.send('update-downloaded-notify', ver || ''),
+  // Surfaced when quitAndInstall throws so the renderer can re-enable the
+  // toolbar Update Now button + show an error in Settings → About.
+  onUpdateInstallFailed: (fn)    => ipcRenderer.on('update-install-failed', (e, d) => fn(d)),
   // Manual "Check for updates" trigger from Settings > About > Updates.
   // Returns { ok, status } — status is 'checking' | 'up-to-date' |
   // 'update-available' — so the renderer can reflect state in the UI.
