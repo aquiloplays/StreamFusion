@@ -1,4 +1,4 @@
-// Cloudflare Worker for StreamFusion — four jobs:
+// Cloudflare Worker for StreamFusion — six jobs:
 //
 //   1. /  (or anything not otherwise matched)
 //      Patreon OAuth token-exchange proxy. Holds the Patreon client_secret
@@ -43,6 +43,18 @@
 //      authorization_code or refresh_token. Redirect URIs restricted
 //      to 127.0.0.1 for the loopback-auth pattern.
 //
+//   6. /beta-updater-token
+//      Vends GITHUB_BETA_TOKEN to verified current Tier 3 patrons (or
+//      the owner) so beta installs auto-update without the user having
+//      to manage a PAT file by hand at userData/beta-updater-token.txt.
+//      The Worker verifies entitlement server-side against Patreon's
+//      identity API, using the Patreon access token the SF app already
+//      holds. The PAT itself stays secret to the Worker; clients only
+//      get it back when they prove they are entitled NOW. SF caches the
+//      returned PAT to disk and falls back to the cache when the Worker
+//      is unreachable; on an explicit 403 the cache is wiped so demoted
+//      patrons lose beta-update access on next launch.
+//
 // Deploy:
 //   1. wrangler init or create a Worker in the Cloudflare dashboard
 //   2. Paste this file as the Worker script
@@ -83,6 +95,9 @@ export default {
     }
     if (path.indexOf('/beta-download/') === 0) {
       return handleBetaDownload(request, env, path);
+    }
+    if (path === '/beta-updater-token') {
+      return handleBetaUpdaterToken(request, env);
     }
     if (path === '/discord-token') {
       return handleDiscordTokenProxy(request, env);
@@ -429,4 +444,138 @@ function json(obj, status, extraHeaders) {
     status: status || 200,
     headers: headers
   });
+}
+
+// ── /beta-updater-token ─────────────────────────────────────────────────────
+// Vends GITHUB_BETA_TOKEN to verified current Tier 3 patrons (or the owner)
+// so beta installs can auto-update without the user managing a PAT file by
+// hand. Verification happens server-side against Patreon's identity API,
+// using the Patreon access token the SF app already holds. The PAT itself
+// stays secret to the Worker — clients only get it back if they prove they
+// are entitled NOW.
+//
+// Trust model:
+//   - The SF app's Patreon access token is sensitive but already held by
+//     the user (it's how SF talks to Patreon directly). Sending it to the
+//     Worker over HTTPS is the same trust as the existing /  (Patreon proxy)
+//     endpoint that handles refresh-token calls.
+//   - The vended PAT IS the same long-lived GITHUB_BETA_TOKEN the Worker
+//     uses for /beta-download. A user who saves the PAT off disk after
+//     receiving it retains beta-update access until the PAT is rotated.
+//     Acceptable risk for now — same model as today's manual-file flow,
+//     just automated.
+//   - To revoke beta access for a demoted user, the SF app deletes its
+//     local copy on the next 403 from this endpoint. They lose access on
+//     next launch.
+//
+// Request:
+//   POST /beta-updater-token
+//   { "patreonAccessToken": "...optional Patreon access token..." }
+//
+// Response (200):
+//   { ok: true, token: "ghp_...", email: "...", tier: "tier3", expiresHint: 86400000 }
+//
+// Errors (403):
+//   { ok: false, error: "not_tier3" | "patreon_check_failed" | "no_token" }
+async function handleBetaUpdaterToken(request, env) {
+  if (request.method === 'OPTIONS') return preflightCors();
+  if (request.method !== 'POST') {
+    return json({ ok: false, error: 'method_not_allowed' }, 405, corsHeaders());
+  }
+  if (!env.GITHUB_BETA_TOKEN) {
+    return json({ ok: false, error: 'proxy_not_configured' }, 500, corsHeaders());
+  }
+  var body;
+  try { body = await request.json(); }
+  catch (e) { return json({ ok: false, error: 'invalid_json' }, 400, corsHeaders()); }
+
+  var accessToken = body && body.patreonAccessToken;
+  if (!accessToken || typeof accessToken !== 'string') {
+    return json({ ok: false, error: 'no_token' }, 400, corsHeaders());
+  }
+
+  var verdict;
+  try {
+    verdict = await _verifyTier3PatreonToken(accessToken, env);
+  } catch (e) {
+    return json({ ok: false, error: 'patreon_check_failed', detail: String(e && e.message || e) }, 502, corsHeaders());
+  }
+
+  if (!verdict.entitled) {
+    return json({ ok: false, error: 'not_tier3', tier: verdict.tier || 'none', email: verdict.email || null }, 403, corsHeaders());
+  }
+
+  return json({
+    ok: true,
+    token:       env.GITHUB_BETA_TOKEN,
+    email:       verdict.email || null,
+    tier:        verdict.tier  || 'tier3',
+    expiresHint: 86400000   // 24h cache hint to the client; not enforced server-side
+  }, 200, corsHeaders());
+}
+
+// Calls Patreon's /identity endpoint with the user's access token, then
+// returns {entitled, tier, email, reason}. Mirrors the looser-but-safe
+// rules used in patreon-auth.js inside the SF app:
+//   - currently_entitled_amount_cents >= 1000 → tier3
+//   - currently_entitled_amount_cents >= 600  → tier2 (NOT entitled here)
+//   - patron_status === 'declined_patron' or 'former_patron' → blocked
+//   - owner email always grants regardless of pledge
+const PATREON_OWNER_EMAIL = 'bisherclay@gmail.com';
+async function _verifyTier3PatreonToken(accessToken, env) {
+  var url = 'https://www.patreon.com/api/oauth2/v2/identity'
+    + '?include=memberships'
+    + '&fields%5Bmember%5D=patron_status,currently_entitled_amount_cents'
+    + '&fields%5Buser%5D=email';
+  var resp;
+  try {
+    resp = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + accessToken },
+    });
+  } catch (e) {
+    throw new Error('Patreon fetch network error: ' + (e && e.message || e));
+  }
+  if (!resp.ok) {
+    throw new Error('Patreon identity HTTP ' + resp.status);
+  }
+  var doc;
+  try { doc = await resp.json(); }
+  catch (e) { throw new Error('Patreon identity returned non-JSON'); }
+
+  var email = (doc && doc.data && doc.data.attributes && doc.data.attributes.email) || null;
+  // Owner bypass — always tier3 regardless of pledge state. Matches
+  // patreon-auth.js's strengthen-owner-bypass logic.
+  if (email && email.toLowerCase() === PATREON_OWNER_EMAIL.toLowerCase()) {
+    return { entitled: true, tier: 'tier3', email: email, reason: 'owner_bypass' };
+  }
+
+  var memberships = (doc && doc.data && doc.data.relationships && doc.data.relationships.memberships && doc.data.relationships.memberships.data) || [];
+  var memberLookup = {};
+  if (Array.isArray(doc.included)) {
+    for (var i = 0; i < doc.included.length; i++) {
+      var inc = doc.included[i];
+      if (inc && inc.type === 'member') memberLookup[inc.id] = inc.attributes || {};
+    }
+  }
+  var bestTier = 'none';
+  var bestAmount = 0;
+  for (var j = 0; j < memberships.length; j++) {
+    var attrs = memberLookup[memberships[j].id] || {};
+    var status = attrs.patron_status || null;
+    var amount = parseInt(attrs.currently_entitled_amount_cents, 10) || 0;
+    // Explicit declines/former patrons can't be entitled even if a stale
+    // amount is reported.
+    if (status === 'declined_patron' || status === 'former_patron') continue;
+    if (amount > bestAmount) bestAmount = amount;
+  }
+  if (bestAmount >= 1000)      bestTier = 'tier3';
+  else if (bestAmount >= 600)  bestTier = 'tier2';
+  else if (bestAmount > 0)     bestTier = 'tier1';
+
+  return {
+    entitled: bestTier === 'tier3',
+    tier:     bestTier,
+    email:    email,
+    reason:   bestTier === 'tier3' ? 'patreon_tier3' : 'patreon_below_tier3'
+  };
 }

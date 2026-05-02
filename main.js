@@ -731,49 +731,114 @@ app.whenReady().then(() => {
     });
     // Beta installs publish to a PRIVATE repo (aquiloplays/StreamFusion-beta),
     // so electron-updater needs a PAT with `repo` read scope to fetch the
-    // manifest. We look for one at userData/beta-updater-token.txt — the user
-    // (or a future automated vending flow via Cloudflare Worker) drops the
-    // token there. If the file is missing or empty, we disable auto-update
-    // for this session rather than letting electron-updater log 404s from
-    // the private-repo API. Stable installs are unaffected.
+    // manifest. v1.5.5 onwards: SF asks the Cloudflare Worker for that PAT
+    // on every launch — the Worker verifies the user is currently a Tier 3
+    // patron (via their Patreon access token) and returns GITHUB_BETA_TOKEN.
+    // SF caches the returned PAT to userData/beta-updater-token.txt so:
+    //   - subsequent launches work even when the Worker is unreachable
+    //     (network down, deploy in progress, etc.)
+    //   - manual PAT-file management is no longer required for new patrons
+    //   - existing patrons with a hand-managed PAT keep working unchanged
+    //
+    // On an explicit 403 from the Worker (patron demoted below Tier 3) the
+    // cached PAT is deleted so they lose beta-update access next launch.
+    // On a network/5xx error the cached PAT is preserved.
+    //
+    // Stable installs skip this whole flow.
     var _skipAutoUpdate = false;
-    try {
-      if (_isBetaVariant()) {
-        var tokenPath = path.join(app.getPath('userData'), 'beta-updater-token.txt');
-        if (fs.existsSync(tokenPath)) {
-          var betaToken = fs.readFileSync(tokenPath, 'utf8').trim();
-          if (betaToken) {
-            // Explicit feed URL so electron-updater uses the PAT (via the
-            // `token` field — which it passes as `Authorization: token X`).
-            // `private: true` tells electron-updater to fetch release assets
-            // through the authenticated GitHub API instead of the public
-            // download CDN, which would 404 on a private repo.
-            autoUpdater.setFeedURL({
-              provider: 'github',
-              owner:    'aquiloplays',
-              repo:     'StreamFusion-beta',
-              private:  true,
-              token:    betaToken,
-              channel:  'beta'
-            });
-            logToFile('UPDATE', 'beta: PAT loaded from userData/beta-updater-token.txt, feed pinned to StreamFusion-beta');
-          } else {
-            logToFile('UPDATE', 'beta: beta-updater-token.txt is empty — auto-update disabled for this session');
-            _skipAutoUpdate = true;
-          }
-        } else {
-          logToFile('UPDATE', 'beta: no beta-updater-token.txt in userData — auto-update disabled for this session');
-          _skipAutoUpdate = true;
-        }
-      }
-    } catch (e) {
-      logToFile('UPDATE-ERR', 'beta PAT setup threw: ' + (e && e.message));
-      _skipAutoUpdate = true;
+    var _betaPatPath = path.join(app.getPath('userData'), 'beta-updater-token.txt');
+    var WORKER_BASE = 'https://streamfusion-patreon-proxy.bisherclay.workers.dev';
+
+    function _setBetaFeed(token) {
+      autoUpdater.setFeedURL({
+        provider: 'github',
+        owner:    'aquiloplays',
+        repo:     'StreamFusion-beta',
+        private:  true,
+        token:    token,
+        channel:  'beta'
+      });
     }
+
+    // Fetches a fresh PAT from the Worker, writes it to disk, returns it.
+    // Resolves with { ok, token, status } so the caller can decide whether
+    // to fall back to the cached value or wipe the cache outright.
+    async function _fetchBetaPatFromWorker() {
+      var pat = patreonAuth.getRawAccessToken && patreonAuth.getRawAccessToken();
+      if (!pat) return { ok: false, status: 'no-patreon-token' };
+      try {
+        var resp = await fetch(WORKER_BASE + '/beta-updater-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patreonAccessToken: pat })
+        });
+        var body = null;
+        try { body = await resp.json(); } catch (e) {}
+        if (resp.ok && body && body.token) {
+          try {
+            fs.writeFileSync(_betaPatPath, body.token, { encoding: 'utf-8', mode: 0o600 });
+          } catch (writeErr) {
+            logToFile('UPDATE-ERR', 'beta: failed to write fetched PAT to disk: ' + (writeErr && writeErr.message));
+          }
+          logToFile('UPDATE', 'beta: Worker vended a fresh PAT (tier=' + (body.tier || '?') + ') and cached to disk');
+          return { ok: true, status: 'fresh', token: body.token };
+        }
+        if (resp.status === 403) {
+          // Patron demoted — wipe cached PAT so they don't keep using a stale one.
+          try { if (fs.existsSync(_betaPatPath)) fs.unlinkSync(_betaPatPath); } catch (e) {}
+          logToFile('UPDATE', 'beta: Worker said 403 (' + (body && body.error) + '); wiped cached PAT — auto-update disabled until re-entitled');
+          return { ok: false, status: '403', error: (body && body.error) || 'forbidden' };
+        }
+        logToFile('UPDATE-ERR', 'beta: Worker returned ' + resp.status + ' (' + (body && body.error) + ') — falling back to cached PAT');
+        return { ok: false, status: 'http-' + resp.status };
+      } catch (e) {
+        logToFile('UPDATE-ERR', 'beta: Worker fetch threw (' + (e && e.message) + ') — falling back to cached PAT');
+        return { ok: false, status: 'network-error' };
+      }
+    }
+
+    function _readCachedBetaPat() {
+      try {
+        if (!fs.existsSync(_betaPatPath)) return null;
+        var t = fs.readFileSync(_betaPatPath, 'utf-8').trim();
+        return t || null;
+      } catch (e) { return null; }
+    }
+
+    async function _setupBetaFeedAndCheck() {
+      if (!_isBetaVariant()) return;   // stable: nothing to do
+      // Worker fetch first. On 403 the cache is wiped inside the helper.
+      var fresh = await _fetchBetaPatFromWorker();
+      var token = null;
+      if (fresh.ok && fresh.token) {
+        token = fresh.token;
+      } else if (fresh.status !== '403') {
+        // Network / Worker / signed-out: try the cached PAT.
+        token = _readCachedBetaPat();
+        if (token) logToFile('UPDATE', 'beta: using cached PAT from disk (Worker unavailable: ' + fresh.status + ')');
+      }
+      if (!token) {
+        _skipAutoUpdate = true;
+        logToFile('UPDATE', 'beta: no PAT available (Worker=' + fresh.status + ', cache=empty) — auto-update disabled');
+        return;
+      }
+      try { _setBetaFeed(token); }
+      catch (e) {
+        logToFile('UPDATE-ERR', 'beta: setFeedURL threw: ' + (e && e.message));
+        _skipAutoUpdate = true;
+        return;
+      }
+      logToFile('UPDATE', 'beta: feed pinned to StreamFusion-beta with ' + (fresh.ok ? 'fresh Worker-vended' : 'cached on-disk') + ' PAT');
+    }
+
     setTimeout(() => {
-      if (_skipAutoUpdate) { logToFile('UPDATE', 'beta: checkForUpdates skipped (no PAT)'); return; }
-      try { autoUpdater.checkForUpdates(); }
-      catch (e) { logToFile('UPDATE-ERR', 'checkForUpdates threw: ' + (e && e.message)); }
+      _setupBetaFeedAndCheck()
+        .catch(function(e) { logToFile('UPDATE-ERR', 'beta setup threw: ' + (e && e.message)); _skipAutoUpdate = true; })
+        .finally(function() {
+          if (_skipAutoUpdate) { logToFile('UPDATE', 'beta: checkForUpdates skipped (no PAT)'); return; }
+          try { autoUpdater.checkForUpdates(); }
+          catch (e) { logToFile('UPDATE-ERR', 'checkForUpdates threw: ' + (e && e.message)); }
+        });
     }, 8000);
   }
 
