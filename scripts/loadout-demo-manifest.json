@@ -1,0 +1,85 @@
+{
+  "source": "aquilo_loadout_manifest",
+  "schema": 1,
+  "fetchedAt": 0,
+  "kit": {
+    "name": "Aquilo Loadout (demo)",
+    "version": "0.0.1-demo",
+    "description": "Mock manifest for previewing the SF Loadout dashboard without a real SB kit installed.",
+    "accentColor": "#3A86FF",
+    "supportUrl": "https://aquilo.gg/loadout"
+  },
+  "activeLoadoutId": "default",
+  "loadouts": [
+    {
+      "id": "default",
+      "name": "Default",
+      "description": "Standard streaming setup — soundboard, counters, modules, and quick chat templates.",
+      "widgets": [
+        { "id": "sec_sounds", "type": "section", "name": "Soundboard", "icon": "🔊" },
+        { "id": "snd_cheer",   "type": "action", "name": "Cheer",       "icon": "🎉", "section": "sec_sounds", "actionName": "Aquilo Loadout — Sound — Cheer" },
+        { "id": "snd_airhorn", "type": "action", "name": "Air Horn",    "icon": "📢", "section": "sec_sounds", "actionName": "Aquilo Loadout — Sound — Airhorn" },
+        { "id": "snd_oof",     "type": "action", "name": "Oof",         "icon": "💀", "section": "sec_sounds", "actionName": "Aquilo Loadout — Sound — Oof" },
+        { "id": "snd_drum",    "type": "action", "name": "Drumroll",    "icon": "🥁", "section": "sec_sounds", "actionName": "Aquilo Loadout — Sound — Drumroll" },
+
+        { "id": "sec_counters", "type": "section", "name": "Counters", "icon": "🔢" },
+        {
+          "id": "deaths",
+          "type": "counter",
+          "name": "Deaths",
+          "value": 7,
+          "section": "sec_counters",
+          "actions": {
+            "increment": { "actionName": "Aquilo Loadout — Counter — Deaths++" },
+            "decrement": { "actionName": "Aquilo Loadout — Counter — Deaths--" },
+            "reset":     { "actionName": "Aquilo Loadout — Counter — Deaths Reset" }
+          }
+        },
+        {
+          "id": "wins",
+          "type": "counter",
+          "name": "Wins",
+          "value": 3,
+          "section": "sec_counters",
+          "actions": {
+            "increment": { "actionName": "Aquilo Loadout — Counter — Wins++" },
+            "decrement": { "actionName": "Aquilo Loadout — Counter — Wins--" },
+            "reset":     { "actionName": "Aquilo Loadout — Counter — Wins Reset" }
+          }
+        },
+
+        { "id": "sec_modules", "type": "section", "name": "Modules", "icon": "⚙️" },
+        { "id": "auto_so",    "type": "toggle", "name": "Auto-shoutout incoming raids", "value": true,  "section": "sec_modules", "actionName": "Aquilo Loadout — Toggle — AutoSO" },
+        { "id": "first_word", "type": "toggle", "name": "First-words celebration",      "value": true,  "section": "sec_modules", "actionName": "Aquilo Loadout — Toggle — FirstWord" },
+        { "id": "redeem_q",   "type": "toggle", "name": "Pause channel-point redemptions", "value": false, "section": "sec_modules", "actionName": "Aquilo Loadout — Toggle — RedeemPause" },
+
+        { "id": "sec_chat", "type": "section", "name": "Quick Messages", "icon": "💬" },
+        { "id": "tpl_discord", "type": "chat-template", "name": "Discord",  "preview": "Join our Discord at https://discord.gg/aquilo",        "section": "sec_chat", "actionName": "Aquilo Loadout — Template — Discord" },
+        { "id": "tpl_socials", "type": "chat-template", "name": "Socials",  "preview": "Follow me on TikTok @aquilo and YouTube /aquilo",       "section": "sec_chat", "actionName": "Aquilo Loadout — Template — Socials" },
+        { "id": "tpl_lurk",    "type": "chat-template", "name": "Lurk",     "preview": "Thanks for the lurk! Have a great day.",                "section": "sec_chat", "actionName": "Aquilo Loadout — Template — Lurk" },
+        { "id": "tpl_setup",   "type": "chat-template", "name": "Setup",    "preview": "My PC: 7800X3D / 4090 / 32GB DDR5 — full list at aquilo.gg/setup", "section": "sec_chat", "actionName": "Aquilo Loadout — Template — Setup" }
+      ]
+    },
+    {
+      "id": "speedrun",
+      "name": "Speedrun",
+      "description": "Stripped-down setup for runs — counters and a single 'PB!' celebration only.",
+      "widgets": [
+        { "id": "sec_run", "type": "section", "name": "Run", "icon": "🏃" },
+        {
+          "id": "attempts",
+          "type": "counter",
+          "name": "Attempts",
+          "value": 12,
+          "section": "sec_run",
+          "actions": {
+            "increment": { "actionName": "Aquilo Loadout — Counter — Attempts++" },
+            "decrement": { "actionName": "Aquilo Loadout — Counter — Attempts--" },
+            "reset":     { "actionName": "Aquilo Loadout — Counter — Attempts Reset" }
+          }
+        },
+        { "id": "snd_pb", "type": "action", "name": "PB Celebration", "icon": "🏆", "section": "sec_run", "actionName": "Aquilo Loadout — Sound — PB" }
+      ]
+    }
+  ]
+}

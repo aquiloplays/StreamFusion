@@ -1601,6 +1601,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
+  <!-- Loadout dashboard \u2014 shows when the Aquilo Loadout SB kit is
+       detected. Hidden until detection so the toolbar isn't crowded
+       for users who haven't installed the kit. -->
+  <button class="tbtn" id="loadoutBtn" onclick="openLoadoutDashboard()" title="Aquilo Loadout dashboard" style="display:none"><svg class="ic"><use href="#i-target"/></svg>Loadout</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
   <a class="tbtn tbtn-discord" href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" title="Join the StreamFusion Discord"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
@@ -4759,6 +4763,7 @@ function _rfCheckActions(done) {
     // re-querying SB. Refreshed every time we run this handshake.
     S._sbActionsCache = actions;
     if (typeof renderAquiloProducts === 'function') { try { renderAquiloProducts(); } catch (e) {} }
+    if (typeof _loadoutMaybeDetect === 'function')   { try { _loadoutMaybeDetect();   } catch (e) {} }
     var findById = null, raidById = null;
     var findByName = null, raidByName = null;
     for (var i = 0; i < actions.length; i++) {
@@ -5609,6 +5614,337 @@ function _shoutoutRefreshUI() {
       && modalEl.innerHTML.indexOf('Early Access</div>') < 0) {
     _shoutoutRenderPanel();
   }
+}
+
+// ── Aquilo Loadout dashboard ────────────────────────────────────────────────
+// SF as the control surface for the upcoming Aquilo Loadout Streamer.bot kit.
+// Protocol contract: see LOADOUT-KIT.md at the repo root.
+//
+// Detection flow:
+//   1. _rfCheckActions populates S._sbActionsCache on every SB connect.
+//   2. _loadoutMaybeDetect scans the cache for a "Aquilo Loadout — Manifest"
+//      action. If found, toolbar Loadout button appears AND the manifest
+//      action is fired automatically.
+//   3. The kit broadcasts the manifest as a General.Custom event with
+//      source === "aquilo_loadout_manifest". handleSBEvent routes it to
+//      _loadoutHandleManifest, which caches + re-renders the panel.
+//   4. Widget clicks DoAction the matching kit action by id (or name).
+//   5. Kit broadcasts state-deltas with source === "aquilo_loadout_state",
+//      _loadoutHandleStateDelta merges them into the cached manifest and
+//      re-renders only the touched widgets.
+var SF_LOADOUT_MANIFEST_ACTION = 'Aquilo Loadout — Manifest';
+var SF_LOADOUT_SWITCH_ACTION   = 'Aquilo Loadout — Switch';
+var SF_LOADOUT_KIT_GROUP       = 'Aquilo Streamer.Bot Kit';
+var _loadoutManifest = null;       // cached manifest object
+var _loadoutManifestActionId = null;
+var _loadoutWaitingForFetch = false;
+var _loadoutFetchTimer = null;
+
+function _loadoutMaybeDetect() {
+  var actions = S && S._sbActionsCache;
+  if (!Array.isArray(actions)) return;
+  var manifestAction = null;
+  for (var i = 0; i < actions.length; i++) {
+    var a = actions[i];
+    if (!a) continue;
+    if (a.name === SF_LOADOUT_MANIFEST_ACTION) { manifestAction = a; break; }
+  }
+  var btn = document.getElementById('loadoutBtn');
+  if (manifestAction) {
+    _loadoutManifestActionId = manifestAction.id;
+    if (btn) btn.style.display = '';
+    if (!_loadoutManifest) _loadoutFetchManifest();
+  } else {
+    // Kit not detected — hide button, drop cached manifest so a future
+    // detect reads fresh state.
+    _loadoutManifestActionId = null;
+    _loadoutManifest = null;
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+function _loadoutFetchManifest() {
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) return;
+  if (!_loadoutManifestActionId) return;
+  if (_loadoutWaitingForFetch) return;
+  _loadoutWaitingForFetch = true;
+  var reqId = 'sf-loadout-fetch-' + Date.now();
+  console.log('[SF loadout] fetching manifest via DoAction id=' + _loadoutManifestActionId);
+  try {
+    S.sbWS.send(JSON.stringify({
+      request: 'DoAction',
+      id:      reqId,
+      action:  { id: _loadoutManifestActionId, name: SF_LOADOUT_MANIFEST_ACTION }
+    }));
+  } catch (e) { console.warn('[SF loadout] fetch send threw:', e && e.message); }
+  // 15s safety so a non-responding kit clears the waiting flag and
+  // the user can retry. Same timeout shape Raid Finder uses.
+  if (_loadoutFetchTimer) clearTimeout(_loadoutFetchTimer);
+  _loadoutFetchTimer = setTimeout(function() {
+    if (_loadoutWaitingForFetch) {
+      _loadoutWaitingForFetch = false;
+      console.warn('[SF loadout] manifest fetch timed out');
+      _loadoutRenderPanel(); // re-render so the timeout error shows if panel is open
+    }
+  }, 15000);
+}
+
+function _loadoutHandleManifest(payload) {
+  _loadoutWaitingForFetch = false;
+  if (_loadoutFetchTimer) { clearTimeout(_loadoutFetchTimer); _loadoutFetchTimer = null; }
+  if (!payload || payload.schema !== 1) {
+    console.warn('[SF loadout] manifest schema mismatch or missing:', payload && payload.schema);
+    _loadoutManifest = { _error: 'schema-mismatch', schema: payload && payload.schema };
+  } else {
+    _loadoutManifest = payload;
+    console.log('[SF loadout] manifest loaded:', payload.kit && payload.kit.name, 'v' + (payload.kit && payload.kit.version), '— activeLoadout=' + payload.activeLoadoutId);
+  }
+  // Re-render if the dashboard is currently open.
+  var modalEl = document.getElementById('modal');
+  if (modalEl && modalEl.innerHTML.indexOf('Aquilo Loadout</div>') >= 0) _loadoutRenderPanel();
+}
+
+function _loadoutHandleStateDelta(payload) {
+  if (!_loadoutManifest || !payload || !Array.isArray(payload.deltas)) return;
+  var loadout = _loadoutActiveLoadout();
+  if (!loadout) return;
+  var changedIds = {};
+  for (var i = 0; i < payload.deltas.length; i++) {
+    var d = payload.deltas[i];
+    if (!d || !d.id) continue;
+    for (var j = 0; j < loadout.widgets.length; j++) {
+      if (loadout.widgets[j].id === d.id) {
+        // Only update value-bearing fields; keep type/name/actionId/etc.
+        if (d.value !== undefined) loadout.widgets[j].value = d.value;
+        changedIds[d.id] = true;
+      }
+    }
+  }
+  // Patch only the touched widgets in DOM if panel is open.
+  var modalEl = document.getElementById('modal');
+  if (modalEl && modalEl.innerHTML.indexOf('Aquilo Loadout</div>') >= 0) {
+    Object.keys(changedIds).forEach(function(id) { _loadoutRefreshWidget(id); });
+  }
+}
+
+function _loadoutActiveLoadout() {
+  if (!_loadoutManifest || !Array.isArray(_loadoutManifest.loadouts)) return null;
+  var id = _loadoutManifest.activeLoadoutId;
+  for (var i = 0; i < _loadoutManifest.loadouts.length; i++) {
+    if (_loadoutManifest.loadouts[i].id === id) return _loadoutManifest.loadouts[i];
+  }
+  return _loadoutManifest.loadouts[0] || null;
+}
+
+// Resolves a widget's actionId/actionName against the SB action cache so
+// SF can DoAction by id. Returns { id, name } or null.
+function _loadoutResolveAction(spec) {
+  if (!spec) return null;
+  var cache = (S && S._sbActionsCache) || [];
+  if (spec.actionId) {
+    for (var i = 0; i < cache.length; i++) {
+      if (cache[i].id === spec.actionId) return { id: cache[i].id, name: cache[i].name };
+    }
+  }
+  if (spec.actionName) {
+    for (var k = 0; k < cache.length; k++) {
+      if (cache[k].name === spec.actionName) return { id: cache[k].id, name: cache[k].name };
+    }
+  }
+  return null;
+}
+
+function _loadoutFireAction(spec, runtimeArgs) {
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
+    sysMsg('tw', 'Loadout: Streamer.bot not connected.');
+    return;
+  }
+  var resolved = _loadoutResolveAction(spec);
+  if (!resolved) {
+    sysMsg('tw', 'Loadout: kit action not found ('
+      + (spec && (spec.actionName || spec.actionId)) + '). Re-import the kit.');
+    return;
+  }
+  var args = Object.assign({}, (spec && spec.args) || {}, runtimeArgs || {});
+  console.log('[SF loadout] DoAction', resolved.name, args);
+  try {
+    S.sbWS.send(JSON.stringify({
+      request: 'DoAction',
+      id:      'sf-loadout-fire-' + Date.now(),
+      action:  resolved,
+      args:    args
+    }));
+  } catch (e) { sysMsg('tw', 'Loadout fire failed: ' + (e && e.message)); }
+}
+
+function openLoadoutDashboard() {
+  var m = document.getElementById('modal');
+  if (!m) return;
+  document.getElementById('overlay').classList.add('show');
+  // First open after detect — kick a fetch if we don't have one cached yet.
+  if (!_loadoutManifest && !_loadoutWaitingForFetch && _loadoutManifestActionId) _loadoutFetchManifest();
+  _loadoutRenderPanel();
+}
+
+function _loadoutRenderPanel() {
+  var m = document.getElementById('modal');
+  if (!m) return;
+  var manifest = _loadoutManifest;
+  var loadout = _loadoutActiveLoadout();
+  var headRight = '';
+  if (manifest && manifest.loadouts && manifest.loadouts.length > 1) {
+    var opts = manifest.loadouts.map(function(l) {
+      return '<option value="' + esc(l.id) + '"' + (l.id === manifest.activeLoadoutId ? ' selected' : '') + '>' + esc(l.name || l.id) + '</option>';
+    }).join('');
+    headRight = '<select onchange="_loadoutSwitchLoadout(this.value)" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:4px 8px;font-size:11px;margin-left:auto">' + opts + '</select>';
+  }
+  var headerHtml = '<div class="mh" style="display:flex;align-items:center;gap:10px"><svg class="ic"><use href="#i-target"/></svg> Aquilo Loadout' + (manifest && manifest.kit ? ' <span style="font-size:10px;color:var(--mut);font-weight:600">' + esc(manifest.kit.name) + ' v' + esc(manifest.kit.version || '?') + '</span>' : '') + headRight + '</div>';
+
+  var bodyHtml;
+  if (manifest && manifest._error === 'schema-mismatch') {
+    bodyHtml = '<div style="text-align:center;padding:24px;color:var(--err,#ef4444);font-size:12px;line-height:1.6">'
+      + '<svg class="ic" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-warn"/></svg> '
+      + 'Loadout kit manifest schema is unrecognised (got ' + esc(String(manifest.schema || '?')) + ', SF supports 1).<br>'
+      + '<span style="color:var(--mut)">Either update SF or the kit so they’re on a compatible schema.</span>'
+      + '</div>';
+  } else if (_loadoutWaitingForFetch && !manifest) {
+    bodyHtml = '<div style="text-align:center;padding:24px;color:var(--mut);font-size:12px"><svg class="ic spin"><use href="#i-refresh"/></svg> Fetching loadout manifest from Streamer.bot…</div>';
+  } else if (!manifest) {
+    bodyHtml = '<div style="text-align:center;padding:24px;color:var(--mut);font-size:12px;line-height:1.6">'
+      + 'No loadout manifest received. Make sure the Aquilo Loadout SB kit is imported and the manifest action is enabled.<br><br>'
+      + '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:6px 14px;font-size:11px;border-radius:5px" onclick="_loadoutFetchManifest()">Retry fetch</button> '
+      + '<button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:6px 14px;font-size:11px;border-radius:5px;margin-left:6px" onclick="_loadoutLoadDemoManifest()">Load demo manifest</button>'
+      + '</div>';
+  } else if (!loadout) {
+    bodyHtml = '<div style="text-align:center;padding:24px;color:var(--mut);font-size:12px">Manifest received but the active loadout (<code>' + esc(manifest.activeLoadoutId || '') + '</code>) was not found.</div>';
+  } else {
+    bodyHtml = '<div id="loadoutBody" style="max-height:60vh;overflow-y:auto">' + _loadoutRenderWidgetsHtml(loadout) + '</div>';
+  }
+
+  m.innerHTML = headerHtml + bodyHtml + '<div class="mbtns" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">'
+    + (manifest && manifest.kit && manifest.kit.supportUrl ? '<a onclick="window.open(\'' + escA(manifest.kit.supportUrl) + '\',\'_blank\');return false" style="color:var(--mut);font-size:10px;cursor:pointer;text-decoration:underline">Kit docs</a>' : '<span></span>')
+    + '<div><button class="cbtn" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--mut);padding:5px 12px;font-size:11px;border-radius:5px;margin-right:6px" onclick="_loadoutFetchManifest()">Refresh</button><button class="btn-x" onclick="closeModal()">Close</button></div>'
+    + '</div>';
+}
+
+function _loadoutRenderWidgetsHtml(loadout) {
+  var sections = {};
+  var orderedSections = [];
+  // Index sections + bucket widgets per section.
+  for (var i = 0; i < loadout.widgets.length; i++) {
+    var w = loadout.widgets[i];
+    if (w.type === 'section') {
+      sections[w.id] = { def: w, widgets: [] };
+      orderedSections.push(w.id);
+    }
+  }
+  // Orphan-bucket: widgets without a section get rendered first under "Other"
+  var orphan = { def: { id: '_orphan', name: 'Other', icon: '·' }, widgets: [] };
+  for (var j = 0; j < loadout.widgets.length; j++) {
+    var w2 = loadout.widgets[j];
+    if (w2.type === 'section') continue;
+    if (w2.section && sections[w2.section]) sections[w2.section].widgets.push(w2);
+    else orphan.widgets.push(w2);
+  }
+  var html = '';
+  if (orphan.widgets.length) html += _loadoutRenderSectionHtml(orphan);
+  for (var k = 0; k < orderedSections.length; k++) {
+    html += _loadoutRenderSectionHtml(sections[orderedSections[k]]);
+  }
+  return html;
+}
+
+function _loadoutRenderSectionHtml(s) {
+  if (!s.widgets.length) return '';
+  var icon = s.def.icon ? esc(s.def.icon) + ' ' : '';
+  var html = '<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:6px 0 6px 2px">' + icon + esc(s.def.name || s.def.id) + '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">';
+  for (var i = 0; i < s.widgets.length; i++) {
+    html += _loadoutRenderWidgetHtml(s.widgets[i]);
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function _loadoutRenderWidgetHtml(w) {
+  var idAttr = ' data-loadout-widget="' + esc(w.id) + '"';
+  if (w.type === 'action') {
+    return '<button class="cbtn"' + idAttr + ' style="background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);padding:10px 12px;font-size:12px;font-weight:700;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;justify-content:center" onclick="_loadoutFireAction(' + _loadoutSpecJsonAttr(w) + ')">' + (w.icon ? '<span style="font-size:16px">' + esc(w.icon) + '</span>' : '') + esc(w.name || w.id) + '</button>';
+  }
+  if (w.type === 'chat-template') {
+    var preview = w.preview ? ' title="' + esc(w.preview) + '"' : '';
+    return '<button class="cbtn"' + idAttr + preview + ' style="background:linear-gradient(135deg,rgba(58,134,255,0.10),rgba(0,229,160,0.06));border:1px solid var(--bdr);color:var(--txt);padding:10px 12px;font-size:12px;font-weight:700;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;justify-content:center" onclick="_loadoutFireAction(' + _loadoutSpecJsonAttr(w) + ')"><span style="font-size:14px">💬</span>' + esc(w.name || w.id) + '</button>';
+  }
+  if (w.type === 'counter') {
+    var v = (w.value !== undefined) ? w.value : 0;
+    return '<div' + idAttr + ' style="background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0">'
+      + '<div style="display:flex;align-items:center;gap:8px"><div style="font-size:11px;color:var(--mut);font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(w.name || w.id) + '</div><div data-loadout-counter-val="' + esc(w.id) + '" style="font-size:18px;font-weight:900;color:var(--accent)">' + esc(String(v)) + '</div></div>'
+      + '<div style="display:flex;gap:4px"><button class="cbtn" style="flex:1;padding:5px 0;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);font-size:11px;font-weight:700;border-radius:4px" onclick="_loadoutFireAction(' + _loadoutSpecJsonAttr(w.actions && w.actions.decrement) + ',{delta:-1})">−</button>'
+      +   '<button class="cbtn" style="flex:1;padding:5px 0;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);font-size:11px;font-weight:700;border-radius:4px" onclick="_loadoutFireAction(' + _loadoutSpecJsonAttr(w.actions && w.actions.reset)     + ')">↻</button>'
+      +   '<button class="cbtn" style="flex:1;padding:5px 0;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);font-size:11px;font-weight:700;border-radius:4px" onclick="_loadoutFireAction(' + _loadoutSpecJsonAttr(w.actions && w.actions.increment) + ',{delta:1})">+</button>'
+      + '</div></div>';
+  }
+  if (w.type === 'toggle') {
+    var on = !!w.value;
+    return '<label' + idAttr + ' style="background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:8px;cursor:pointer">'
+      + '<input type="checkbox" data-loadout-toggle="' + esc(w.id) + '"' + (on ? ' checked' : '') + ' onchange="_loadoutFireAction(' + _loadoutSpecJsonAttr(w) + ',{enabled:this.checked})">'
+      + '<span style="font-size:11px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(w.name || w.id) + '</span>'
+      + '</label>';
+  }
+  // Unknown / future widget types — render a placeholder so the grid
+  // doesn't collapse. Forward-compatibility hook (see LOADOUT-KIT.md).
+  return '<div' + idAttr + ' style="background:var(--surf3);border:1px dashed var(--bdr);color:var(--mut);padding:10px 12px;font-size:10px;border-radius:6px;text-align:center">' + esc(w.name || w.id) + ' <span style="opacity:.7">(' + esc(w.type) + ')</span></div>';
+}
+
+function _loadoutSpecJsonAttr(spec) {
+  // Inline the spec into an onclick — JSON.stringify + escape for HTML
+  // attribute. Same pattern Raid Finder uses for inline closures.
+  var s = JSON.stringify(spec || null);
+  return s.replace(/"/g, '&quot;').replace(/\\/g, '\\\\\\\\');
+}
+
+function _loadoutRefreshWidget(widgetId) {
+  var loadout = _loadoutActiveLoadout();
+  if (!loadout) return;
+  var w = null;
+  for (var i = 0; i < loadout.widgets.length; i++) {
+    if (loadout.widgets[i].id === widgetId) { w = loadout.widgets[i]; break; }
+  }
+  if (!w) return;
+  if (w.type === 'counter') {
+    var el = document.querySelector('[data-loadout-counter-val="' + widgetId + '"]');
+    if (el) el.textContent = String(w.value);
+  } else if (w.type === 'toggle') {
+    var t = document.querySelector('[data-loadout-toggle="' + widgetId + '"]');
+    if (t) t.checked = !!w.value;
+  } else {
+    // For other types, full re-render is cheap.
+    var modalEl = document.getElementById('modal');
+    if (modalEl && modalEl.innerHTML.indexOf('Aquilo Loadout</div>') >= 0) _loadoutRenderPanel();
+  }
+}
+
+function _loadoutSwitchLoadout(loadoutId) {
+  if (!loadoutId || !_loadoutManifest) return;
+  // Update local view immediately (optimistic) — kit will re-broadcast
+  // the manifest after switching, which overwrites this.
+  _loadoutManifest.activeLoadoutId = loadoutId;
+  _loadoutRenderPanel();
+  // Fire kit's switch action by name. If not found, the user gets a sysMsg.
+  _loadoutFireAction({ actionName: SF_LOADOUT_SWITCH_ACTION }, { loadoutId: loadoutId });
+}
+
+// Dev affordance — load the demo manifest from disk so the panel can be
+// previewed without a real kit installed. Hidden from the main flow but
+// reachable from the empty-state Retry/Demo button.
+function _loadoutLoadDemoManifest() {
+  fetch('scripts/loadout-demo-manifest.json')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(j) {
+      if (!j) { sysMsg('tw', 'Demo manifest not found at scripts/loadout-demo-manifest.json'); return; }
+      _loadoutHandleManifest(j);
+    })
+    .catch(function() { sysMsg('tw', 'Demo manifest fetch failed.'); });
 }
 
 // ── Demo Mode ────────────────────────────────────────────────────────────────
@@ -6545,6 +6881,14 @@ function handleSBEvent(event, data) {
   }
   else if (key === 'General.Custom' && data && data.source === 'sf_raid_finder') {
     _handleRaidFinderResponse(data);
+    return;
+  }
+  else if (key === 'General.Custom' && data && data.source === 'aquilo_loadout_manifest') {
+    if (typeof _loadoutHandleManifest === 'function') _loadoutHandleManifest(data);
+    return;
+  }
+  else if (key === 'General.Custom' && data && data.source === 'aquilo_loadout_state') {
+    if (typeof _loadoutHandleStateDelta === 'function') _loadoutHandleStateDelta(data);
     return;
   } else if (key === 'General.Custom' && (data.name === 'PayPal' || data.name === 'PayPalDonation' || (data.source || '').toLowerCase().includes('paypal'))) {
     handleSETip(data, true);

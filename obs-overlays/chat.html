@@ -72,17 +72,19 @@
     pointer-events: none;
   }
 
-  /* Box theme: gradient container wraps every message. Per-msg chrome
-     disappears. Text reads as a flowing transcript inside a single bordered
-     panel. The container auto-sizes to the message count (maxMessages
-     setting drives content height) so the streamer's overlay isn't a fat
-     empty rectangle when chat is quiet. Capped at 95vh as a safety so a
-     wildly-high maxMessages can't push the bottom of the box off-screen.
+  /* Box theme: gradient container fills the ENTIRE OBS browser-source
+     viewport. Pinned top + bottom + left + right with a small inset, so
+     the streamer's source dimensions ARE the box dimensions. Messages
+     stack from the bottom (justify-content: flex-end on #feed); the
+     space above the latest message is empty/quiet within the gradient
+     frame. v1.5.4 had this auto-sizing to message count, which made the
+     box visibly grow as chat came in — visually unstable. v1.5.6+ pins
+     the box so the OBS source is the size you set, full stop.
      overflow:hidden ensures messages can never appear *outside* the
-     gradient frame mid-animation. */
+     gradient frame during in/out animations. */
   body.theme-box #feed {
-    left: 10px; right: 10px; bottom: 10px;
-    max-height: 95vh;
+    top: 10px; left: 10px; right: 10px; bottom: 10px;
+    max-height: none;
     padding: 14px 16px 12px;
     background:
       linear-gradient(135deg,
@@ -95,13 +97,13 @@
     box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
   }
 
-  /* No-background variant: same auto-size and inner flat-message styling
-     as theme-box, but no gradient frame. For streamers who want the
-     transcript style on a transparent overlay (or layered under a custom
-     OBS background source). */
+  /* No-background variant: also pinned top+bottom now, but no frame. For
+     streamers who want the transcript style on a transparent overlay (or
+     layered under a custom OBS background source). Same fill-the-source
+     behaviour as theme-box minus the gradient. */
   body.theme-nobg #feed {
-    left: 10px; right: 10px; bottom: 10px;
-    max-height: 95vh;
+    top: 10px; left: 10px; right: 10px; bottom: 10px;
+    max-height: none;
     padding: 6px 10px 8px;
     background: transparent;
     border: 0;

@@ -63,18 +63,22 @@
     z-index: 3;
   }
 
+  /* No static bar background. v1.5.6+: the bar is just a positioning
+     container for the message text — no rounded panel, no blur, no
+     border, no shadow. Streamers asked for clean text-only legibility
+     so chat doesn't look like a "chat box" pasted on the stream. The
+     text gets a strong text-shadow downstream (.m below) for contrast
+     on bright scenes. Re-enable any of the panel chrome here if a
+     specific scene calls for it. */
   .bar {
     position: relative;
     width: 100%;
     max-width: 960px;
     min-height: 48px;
     padding: 12px 18px;
-    border-radius: 12px;
-    background: rgba(14, 14, 16, var(--bg-op));
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 40px rgba(0,0,0,.4);
+    background: transparent;
+    border: 0;
+    box-shadow: none;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -143,8 +147,13 @@
     flex-shrink: 0;
     white-space: nowrap;
     color: currentColor;
+    /* Without the bar background, the username needs its own contrast
+       so the platform-tinted color reads on bright scenes. Stack a
+       neutral-dark shadow + a coloured glow that picks up the user's
+       platform tint via currentColor. */
+    text-shadow: 0 2px 6px rgba(0,0,0,.7), 0 0 10px currentColor;
   }
-  .sep { color: rgba(255,255,255,.6); flex-shrink: 0; }
+  .sep { color: rgba(255,255,255,.85); flex-shrink: 0; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
 
   /* 1.4.9: left-edge mask removed — text never scrolls past the left,
      so the fade was cutting off the first letter with no benefit. Kept
