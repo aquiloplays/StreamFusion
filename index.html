@@ -11352,41 +11352,67 @@ if (window.electronAPI && window.electronAPI.onRotationRelayStatus) {
   window.electronAPI.onRotationRelayStatus(_renderRotationRelayStatus);
 }
 
-// Inbound song events → chat panel as system rows + Events history. We use the
-// existing sysMsg() helper for the chat panel and addEvHistory() for the
-// dedicated events panel — same surfaces every other source flows through.
+// Inbound song events → chat panel as system rows + rich Events history rows.
+// Each kind renders differently: track changes pin with album art, queued/
+// requested events show the viewer name, denials/skips are flat system rows.
 if (window.electronAPI && window.electronAPI.onRotationEvent) {
+  // Re-pinning every track change would visually thrash the events panel.
+  // Track the most recently pinned now-playing entry id so we can replace it
+  // instead of stacking pins.
+  var _lastNowPlayingTs = 0;
+
   window.electronAPI.onRotationEvent(function(ev) {
     if (!ev || !ev.kind) return;
     var d = ev.data || {};
-    var line = '';
+
+    var name      = 'Rotation';
+    var text      = '';
+    var color     = 'se';   // tints the row label — 'se' is the existing green-ish tint
+    var isPinned  = false;
+    var avatar    = '';
+    var oneLine   = '';     // for sysMsg in chat panel
+
     if (ev.kind === 'rotation.song.playing') {
-      line = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '');
-      if (d.requestedBy) line += '  · req @' + d.requestedBy;
+      name     = '♪ Now playing';
+      text     = (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '');
+      if (d.requestedBy) text += '  · req @' + d.requestedBy;
+      avatar   = d.art || '';
+      isPinned = true;
+      oneLine  = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '') + (d.requestedBy ? '  · req @' + d.requestedBy : '');
+      _lastNowPlayingTs = ev.ts || Date.now();
     } else if (ev.kind === 'rotation.song.queued') {
-      line = '♪ @' + (d.displayName || d.user || 'viewer') + ' queued: '
-           + (d.title || d.query || '?') + (d.artist ? ' — ' + d.artist : '')
-           + (d.position ? ' (#' + d.position + ')' : '');
+      name     = '@' + (d.displayName || d.user || 'viewer');
+      text     = 'queued ' + (d.title || d.query || '?')
+               + (d.artist ? ' — ' + d.artist : '')
+               + (d.position ? '  (#' + d.position + ')' : '');
+      oneLine  = '♪ ' + name + ' queued: ' + (d.title || d.query || '?') + (d.artist ? ' — ' + d.artist : '');
     } else if (ev.kind === 'rotation.song.requested') {
-      line = '♪ @' + (d.displayName || d.user || 'viewer') + ' requested: ' + (d.query || '?');
+      name     = '@' + (d.displayName || d.user || 'viewer');
+      text     = 'requested ' + (d.query || '?');
+      oneLine  = '♪ ' + name + ' requested: ' + (d.query || '?');
     } else if (ev.kind === 'rotation.song.rejected') {
-      line = '♪ @' + (d.displayName || d.user || 'viewer') + ' request denied (' + (d.reason || 'rejected') + ')';
+      name     = '@' + (d.displayName || d.user || 'viewer');
+      text     = 'request denied — ' + (d.reason || 'rejected');
+      oneLine  = '♪ ' + name + ' ' + text;
     } else if (ev.kind === 'rotation.song.skipped') {
-      line = '♪ Skipped' + (d.title ? ': ' + d.title : '');
+      name     = '♪ Rotation';
+      text     = 'skipped' + (d.title ? ': ' + d.title : '');
+      oneLine  = '♪ Skipped' + (d.title ? ': ' + d.title : '');
     } else {
       return; // unknown kind — ignore
     }
 
-    // 1) Chat panel system row — uses the existing sysMsg helper. 'tw' is the
-    // safest channel because every chat tab listens to it (matches what the
-    // SB connection status messages do).
-    try { if (typeof sysMsg === 'function') sysMsg('tw', line); } catch (e) {}
+    // 1) Chat panel system row — pipes through every chat tab via the same
+    // helper SB status messages use, so it shows up wherever the streamer
+    // is currently looking.
+    try { if (typeof sysMsg === 'function' && oneLine) sysMsg('tw', oneLine); } catch (e) {}
 
-    // 2) Events history panel — uses Rotation's green so it reads visually
-    // distinct from chat events. addEvHistory(name, text, color, isPinned).
+    // 2) Events history panel — addEvHistory's signature is
+    // (name, text, color, isPinned, ?, '', avatarUrl). We pass album art for
+    // now-playing rows so the events panel reads like a small concert poster.
     try {
       if (typeof addEvHistory === 'function') {
-        addEvHistory('Rotation', line.replace(/^♪ /, ''), 'se', false);
+        addEvHistory(name, text, color, isPinned, null, '', avatar);
       }
     } catch (e) {}
   });

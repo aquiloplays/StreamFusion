@@ -26,7 +26,7 @@ var path = require('path');
 var electron = require('electron');
 var app = electron.app;
 
-var DEFAULT_RELAY_BASE = 'wss://aquilo-rotation-relay.bisherclay.workers.dev';
+var DEFAULT_RELAY_BASE = 'wss://aquilo-rotation-relay.aquiloplays.workers.dev';
 var STATE_FILE = 'rotation-relay.json';
 
 var state = null;             // loaded config, see loadState()
