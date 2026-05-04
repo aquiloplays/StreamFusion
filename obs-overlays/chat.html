@@ -102,6 +102,21 @@
     box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
   }
 
+  /* Plain grey box — same fill-the-source behaviour as theme-box but
+     without the blue/teal gradient. For streamers who want the
+     "container" look without the stylized accent. Background is just
+     the box-op-tinted neutral defined in :root, so opacity slider in
+     SF still drives transparency. */
+  body.theme-box-grey #feed {
+    top: 10px; left: 10px; right: 10px; bottom: 10px;
+    max-height: none;
+    padding: 14px 16px 12px;
+    background: rgba(var(--box-color), var(--box-op));
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
+  }
+
   /* No-background variant: also pinned top+bottom now, but no frame. For
      streamers who want the transcript style on a transparent overlay (or
      layered under a custom OBS background source). Same fill-the-source
@@ -1088,9 +1103,16 @@
     // 'box' (single gradient container), 'nobg' (transparent transcript).
     // Pre-1.5.3 settings only know 'card'/'box', so unknown values fall
     // back to card.
-    document.body.classList.remove('theme-card', 'theme-box', 'theme-nobg');
-    var themeName = (CFG.theme === 'box' || CFG.theme === 'nobg') ? CFG.theme : 'card';
+    // Theme is now a 4-way enum: 'card' | 'box' | 'box-grey' | 'nobg'.
+    // box-grey re-uses every theme-box layout rule and just paints a
+    // plain grey background instead of the blue/teal gradient — to keep
+    // CSS small we apply BOTH classes so existing 'body.theme-box ...'
+    // selectors continue to match without per-rule duplication.
+    document.body.classList.remove('theme-card', 'theme-box', 'theme-nobg', 'theme-box-grey');
+    var validThemes = { box: 1, 'box-grey': 1, nobg: 1 };
+    var themeName = validThemes[CFG.theme] ? CFG.theme : 'card';
     document.body.classList.add('theme-' + themeName);
+    if (themeName === 'box-grey') document.body.classList.add('theme-box');
     // --feed-max ONLY affects theme-card. theme-box and theme-nobg auto-
     // size to content (capped via CSS max-height: 95vh) so maxMessages
     // becomes the de-facto height limit for those themes. The 55vh cap

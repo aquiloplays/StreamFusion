@@ -2186,7 +2186,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button id="discordEaConnectBtn" onclick="connectDiscord()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#5865F2;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-                <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><path d="M20.3 4.4A19.8 19.8 0 0016.6 3a13.6 13.6 0 00-.6 1.2 18.4 18.4 0 00-5.4 0A13.6 13.6 0 009.9 3a19.8 19.8 0 00-3.7 1.4A20.8 20.8 0 002.5 16 20 20 0 008.6 19a14.8 14.8 0 001.2-2 13 13 0 01-1.9-.9c.2-.1.3-.3.5-.4a14.1 14.1 0 0012.2 0c.2.1.4.3.5.4a13 13 0 01-1.9.9 14.8 14.8 0 001.2 2 20 20 0 006.1-3 20.8 20.8 0 00-3.7-11.6zM8.9 13.7c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4zm6.2 0c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4z"/></svg>
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;flex-shrink:0"><use href="#i-discord"/></svg>
                 <span id="discordEaConnectBtnText">Connect Discord</span>
               </button>
               <button id="discordEaSignOutBtn" onclick="disconnectDiscord()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
@@ -2243,9 +2243,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Look</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Box (gradient) = single gradient-bordered container around the whole feed; the box auto-sizes to the Max Messages count so it never looks empty when chat is quiet. Box (no background) = same auto-sizing transcript style with NO frame, for streamers who layer chat over a custom OBS background."><span>Style</span>
+                    <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Box (gradient) = single container around the whole feed, painted with the StreamFusion blue/teal gradient. Box (grey) = same container, but a plain grey panel with no gradient — for streamers who want the framed look without the stylized accent. Box (no background) = the same auto-sizing transcript style with NO frame, for streamers who layer chat over a custom OBS background."><span>Style</span>
                       <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="box">Box (default)</option>
+                        <option value="box">Box (gradient)</option>
+                        <option value="box-grey">Box (grey)</option>
                         <option value="card">Card</option>
                         <option value="nobg">Box (no background)</option>
                       </select>
@@ -8105,7 +8106,7 @@ function renderObsOverlaysTab() {
   if (c.chat) {
     // 1.4.9 removed the 'hud' theme. 1.5.3 added 'nobg'. Migrate
     // unknown values to 'card' so legacy settings don't break the picker.
-    if (get('obsChatTheme'))                get('obsChatTheme').value = (c.chat.theme === 'box' || c.chat.theme === 'nobg') ? c.chat.theme : 'card';
+    if (get('obsChatTheme'))                get('obsChatTheme').value = (c.chat.theme === 'box' || c.chat.theme === 'box-grey' || c.chat.theme === 'nobg') ? c.chat.theme : 'card';
     if (get('obsChatFontSize'))             get('obsChatFontSize').value = c.chat.fontSize || 18;
     if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
     if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
@@ -11667,6 +11668,25 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
       // Live-update the now-playing bar so it flips immediately on track
       // change without waiting for the next integration heartbeat.
       try { if (typeof _npApplyRotationEvent === 'function') _npApplyRotationEvent(d); } catch (e) {}
+      // Mirror the now-playing card into the pop-out overlay so the
+      // streamer's second-monitor surface shows the current song too.
+      // overlay.html renders a compact strip when these arrive; the
+      // strip auto-hides if no event lands within 30s after the last.
+      try {
+        if (typeof sendToOverlay === 'function') {
+          sendToOverlay({
+            type: 'rotation-now-playing',
+            title:       d.title || '',
+            artist:      d.artist || '',
+            art:         d.art || '',
+            requestedBy: d.requestedBy || '',
+            durationMs:  d.durationMs || 0,
+            progressMs:  d.progressMs || 0,
+            isPlaying:   d.isPlaying !== false,
+            ts:          ev.ts || Date.now(),
+          });
+        }
+      } catch (e) {}
     } else if (ev.kind === 'rotation.song.queued') {
       name     = '@' + (d.displayName || d.user || 'viewer');
       text     = 'queued ' + (d.title || d.query || '?')
@@ -11750,7 +11770,24 @@ if (window.electronAPI && window.electronAPI.onDiscordEvent) {
     if (kind === 'ready')        renderDiscordBotStatus();
     if (kind === 'gateway_connected') renderDiscordBotStatus();
     if (kind === 'gateway_closed')    renderDiscordBotStatus();
-    if (kind === 'fatal') { addEvHistory('StreamFusion', 'Discord bot: ' + (data.reason || 'fatal error') + ' (check bot token + privileged intents).', 'tw', false); return; }
+    if (kind === 'fatal') {
+      // The reason field tells us which side failed:
+      //   bot_service_rejected — shared bot service (Railway) returned non-200 on
+      //     /events SSE. User's Patreon access token is likely stale or the
+      //     server lost their association. Fix: disconnect Discord in
+      //     Settings → Patreon, then reconnect to refresh the token.
+      //   anything else — user is running their OWN bot via gateway; usually
+      //     a bad bot token or missing privileged intents on the Discord app.
+      var dReason = data && data.reason ? String(data.reason) : 'fatal error';
+      var dHint;
+      if (dReason === 'bot_service_rejected') {
+        dHint = 'the shared bot rejected your token (HTTP ' + (data && data.code ? data.code : '?') + '). Disconnect + reconnect Discord in Settings → Patreon to refresh, or wait a minute and retry if Patreon just synced.';
+      } else {
+        dHint = 'check your bot token + privileged intents in Discord Developer Portal.';
+      }
+      addEvHistory('StreamFusion', 'Discord bot: ' + dReason + ' — ' + dHint, 'tw', false);
+      return;
+    }
     if (kind === 'member_add' && dcBot.evtMember) {
       // Render with avatar + big flag so the welcome lands as a pinned
       // moment in the Events panel, not a silent one-line entry. Discord

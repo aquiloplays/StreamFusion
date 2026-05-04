@@ -13,10 +13,10 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:transparent}
-/* No bottom padding reservation needed: .ov-event-area used to be
-   fixed-position at bottom:0 (covering chat when stacked beyond its 96px
-   min-height); it's now an in-flow flex item placed between the feed and
-   the chat input, so chat can never be visually overlapped. */
+/* .ov-event-area sits BELOW the chat-send bar (was previously between
+   feed and input; before that, fixed-position at bottom:0 covering
+   chat). Events never overlap chat now — the stack is capped to 3
+   cards via OV_EV_MAX so it stays bounded even on tall pop-out windows. */
 body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;box-sizing:border-box}
 
 /* ── Drag bar ─────────────────────────────────────────────────── */
@@ -49,6 +49,16 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 
 /* ── Live-on bar ──────────────────────────────────────────────── */
 .ov-live{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;white-space:nowrap;overflow-x:auto}
+/* Rotation now-playing strip — sits under the live bar and surfaces
+   when the cloud relay forwards a rotation.song.playing event. */
+.ov-np{display:flex;align-items:center;gap:9px;padding:5px 10px;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;font-size:11px;color:var(--txt);min-height:34px}
+.ov-np-art{width:28px;height:28px;border-radius:4px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px var(--bdr)}
+.ov-np-art:not([src]),.ov-np-art[src=""]{visibility:hidden}
+.ov-np-meta{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.ov-np-title{font-size:11px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.ov-np-artist{font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.ov-np-req{font-size:9px;font-weight:700;color:#1db954;letter-spacing:.04em;flex-shrink:0;background:rgba(29,185,84,.14);border:1px solid rgba(29,185,84,.35);border-radius:999px;padding:2px 7px;white-space:nowrap}
+.ov-np-req:empty{display:none}
 .ov-live::-webkit-scrollbar{height:3px}.ov-live::-webkit-scrollbar-thumb{background:var(--bdr)}
 .ov-live-lbl{font-size:10px;font-weight:900;letter-spacing:1.4px;color:var(--mut);text-transform:uppercase;padding-right:2px;flex-shrink:0}
 .ov-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:livePulse 1.3s ease-in-out infinite;flex-shrink:0}
@@ -224,7 +234,12 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
    shrinks naturally to make room and can never be overlapped. When no
    events exist the container collapses to 0px so the feed reclaims the
    full height. */
-.ov-event-area{flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;pointer-events:none;padding:0 8px 6px;box-sizing:border-box;overflow:visible;gap:6px;max-height:50vh}
+/* Event area now sits BELOW the chat-send bar — events never overlap
+   chat or the input. Capped to OV_EV_MAX cards (3) so the stack stays
+   bounded. max-height is tighter than the old between-feed-and-input
+   placement since we no longer need to share vertical space with the
+   feed. */
+.ov-event-area{flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;pointer-events:none;padding:6px 8px;box-sizing:border-box;overflow:visible;gap:6px;max-height:35vh;background:transparent;border-top:1px solid var(--bdr)}
 .ov-event-area:empty{display:none}
 .ov-event-area .ov-event{pointer-events:auto}
 /* Wide event cards — full pop-out width so text breathes and multiple
@@ -723,6 +738,17 @@ body.layout-hud::before {
   <span class="ov-live-timer off" id="ovLiveTimer">00:00:00</span>
 </div>
 <div class="ov-stats" id="ovStats"></div>
+<!-- Rotation now-playing strip — shows whenever a rotation.song.playing
+     event arrives from the cloud relay. Hidden by default; reveals on
+     first event and auto-hides 30s after the last update. -->
+<div class="ov-np" id="ovNp" style="display:none">
+  <img class="ov-np-art" id="ovNpArt" alt="" src=""/>
+  <div class="ov-np-meta">
+    <div class="ov-np-title" id="ovNpTitle"></div>
+    <div class="ov-np-artist" id="ovNpArtist"></div>
+  </div>
+  <div class="ov-np-req" id="ovNpReq"></div>
+</div>
 <div class="ov-goals" id="ovGoals"></div>
 <div class="ov-hype" id="ovHype">
   <div class="ov-hype-hd"><span>&#128642; HYPE <span class="ov-hype-lv" id="ovHypeLv">1</span></span><span class="ov-hype-timer" id="ovHypeTimer"></span></div>
@@ -737,15 +763,15 @@ body.layout-hud::before {
   <div class="ov-pred-outcomes" id="ovPredOutcomes"></div>
 </div>
 <div class="ov-feed" id="ovFeed"></div>
-<!-- Event area sits between the feed and the chat input. It's flex-flow
-     (no longer position:fixed) so a stack of incoming subs/gifts/raids
-     pushes the feed UP instead of covering it. Empty state collapses to
-     0px via .ov-event-area:empty. -->
-<div class="ov-event-area" id="ovEventArea"></div>
 <div class="ov-chat-bar" id="ovChatBar">
   <textarea class="ov-chat-input" id="ovChatInput" rows="1" placeholder="Send to chat…"></textarea>
   <button class="ov-chat-send" id="ovChatSend" type="button">Send</button>
 </div>
+<!-- Event area sits BELOW the chat send bar so events never cover or
+     compress chat. addMsg/addEvent are the only things that produce
+     entries here; the script trims to .ov-event-max so at most 3 cards
+     are visible at any time. Empty state collapses via :empty. -->
+<div class="ov-event-area" id="ovEventArea"></div>
 <div class="ov-hotbar hidden" id="ovHotbar">
   <span class="ov-hotbar-lbl">Actions</span>
   <div id="ovHotbarBtns" style="display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0"></div>
@@ -1108,7 +1134,11 @@ var _ovModOpen = null;
 // top (oldest) one with its out animation. This bounds vertical growth
 // so the event area can't eat more than ~60vh of the pop-out even
 // during a gift bomb.
-var OV_EV_MAX = 5;
+// Hard cap on visible event cards. Lowered from 5 -> 3 because the
+// event area moved out from between the feed and the chat input and
+// now sits below the chat-send bar. A taller stack would push events
+// off-window in compact pop-out sizes.
+var OV_EV_MAX = 3;
 function showEvent(d) {
   if (!cfg.showEvents) return;
   if (!platAllowed(d.plat)) return;
@@ -1305,6 +1335,39 @@ function renderLiveBar() {
     t.textContent = '00:00:00';
   }
 }
+
+// ── Rotation now-playing ────────────────────────────────────
+// Cloud-relay rotation.song.playing events arrive as 'rotation-now-
+// playing' overlay-data packets. We render them in the .ov-np strip
+// directly under the live-bar. The strip auto-hides 30s after the
+// most recent update so a stale "playing" doesn't sit forever when
+// the streamer kills the widget.
+var _ovNpHideTimer = null;
+function updateRotationNowPlaying(d) {
+  var bar = document.getElementById('ovNp');
+  if (!bar) return;
+  if (!d || !d.title) {
+    bar.style.display = 'none';
+    return;
+  }
+  var artEl    = document.getElementById('ovNpArt');
+  var titleEl  = document.getElementById('ovNpTitle');
+  var artistEl = document.getElementById('ovNpArtist');
+  var reqEl    = document.getElementById('ovNpReq');
+  if (artEl) {
+    if (d.art) artEl.setAttribute('src', d.art);
+    else artEl.removeAttribute('src');
+  }
+  if (titleEl)  titleEl.textContent  = d.title || '';
+  if (artistEl) artistEl.textContent = d.artist || '';
+  if (reqEl)    reqEl.textContent    = d.requestedBy ? '@' + d.requestedBy : '';
+  bar.style.display = 'flex';
+  if (_ovNpHideTimer) clearTimeout(_ovNpHideTimer);
+  _ovNpHideTimer = setTimeout(function() {
+    bar.style.display = 'none';
+  }, 30000);
+}
+
 function updateLive(d) {
   _liveState.tw = !!d.tw;
   _liveState.yt = !!d.yt;
@@ -1634,6 +1697,7 @@ if (api.onOverlayData) {
     if (!d || !d.type) return;
     if (d.type === 'chat') addMsg(d);
     else if (d.type === 'event') showEvent(d);
+    else if (d.type === 'rotation-now-playing') updateRotationNowPlaying(d);
     else if (d.type === 'stats') updateStats(d);
     else if (d.type === 'goals') updateGoals(d);
     else if (d.type === 'live') updateLive(d);
