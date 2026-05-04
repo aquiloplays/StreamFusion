@@ -39,6 +39,11 @@
     --yt: #ff4545;
     --tt: #fe2c55;
     --kk: #53fc18;
+    /* Side-zone widths — used when TikTok gifts or events are pinned to
+       the left/right of the chat box instead of stacked over it. The
+       chat box automatically shrinks horizontally to leave room. */
+    --gift-side-w: 160px;
+    --event-side-w: 220px;
   }
 
   * { box-sizing: border-box; }
@@ -535,6 +540,123 @@
   #combo[data-anchor="bm"] { bottom: 0; left: 50%; transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
   #combo[data-anchor="off"] { display: none; }
 
+  /* ──────────────────────────────────────────────────────────────────
+     Side-mounted TikTok gift zone (1.5.5+).
+
+     Default `tt-gift-side-top` keeps the legacy behaviour: gifts in the
+     top half of the canvas, drifting right→left across the upper 50vh.
+     That worked for theme-card (chat at the bottom only) but visibly
+     overlapped chat in theme-box / theme-nobg, where the chat fills
+     the entire OBS source.
+
+     Sided modes (`right` / `left`) instead pin the gift zone to a
+     vertical column on that side and gifts fall top→bottom through it.
+     The chat box shrinks horizontally to leave the column free, so the
+     two never visually collide.
+     ────────────────────────────────────────────────────────────────── */
+  body.tt-gift-side-right #gifts,
+  body.tt-gift-side-left  #gifts {
+    top: 0; bottom: 0;
+    width: var(--gift-side-w, 160px);
+    height: auto;
+    z-index: 11;
+  }
+  body.tt-gift-side-right #gifts { left: auto; right: 0; }
+  body.tt-gift-side-left  #gifts { left: 0;    right: auto; }
+  body.tt-gift-side-off   #gifts { display: none !important; }
+
+  /* In sided mode the gift sprites live full-width inside the column,
+     centered horizontally, falling vertically through it. */
+  body.tt-gift-side-right .gift,
+  body.tt-gift-side-left  .gift {
+    top: 0;
+    left: 50%;
+    right: auto;
+    margin-left: -46px;     /* center the 92px gift within the column */
+    animation-name: giftFloatV;
+  }
+  body.tt-gift-side-right .gift .g-spark,
+  body.tt-gift-side-left  .gift .g-spark { display: none; }
+  /* Vertical drift — same overshoot/wobble feel as horizontal, just
+     gravity-flipped so gifts fall from top to bottom. */
+  @keyframes giftFloatV {
+    0%   { opacity: 0; transform: translate(0, -40px) scale(.3) rotate(-10deg); }
+    10%  { opacity: 1; transform: translate(0, -8px)  scale(1.18) rotate(4deg); }
+    20%  { opacity: 1; transform: translate(0, 0)     scale(1)    rotate(0deg); }
+    70%  { opacity: 1; transform: translate(0, var(--gift-mid-y, 35vh)) scale(.95) rotate(-4deg); }
+    100% { opacity: 0; transform: translate(0, var(--gift-end-y, 90vh)) scale(.8)  rotate(8deg); }
+  }
+
+  /* Box / nobg / card themes — shrink horizontally so the chat surface
+     and the gift column don't share pixels. */
+  body.theme-box.tt-gift-side-right  #feed,
+  body.theme-nobg.tt-gift-side-right #feed { right: calc(10px + var(--gift-side-w, 160px)); }
+  body.theme-box.tt-gift-side-left   #feed,
+  body.theme-nobg.tt-gift-side-left  #feed { left:  calc(10px + var(--gift-side-w, 160px)); }
+  body.theme-card.tt-gift-side-right #feed { right: var(--gift-side-w, 160px); }
+  body.theme-card.tt-gift-side-left  #feed { left:  var(--gift-side-w, 160px); }
+
+  /* ──────────────────────────────────────────────────────────────────
+     Side-mounted event column (1.5.5+).
+
+     `placement-right` / `placement-left` pin a vertical strip of event
+     cards to the chosen side, mirroring the new TT gift placement.
+     Cards stack from the bottom up so the most recent event hugs the
+     visible chat region. Like the gift side mode, the chat box
+     shrinks to leave room.
+     ────────────────────────────────────────────────────────────────── */
+  .events.events-side {
+    top: 6px; bottom: 6px;
+    width: var(--event-side-w, 220px);
+    display: none;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 6px;
+    pointer-events: none;
+    z-index: 6;
+  }
+  #events-right { right: 0; left: auto; }
+  #events-left  { left:  0; right: auto; }
+  body.placement-right #events-right { display: flex; }
+  body.placement-left  #events-left  { display: flex; }
+
+  /* Sided event rows take the full column width and stack vertically. */
+  body.placement-right .ev-row,
+  body.placement-left  .ev-row {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  body.theme-box.placement-right  #feed,
+  body.theme-nobg.placement-right #feed { right: calc(10px + var(--event-side-w, 220px)); }
+  body.theme-box.placement-left   #feed,
+  body.theme-nobg.placement-left  #feed { left:  calc(10px + var(--event-side-w, 220px)); }
+  body.theme-card.placement-right #feed { right: var(--event-side-w, 220px); }
+  body.theme-card.placement-left  #feed { left:  var(--event-side-w, 220px); }
+
+  /* When gifts AND events share the same side, split the column —
+     gifts in the top half, events in the bottom half — so they don't
+     overlay each other. The chat shrink uses max() of the two widths
+     since they only occupy one column total. */
+  body.tt-gift-side-right.placement-right #gifts            { bottom: 50%; }
+  body.tt-gift-side-right.placement-right #events-right     { top: 50%; bottom: 6px; }
+  body.tt-gift-side-left.placement-left   #gifts            { bottom: 50%; }
+  body.tt-gift-side-left.placement-left   #events-left      { top: 50%; bottom: 6px; }
+  body.theme-box.tt-gift-side-right.placement-right  #feed,
+  body.theme-nobg.tt-gift-side-right.placement-right #feed {
+    right: calc(10px + max(var(--gift-side-w, 160px), var(--event-side-w, 220px)));
+  }
+  body.theme-box.tt-gift-side-left.placement-left   #feed,
+  body.theme-nobg.tt-gift-side-left.placement-left  #feed {
+    left:  calc(10px + max(var(--gift-side-w, 160px), var(--event-side-w, 220px)));
+  }
+  body.theme-card.tt-gift-side-right.placement-right #feed {
+    right: max(var(--gift-side-w, 160px), var(--event-side-w, 220px));
+  }
+  body.theme-card.tt-gift-side-left.placement-left   #feed {
+    left:  max(var(--gift-side-w, 160px), var(--event-side-w, 220px));
+  }
+
   .combo {
     display: flex;
     align-items: center;
@@ -566,6 +688,9 @@
 <div class="events" id="events-above"></div>
 <div id="feed"></div>
 <div class="events" id="events-below"></div>
+<!-- Side-mounted event hosts — only visible when placement === 'left'|'right'. -->
+<div class="events events-side" id="events-left"></div>
+<div class="events events-side" id="events-right"></div>
 <div id="gifts"></div>
 <div id="combo" data-anchor="off"></div>
 <div id="gated">Patreon Early Access required<br><span style="font-size:11px;color:#adadb8;letter-spacing:.04em;text-transform:none;font-weight:600">Connect in StreamFusion → Settings → Early Access</span></div>
@@ -591,13 +716,16 @@
     eventSize:        13,
     eventsHoldMs:     6000,
     showGiftAnimations: false,
-    ttGiftCorner:     'off',           // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
+    ttGiftCorner:     'off',           // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off' — combo-counter anchor
+    ttGiftSide:       'top',           // 'top'|'right'|'left'|'off' — floating gift zone
     ttGiftComboHoldMs: 3000
   };
 
   var feed      = document.getElementById('feed');
   var evAbove   = document.getElementById('events-above');
   var evBelow   = document.getElementById('events-below');
+  var evLeft    = document.getElementById('events-left');
+  var evRight   = document.getElementById('events-right');
   var gifts     = document.getElementById('gifts');
   var comboBox  = document.getElementById('combo');
   var gated     = document.getElementById('gated');
@@ -747,7 +875,11 @@
     var row = document.createElement('div');
     row.className = 'ev-row ' + plat;
     row.innerHTML = '<span class="ev-icon">' + eventIcon(ev) + '</span><span>' + eventText(ev) + '</span>';
-    var host = place === 'above' ? evAbove : place === 'below' ? evBelow : feed;
+    var host = place === 'above' ? evAbove
+             : place === 'below' ? evBelow
+             : place === 'left'  ? evLeft
+             : place === 'right' ? evRight
+             : feed;
     host.appendChild(row);
     if (place === 'inline') { messageCount++; trimFeed(); }
     setTimeout(function() {
@@ -824,8 +956,10 @@
         midX:   lead.style.getPropertyValue('--mid-x')  || '-50vw',
         endX:   lead.style.getPropertyValue('--end-x')  || '-100vw',
         driftY: lead.style.getPropertyValue('--drift-y') || '5vh',
+        midY:   lead.style.getPropertyValue('--gift-mid-y') || '',
+        endY:   lead.style.getPropertyValue('--gift-end-y') || '',
         // Slightly shorter duration for followers so they catch up
-        // to the lead at the left edge and fade together.
+        // to the lead at the trailing edge and fade together.
         dur: (parseFloat(lead.style.getPropertyValue('--gift-dur') || '5') - 0.3).toFixed(2) + 's',
         showCount: false,
         showUser: false
@@ -836,14 +970,22 @@
       return;
     }
 
-    // Fresh streak — spawn a full gift with count + user label.
+    // Fresh streak — spawn a full gift with count + user label. The
+    // animation's translate vars get used differently depending on
+    // whether the gift zone is the top half (horizontal drift) or a
+    // side column (vertical drift). buildGiftElement sets all of them;
+    // CSS picks which animation runs based on the body class.
     var spawnYPct = 5 + Math.random() * 30;
     var opts = {
       spawnY: spawnYPct.toFixed(1) + '%',
       spawnRight: '0px',
+      // Horizontal drift (tt-gift-side-top — legacy behaviour)
       midX:   -(window.innerWidth * (0.35 + Math.random() * 0.25)) + 'px',
       endX:   -(window.innerWidth * (0.95 + Math.random() * 0.15)) + 'px',
       driftY: (2 + Math.random() * 6).toFixed(1) + 'vh',
+      // Vertical drift (tt-gift-side-right / tt-gift-side-left)
+      midY:   (30 + Math.random() * 12).toFixed(1) + 'vh',
+      endY:   (88 + Math.random() *  8).toFixed(1) + 'vh',
       dur:    (4.4 + Math.random() * 1.2).toFixed(2) + 's',
       showCount: !!(ev.count && ev.count > 1),
       showUser: true
@@ -868,6 +1010,10 @@
     el.style.setProperty('--mid-x',       opts.midX);
     el.style.setProperty('--end-x',       opts.endX);
     el.style.setProperty('--drift-y',     opts.driftY);
+    // Vertical-drift coords (only consulted by giftFloatV keyframes
+    // when body has tt-gift-side-right/left).
+    if (opts.midY) el.style.setProperty('--gift-mid-y', opts.midY);
+    if (opts.endY) el.style.setProperty('--gift-end-y', opts.endY);
     el.style.setProperty('--gift-dur',    opts.dur);
     var countBadge = opts.showCount ? '<div class="g-count">\u00d7' + (ev.count || 1) + '</div>' : '';
     var userLabel  = opts.showUser  ? '<div class="g-user">' + escapeHtml(ev.user || '') + '</div>' : '';
@@ -947,10 +1093,17 @@
     document.body.classList.add('theme-' + themeName);
     // --feed-max ONLY affects theme-card. theme-box and theme-nobg auto-
     // size to content (capped via CSS max-height: 95vh) so maxMessages
-    // becomes the de-facto height limit for those themes.
-    root.style.setProperty('--feed-max', CFG.showGiftAnimations ? '55vh' : '100vh');
-    document.body.classList.remove('placement-above', 'placement-below', 'placement-inline', 'placement-off');
+    // becomes the de-facto height limit for those themes. The 55vh cap
+    // also stops applying once gifts are pinned to a side column —
+    // gifts no longer occupy the top half so the feed can use the
+    // full canvas height in card mode.
+    var giftSide = (CFG.showGiftAnimations ? (CFG.ttGiftSide || 'top') : 'off');
+    var giftsInTopZone = giftSide === 'top';
+    root.style.setProperty('--feed-max', giftsInTopZone ? '55vh' : '100vh');
+    document.body.classList.remove('placement-above', 'placement-below', 'placement-inline', 'placement-off', 'placement-left', 'placement-right');
     document.body.classList.add('placement-' + (CFG.showEvents ? (CFG.eventPlacement || 'inline') : 'off'));
+    document.body.classList.remove('tt-gift-side-top', 'tt-gift-side-right', 'tt-gift-side-left', 'tt-gift-side-off');
+    document.body.classList.add('tt-gift-side-' + giftSide);
     comboBox.setAttribute('data-anchor', CFG.ttGiftCorner || 'off');
   }
 

@@ -2270,11 +2270,13 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Sub / gift / cheer / raid events</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
                     <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Where sub / gift / cheer / raid event notifications show up on your OBS overlay. 'Mixed in' blends them with chat messages so they scroll together. 'Separate bar' pins them in their own strip above or below the chat feed."><span>Event placement</span>
+                    <label class="frow" style="font-size:11px" title="Where sub / gift / cheer / raid event notifications show up on your OBS overlay. 'Mixed in' blends them with chat messages so they scroll together. 'Separate bar' pins them above or below the chat feed. 'Side column' puts them outside the chat box on the left or right — chat shrinks to make room so events never overlap."><span>Event placement</span>
                       <select id="obsChatEventPlacement" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
                         <option value="inline">Mixed in with chat</option>
                         <option value="above">Separate bar, above chat</option>
                         <option value="below">Separate bar, below chat</option>
+                        <option value="left">Side column, left of chat</option>
+                        <option value="right">Side column, right of chat</option>
                         <option value="off">Don't show events</option>
                       </select>
                     </label>
@@ -2283,7 +2285,15 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">TikTok gifts</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Every incoming TikTok gift animates the real gift artwork floating across the top half of your overlay (never covers chat)."><span>Animate gifts across screen</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Every incoming TikTok gift animates the real gift artwork floating across your overlay. Pair this with the placement option on the right to control whether they drift across the top or fall down a side column outside the chat box."><span>Animate gifts across screen</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Where the floating TikTok gift artwork plays. 'Top of overlay' is the legacy behaviour (gifts drift right→left across the upper half — fine for the card theme but can cover chat in the box theme). 'Right column' / 'Left column' move the gifts into a vertical strip outside the chat box; chat shrinks horizontally to make room so they never overlap."><span>Gift float position</span>
+                      <select id="obsChatTtGiftSide" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="top">Top of overlay (legacy)</option>
+                        <option value="right">Right column (outside chat)</option>
+                        <option value="left">Left column (outside chat)</option>
+                        <option value="off">Don't animate</option>
+                      </select>
+                    </label>
                     <label class="frow" style="font-size:11px" title="When someone sends many gifts in a row, a small counter chip appears showing the combo (×5, ×30, etc.). Pick which corner of your overlay it anchors to, or turn it off."><span>Gift combo counter corner</span>
                       <select id="obsChatTtGiftCorner" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
                         <option value="off">Off</option>
@@ -8101,6 +8111,7 @@ function renderObsOverlaysTab() {
     if (get('obsChatEventSize'))            get('obsChatEventSize').value = c.chat.eventSize || 13;
     if (get('obsChatShowGiftAnimations'))   get('obsChatShowGiftAnimations').checked = !!c.chat.showGiftAnimations;
     if (get('obsChatTtGiftCorner'))         get('obsChatTtGiftCorner').value = c.chat.ttGiftCorner || 'br';
+    if (get('obsChatTtGiftSide'))           get('obsChatTtGiftSide').value = c.chat.ttGiftSide || 'top';
   }
   if (c.alerts) {
     var en = c.alerts.enabled || {};
@@ -8581,6 +8592,7 @@ function updateObsConfig(which) {
       eventSize:            parseInt((get('obsChatEventSize') || {}).value, 10) || 13,
       showGiftAnimations:   !!(get('obsChatShowGiftAnimations') && get('obsChatShowGiftAnimations').checked),
       ttGiftCorner:         ((get('obsChatTtGiftCorner') || {}).value) || 'br',
+      ttGiftSide:           ((get('obsChatTtGiftSide') || {}).value) || 'top',
       showPlatforms:        S.show || { tw: true, yt: true, tt: true, kk: true }
     };
     S.obsCfg.chat = cfg;
