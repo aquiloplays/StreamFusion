@@ -188,6 +188,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Get server status + URLs for the Settings panel. Returns:
   //   { running: bool, clients: number, urls: { root, chat, alerts, shoutout } }
   obsGetStatus:         ()            => ipcRenderer.invoke('obs-get-status'),
+  // Push a directive to a connected Aquilo product's control SSE stream.
+  // command is one of 'play' | 'pause' | 'skip' | 'previous'. args is an
+  // optional product-specific object. Returns { ok, reason? } — the
+  // renderer disables the button + shows a hint when no widget is connected.
+  obsControlIntegration:(clientId, command, args) => ipcRenderer.invoke('obs-integration-control', { clientId: clientId, command: command, args: args || {} }),
+  // Snapshot of connected Aquilo products. Used by the now-playing card
+  // to find a 'aquilo-spotify-widget' entry and read its meta + clientId.
+  obsIntegrationList:   ()             => ipcRenderer.invoke('obs-integration-list'),
 
   // ── Discord integration (EA-only) ────────────────────────────────────────
   // Webhook POST — fires a stylized embed to a Discord webhook URL. The

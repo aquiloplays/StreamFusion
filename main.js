@@ -935,6 +935,27 @@ ipcMain.handle('obs-get-status', function() {
   };
 });
 
+// Push a control directive to a connected Aquilo product (e.g. play/pause/
+// skip/prev to the Aquilo Spotify Widget). Returns { ok, reason? } so the
+// renderer can disable the button and surface a "widget offline" hint when
+// no control stream is open.
+ipcMain.handle('obs-integration-control', function(event, payload) {
+  payload = payload || {};
+  if (!payload.clientId || !payload.command) return { ok: false, reason: 'clientId + command required' };
+  try {
+    var sent = obsServer.pushControl(String(payload.clientId), String(payload.command), payload.args || {});
+    return { ok: !!sent, reason: sent ? null : 'no open control stream for that clientId' };
+  } catch (e) {
+    return { ok: false, reason: (e && e.message) || 'push failed' };
+  }
+});
+// Snapshot of currently connected Aquilo products. Renderer uses this to
+// build the now-playing card and decide which control buttons to show.
+ipcMain.handle('obs-integration-list', function() {
+  try { return { products: obsServer.listIntegrations() }; }
+  catch (e) { return { products: [] }; }
+});
+
 // ── Discord IPC ─────────────────────────────────────────────────────────────
 // Webhook POST — used for stylized event embeds, records, and recap. Returns
 // { ok, status, id } so the caller can remember the message id for later

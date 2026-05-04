@@ -162,7 +162,48 @@ after any action that materially changes the dashboard layout.
 | `counter`        | Number + ± and reset buttons        | three actions (`increment`/`decrement`/`reset`)   |
 | `toggle`         | Switch with on/off label            | one action; receives `{ enabled: bool }`          |
 | `chat-template`  | Button that visually hints "posts to chat" (with preview tooltip) | one action |
+| `stat`           | Passive read-only number + optional unit + optional ±delta chip | none — kit pushes value/delta via `aquilo_loadout_state` |
 | `loadout-switcher` | (auto-rendered when `loadouts.length > 1`) | fires `Aquilo Loadout — Switch` with `{ loadoutId }` |
+
+### `stat` widget shape
+
+`stat` is the passive-readout type — use it for any value the kit owns
+that the streamer should glance at but never click. Bolts, viewer score,
+session points, an arbitrary scoreboard. Optional fields:
+
+- `icon`  — leading emoji / single-char glyph (e.g. `"⚡"` for Bolts)
+- `unit`  — small suffix label after the value (e.g. `"Bolts"`, `"$"`, `"pts"`)
+- `delta` — signed number; rendered as a small green/red chip below the
+            value when non-zero. Use to highlight "earned 50 in the last
+            5 minutes" style activity. Reset to `0` (or omit) to hide.
+
+Example widget entry:
+
+```json
+{
+  "id":      "bolts_total",
+  "type":    "stat",
+  "name":    "Bolts",
+  "icon":    "⚡",
+  "unit":    "Bolts",
+  "value":   1250,
+  "delta":   50,
+  "section": "scoreboard"
+}
+```
+
+The kit pushes updates via the standard state-delta channel. Both `value`
+and `delta` may appear in the same delta payload, or either alone:
+
+```jsonc
+{
+  "source": "aquilo_loadout_state",
+  "schema": 1,
+  "deltas": [
+    { "id": "bolts_total", "value": 1300, "delta": 50 }
+  ]
+}
+```
 
 Future planned: `slider`, `select`, `text-input`, `progress-bar`,
 `event-feed`, `media-preview`. Kits should set `schema: 1` until those

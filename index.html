@@ -95,6 +95,25 @@ body.is-beta .sf-boot-logo{background:linear-gradient(135deg,#f59e0b 0%,#f97316 
 /* Live-on bar (main app) */
 .live-bar{display:flex;align-items:center;gap:6px;padding:4px 12px;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;white-space:nowrap;overflow-x:auto}
 .live-bar::-webkit-scrollbar{height:3px}.live-bar::-webkit-scrollbar-thumb{background:var(--bdr)}
+/* Now-playing bar — appears when the Aquilo Spotify Widget heartbeats. */
+.np-bar{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0}
+.np-bar .np-art{width:36px;height:36px;border-radius:5px;object-fit:cover;background:var(--surf3);flex-shrink:0;box-shadow:0 0 0 1px var(--bdr)}
+.np-bar .np-art:not([src]),.np-bar .np-art[src=""]{visibility:hidden}
+.np-bar .np-meta{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.np-bar .np-title{font-size:12px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-bar .np-artist{font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-bar .np-progress{height:2px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:2px}
+.np-bar .np-progress-fill{height:100%;background:#1db954;transition:width .8s linear;width:0%}
+.np-bar .np-controls{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.np-bar .np-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:6px;color:var(--mut);cursor:pointer;transition:all .12s;padding:0}
+.np-bar .np-btn:hover{background:rgba(29,185,84,.18);border-color:#1db954;color:#fff}
+.np-bar .np-btn:active{transform:scale(.94)}
+.np-bar .np-btn:disabled{opacity:.35;cursor:not-allowed}
+.np-bar .np-btn-pp{width:32px;height:32px}
+.np-bar .np-btn.np-flash-ok{animation:npFlashOk .5s ease-out}
+.np-bar .np-btn.np-flash-err{animation:npFlashErr .5s ease-out}
+@keyframes npFlashOk{0%{box-shadow:0 0 0 0 rgba(29,185,84,.6)}100%{box-shadow:0 0 0 8px rgba(29,185,84,0)}}
+@keyframes npFlashErr{0%{box-shadow:0 0 0 0 rgba(248,81,73,.6)}100%{box-shadow:0 0 0 8px rgba(248,81,73,0)}}
 .live-bar .lb-dot{width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:pulse 1.3s ease-in-out infinite;flex-shrink:0}
 .live-bar .lb-lbl{font-size:11px;font-weight:900;letter-spacing:1.6px;color:var(--mut);text-transform:uppercase;flex-shrink:0}
 
@@ -1624,6 +1643,30 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
   <span class="lb-chip tt" id="lbTt"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19.3 6.4a4.8 4.8 0 0 1-3.1-2.8A4.7 4.7 0 0 1 15.8 2h-3.5v13.7a2.9 2.9 0 0 1-2.9 2.7 2.9 2.9 0 0 1-2.9-2.9 2.9 2.9 0 0 1 2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 0 0-.9-.1A6.4 6.4 0 0 0 3 15.5a6.4 6.4 0 0 0 6.4 6.4 6.4 6.4 0 0 0 6.4-6.4v-7a8.3 8.3 0 0 0 4.9 1.6V6.5c-.5 0-1-.1-1.4-.1z"/></svg></span>
   <span class="lb-chip kk" id="lbKk"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg></span>
   <span class="lb-timer off" id="lbTimer">00:00:00</span>
+</div>
+<!-- Now-playing bar — surfaces when the Aquilo Spotify Widget is registered
+     on the local /api/integrations/* loopback. Album art + track/artist on
+     the left, transport controls on the right. Hidden when no widget is
+     connected (most users won't see it). The bar listens to integration
+     heartbeat meta + rotation.song.playing relay events so it stays live. -->
+<div class="np-bar" id="npBar" style="display:none">
+  <img class="np-art" id="npArt" alt="" src=""/>
+  <div class="np-meta">
+    <div class="np-title" id="npTitle"></div>
+    <div class="np-artist" id="npArtist"></div>
+    <div class="np-progress"><div class="np-progress-fill" id="npProgressFill"></div></div>
+  </div>
+  <div class="np-controls">
+    <button class="np-btn" id="npPrev" onclick="_npControl('previous')" title="Previous track">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 6h2v12H6V6zm3.5 6 8.5-6v12l-8.5-6z"/></svg>
+    </button>
+    <button class="np-btn np-btn-pp" id="npPlayPause" onclick="_npTogglePlayPause()" title="Play / Pause">
+      <svg id="npPpIcon" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7L8 5z"/></svg>
+    </button>
+    <button class="np-btn" id="npSkip" onclick="_npControl('skip')" title="Skip track">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 6h2v12h-2V6zm-1.5 6L6 18V6l8.5 6z"/></svg>
+    </button>
+  </div>
 </div>
 <div class="streamstats" id="streamStats"></div>
 <div class="goals-bar" id="goalsBar"></div>
@@ -5911,6 +5954,30 @@ function _loadoutRenderWidgetHtml(w) {
       + '<span style="font-size:11px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(w.name || w.id) + '</span>'
       + '</label>';
   }
+  if (w.type === 'stat') {
+    // Passive readout — Bolts, points, viewer score, etc. Kit owns the
+    // value and pushes deltas via aquilo_loadout_state broadcasts; SF
+    // never mutates. Optional fields:
+    //   icon  — leading emoji / glyph
+    //   unit  — small suffix label ("Bolts", "$", "pts")
+    //   delta — signed number; rendered as a small green/red chip below
+    //           the value (positive green, negative red, omitted = none)
+    var sv = (w.value !== undefined) ? w.value : 0;
+    var deltaHtml = '';
+    if (typeof w.delta === 'number' && w.delta !== 0) {
+      var dColor = w.delta > 0 ? '#22c55e' : '#f87171';
+      var dSign  = w.delta > 0 ? '+' : '';
+      deltaHtml = '<div data-loadout-stat-delta="' + esc(w.id) + '" style="font-size:9px;font-weight:800;color:' + dColor + ';text-align:right;margin-top:2px">' + dSign + esc(String(w.delta)) + '</div>';
+    }
+    var statIcon = w.icon ? '<span style="font-size:14px;flex-shrink:0">' + esc(w.icon) + '</span>' : '';
+    return '<div' + idAttr + ' style="background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0">'
+      + '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);font-weight:700">' + statIcon + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(w.name || w.id) + '</span></div>'
+      + '<div style="display:flex;align-items:baseline;gap:4px"><div data-loadout-stat-val="' + esc(w.id) + '" style="font-size:20px;font-weight:900;color:var(--accent);line-height:1.1">' + esc(String(sv)) + '</div>'
+      + (w.unit ? '<div style="font-size:10px;color:var(--mut);font-weight:700">' + esc(w.unit) + '</div>' : '')
+      + '</div>'
+      + deltaHtml
+      + '</div>';
+  }
   // Unknown / future widget types — render a placeholder so the grid
   // doesn't collapse. Forward-compatibility hook (see LOADOUT-KIT.md).
   return '<div' + idAttr + ' style="background:var(--surf3);border:1px dashed var(--bdr);color:var(--mut);padding:10px 12px;font-size:10px;border-radius:6px;text-align:center">' + esc(w.name || w.id) + ' <span style="opacity:.7">(' + esc(w.type) + ')</span></div>';
@@ -5937,6 +6004,24 @@ function _loadoutRefreshWidget(widgetId) {
   } else if (w.type === 'toggle') {
     var t = document.querySelector('[data-loadout-toggle="' + widgetId + '"]');
     if (t) t.checked = !!w.value;
+  } else if (w.type === 'stat') {
+    // Update the value + optional delta chip in place. Kit pushes deltas
+    // via aquilo_loadout_state with { id, value, delta? }. Both fields are
+    // optional in any single delta — only the present ones get applied.
+    var sEl = document.querySelector('[data-loadout-stat-val="' + widgetId + '"]');
+    if (sEl) sEl.textContent = String(w.value);
+    if (typeof w.delta === 'number') {
+      var dEl = document.querySelector('[data-loadout-stat-delta="' + widgetId + '"]');
+      if (dEl) {
+        if (w.delta === 0) {
+          dEl.style.display = 'none';
+        } else {
+          dEl.style.display = '';
+          dEl.style.color = w.delta > 0 ? '#22c55e' : '#f87171';
+          dEl.textContent = (w.delta > 0 ? '+' : '') + String(w.delta);
+        }
+      }
+    }
   } else {
     // For other types, full re-render is cheap.
     var modalEl = document.getElementById('modal');
@@ -8244,7 +8329,11 @@ function _aquiloRefreshList() {
   fetch(_aquiloBase + '/api/integrations/list')
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(j) {
-      if (j && Array.isArray(j.products)) { _aquiloProducts = j.products; renderAquiloProducts(); }
+      if (j && Array.isArray(j.products)) {
+        _aquiloProducts = j.products;
+        renderAquiloProducts();
+        if (typeof _renderNowPlayingBar === 'function') _renderNowPlayingBar();
+      }
     })
     .catch(function() {});
 }
@@ -8260,7 +8349,14 @@ function startAquiloProductsWatch(baseUrl) {
   try {
     _aquiloEventSrc = new EventSource(baseUrl + '/api/integrations/events');
     _aquiloEventSrc.addEventListener('hello', function(e) {
-      try { var d = JSON.parse(e.data); if (Array.isArray(d.products)) { _aquiloProducts = d.products; renderAquiloProducts(); } } catch (err) {}
+      try {
+        var d = JSON.parse(e.data);
+        if (Array.isArray(d.products)) {
+          _aquiloProducts = d.products;
+          renderAquiloProducts();
+          if (typeof _renderNowPlayingBar === 'function') _renderNowPlayingBar();
+        }
+      } catch (err) {}
     });
     _aquiloEventSrc.addEventListener('registered', function() { _aquiloRefreshList(); });
     _aquiloEventSrc.addEventListener('unregistered', function() { _aquiloRefreshList(); });
@@ -8314,6 +8410,154 @@ function renderAquiloProducts() {
       + '<div style="font-size:10px;color:var(--mut);flex-shrink:0">' + esc(agoStr) + '</div>'
       + '</div>';
   }).join('');
+}
+
+// ── Now-playing bar (Aquilo Spotify Widget) ────────────────────────────────
+// Surfaces a compact now-playing card + Spotify transport controls when the
+// streamer's Rotation widget heartbeats meta to the local /api/integrations
+// surface. Two data sources flow into _npState:
+//   1. Integration heartbeat meta (preferred — carries progressMs + isPlaying
+//      + clientId for control). Refreshed by _aquiloRefreshList polling.
+//   2. rotation.song.playing relay events (instant flip on track change so
+//      the bar stays responsive between heartbeats).
+// Controls disable when no clientId is registered (e.g. the streamer's
+// widget is hosted on https://widget.aquilo.gg in a hardened browser that
+// can't reach 127.0.0.1 due to mixed-content; bar still surfaces from the
+// relay-only data, just without working buttons).
+var _npState = {
+  clientId: null, product: null,
+  track: '', artist: '', albumArt: '',
+  isPlaying: false,
+  durationMs: 0, progressMs: 0, updatedAt: 0,
+  hasControl: false,
+  rotationOnly: false   // true when bar is up purely from a relay event
+};
+var _npProgressTimer = null;
+
+function _renderNowPlayingBar() {
+  var bar = document.getElementById('npBar');
+  if (!bar) return;
+  var sp = (_aquiloProducts || []).find(function(p) { return p && p.product === 'aquilo-spotify-widget'; });
+  if (sp) {
+    _npState.clientId   = sp.clientId;
+    _npState.product    = sp.product;
+    _npState.hasControl = (sp.capabilities || []).indexOf('playback-control') !== -1;
+    _npState.rotationOnly = false;
+    if (sp.meta) {
+      if (sp.meta.track !== undefined)      _npState.track      = sp.meta.track || _npState.track;
+      if (sp.meta.artist !== undefined)     _npState.artist     = sp.meta.artist || _npState.artist;
+      if (sp.meta.albumArt !== undefined)   _npState.albumArt   = sp.meta.albumArt || _npState.albumArt;
+      if (sp.meta.isPlaying !== undefined)  _npState.isPlaying  = !!sp.meta.isPlaying;
+      if (sp.meta.durationMs !== undefined) _npState.durationMs = Number(sp.meta.durationMs || 0);
+      if (sp.meta.progressMs !== undefined) _npState.progressMs = Number(sp.meta.progressMs || 0);
+      if (sp.meta.updatedAt !== undefined)  _npState.updatedAt  = Number(sp.meta.updatedAt || Date.now());
+    }
+  } else {
+    _npState.clientId = null;
+    _npState.hasControl = false;
+    // Keep any rotation-event-derived state; let _npApplyRotationEvent
+    // drive visibility in that case.
+  }
+  // Hide unless we have something to show.
+  if (!_npState.track) {
+    bar.style.display = 'none';
+    if (_npProgressTimer) { clearInterval(_npProgressTimer); _npProgressTimer = null; }
+    return;
+  }
+  bar.style.display = 'flex';
+  var artEl    = document.getElementById('npArt');
+  var titleEl  = document.getElementById('npTitle');
+  var artistEl = document.getElementById('npArtist');
+  var ppIcon   = document.getElementById('npPpIcon');
+  if (artEl) {
+    if (_npState.albumArt) artEl.setAttribute('src', _npState.albumArt);
+    else artEl.removeAttribute('src');
+  }
+  if (titleEl)  titleEl.textContent = _npState.track || '';
+  if (artistEl) artistEl.textContent = _npState.artist || '';
+  if (ppIcon) {
+    ppIcon.innerHTML = _npState.isPlaying
+      ? '<path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/>'
+      : '<path fill="currentColor" d="M8 5v14l11-7L8 5z"/>';
+  }
+  var controlsEnabled = !!_npState.clientId && _npState.hasControl;
+  ['npPrev','npPlayPause','npSkip'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) {
+      b.disabled = !controlsEnabled;
+      b.title = controlsEnabled ? b.title.replace(/ \(widget offline\)$/, '')
+                                : (b.title.replace(/ \(widget offline\)$/, '') + ' (widget offline)');
+    }
+  });
+  _npStartProgressTicker();
+}
+
+function _npStartProgressTicker() {
+  if (_npProgressTimer) { clearInterval(_npProgressTimer); _npProgressTimer = null; }
+  _npUpdateProgress();
+  if (_npState.isPlaying && _npState.durationMs > 0) {
+    _npProgressTimer = setInterval(_npUpdateProgress, 800);
+  }
+}
+
+function _npUpdateProgress() {
+  var fill = document.getElementById('npProgressFill');
+  if (!fill || !_npState.durationMs) { if (fill) fill.style.width = '0%'; return; }
+  var elapsed = _npState.progressMs;
+  if (_npState.isPlaying && _npState.updatedAt) elapsed += Date.now() - _npState.updatedAt;
+  var pct = Math.max(0, Math.min(100, (elapsed / _npState.durationMs) * 100));
+  fill.style.width = pct.toFixed(2) + '%';
+}
+
+// Apply meta from a rotation.song.playing relay event so the bar flips
+// instantly on track change. Source: cloud relay (rotation-relay-client.js
+// → onRotationEvent). Fields expected: title, artist, art, durationMs,
+// progressMs, isPlaying, requestedBy.
+function _npApplyRotationEvent(d) {
+  if (!d) return;
+  if (d.title !== undefined)      _npState.track      = d.title || '';
+  if (d.artist !== undefined)     _npState.artist     = d.artist || '';
+  if (d.art !== undefined)        _npState.albumArt   = d.art || '';
+  if (d.isPlaying !== undefined)  _npState.isPlaying  = !!d.isPlaying;
+  if (d.durationMs !== undefined) _npState.durationMs = Number(d.durationMs || 0);
+  if (d.progressMs !== undefined) _npState.progressMs = Number(d.progressMs || 0);
+  _npState.updatedAt = Date.now();
+  // If no local widget is registered, mark the bar as relay-only so we
+  // know to keep controls disabled.
+  if (!_npState.clientId) _npState.rotationOnly = true;
+  _renderNowPlayingBar();
+}
+
+function _npTogglePlayPause() {
+  return _npControl(_npState.isPlaying ? 'pause' : 'play');
+}
+
+function _npControl(cmd) {
+  if (!window.electronAPI || !window.electronAPI.obsControlIntegration) return;
+  if (!_npState.clientId) return;
+  var btnId = cmd === 'previous' ? 'npPrev' : cmd === 'skip' ? 'npSkip' : 'npPlayPause';
+  var btn = document.getElementById(btnId);
+  Promise.resolve(window.electronAPI.obsControlIntegration(_npState.clientId, cmd)).then(function(res) {
+    if (btn) {
+      btn.classList.remove('np-flash-ok','np-flash-err');
+      void btn.offsetWidth;       // force reflow so the animation can replay
+      btn.classList.add(res && res.ok ? 'np-flash-ok' : 'np-flash-err');
+    }
+    if (res && !res.ok && typeof addEvHistory === 'function') {
+      addEvHistory('StreamFusion', 'Spotify control "' + cmd + '" failed: ' + (res.reason || 'widget offline'), 'se', false);
+    }
+    // Optimistic toggle for play/pause so the icon flips before the next
+    // heartbeat reports the new state.
+    if (cmd === 'play')  _npState.isPlaying = true;
+    if (cmd === 'pause') _npState.isPlaying = false;
+    _renderNowPlayingBar();
+  }).catch(function() {
+    if (btn) {
+      btn.classList.remove('np-flash-ok','np-flash-err');
+      void btn.offsetWidth;
+      btn.classList.add('np-flash-err');
+    }
+  });
 }
 
 function updateObsConfig(which) {
@@ -11380,6 +11624,9 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
       isPinned = true;
       oneLine  = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '') + (d.requestedBy ? '  · req @' + d.requestedBy : '');
       _lastNowPlayingTs = ev.ts || Date.now();
+      // Live-update the now-playing bar so it flips immediately on track
+      // change without waiting for the next integration heartbeat.
+      try { if (typeof _npApplyRotationEvent === 'function') _npApplyRotationEvent(d); } catch (e) {}
     } else if (ev.kind === 'rotation.song.queued') {
       name     = '@' + (d.displayName || d.user || 'viewer');
       text     = 'queued ' + (d.title || d.query || '?')
@@ -11413,6 +11660,24 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
     try {
       if (typeof addEvHistory === 'function') {
         addEvHistory(name, text, color, isPinned, null, '', avatar);
+      }
+    } catch (e) {}
+
+    // 3) Pop-out overlay chat feed — mirrors song activity inline with the
+    // streamer's chat in their second-monitor pop-out. The overlay's
+    // existing chat row CSS handles unknown platforms gracefully; we tag
+    // the row with the Spotify green color so it visually reads as music
+    // activity rather than a Twitch chat msg.
+    try {
+      if (typeof sendOverlayChat === 'function' && oneLine) {
+        sendOverlayChat({
+          plat:   'tw',
+          user:   name,
+          text:   text,
+          color:  '#1db954',
+          avatar: avatar || null,
+          msgId:  'rotation-' + (ev.ts || Date.now()),
+        });
       }
     } catch (e) {}
   });

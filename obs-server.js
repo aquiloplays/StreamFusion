@@ -49,6 +49,11 @@ const INTEGRATIONS_STALE_MS = 60000;
 let integrations = new Map();      // clientId -> {clientId, product, version, capabilities, port, urls, lastSeen, meta}
 let integrationsSseClients = new Set();
 let integrationsCounter = 0;
+// Per-client control streams. Companion products (e.g. Aquilo Spotify Widget)
+// hold one SSE connection here so SF can push directives back at them — skip,
+// play/pause, previous, etc. Map of clientId -> { res } so pushControl can
+// write to a specific product without blasting all of them.
+let controlStreams = new Map();
 
 function _newClientId() {
   integrationsCounter += 1;
@@ -62,11 +67,24 @@ function _broadcastIntegrationsEvent(eventName, payload) {
   });
 }
 
+function _closeControlStream(clientId, reason) {
+  const c = controlStreams.get(clientId);
+  if (!c) return;
+  try { c.res.write('event: shutdown\ndata: ' + JSON.stringify({ reason: reason || 'closed' }) + '\n\n'); } catch (e) {}
+  try { c.res.end(); } catch (e) {}
+  controlStreams.delete(clientId);
+}
+
 function _pruneStaleIntegrations() {
   const cutoff = Date.now() - INTEGRATIONS_STALE_MS;
   let pruned = false;
   integrations.forEach(function(v, k) {
-    if (v.lastSeen < cutoff) { integrations.delete(k); pruned = true; _broadcastIntegrationsEvent('unregistered', { clientId: k, reason: 'stale' }); }
+    if (v.lastSeen < cutoff) {
+      integrations.delete(k);
+      _closeControlStream(k, 'stale');
+      pruned = true;
+      _broadcastIntegrationsEvent('unregistered', { clientId: k, reason: 'stale' });
+    }
   });
   return pruned;
 }
@@ -74,6 +92,25 @@ function _pruneStaleIntegrations() {
 function listIntegrations() {
   _pruneStaleIntegrations();
   return Array.from(integrations.values());
+}
+
+// Push a control directive to a specific client's SSE control stream. The
+// client must have opened /api/integrations/control-stream?clientId=X.
+// Returns true if the directive was queued, false if the client has no
+// open stream (caller can decide whether to surface a "widget offline"
+// hint to the user). `command` is a free-form string like 'play' / 'pause'
+// / 'skip' / 'previous'; `args` is an optional object the widget interprets.
+function pushControl(clientId, command, args) {
+  const c = controlStreams.get(clientId);
+  if (!c) return false;
+  const payload = { command: String(command || ''), args: (args && typeof args === 'object') ? args : {} };
+  try {
+    c.res.write('event: control\ndata: ' + JSON.stringify(payload) + '\n\n');
+    return true;
+  } catch (e) {
+    controlStreams.delete(clientId);
+    return false;
+  }
 }
 
 // Read an overlay file from disk each request. File reads are cheap and
@@ -215,6 +252,67 @@ function handleRequest(req, res) {
     return;
   }
 
+  if (p === '/api/integrations/control-stream' && req.method === 'GET') {
+    // Per-client SSE channel for SF -> companion product directives (skip,
+    // play/pause, etc.). The widget opens this on register; SF writes via
+    // pushControl(clientId, command, args). One stream per clientId — a new
+    // connection from the same client displaces the old one (handles widget
+    // page reload without piling up zombie streams).
+    var csClientId = u.searchParams.get('clientId') || '';
+    if (!csClientId || !integrations.has(csClientId)) {
+      res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'unknown clientId — register first' }));
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+    // Displace any existing stream for this clientId.
+    var existing = controlStreams.get(csClientId);
+    if (existing) {
+      try { existing.res.write('event: shutdown\ndata: {"reason":"displaced"}\n\n'); } catch (e) {}
+      try { existing.res.end(); } catch (e) {}
+    }
+    res.write('event: hello\ndata: ' + JSON.stringify({ clientId: csClientId }) + '\n\n');
+    var cs = { res: res, clientId: csClientId };
+    controlStreams.set(csClientId, cs);
+    req.on('close', function() {
+      // Only delete if it's still us — a displacing connection would have
+      // already replaced this entry.
+      var current = controlStreams.get(csClientId);
+      if (current === cs) controlStreams.delete(csClientId);
+    });
+    return;
+  }
+
+  if (p === '/api/integrations/control' && req.method === 'POST') {
+    // Cross-origin POST control endpoint. Mostly used by SF's own renderer
+    // (via the obs-integration-control IPC) but exposed over HTTP too so
+    // companion tooling on the same machine can drive a widget without
+    // shipping its own SB integration.
+    var ctlChunks = [];
+    req.on('data', function(d) {
+      ctlChunks.push(d);
+      if (ctlChunks.reduce(function(n, b) { return n + b.length; }, 0) > 4096) { req.destroy(); }
+    });
+    req.on('end', function() {
+      var body = {};
+      try { body = JSON.parse(Buffer.concat(ctlChunks).toString('utf-8') || '{}'); } catch (e) {}
+      if (!body.clientId || !body.command) {
+        res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ error: 'clientId + command required' }));
+        return;
+      }
+      var sent = pushControl(String(body.clientId), String(body.command).slice(0, 32), body.args);
+      res.writeHead(sent ? 200 : 503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok: sent, reason: sent ? null : 'no open control stream for that clientId' }));
+    });
+    return;
+  }
+
   if ((p === '/api/integrations/register' || p === '/api/integrations/heartbeat' || p === '/api/integrations/unregister') && req.method === 'POST') {
     var chunks = [];
     req.on('data', function(d) {
@@ -267,6 +365,7 @@ function handleRequest(req, res) {
       if (p === '/api/integrations/unregister') {
         if (body.clientId && integrations.has(body.clientId)) {
           integrations.delete(body.clientId);
+          _closeControlStream(body.clientId, 'unregistered');
           _broadcastIntegrationsEvent('unregistered', { clientId: body.clientId });
         }
         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -351,6 +450,9 @@ function startServer(port) {
         integrationsSseClients.forEach(function(c) {
           try { c.res.write(': hb\n\n'); } catch (e) { integrationsSseClients.delete(c); }
         });
+        controlStreams.forEach(function(c, k) {
+          try { c.res.write(': hb\n\n'); } catch (e) { controlStreams.delete(k); }
+        });
         _pruneStaleIntegrations();
       }, HEARTBEAT_MS);
       return true;
@@ -379,6 +481,11 @@ function stopServer() {
     try { c.res.end(); } catch (e) {}
   });
   sseClients.clear();
+  controlStreams.forEach(function(c) {
+    try { c.res.write('event: shutdown\ndata: {"reason":"server_stop"}\n\n'); } catch (e) {}
+    try { c.res.end(); } catch (e) {}
+  });
+  controlStreams.clear();
   if (server) {
     try { server.close(); } catch (e) {}
     server = null;
@@ -460,5 +567,6 @@ module.exports = {
   isRunning:        isRunning,
   connectedClients: connectedClients,
   // Aquilo product registry
-  listIntegrations: listIntegrations
+  listIntegrations: listIntegrations,
+  pushControl:      pushControl
 };
