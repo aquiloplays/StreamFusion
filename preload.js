@@ -212,4 +212,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // access token from its own store; the renderer never sees it.
   sharedBotConnect:     (cfg)         => ipcRenderer.invoke('shared-bot-connect',    cfg || {}),
   sharedBotDisconnect:  ()            => ipcRenderer.invoke('shared-bot-disconnect'),
+
+  // ── Rotation Relay (free for all users) ─────────────────────────────────
+  // Subscribes to the streamer's Rotation widget over the cloud relay so
+  // song events show up in the events tab + chat overlay. Streamer pastes
+  // their room key (visible in Rotation's config.html under "Connect to
+  // StreamFusion") here; the main process owns the WebSocket.
+  //
+  // Events arrive via onRotationEvent({ kind, data, ts }):
+  //   - rotation.song.playing   — now playing changed
+  //   - rotation.song.queued    — viewer's !sr just landed in queue
+  //   - rotation.song.requested — chat command received
+  //   - rotation.song.rejected  — request denied (cooldown / banned / etc.)
+  //   - rotation.song.skipped   — track skipped
+  rotationRelayGetStatus: ()          => ipcRenderer.invoke('rotation-relay-get-status'),
+  rotationRelaySetConfig: (patch)     => ipcRenderer.invoke('rotation-relay-set-config', patch || {}),
+  rotationRelayStop:      ()          => ipcRenderer.invoke('rotation-relay-stop'),
+  onRotationEvent:        (fn)        => ipcRenderer.on('rotation-event',           (e, payload) => fn(payload)),
+  onRotationRelayStatus:  (fn)        => ipcRenderer.on('rotation-relay-status',    (e, status)  => fn(status)),
+  onRotationRelayBroadcast: (fn)      => ipcRenderer.on('rotation-relay-broadcast', (e, row)     => fn(row)),
 });

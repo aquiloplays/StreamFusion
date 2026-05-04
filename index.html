@@ -1711,6 +1711,26 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec-hd">Connection Status</div>
             <div class="ccard tw" id="ccard-sb"><div class="sdot off" id="dot-sb"></div><div class="lbl">Streamer.bot<small id="lbl-sb">Twitch, YouTube &amp; Kick</small></div><button class="cbtn tw" id="btn-sb" onclick="openModal('sb')">Connect</button></div>
             <div class="ccard tt" id="ccard-tf"><div class="sdot off" id="dot-tf"></div><div class="lbl">Tikfinity<small id="lbl-tf">TikTok LIVE</small></div><button class="cbtn tt" id="btn-tf" onclick="openModal('tf')">Connect</button></div>
+            <div class="ccard" id="ccard-rotation" style="--accent:#1db954;"><div class="sdot off" id="dot-rotation"></div><div class="lbl">Rotation Widget<small id="lbl-rotation">Song events from widget.aquilo.gg</small></div><button class="cbtn" id="btn-rotation" onclick="openRotationRelayConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
+          </div>
+          <div class="sec" id="sec-rotation-relay" style="display:none">
+            <div class="sec-hd" style="color:#1db954">Rotation Widget</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Pipes <strong>now-playing</strong> + <strong>song requests</strong> from your Rotation widget at widget.aquilo.gg into the chat panel and OBS chat overlay. Free for everyone using both products.</div>
+            <label class="frow" style="margin-bottom:6px"><span>Enable Rotation events</span><input type="checkbox" id="rotation-relay-enabled" onchange="onRotationRelayToggle(this.checked)"></label>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">Room key — get this from Rotation's <em>config.html</em> → "Connect to StreamFusion" button. Knowing the key = full access for that room, so keep it private.</div>
+            <div style="display:flex;gap:5px;align-items:center">
+              <input class="minput" id="rotation-relay-room-key" placeholder="paste room key here..." style="font-size:11px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
+              <button class="cbtn" onclick="onRotationRelayApplyKey()" style="background:#1db954;color:#0a1a10;font-size:11px;height:28px;padding:0 12px">Save</button>
+            </div>
+            <div id="rotation-relay-status-line" style="font-size:10.5px;color:var(--mut);margin-top:6px;min-height:14px"></div>
+            <details style="margin-top:8px">
+              <summary style="cursor:pointer;font-size:11px;color:var(--mut)">Advanced — relay base URL</summary>
+              <div style="display:flex;gap:5px;align-items:center;margin-top:6px">
+                <input class="minput" id="rotation-relay-base" placeholder="wss://aquilo-rotation-relay.bisherclay.workers.dev" style="font-size:10.5px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
+                <button class="cbtn" onclick="onRotationRelayApplyBase()" style="background:var(--surf2);color:var(--txt);font-size:10.5px;height:24px;padding:0 10px">Save</button>
+              </div>
+              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:5px">Override only if you've deployed your own relay. Default points at the Aquilo-hosted instance.</div>
+            </details>
           </div>
           <div class="sec">
             <div class="sec-hd">Show Platforms</div>
@@ -11234,6 +11254,160 @@ function renderDiscordBotStatus() {
     if (s && s.connected) st.innerHTML = '<span style="color:var(--ok,#22c55e)">&#9679; Connected</span> \u2014 watching for events.';
     else if (dcBot.enabled) st.innerHTML = '<span style="color:#f0b429">&#9679; Connecting\u2026</span>';
     else st.innerHTML = 'Not connected.';
+  });
+}
+
+// ── Rotation Relay (free, universal) ──────────────────────────────────────
+// Subscribes to song events from the streamer's Rotation widget and surfaces
+// them in the chat panel + OBS chat overlay. The room key is the same UUID
+// shown by Rotation's config.html → "Connect to StreamFusion" button.
+function openRotationRelayConfig() {
+  // Open the Connections settings tab and reveal the Rotation Widget section.
+  try { switchSettingsTab('connections'); } catch (e) {}
+  var sec = document.getElementById('sec-rotation-relay');
+  if (sec) { sec.style.display = ''; sec.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  var input = document.getElementById('rotation-relay-room-key');
+  if (input) setTimeout(function(){ try { input.focus(); } catch (e) {} }, 200);
+}
+
+function _setRotationRelayDot(state, label) {
+  var dot = document.getElementById('dot-rotation');
+  var lbl = document.getElementById('lbl-rotation');
+  if (dot) dot.className = 'sdot ' + (state || 'off');
+  if (lbl && label) lbl.textContent = label;
+}
+
+function _renderRotationRelayStatus(s) {
+  if (!s) return;
+  var line = document.getElementById('rotation-relay-status-line');
+  var cb   = document.getElementById('rotation-relay-enabled');
+  var keyI = document.getElementById('rotation-relay-room-key');
+  var baseI = document.getElementById('rotation-relay-base');
+  var sec  = document.getElementById('sec-rotation-relay');
+  if (cb)   cb.checked = !!s.enabled;
+  if (keyI && document.activeElement !== keyI) keyI.value = s.roomKey || '';
+  if (baseI && document.activeElement !== baseI) baseI.value = s.relayBase || '';
+  // Reveal the section once the user has any config — keeps the panel quiet
+  // for streamers who don't use Rotation.
+  if (sec && (s.enabled || s.roomKey)) sec.style.display = '';
+  if (!line) return;
+  if (!s.enabled) {
+    _setRotationRelayDot('off', 'Disabled');
+    line.textContent = 'Disabled. Toggle on, paste your room key, and play a song to test.';
+    return;
+  }
+  if (!s.roomKey) {
+    _setRotationRelayDot('off', 'No room key');
+    line.textContent = 'No room key — open Rotation\'s config.html and click "Connect to StreamFusion".';
+    return;
+  }
+  if (s.connected) {
+    _setRotationRelayDot('on', 'Connected');
+    var pieces = ['Connected'];
+    if (typeof s.subs === 'number') pieces.push(s.subs + ' subscriber' + (s.subs === 1 ? '' : 's') + ' in this room');
+    if (s.lastEventAt) pieces.push('last event ' + _ago(s.lastEventAt));
+    line.textContent = pieces.join(' · ');
+  } else {
+    _setRotationRelayDot('wait', 'Reconnecting');
+    line.textContent = 'Connecting' + (s.reason ? ' (' + s.reason + ')' : '') + '…';
+  }
+}
+
+function _ago(ts) {
+  var d = Date.now() - ts;
+  if (d < 60_000)        return Math.round(d / 1000) + 's ago';
+  if (d < 3_600_000)     return Math.round(d / 60_000) + 'm ago';
+  return Math.round(d / 3_600_000) + 'h ago';
+}
+
+function onRotationRelayToggle(enabled) {
+  if (!window.electronAPI || !window.electronAPI.rotationRelaySetConfig) return;
+  window.electronAPI.rotationRelaySetConfig({ enabled: !!enabled }).then(_renderRotationRelayStatus);
+}
+function onRotationRelayApplyKey() {
+  var keyI = document.getElementById('rotation-relay-room-key');
+  if (!keyI || !window.electronAPI || !window.electronAPI.rotationRelaySetConfig) return;
+  var key = (keyI.value || '').trim();
+  // Validate: 8-64 chars from sync key alphabet (UUIDs fit).
+  if (key && !/^[A-Za-z0-9_-]{8,64}$/.test(key)) {
+    var line = document.getElementById('rotation-relay-status-line');
+    if (line) line.textContent = 'That doesn\'t look like a Rotation room key (expected 8-64 chars from A-Z, a-z, 0-9, _, -).';
+    return;
+  }
+  window.electronAPI.rotationRelaySetConfig({ roomKey: key, enabled: true }).then(_renderRotationRelayStatus);
+}
+function onRotationRelayApplyBase() {
+  var baseI = document.getElementById('rotation-relay-base');
+  if (!baseI || !window.electronAPI || !window.electronAPI.rotationRelaySetConfig) return;
+  window.electronAPI.rotationRelaySetConfig({ relayBase: baseI.value || '' }).then(_renderRotationRelayStatus);
+}
+
+// Bootstrap: pull current config into the UI on load.
+if (window.electronAPI && window.electronAPI.rotationRelayGetStatus) {
+  window.electronAPI.rotationRelayGetStatus().then(_renderRotationRelayStatus).catch(function(){});
+}
+
+// Live status updates (connected / reconnecting / event arrived).
+if (window.electronAPI && window.electronAPI.onRotationRelayStatus) {
+  window.electronAPI.onRotationRelayStatus(_renderRotationRelayStatus);
+}
+
+// Inbound song events → chat panel as system rows + Events history. We use the
+// existing sysMsg() helper for the chat panel and addEvHistory() for the
+// dedicated events panel — same surfaces every other source flows through.
+if (window.electronAPI && window.electronAPI.onRotationEvent) {
+  window.electronAPI.onRotationEvent(function(ev) {
+    if (!ev || !ev.kind) return;
+    var d = ev.data || {};
+    var line = '';
+    if (ev.kind === 'rotation.song.playing') {
+      line = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '');
+      if (d.requestedBy) line += '  · req @' + d.requestedBy;
+    } else if (ev.kind === 'rotation.song.queued') {
+      line = '♪ @' + (d.displayName || d.user || 'viewer') + ' queued: '
+           + (d.title || d.query || '?') + (d.artist ? ' — ' + d.artist : '')
+           + (d.position ? ' (#' + d.position + ')' : '');
+    } else if (ev.kind === 'rotation.song.requested') {
+      line = '♪ @' + (d.displayName || d.user || 'viewer') + ' requested: ' + (d.query || '?');
+    } else if (ev.kind === 'rotation.song.rejected') {
+      line = '♪ @' + (d.displayName || d.user || 'viewer') + ' request denied (' + (d.reason || 'rejected') + ')';
+    } else if (ev.kind === 'rotation.song.skipped') {
+      line = '♪ Skipped' + (d.title ? ': ' + d.title : '');
+    } else {
+      return; // unknown kind — ignore
+    }
+
+    // 1) Chat panel system row — uses the existing sysMsg helper. 'tw' is the
+    // safest channel because every chat tab listens to it (matches what the
+    // SB connection status messages do).
+    try { if (typeof sysMsg === 'function') sysMsg('tw', line); } catch (e) {}
+
+    // 2) Events history panel — uses Rotation's green so it reads visually
+    // distinct from chat events. addEvHistory(name, text, color, isPinned).
+    try {
+      if (typeof addEvHistory === 'function') {
+        addEvHistory('Rotation', line.replace(/^♪ /, ''), 'se', false);
+      }
+    } catch (e) {}
+  });
+}
+
+// Inbound system rows from the relay client (kind='system', source='rotation')
+// → existing OBS chat overlay broadcast pipe. The overlay already knows how to
+// render system rows (used by SB connection messages), so this just plugs in.
+if (window.electronAPI && window.electronAPI.onRotationRelayBroadcast) {
+  window.electronAPI.onRotationRelayBroadcast(function(row) {
+    if (!row || !window.electronAPI || !window.electronAPI.obsBroadcastChat) return;
+    try {
+      window.electronAPI.obsBroadcastChat({
+        platform: 'rotation',
+        username: 'Rotation',
+        userColor: '#1db954',
+        message:  row.text,
+        ts:       row.ts || Date.now(),
+        system:   true,
+      });
+    } catch (e) {}
   });
 }
 

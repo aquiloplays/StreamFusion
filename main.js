@@ -32,6 +32,7 @@ const obsServer = require('./obs-server');
 // observing Discord-side events (member/voice joins, messages in a channel).
 // Gated behind the EA entitlement check in main.js's setup path.
 const discordBot = require('./discord-bot');
+const rotationRelay = require('./rotation-relay-client');
 
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
@@ -684,6 +685,14 @@ app.whenReady().then(() => {
   });
   discordBot.setMainWindow(mainWindow);
 
+  // Rotation Relay — subscribes to song events from the streamer's Rotation
+  // widget and forwards them to the events tab + chat overlay. No-op until
+  // the streamer pastes a roomKey in Settings → Rotation Widget. Universal
+  // (free for everyone using both products) — not gated on entitlement.
+  rotationRelay.setMainWindow(mainWindow);
+  try { rotationRelay.start(); }
+  catch (e) { logToFile('ROTATION-RELAY', 'start threw: ' + (e && e.message)); }
+
   setTimeout(function() {
     patreonAuth.getEntitlement().then(function(state) {
       if (state && state.signedIn) patreonAuth.startRuntimeChecks();
@@ -859,6 +868,7 @@ app.on('before-quit', () => {
   try { discordAuth.stopRuntimeChecks(); } catch (e) {}
   try { obsServer.stopServer(); } catch (e) {}
   try { discordBot.disconnectBot(); } catch (e) {}
+  try { rotationRelay.stop(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
@@ -888,6 +898,26 @@ ipcMain.on('obs-broadcast-alert', function(event, data) {
 });
 ipcMain.on('obs-broadcast-shoutout', function(event, data) {
   try { obsServer.broadcast('shoutout', data, 'shoutout'); } catch (e) {}
+});
+
+// ── Rotation Relay IPC ──────────────────────────────────────────────────────
+// The renderer drives lifecycle (set room key, toggle on/off) and listens for
+// events on the 'rotation-event' channel so the events tab can render them.
+// Status changes flow back via 'rotation-relay-status'. The
+// 'rotation-relay-broadcast' channel is the relay client's nudge to the
+// renderer to rebroadcast as a chat-overlay system row — handled there
+// because the renderer holds canonical chat-overlay broadcast logic.
+ipcMain.handle('rotation-relay-get-status', function() {
+  try { return rotationRelay.getStatus(); }
+  catch (e) { return { enabled: false, connected: false, reason: 'error' }; }
+});
+ipcMain.handle('rotation-relay-set-config', function(event, patch) {
+  try { return rotationRelay.setConfig(patch || {}); }
+  catch (e) { return { enabled: false, connected: false, reason: 'error' }; }
+});
+ipcMain.handle('rotation-relay-stop', function() {
+  try { rotationRelay.stop(); return rotationRelay.getStatus(); }
+  catch (e) { return { enabled: false, connected: false, reason: 'error' }; }
 });
 // Per-overlay config (what to show, transparency, durations, etc.) — the
 // settings panel in the renderer drives this. The server remembers the
