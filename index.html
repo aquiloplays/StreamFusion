@@ -1760,6 +1760,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec-hd" style="color:#1db954">Rotation Widget</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Pipes <strong>now-playing</strong> + <strong>song requests</strong> from your Rotation widget at widget.aquilo.gg into the chat panel and OBS chat overlay. Free for everyone using both products.</div>
             <label class="frow" style="margin-bottom:6px"><span>Enable Rotation events</span><input type="checkbox" id="rotation-relay-enabled" onchange="onRotationRelayToggle(this.checked)"></label>
+            <label class="frow" style="margin-bottom:6px" title="Show a compact now-playing card (album art, track, artist, progress, play/pause/skip/prev) under the Live bar whenever Rotation reports a song. Turn off to keep the main view clean — song activity still lands in the chat panel and events history."><span>Show now-playing bar</span><input type="checkbox" id="settings-show-now-playing" onchange="onShowNowPlayingToggle(this.checked)"></label>
             <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">Room key — get this from Rotation's <em>config.html</em> → "Connect to StreamFusion" button. Knowing the key = full access for that room, so keep it private.</div>
             <div style="display:flex;gap:5px;align-items:center">
               <input class="minput" id="rotation-relay-room-key" placeholder="paste room key here..." style="font-size:11px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
@@ -3316,6 +3317,10 @@ var ttsEventTypes = {
 };
 var showAvatars = true;
 var hideMainAnimations = false;
+// Show the now-playing bar (album art + track + Spotify controls) under
+// the live-bar when the Rotation widget is connected. Toggle lives in
+// Settings → Integrations → Rotation Widget; default on.
+var showNowPlaying = true;
 var _avatarCache = {};
 var _sessionChatters = new Set();
 var _chatterMap = new Map(); // lowerUser → { display, plat, lastSeen }
@@ -3385,6 +3390,7 @@ function loadSettings() {
     if (d.ttsInstant !== undefined) ttsInstant = !!d.ttsInstant;
     if (d.ttsGiftCoinMin !== undefined) ttsGiftCoinMin = Math.max(0, parseInt(d.ttsGiftCoinMin) || 0);
     if (d.hideMainAnimations !== undefined) hideMainAnimations = !!d.hideMainAnimations;
+    if (d.showNowPlaying !== undefined) showNowPlaying = !!d.showNowPlaying;
     // Raid Finder persisted preferences
     if (d.rfRangeMode) S.raidFinder.rangeMode = d.rfRangeMode;
     if (d.rfRangeLowPct !== undefined) S.raidFinder.rangeLowPct = d.rfRangeLowPct;
@@ -3437,6 +3443,7 @@ function saveSettings() {
     discordWebhook: discordWebhook, discordEnabled: discordEnabled,
     ttsInstant: ttsInstant, ttsGiftCoinMin: ttsGiftCoinMin,
     hideMainAnimations: hideMainAnimations,
+    showNowPlaying: showNowPlaying,
     rfRangeMode: S.raidFinder.rangeMode, rfRangeLowPct: S.raidFinder.rangeLowPct,
     rfRangeHighPct: S.raidFinder.rangeHighPct, rfRangeLowAbs: S.raidFinder.rangeLowAbs,
     rfRangeHighAbs: S.raidFinder.rangeHighAbs, rfWantCount: S.raidFinder.wantCount,
@@ -3473,6 +3480,8 @@ loadSettings();
   if (ttsRateValEl) ttsRateValEl.textContent = Math.round(ttsRate * 100) + '%';
   var avChk = document.getElementById('showAvatarsChk');
   if (avChk) avChk.checked = showAvatars;
+  var npChk = document.getElementById('settings-show-now-playing');
+  if (npChk) npChk.checked = !!showNowPlaying;
   // Restore granular per-event TTS toggles
   Object.keys(ttsEventTypes).forEach(function(p) {
     Object.keys(ttsEventTypes[p]).forEach(function(k) {
@@ -8448,6 +8457,16 @@ var _npProgressTimer = null;
 function _renderNowPlayingBar() {
   var bar = document.getElementById('npBar');
   if (!bar) return;
+  // User toggle: when off, hide unconditionally and stop the progress
+  // ticker so we don't keep advancing a hidden DOM element. State still
+  // accumulates in _npState in the background so flipping the toggle
+  // back on instantly shows the current song without waiting for the
+  // next heartbeat / relay event.
+  if (typeof showNowPlaying !== 'undefined' && !showNowPlaying) {
+    bar.style.display = 'none';
+    if (_npProgressTimer) { clearInterval(_npProgressTimer); _npProgressTimer = null; }
+    return;
+  }
   var sp = (_aquiloProducts || []).find(function(p) { return p && p.product === 'aquilo-spotify-widget'; });
   if (sp) {
     _npState.clientId   = sp.clientId;
@@ -8569,6 +8588,15 @@ function _npControl(cmd) {
       btn.classList.add('np-flash-err');
     }
   });
+}
+
+// User toggle for the now-playing bar. Flipping this to off hides the
+// bar and clears the progress ticker; flipping back on re-renders from
+// whatever's already in _npState (no need to wait for the next event).
+function onShowNowPlayingToggle(checked) {
+  showNowPlaying = !!checked;
+  if (typeof saveSettings === 'function') saveSettings();
+  _renderNowPlayingBar();
 }
 
 function updateObsConfig(which) {
