@@ -15,9 +15,10 @@
          bar. Each event is a compact card (SUB / FOLLOW / CHEER / etc.)
          with platform-tinted left accent. Stacks multiple events so a
          sub-bomb doesn't lose earlier entries.
-       - TikTok gift layer: floating animation in the TOP 50vh, confined
-         so gifts never cover chat or events. Matches the horizontal
-         overlay's spec so the visual language is consistent.
+       - TikTok gift layer: floating animation anchored just above the
+         chat bar (bottom: 110px, height: 40vh). Streamers said the
+         pre-1.5.5-beta.4 top-50vh band felt disconnected from chat —
+         gifts now drift past the most recent message instead.
      ─────────────────────────────────────────────────────────────────── */
 
   :root {
@@ -148,12 +149,30 @@
     white-space: nowrap;
     color: currentColor;
     /* Without the bar background, the username needs its own contrast
-       so the platform-tinted color reads on bright scenes. Stack a
-       neutral-dark shadow + a coloured glow that picks up the user's
-       platform tint via currentColor. */
-    text-shadow: 0 2px 6px rgba(0,0,0,.7), 0 0 10px currentColor;
+       so it reads on bright scenes. Four 1px hard offsets create a
+       sharp dark outline that survives any background color; stack a
+       soft dark blur + the platform-tint glow on top so the colour
+       still pops without becoming illegible. */
+    text-shadow:
+      -1px -1px 0 rgba(0,0,0,.95),
+       1px -1px 0 rgba(0,0,0,.95),
+      -1px  1px 0 rgba(0,0,0,.95),
+       1px  1px 0 rgba(0,0,0,.95),
+       0 0 8px rgba(0,0,0,.85),
+       0 0 14px currentColor;
   }
-  .sep { color: rgba(255,255,255,.85); flex-shrink: 0; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+  .sep {
+    color: rgba(255,255,255,.95);
+    flex-shrink: 0;
+    /* Same outline recipe as .user / .text — separator is small but
+       still needs to survive on bright scenes. */
+    text-shadow:
+      -1px -1px 0 rgba(0,0,0,.95),
+       1px -1px 0 rgba(0,0,0,.95),
+      -1px  1px 0 rgba(0,0,0,.95),
+       1px  1px 0 rgba(0,0,0,.95),
+       0 0 8px rgba(0,0,0,.85);
+  }
 
   /* 1.4.9: left-edge mask removed — text never scrolls past the left,
      so the fade was cutting off the first letter with no benefit. Kept
@@ -164,7 +183,18 @@
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
-    text-shadow: 0 2px 6px rgba(0,0,0,.5);
+    /* font-weight bump from inherited 400 → 600 makes the message body
+       read clearly against any background without a panel behind it.
+       Combined with the hard-edged text-shadow outline it survives
+       bright scenes where a single soft shadow gets swallowed. */
+    font-weight: 600;
+    text-shadow:
+      -1px -1px 0 rgba(0,0,0,.95),
+       1px -1px 0 rgba(0,0,0,.95),
+      -1px  1px 0 rgba(0,0,0,.95),
+       1px  1px 0 rgba(0,0,0,.95),
+       0 0 8px rgba(0,0,0,.85),
+       0 0 14px rgba(0,0,0,.55);
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), rgba(0,0,0,0) 100%);
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), rgba(0,0,0,0) 100%);
     padding-right: 4px;
@@ -280,13 +310,23 @@
   /* ──────────────────────────────────────────────────────────────────
      TikTok gift floating layer — mirrors horizontal overlay's 1.5.0
      design: pop-in overshoot, glow halo, sparkle trail, stacking on
-     rapid arrivals. Confined to the top 50vh so gifts stay away from
-     chat + events which live in the bottom half.
+     rapid arrivals.
+
+     1.5.5-beta.4 reposition: previously this was a top-50vh band —
+     gifts drifted across the upper half of the canvas while the chat
+     bar sits at the bottom, so visually the gifts felt disconnected
+     from the chat (streamers said "gifts happen way above the chat").
+     Now anchored to a band immediately above the chat bar (bottom-
+     anchored, ~40vh tall ending ~110px from the bottom) so a TikTok
+     gift drifts in next to the most recent chat msg. Reads as the
+     gift "lands" near the comment that mentioned it.
      ────────────────────────────────────────────────────────────────── */
   #gifts {
     position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 50vh;
+    left: 0; right: 0;
+    top: auto;
+    bottom: 110px;
+    height: 40vh;
     overflow: hidden;
     pointer-events: none;
     z-index: 4;
