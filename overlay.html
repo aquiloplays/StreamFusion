@@ -326,16 +326,20 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 
 /* ── Big Banner (subs, gifts, cheers) ──────────────────────────── */
 /* Multi-stage spring entry: drops in big with a small overshoot, settles, then a tiny re-bounce */
+/* Banner enter/exit — banner is now top-anchored (top:64px), so the
+   keyframes drop the prior translateY(-50%) centering offset and
+   instead slide down from above for entry, and back up + fade for
+   exit. The pop-in overshoot + horizontal jiggle survive intact. */
 @keyframes ovBnrIn{
-  0%{opacity:0;transform:translateY(-50%) scale(.35) translateX(40px) rotate(-6deg);filter:blur(6px)}
-  35%{opacity:1;transform:translateY(-50%) scale(1.18) translateX(-8px) rotate(2deg);filter:blur(0)}
-  55%{transform:translateY(-50%) scale(.96) translateX(4px) rotate(-1deg)}
-  75%{transform:translateY(-50%) scale(1.04) translateX(-2px) rotate(.5deg)}
-  100%{opacity:1;transform:translateY(-50%) scale(1) translateX(0) rotate(0)}
+  0%{opacity:0;transform:translateY(-30px) scale(.35) translateX(40px) rotate(-6deg);filter:blur(6px)}
+  35%{opacity:1;transform:translateY(0) scale(1.18) translateX(-8px) rotate(2deg);filter:blur(0)}
+  55%{transform:translateY(0) scale(.96) translateX(4px) rotate(-1deg)}
+  75%{transform:translateY(0) scale(1.04) translateX(-2px) rotate(.5deg)}
+  100%{opacity:1;transform:translateY(0) scale(1) translateX(0) rotate(0)}
 }
 @keyframes ovBnrOut{
-  0%{opacity:1;transform:translateX(-50%) scale(1) translateY(0)}
-  100%{opacity:0;transform:translateX(-50%) scale(.78) translateY(40px);filter:blur(4px)}
+  0%{opacity:1;transform:translateY(0) scale(1) translateX(0)}
+  100%{opacity:0;transform:translateY(-40px) scale(.78) translateX(0);filter:blur(4px)}
 }
 /* Multi-color glow halo cycling around the banner */
 @keyframes ovBnrGlow{
@@ -365,10 +369,18 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
   0%{transform:translate(-50%,-50%) scale(.6);opacity:.85}
   100%{transform:translate(-50%,-50%) scale(2.4);opacity:0}
 }
+/* Big-event banner (raids, gift bombs, hype level-ups, big tips, etc.).
+   Anchored to the TOP of the pop-out so it surfaces ABOVE the chat
+   feed instead of dead-centering over it. The drag handle (~28px) +
+   live-bar (~32px) + now-playing strip (~46px when visible) sit
+   immediately above it; the banner pushes through them visually
+   (z-index: 200, pointer-events:none) but stays out of the chat
+   feed's vertical space so messages remain readable. Pre-1.5.5-beta.3
+   this used `top:50%; transform:translateY(-50%)` and viewers saw
+   raids/gift bombs paint over their chat. */
 .ov-banner{
   position:fixed;
-  top:50%;left:auto;right:auto;bottom:auto;
-  transform:translateY(-50%);
+  top:64px;left:auto;right:auto;bottom:auto;
   background:linear-gradient(135deg,#1a1a1f 0%,#1a2440 50%,#1a1a1f 100%);
   border:3px solid var(--ev);
   border-radius:clamp(14px,1.8vw,22px);

@@ -104,6 +104,8 @@ body.is-beta .sf-boot-logo{background:linear-gradient(135deg,#f59e0b 0%,#f97316 
 .np-bar .np-artist{font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .np-bar .np-progress{height:2px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:2px}
 .np-bar .np-progress-fill{height:100%;background:#1db954;transition:width .8s linear;width:0%}
+.np-bar .np-req{font-size:10px;font-weight:700;color:#1db954;letter-spacing:.04em;flex-shrink:0;background:rgba(29,185,84,.14);border:1px solid rgba(29,185,84,.35);border-radius:999px;padding:3px 9px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.np-bar .np-req:empty{display:none}
 .np-bar .np-controls{display:flex;gap:4px;flex-shrink:0;align-items:center}
 .np-bar .np-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:6px;color:var(--mut);cursor:pointer;transition:all .12s;padding:0}
 .np-bar .np-btn:hover{background:rgba(29,185,84,.18);border-color:#1db954;color:#fff}
@@ -1656,6 +1658,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
     <div class="np-artist" id="npArtist"></div>
     <div class="np-progress"><div class="np-progress-fill" id="npProgressFill"></div></div>
   </div>
+  <!-- Requester chip — shows @username when this track was requested via
+       !sr by a viewer. Hidden when the streamer is just playing their
+       own queue. Mirrors the pop-out's .ov-np-req. -->
+  <div class="np-req" id="npReq"></div>
   <div class="np-controls">
     <button class="np-btn" id="npPrev" onclick="_npControl('previous')" title="Previous track">
       <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 6h2v12H6V6zm3.5 6 8.5-6v12l-8.5-6z"/></svg>
@@ -8448,6 +8454,7 @@ function renderAquiloProducts() {
 var _npState = {
   clientId: null, product: null,
   track: '', artist: '', albumArt: '',
+  requestedBy: '',     // @username when this track was a viewer !sr; empty otherwise
   isPlaying: false,
   durationMs: 0, progressMs: 0, updatedAt: 0,
   hasControl: false,
@@ -8482,6 +8489,9 @@ function _renderNowPlayingBar() {
       if (sp.meta.durationMs !== undefined) _npState.durationMs = Number(sp.meta.durationMs || 0);
       if (sp.meta.progressMs !== undefined) _npState.progressMs = Number(sp.meta.progressMs || 0);
       if (sp.meta.updatedAt !== undefined)  _npState.updatedAt  = Number(sp.meta.updatedAt || Date.now());
+      // requestedBy can legitimately become empty (next song wasn't a
+      // request), so propagate empty values too — overwrite, don't OR-coalesce.
+      if (sp.meta.requestedBy !== undefined) _npState.requestedBy = String(sp.meta.requestedBy || '');
     }
   } else {
     _npState.clientId = null;
@@ -8506,6 +8516,8 @@ function _renderNowPlayingBar() {
   }
   if (titleEl)  titleEl.textContent = _npState.track || '';
   if (artistEl) artistEl.textContent = _npState.artist || '';
+  var reqEl = document.getElementById('npReq');
+  if (reqEl) reqEl.textContent = _npState.requestedBy ? '@' + _npState.requestedBy : '';
   if (ppIcon) {
     ppIcon.innerHTML = _npState.isPlaying
       ? '<path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/>'
@@ -8542,7 +8554,7 @@ function _npPushToOverlay() {
       title:       _npState.track,
       artist:      _npState.artist,
       art:         _npState.albumArt,
-      requestedBy: '',                       // only from relay events; left blank here
+      requestedBy: _npState.requestedBy || '',
       durationMs:  _npState.durationMs,
       progressMs:  _npState.progressMs,
       isPlaying:   _npState.isPlaying,
@@ -8582,6 +8594,10 @@ function _npApplyRotationEvent(d) {
   if (d.isPlaying !== undefined)  _npState.isPlaying  = !!d.isPlaying;
   if (d.durationMs !== undefined) _npState.durationMs = Number(d.durationMs || 0);
   if (d.progressMs !== undefined) _npState.progressMs = Number(d.progressMs || 0);
+  // Always overwrite requestedBy from the relay event — the next
+  // track might be auto-DJ'd (no requester) and we don't want a stale
+  // chip clinging from the previous song.
+  _npState.requestedBy = String(d.requestedBy || '');
   _npState.updatedAt = Date.now();
   // If no local widget is registered, mark the bar as relay-only so we
   // know to keep controls disabled.
@@ -11747,14 +11763,15 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
       return; // unknown kind — ignore
     }
 
-    // 1) Chat panel system row — pipes through every chat tab via the same
-    // helper SB status messages use, so it shows up wherever the streamer
-    // is currently looking.
-    try { if (typeof sysMsg === 'function' && oneLine) sysMsg('tw', oneLine); } catch (e) {}
-
-    // 2) Events history panel — addEvHistory's signature is
+    // Events history panel — addEvHistory's signature is
     // (name, text, color, isPinned, ?, '', avatarUrl). We pass album art for
     // now-playing rows so the events panel reads like a small concert poster.
+    //
+    // Note: we DO NOT also call sysMsg('tw', oneLine) here. sysMsg routes
+    // through addEvHistory under the hood, so calling both produced two
+    // events-history rows per song event — one as "StreamFusion: ♪ Now
+    // playing: ..." and another as "♪ Now playing: track — artist". The
+    // rich variant (this addEvHistory) is the one we keep.
     try {
       if (typeof addEvHistory === 'function') {
         addEvHistory(name, text, color, isPinned, null, '', avatar);
