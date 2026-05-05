@@ -16,14 +16,22 @@ v4 (1.5.4): same references + game-name resolution; pagination rewrite to
             has real options. Also echoes diagnostic counters
             (scanned/pages/inRange/hitCap) so SF can surface accurate
             "no results" messaging.
+v5 (1.5.5-beta.6): UUIDs are now read from index.html (stable across
+            rebuilds), so a re-import overwrites the existing actions in
+            place rather than creating duplicates beside the old broken
+            v1/v2 copies. CPH.LogInfo diagnostics added at every step
+            of the find action so SB's Logs tab shows exactly where it
+            stops when streamers report "Find Targets does nothing".
+            No behaviour change to the happy path — just observability.
 
 Cross-checked references against an existing working action in the user's
-actions.json ("Discord Stream Logger | Stream Events"). Action UUIDs are
-bumped each version so SB users get fresh actions on re-import.
+actions.json ("Discord Stream Logger | Stream Events").
 """
-import base64, gzip, json, io, uuid
+import base64, gzip, json, io, re, sys, pathlib
 
-# v3 of Find Targets — game-name → game-id resolution server-side.
+# v5 of Find Targets — game-name → game-id resolution server-side, plus
+# CPH.LogInfo diagnostics at every step so the SB Logs tab tells the
+# streamer (and us) exactly where it stops on failure.
 FIND_CSHARP = r"""using System;
 using System.Net.Http;
 using System.Linq;
@@ -41,10 +49,14 @@ public class CPHInline
         int    maxViewers = args.ContainsKey("maxViewers") ? Convert.ToInt32(args["maxViewers"].ToString()) : 2147483647;
         int    wantCount  = args.ContainsKey("wantCount")  ? Convert.ToInt32(args["wantCount"].ToString())  : 25;
 
+        CPH.LogInfo("[SF rf v5] start reqId=" + reqId + " gameId='" + gameId + "' gameName='" + gameName + "' range=[" + minViewers + "," + maxViewers + "] want=" + wantCount);
+
         string clientId = CPH.TwitchClientId;
         string token    = CPH.TwitchOAuthToken;
+        CPH.LogInfo("[SF rf v5] twitch creds: clientId=" + (string.IsNullOrEmpty(clientId) ? "EMPTY" : "len=" + clientId.Length) + " token=" + (string.IsNullOrEmpty(token) ? "EMPTY" : "len=" + token.Length));
         if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(token))
         {
+            CPH.LogWarn("[SF rf v5] twitch_not_connected — sign in to Twitch inside Streamer.bot first");
             BroadcastErr(reqId, "twitch_not_connected");
             return true;
         }
@@ -61,8 +73,10 @@ public class CPHInline
             // category to its event bus yet.
             if (string.IsNullOrEmpty(gameId) && !string.IsNullOrEmpty(gameName))
             {
+                CPH.LogInfo("[SF rf v5] resolving gameName='" + gameName + "' via /helix/games?name=");
                 string gurl = "https://api.twitch.tv/helix/games?name=" + Uri.EscapeDataString(gameName);
                 var gresp = http.GetAsync(gurl).GetAwaiter().GetResult();
+                CPH.LogInfo("[SF rf v5] /helix/games status=" + (int)gresp.StatusCode);
                 if (gresp.IsSuccessStatusCode)
                 {
                     var gbody = JObject.Parse(gresp.Content.ReadAsStringAsync().GetAwaiter().GetResult());
@@ -71,12 +85,24 @@ public class CPHInline
                     {
                         if (garr[0]["id"] != null)   gameId   = garr[0]["id"].Value<string>();
                         if (garr[0]["name"] != null) gameName = garr[0]["name"].Value<string>();
+                        CPH.LogInfo("[SF rf v5] resolved gameId='" + gameId + "' gameName='" + gameName + "'");
                     }
+                    else
+                    {
+                        CPH.LogWarn("[SF rf v5] /helix/games returned 0 rows for '" + gameName + "' — game name doesn't match a Twitch category exactly");
+                    }
+                }
+                else
+                {
+                    string gerr = "";
+                    try { gerr = gresp.Content.ReadAsStringAsync().GetAwaiter().GetResult(); } catch {}
+                    CPH.LogWarn("[SF rf v5] /helix/games failed status=" + (int)gresp.StatusCode + " body=" + (gerr.Length > 200 ? gerr.Substring(0, 200) : gerr));
                 }
             }
 
             if (string.IsNullOrEmpty(gameId))
             {
+                CPH.LogWarn("[SF rf v5] missing_gameId — neither SF nor /helix/games resolved a Twitch category");
                 BroadcastErr(reqId, "missing_gameId");
                 return true;
             }
@@ -107,8 +133,12 @@ public class CPHInline
                 if (cursor != null) url += "&after=" + Uri.EscapeDataString(cursor);
 
                 var resp = http.GetAsync(url).GetAwaiter().GetResult();
+                CPH.LogInfo("[SF rf v5] page " + pages + " /helix/streams status=" + (int)resp.StatusCode);
                 if (!resp.IsSuccessStatusCode)
                 {
+                    string errBody = "";
+                    try { errBody = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult(); } catch {}
+                    CPH.LogWarn("[SF rf v5] /helix/streams failed status=" + (int)resp.StatusCode + " body=" + (errBody.Length > 200 ? errBody.Substring(0, 200) : errBody));
                     BroadcastErr(reqId, "helix_" + (int)resp.StatusCode);
                     return true;
                 }
@@ -142,6 +172,7 @@ public class CPHInline
 
                 var pag = body["pagination"];
                 cursor = pag != null && pag["cursor"] != null ? pag["cursor"].Value<string>() : null;
+                CPH.LogInfo("[SF rf v5] page " + pages + " scanned-so-far=" + scanned + " kept=" + keep.Count + " sortedPast=" + sortedPastRange + " hasCursor=" + (!string.IsNullOrEmpty(cursor)));
                 if (string.IsNullOrEmpty(cursor)) break;
             }
 
@@ -202,6 +233,7 @@ public class CPHInline
                 ["pagesCap"]  = MAX_PAGES,
                 ["hitCap"]    = !sortedPastRange && (keep.Count < oversample) && (pages >= MAX_PAGES)
             };
+            CPH.LogInfo("[SF rf v5] broadcasting results reqId=" + reqId + " streams=" + sorted.Count + " scanned=" + scanned + " inRange=" + keep.Count);
             CPH.WebsocketBroadcastJson(payload.ToString(Newtonsoft.Json.Formatting.None));
             return true;
         }
@@ -209,6 +241,7 @@ public class CPHInline
 
     private void BroadcastErr(string reqId, string code)
     {
+        CPH.LogWarn("[SF rf v5] BroadcastErr reqId=" + reqId + " code=" + code);
         var p = new JObject {
             ["source"] = "sf_raid_finder",
             ["kind"]   = "error",
@@ -252,13 +285,28 @@ MIN_REFS = [
     r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.dll",
 ]
 
-# v3 UUIDs — bumped from v2 so a fresh re-import doesn't conflict with
-# the v2 actions (and so SF's UUID-first matching picks the new copy
-# even if the user forgot to delete the v2 group).
-FIND_TOP_UUID = str(uuid.uuid4())
-FIND_SUB_UUID = str(uuid.uuid4())
-RAID_TOP_UUID = str(uuid.uuid4())
-RAID_SUB_UUID = str(uuid.uuid4())
+# Stable UUIDs sourced from index.html (SF_RF_FIND_UUID + SF_RF_RAID_UUID).
+# Pre-v5 the build script generated fresh uuid.uuid4() values on every
+# run, which meant a streamer who re-imported after a SF update wound
+# up with the OLD action sitting next to the NEW action (different
+# UUIDs, same name) — and SB resolved DoAction by ID, hitting the
+# stale broken copy. Reading from index.html keeps both halves of the
+# import lockstep with whatever SF's hard-coded matchers expect, so
+# re-import overwrites the existing actions in place. Sub-action UUIDs
+# don't need to be stable (SF doesn't reference them); we still
+# stabilise them off the top UUID so the entire SBAE is reproducible.
+HTML_PATH = pathlib.Path(__file__).resolve().parent.parent / "index.html"
+_html = HTML_PATH.read_text(encoding="utf-8")
+_find_match = re.search(r"var SF_RF_FIND_UUID = '([0-9a-f-]+)'", _html)
+_raid_match = re.search(r"var SF_RF_RAID_UUID = '([0-9a-f-]+)'", _html)
+if not _find_match or not _raid_match:
+    sys.exit("could not find SF_RF_FIND_UUID/SF_RF_RAID_UUID in index.html — check selectors")
+FIND_TOP_UUID = _find_match.group(1)
+RAID_TOP_UUID = _raid_match.group(1)
+# Deterministic sub-UUIDs derived from the top UUIDs so the SBAE is
+# reproducible on rebuild without changing what SF resolves.
+FIND_SUB_UUID = FIND_TOP_UUID[:-1] + ("0" if FIND_TOP_UUID[-1] != "0" else "1")
+RAID_SUB_UUID = RAID_TOP_UUID[:-1] + ("0" if RAID_TOP_UUID[-1] != "0" else "1")
 
 def _b64(text):
     return base64.b64encode(text.replace("\n", "\r\n").encode("utf-8")).decode("ascii")
@@ -365,9 +413,9 @@ b64 = base64.b64encode(sbae).decode("ascii")
 with open("scripts/sf-rf-import-new.txt", "w", encoding="utf-8") as f:
     f.write(b64)
 
-print(f"v3 SBAE built: {len(b64)} chars")
-print(f"FIND_TOP_UUID = '{FIND_TOP_UUID}'")
-print(f"RAID_TOP_UUID = '{RAID_TOP_UUID}'")
+print(f"v5 SBAE built: {len(b64)} chars (action C# now logs to SB Logs at every step)")
+print(f"FIND_TOP_UUID = '{FIND_TOP_UUID}' (sourced from index.html — stable)")
+print(f"RAID_TOP_UUID = '{RAID_TOP_UUID}' (sourced from index.html — stable)")
 
 # Round-trip sanity
 import zlib
