@@ -8521,6 +8521,36 @@ function _renderNowPlayingBar() {
     }
   });
   _npStartProgressTicker();
+  // Mirror to the pop-out so its now-playing strip stays in sync with
+  // integration-heartbeat updates too (not just rotation relay events).
+  // Pushing here means the pop-out picks up clientId + hasControl the
+  // moment the local widget registers, without waiting for the next
+  // song change.
+  _npPushToOverlay();
+}
+
+// Send the current _npState to the pop-out overlay so its strip
+// matches the main app's now-playing card. Called from
+// _renderNowPlayingBar (covers integration-heartbeat updates) and from
+// the rotation event handler (covers cloud-relay-only setups).
+function _npPushToOverlay() {
+  if (typeof sendToOverlay !== 'function') return;
+  if (!_npState.track) return;     // nothing meaningful to show
+  try {
+    sendToOverlay({
+      type: 'rotation-now-playing',
+      title:       _npState.track,
+      artist:      _npState.artist,
+      art:         _npState.albumArt,
+      requestedBy: '',                       // only from relay events; left blank here
+      durationMs:  _npState.durationMs,
+      progressMs:  _npState.progressMs,
+      isPlaying:   _npState.isPlaying,
+      clientId:    _npState.clientId,
+      hasControl:  _npState.hasControl,
+      ts:          _npState.updatedAt || Date.now(),
+    });
+  } catch (e) {}
 }
 
 function _npStartProgressTicker() {
@@ -11672,8 +11702,14 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
       // streamer's second-monitor surface shows the current song too.
       // overlay.html renders a compact strip when these arrive; the
       // strip auto-hides if no event lands within 30s after the last.
+      // Include the local-loopback widget's clientId (if registered)
+      // so the pop-out's transport buttons can drive Spotify directly
+      // via electronAPI.obsControlIntegration without an extra round-
+      // trip through the main window.
       try {
         if (typeof sendToOverlay === 'function') {
+          var spProduct = (_aquiloProducts || []).find(function(p) { return p && p.product === 'aquilo-spotify-widget'; });
+          var hasControl = spProduct && (spProduct.capabilities || []).indexOf('playback-control') !== -1;
           sendToOverlay({
             type: 'rotation-now-playing',
             title:       d.title || '',
@@ -11683,6 +11719,8 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
             durationMs:  d.durationMs || 0,
             progressMs:  d.progressMs || 0,
             isPlaying:   d.isPlaying !== false,
+            clientId:    spProduct ? spProduct.clientId : null,
+            hasControl:  !!hasControl,
             ts:          ev.ts || Date.now(),
           });
         }

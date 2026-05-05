@@ -59,6 +59,16 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-np-artist{font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
 .ov-np-req{font-size:9px;font-weight:700;color:#1db954;letter-spacing:.04em;flex-shrink:0;background:rgba(29,185,84,.14);border:1px solid rgba(29,185,84,.35);border-radius:999px;padding:2px 7px;white-space:nowrap}
 .ov-np-req:empty{display:none}
+.ov-np-controls{display:flex;gap:3px;flex-shrink:0;align-items:center}
+.ov-np-btn{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:5px;color:var(--mut);cursor:pointer;padding:0;transition:all .12s}
+.ov-np-btn:hover{background:rgba(29,185,84,.18);border-color:#1db954;color:#fff}
+.ov-np-btn:active{transform:scale(.94)}
+.ov-np-btn:disabled{opacity:.30;cursor:not-allowed}
+.ov-np-btn-pp{width:26px;height:26px}
+.ov-np-btn.ov-np-flash-ok{animation:ovNpFlashOk .5s ease-out}
+.ov-np-btn.ov-np-flash-err{animation:ovNpFlashErr .5s ease-out}
+@keyframes ovNpFlashOk{0%{box-shadow:0 0 0 0 rgba(29,185,84,.6)}100%{box-shadow:0 0 0 6px rgba(29,185,84,0)}}
+@keyframes ovNpFlashErr{0%{box-shadow:0 0 0 0 rgba(248,81,73,.6)}100%{box-shadow:0 0 0 6px rgba(248,81,73,0)}}
 .ov-live::-webkit-scrollbar{height:3px}.ov-live::-webkit-scrollbar-thumb{background:var(--bdr)}
 .ov-live-lbl{font-size:10px;font-weight:900;letter-spacing:1.4px;color:var(--mut);text-transform:uppercase;padding-right:2px;flex-shrink:0}
 .ov-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:livePulse 1.3s ease-in-out infinite;flex-shrink:0}
@@ -738,9 +748,11 @@ body.layout-hud::before {
   <span class="ov-live-timer off" id="ovLiveTimer">00:00:00</span>
 </div>
 <div class="ov-stats" id="ovStats"></div>
-<!-- Rotation now-playing strip — shows whenever a rotation.song.playing
-     event arrives from the cloud relay. Hidden by default; reveals on
-     first event and auto-hides 30s after the last update. -->
+<!-- Rotation now-playing strip — shows whenever a rotation song event
+     arrives. Hidden by default; reveals on first event and auto-hides
+     30s after the last update. Transport buttons fire via the integ-
+     ration control IPC; they disable themselves when no local widget
+     is registered (relay-only setup). -->
 <div class="ov-np" id="ovNp" style="display:none">
   <img class="ov-np-art" id="ovNpArt" alt="" src=""/>
   <div class="ov-np-meta">
@@ -748,6 +760,17 @@ body.layout-hud::before {
     <div class="ov-np-artist" id="ovNpArtist"></div>
   </div>
   <div class="ov-np-req" id="ovNpReq"></div>
+  <div class="ov-np-controls" id="ovNpControls">
+    <button class="ov-np-btn" id="ovNpPrev" title="Previous track" type="button">
+      <svg viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M6 6h2v12H6V6zm3.5 6 8.5-6v12l-8.5-6z"/></svg>
+    </button>
+    <button class="ov-np-btn ov-np-btn-pp" id="ovNpPlayPause" title="Play / Pause" type="button">
+      <svg id="ovNpPpIcon" viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M8 5v14l11-7L8 5z"/></svg>
+    </button>
+    <button class="ov-np-btn" id="ovNpSkip" title="Skip track" type="button">
+      <svg viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M16 6h2v12h-2V6zm-1.5 6L6 18V6l8.5 6z"/></svg>
+    </button>
+  </div>
 </div>
 <div class="ov-goals" id="ovGoals"></div>
 <div class="ov-hype" id="ovHype">
@@ -1337,12 +1360,17 @@ function renderLiveBar() {
 }
 
 // ── Rotation now-playing ────────────────────────────────────
-// Cloud-relay rotation.song.playing events arrive as 'rotation-now-
-// playing' overlay-data packets. We render them in the .ov-np strip
-// directly under the live-bar. The strip auto-hides 30s after the
-// most recent update so a stale "playing" doesn't sit forever when
-// the streamer kills the widget.
+// Cloud-relay rotation.song.playing events + integration-heartbeat
+// pushes from the main app both arrive as 'rotation-now-playing'
+// overlay-data packets. We render them in the .ov-np strip directly
+// under the live-bar. The strip auto-hides 30s after the most recent
+// update so a stale "playing" doesn't sit forever when the streamer
+// kills the widget.
 var _ovNpHideTimer = null;
+var _ovNpClientId = null;       // last known SF integration clientId
+var _ovNpHasControl = false;    // whether the registered widget exposes playback-control
+var _ovNpIsPlaying = false;     // last known playback state (drives pp icon)
+
 function updateRotationNowPlaying(d) {
   var bar = document.getElementById('ovNp');
   if (!bar) return;
@@ -1361,12 +1389,82 @@ function updateRotationNowPlaying(d) {
   if (titleEl)  titleEl.textContent  = d.title || '';
   if (artistEl) artistEl.textContent = d.artist || '';
   if (reqEl)    reqEl.textContent    = d.requestedBy ? '@' + d.requestedBy : '';
+
+  // Transport buttons — enable only when the main app told us a local
+  // widget is registered AND it advertised the playback-control
+  // capability. Cloud-relay-only setups (widget hosted on https) keep
+  // the buttons greyed out since we have no back-channel.
+  _ovNpClientId   = d.clientId || null;
+  _ovNpHasControl = !!d.hasControl;
+  _ovNpIsPlaying  = d.isPlaying !== false;
+  var canControl  = !!_ovNpClientId && _ovNpHasControl;
+  ['ovNpPrev','ovNpPlayPause','ovNpSkip'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) {
+      b.disabled = !canControl;
+      b.title = canControl
+        ? b.title.replace(/ \(widget offline\)$/, '')
+        : (b.title.replace(/ \(widget offline\)$/, '') + ' (widget offline)');
+    }
+  });
+  // Flip the play/pause icon to match current state.
+  var ppIcon = document.getElementById('ovNpPpIcon');
+  if (ppIcon) {
+    ppIcon.innerHTML = _ovNpIsPlaying
+      ? '<path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/>'
+      : '<path fill="currentColor" d="M8 5v14l11-7L8 5z"/>';
+  }
+
   bar.style.display = 'flex';
   if (_ovNpHideTimer) clearTimeout(_ovNpHideTimer);
   _ovNpHideTimer = setTimeout(function() {
     bar.style.display = 'none';
   }, 30000);
 }
+
+// Pop-out → main process IPC for transport directives. The integration
+// control IPC is exposed in preload.js (overlay window shares the same
+// preload as the main window). Optimistic local toggle for play/pause
+// so the icon flips before the next heartbeat confirms.
+function _ovNpControl(cmd) {
+  if (!_ovNpClientId) return;
+  if (!api.obsControlIntegration) return;
+  var btnId = cmd === 'previous' ? 'ovNpPrev' : cmd === 'skip' ? 'ovNpSkip' : 'ovNpPlayPause';
+  var btn = document.getElementById(btnId);
+  Promise.resolve(api.obsControlIntegration(_ovNpClientId, cmd)).then(function(res) {
+    if (btn) {
+      btn.classList.remove('ov-np-flash-ok','ov-np-flash-err');
+      void btn.offsetWidth;
+      btn.classList.add(res && res.ok ? 'ov-np-flash-ok' : 'ov-np-flash-err');
+    }
+    if (cmd === 'play')  _ovNpIsPlaying = true;
+    if (cmd === 'pause') _ovNpIsPlaying = false;
+    var ppIcon = document.getElementById('ovNpPpIcon');
+    if (ppIcon) {
+      ppIcon.innerHTML = _ovNpIsPlaying
+        ? '<path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/>'
+        : '<path fill="currentColor" d="M8 5v14l11-7L8 5z"/>';
+    }
+  }).catch(function() {
+    if (btn) {
+      btn.classList.remove('ov-np-flash-ok','ov-np-flash-err');
+      void btn.offsetWidth;
+      btn.classList.add('ov-np-flash-err');
+    }
+  });
+}
+function _ovNpTogglePlayPause() { return _ovNpControl(_ovNpIsPlaying ? 'pause' : 'play'); }
+
+// Wire the click handlers once on load. Buttons exist in the static
+// markup; we don't need to defer this to first event arrival.
+(function bindOvNpControls() {
+  var p = document.getElementById('ovNpPrev');
+  var s = document.getElementById('ovNpSkip');
+  var pp = document.getElementById('ovNpPlayPause');
+  if (p)  p.addEventListener('click',  function() { _ovNpControl('previous'); });
+  if (s)  s.addEventListener('click',  function() { _ovNpControl('skip'); });
+  if (pp) pp.addEventListener('click', function() { _ovNpTogglePlayPause(); });
+})();
 
 function updateLive(d) {
   _liveState.tw = !!d.tw;
