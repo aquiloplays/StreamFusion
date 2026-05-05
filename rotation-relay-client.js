@@ -106,13 +106,34 @@ function translateAndForward(envelope) {
   }
 }
 
+// "anonymous" / "anon" / "viewer" / "someone" / "" are all placeholder
+// values the upstream chat sources fall back to when they couldn't extract
+// a real username. Showing them as "@anonymous" is misleading — readers
+// assume that's the actual handle. Treat them all as "no real requester"
+// and let downstream formatters drop the @user prefix entirely.
+function _isRealRequester(s) {
+  if (!s) return false;
+  var lc = String(s).trim().toLowerCase();
+  if (!lc) return false;
+  if (lc === 'anonymous' || lc === 'anon' || lc === 'viewer' || lc === 'someone') return false;
+  return true;
+}
+
 function chatRowForEvent(envelope) {
   var d = envelope.data || {};
   var kind = envelope.kind;
+  var requester = (d.displayName && _isRealRequester(d.displayName)) ? d.displayName
+                : (d.user        && _isRealRequester(d.user))        ? d.user
+                : '';
+  var nameTag = requester ? ('@' + requester) : '';
   if (kind === 'rotation.song.playing') {
     var line = '♪ Now playing: ' + (d.title || 'Unknown') +
                (d.artist ? ' — ' + d.artist : '');
-    if (d.requestedBy) line += '  · req @' + d.requestedBy;
+    // Only surface the "req by" suffix when we have an actual viewer
+    // handle. Pre-1.5.5-beta.5 this fired on any truthy requestedBy
+    // including the upstream "anonymous" fallback, so streams without
+    // chat-bound song requests still showed "req @anonymous" rows.
+    if (_isRealRequester(d.requestedBy)) line += '  · req @' + d.requestedBy;
     return {
       kind: 'system',
       source: 'rotation',
@@ -122,13 +143,16 @@ function chatRowForEvent(envelope) {
     };
   }
   if (kind === 'rotation.song.queued') {
+    var queuedText = nameTag
+      ? (nameTag + ' queued: ' + (d.title || d.query || '?'))
+      : ('♪ Queued: ' + (d.title || d.query || '?'));
+    if (d.artist) queuedText += ' — ' + d.artist;
+    if (d.position) queuedText += ' (#' + d.position + ')';
+    if (nameTag) queuedText = '♪ ' + queuedText;
     return {
       kind: 'system',
       source: 'rotation',
-      text: '♪ @' + (d.displayName || d.user || 'viewer') +
-            ' queued: ' + (d.title || d.query || '?') +
-            (d.artist ? ' — ' + d.artist : '') +
-            (d.position ? ' (#' + d.position + ')' : ''),
+      text: queuedText,
       ts: envelope.ts || Date.now(),
       meta: d,
     };
@@ -137,8 +161,9 @@ function chatRowForEvent(envelope) {
     return {
       kind: 'system',
       source: 'rotation',
-      text: '♪ @' + (d.displayName || d.user || 'viewer') +
-            ' requested: ' + (d.query || '?'),
+      text: nameTag
+        ? ('♪ ' + nameTag + ' requested: ' + (d.query || '?'))
+        : ('♪ Requested: ' + (d.query || '?')),
       ts: envelope.ts || Date.now(),
       meta: d,
     };
@@ -147,8 +172,9 @@ function chatRowForEvent(envelope) {
     return {
       kind: 'system',
       source: 'rotation',
-      text: '♪ @' + (d.displayName || d.user || 'viewer') +
-            ' request denied (' + (d.reason || 'rejected') + ')',
+      text: nameTag
+        ? ('♪ ' + nameTag + ' request denied (' + (d.reason || 'rejected') + ')')
+        : ('♪ Request denied (' + (d.reason || 'rejected') + ')'),
       ts: envelope.ts || Date.now(),
       meta: d,
     };

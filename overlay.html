@@ -161,6 +161,7 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-mbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .ov-mhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;min-width:0}
 .ov-msg.tw{border-color:var(--tw)}.ov-msg.yt{border-color:var(--yt)}.ov-msg.tt{border-color:var(--tt)}.ov-msg.kk{border-color:var(--kk)}
+.ov-msg.rotation{border-color:#1db954}
 .ov-msg:hover{background:rgba(255,255,255,.04)}
 /* Mod menu (Twitch only) — hidden until msg is hovered or menu is open */
 .ov-mod-wrap{position:absolute;top:2px;right:4px;opacity:0;transition:opacity .15s ease;z-index:20}
@@ -176,12 +177,17 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-mod-item.danger:hover{background:rgba(248,81,73,.15)}
 .ov-user{font-weight:700;flex-shrink:0;white-space:nowrap}
 .ov-user.tw{color:var(--tw)}.ov-user.yt{color:var(--yt)}.ov-user.tt{color:var(--tt)}.ov-user.kk{color:var(--kk)}
+.ov-user.rotation{color:#1db954}
 .ov-text{color:var(--txt);min-width:0}
 .ov-badge{width:14px;height:14px;vertical-align:middle;margin:0 1px;border-radius:2px}
 .ov-avatar{width:20px;height:20px;border-radius:50%;flex-shrink:0;object-fit:cover;margin-top:1px;border:1px solid rgba(255,255,255,.1)}
 .ov-pico{width:14px;height:14px;border-radius:50%;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center}
 .ov-pico svg{width:8px;height:8px}
 .ov-pico.tw{background:var(--tw);color:#fff}.ov-pico.yt{background:var(--yt);color:#fff}.ov-pico.tt{background:var(--tt);color:#000}.ov-pico.kk{background:var(--kk);color:#000}
+/* Rotation = Spotify-green pill with the Spotify wordmark glyph. Used
+   for song-activity rows piped through the chat feed by the relay. */
+.ov-pico.rotation{background:#1db954;color:#000}
+.ov-pico.rotation svg{width:10px;height:10px}
 .ov-fmsg-badge,.ov-fwords-badge{display:inline-block;font-size:8px;font-weight:900;padding:1px 5px;border-radius:8px;letter-spacing:.5px;vertical-align:middle;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
 .ov-fmsg-badge{background:linear-gradient(135deg,#ffd700,#f0883e);color:#1a1a1f;box-shadow:0 0 6px rgba(255,200,0,.5)}
 .ov-fwords-badge{background:linear-gradient(135deg,#53fc18,#2fa80d);color:#041c00;box-shadow:0 0 6px rgba(83,252,24,.55);animation:ovFwordsBadgePulse 1.8s ease-out 2}
@@ -1056,7 +1062,7 @@ function addMsg(d) {
   el.className = 'ov-msg ' + (d.plat || '') + fc;
 
   var parts = '';
-  var _pSvg = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>'};
+  var _pSvg = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>',rotation:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/></svg>'};
   var _picoIcon = _pSvg[d.plat] || '';
   if (cfg.showAvatars && d.avatar) {
     // Render both the img and a hidden pico fallback. If the image fails to

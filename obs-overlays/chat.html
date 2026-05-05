@@ -253,6 +253,15 @@
   .pi.yt { background: var(--yt); }
   .pi.tt { background: var(--tt); }
   .pi.kk { background: var(--kk); color: #0e0e10; }
+  /* Rotation = Spotify-green pill with the Spotify wordmark glyph
+     instead of a 2-letter text label. Used when the cloud relay
+     pipes a song event into the OBS chat overlay as a system row. */
+  .pi.rotation { background: #1db954; color: #0e0e10; }
+  .pi.rotation svg {
+    width: calc(var(--font-size) - 2px);
+    height: calc(var(--font-size) - 2px);
+    display: block;
+  }
 
   /* User badges (mod/sub/vip/broadcaster/member). Short letter chips. */
   .ub {
@@ -805,6 +814,14 @@
 
   function renderPlatIcon(plat) {
     if (!CFG.showPlatformIcon || !plat) return '';
+    // Rotation rows render the Spotify wordmark instead of a 2-letter
+    // text label so song activity reads as music, not as another chat
+    // platform. All other platforms keep the existing text-chip look.
+    if (plat === 'rotation') {
+      return '<span class="pi rotation"><svg viewBox="0 0 24 24" fill="currentColor">'
+           + '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/>'
+           + '</svg></span>';
+    }
     var label = { tw: 'TW', yt: 'YT', tt: 'TT', kk: 'KK' }[plat] || plat.toUpperCase();
     return '<span class="pi ' + plat + '">' + label + '</span>';
   }

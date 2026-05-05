@@ -11703,13 +11703,28 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
     var avatar    = '';
     var oneLine   = '';     // for sysMsg in chat panel
 
+    // Treat the upstream chat-source placeholder values ("anonymous",
+    // "viewer", etc.) as "no real requester" so the UI doesn't render
+    // misleading "@anonymous queued" / "req @anonymous" rows when the
+    // SB user object was missing identity fields. Real handles take
+    // precedence; otherwise the @user prefix is dropped entirely.
+    var _isReal = function(s) {
+      if (!s) return false;
+      var lc = String(s).trim().toLowerCase();
+      return !!lc && lc !== 'anonymous' && lc !== 'anon' && lc !== 'viewer' && lc !== 'someone';
+    };
+    var _requester = _isReal(d.displayName) ? d.displayName
+                   : _isReal(d.user)        ? d.user
+                   : '';
+    var _nameTag = _requester ? '@' + _requester : '';
+
     if (ev.kind === 'rotation.song.playing') {
       name     = '♪ Now playing';
       text     = (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '');
-      if (d.requestedBy) text += '  · req @' + d.requestedBy;
+      if (_isReal(d.requestedBy)) text += '  · req @' + d.requestedBy;
       avatar   = d.art || '';
       isPinned = true;
-      oneLine  = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '') + (d.requestedBy ? '  · req @' + d.requestedBy : '');
+      oneLine  = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '') + (_isReal(d.requestedBy) ? '  · req @' + d.requestedBy : '');
       _lastNowPlayingTs = ev.ts || Date.now();
       // Live-update the now-playing bar so it flips immediately on track
       // change without waiting for the next integration heartbeat.
@@ -11731,7 +11746,9 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
             title:       d.title || '',
             artist:      d.artist || '',
             art:         d.art || '',
-            requestedBy: d.requestedBy || '',
+            // Drop placeholder requester values — only show the @chip
+            // for an actual viewer handle, not "anonymous".
+            requestedBy: _isReal(d.requestedBy) ? d.requestedBy : '',
             durationMs:  d.durationMs || 0,
             progressMs:  d.progressMs || 0,
             isPlaying:   d.isPlaying !== false,
@@ -11742,19 +11759,39 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
         }
       } catch (e) {}
     } else if (ev.kind === 'rotation.song.queued') {
-      name     = '@' + (d.displayName || d.user || 'viewer');
-      text     = 'queued ' + (d.title || d.query || '?')
-               + (d.artist ? ' — ' + d.artist : '')
-               + (d.position ? '  (#' + d.position + ')' : '');
-      oneLine  = '♪ ' + name + ' queued: ' + (d.title || d.query || '?') + (d.artist ? ' — ' + d.artist : '');
+      if (_nameTag) {
+        name     = _nameTag;
+        text     = 'queued ' + (d.title || d.query || '?')
+                 + (d.artist ? ' — ' + d.artist : '')
+                 + (d.position ? '  (#' + d.position + ')' : '');
+        oneLine  = '♪ ' + _nameTag + ' queued: ' + (d.title || d.query || '?') + (d.artist ? ' — ' + d.artist : '');
+      } else {
+        name     = '♪ Queued';
+        text     = (d.title || d.query || '?')
+                 + (d.artist ? ' — ' + d.artist : '')
+                 + (d.position ? '  (#' + d.position + ')' : '');
+        oneLine  = '♪ Queued: ' + (d.title || d.query || '?') + (d.artist ? ' — ' + d.artist : '');
+      }
     } else if (ev.kind === 'rotation.song.requested') {
-      name     = '@' + (d.displayName || d.user || 'viewer');
-      text     = 'requested ' + (d.query || '?');
-      oneLine  = '♪ ' + name + ' requested: ' + (d.query || '?');
+      if (_nameTag) {
+        name     = _nameTag;
+        text     = 'requested ' + (d.query || '?');
+        oneLine  = '♪ ' + _nameTag + ' requested: ' + (d.query || '?');
+      } else {
+        name     = '♪ Requested';
+        text     = d.query || '?';
+        oneLine  = '♪ Requested: ' + (d.query || '?');
+      }
     } else if (ev.kind === 'rotation.song.rejected') {
-      name     = '@' + (d.displayName || d.user || 'viewer');
-      text     = 'request denied — ' + (d.reason || 'rejected');
-      oneLine  = '♪ ' + name + ' ' + text;
+      if (_nameTag) {
+        name     = _nameTag;
+        text     = 'request denied — ' + (d.reason || 'rejected');
+        oneLine  = '♪ ' + _nameTag + ' ' + text;
+      } else {
+        name     = '♪ Request denied';
+        text     = d.reason || 'rejected';
+        oneLine  = '♪ Request denied (' + (d.reason || 'rejected') + ')';
+      }
     } else if (ev.kind === 'rotation.song.skipped') {
       name     = '♪ Rotation';
       text     = 'skipped' + (d.title ? ': ' + d.title : '');
@@ -11779,14 +11816,14 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
     } catch (e) {}
 
     // 3) Pop-out overlay chat feed — mirrors song activity inline with the
-    // streamer's chat in their second-monitor pop-out. The overlay's
-    // existing chat row CSS handles unknown platforms gracefully; we tag
-    // the row with the Spotify green color so it visually reads as music
-    // activity rather than a Twitch chat msg.
+    // streamer's chat in their second-monitor pop-out. Tagged with the new
+    // 'rotation' platform so the overlay paints a Spotify-green pill +
+    // Spotify glyph beside the row instead of the Twitch purple "TW" chip
+    // that pre-1.5.5-beta.5 surfaces showed.
     try {
       if (typeof sendOverlayChat === 'function' && oneLine) {
         sendOverlayChat({
-          plat:   'tw',
+          plat:   'rotation',
           user:   name,
           text:   text,
           color:  '#1db954',
