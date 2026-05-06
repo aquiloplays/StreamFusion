@@ -33,6 +33,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 0-indexed hotbar slot to fire, or null to unbind.
   setMouseHotbarBinding:  (button, slot) => ipcRenderer.invoke('mouse-set-hotbar-binding', { button: button, slot: slot }),
   getMouseHotbarBindings: ()             => ipcRenderer.invoke('mouse-get-hotbar-bindings'),
+  // Sync ALL hotbar slot → keyboard-accelerator bindings to the main
+  // process. The renderer is the source of truth (lives in
+  // hotbarActions[i].hotkey, persisted with sf_settings); this IPC
+  // pushes the full slot→accel map and the main process re-registers
+  // atomically. Pass an object like { '0': 'F13', '1': 'Ctrl+Shift+2',
+  // '2': 'Mouse4' } — empty / missing entries clear that slot.
+  // Returns { ok, registered: [], failed: [], conflicted: [] } so the
+  // settings UI can warn the streamer when an accel is already taken
+  // by another app or by the overlay-toggle / overlay-vis hotkeys.
+  hotbarSyncHotkeys:      (map) => ipcRenderer.invoke('hotbar-sync-hotkeys', map || {}),
   overlayToggleVisibility:()  => ipcRenderer.send('overlay-toggle-visibility'),
   overlaySetBounds: (b)       => ipcRenderer.send('overlay-set-bounds', b || {}),
   onOverlayToggleInteract:(fn)=> ipcRenderer.on('overlay-toggle-interact', fn),

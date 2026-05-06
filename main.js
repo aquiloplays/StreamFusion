@@ -1308,6 +1308,80 @@ ipcMain.handle('mouse-set-hotbar-binding', (event, payload) => {
 });
 ipcMain.handle('mouse-get-hotbar-bindings', () => mouseHotbarBindings);
 
+// ── Per-hotbar-slot keyboard hotkeys ─────────────────────────────────────
+// Each hotbar slot can bind any Electron-supported accelerator (F13,
+// Ctrl+Shift+1, Alt+Q, etc.) plus the special tokens Mouse4 / Mouse5 that
+// route through the existing PowerShell mouse-button poller. Designed for
+// multi-button gaming mice — Windows natively distinguishes only XButton1
+// (Mouse4) and XButton2 (Mouse5), so streamers with 6+ button mice map
+// the additional buttons to keyboard combos in their mouse software
+// (Logitech G HUB, Razer Synapse, Corsair iCUE, etc.) and bind those
+// combos here.
+//
+// Renderer is the source of truth: hotbarActions[i].hotkey holds the
+// accelerator string per slot, persisted with the rest of sf_settings.
+// On every hotbar change (add / remove / rename / hotkey edit) and on
+// app startup the renderer pushes the full slot→accel map via
+// hotbar-sync-hotkeys; the main process re-registers atomically.
+let _hotbarRegistered = new Set();   // accels currently bound for hotbar slots
+
+function _clearAllHotbarHotkeys() {
+  _hotbarRegistered.forEach(a => { try { globalShortcut.unregister(a); } catch (e) {} });
+  _hotbarRegistered.clear();
+  // Mouse4/Mouse5 reset: any prior mouse-bound slots get cleared too,
+  // since the renderer's sync call is the new source of truth.
+  mouseHotbarBindings.Mouse4 = null;
+  mouseHotbarBindings.Mouse5 = null;
+}
+
+ipcMain.handle('hotbar-sync-hotkeys', (event, payload) => {
+  // payload = { '0': 'F13', '1': 'Ctrl+Shift+2', '2': 'Mouse4', ... }
+  // Keys are slot indices as strings; values are accelerator strings.
+  // An empty / missing entry means that slot has no hotkey.
+  payload = (payload && typeof payload === 'object') ? payload : {};
+  _clearAllHotbarHotkeys();
+
+  var registered = [];        // accels we successfully bound this round
+  var failed = [];            // accels register() said no to (already taken)
+  var conflicted = [];        // collide with overlay hotkeys
+  Object.keys(payload).forEach(function(key) {
+    var idx = parseInt(key, 10);
+    if (isNaN(idx) || idx < 0 || idx > 50) return;
+    var accel = String(payload[key] || '').trim();
+    if (!accel) return;
+
+    if (accel === 'Mouse4' || accel === 'Mouse5') {
+      mouseHotbarBindings[accel] = idx;
+      registered.push(accel + '→' + idx);
+      return;
+    }
+    // Don't double-register if the overlay already owns this accel —
+    // Electron silently fails the second register. Surface that to the
+    // renderer so the user knows their binding clashes with the
+    // overlay-toggle / overlay-vis hotkeys.
+    if (accel === overlayHotkeyAccel || accel === overlayVisHotkeyAccel) {
+      conflicted.push(accel);
+      return;
+    }
+    var ok = false;
+    try {
+      ok = globalShortcut.register(accel, () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('overlay-fire-hotbar', idx);
+        }
+      });
+    } catch (e) { console.warn('[hotbar-hotkey] register threw', accel, e && e.message); }
+    if (ok) {
+      _hotbarRegistered.add(accel);
+      registered.push(accel + '→' + idx);
+    } else {
+      failed.push(accel);
+    }
+  });
+  saveMouseBindings();
+  return { ok: true, registered: registered, failed: failed, conflicted: conflicted };
+});
+
 // Visibility toggle hotkey — separate from interact hotkey. Hides/shows the
 // overlay window without losing state or position.
 ipcMain.handle('overlay-set-vis-hotkey', (event, accel) => {

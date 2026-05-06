@@ -3489,6 +3489,17 @@ loadSettings();
   if (avChk) avChk.checked = showAvatars;
   var npChk = document.getElementById('settings-show-now-playing');
   if (npChk) npChk.checked = !!showNowPlaying;
+  // Push the persisted hotbar hotkeys to main so global shortcuts get
+  // registered. Without this the saved hotkeys stay dormant until the
+  // user opens the editor and changes something. Defer slightly so the
+  // electronAPI is fully ready (the bridge fires on DOMContentLoaded
+  // but some IPC handlers are wired in app.whenReady → ready a tick
+  // later in renderer time).
+  setTimeout(function() {
+    if (typeof syncHotbarHotkeys === 'function') {
+      try { syncHotbarHotkeys(); } catch (e) {}
+    }
+  }, 0);
   // Restore granular per-event TTS toggles
   Object.keys(ttsEventTypes).forEach(function(p) {
     Object.keys(ttsEventTypes[p]).forEach(function(k) {
@@ -4691,24 +4702,151 @@ function openHotbarEditor() {
 function renderHotbarCurrentList() {
   var el = document.getElementById('hbar-current'); if (!el) return;
   if (!hotbarActions.length) { el.innerHTML = '<div style="font-size:11px;color:var(--mut)">No actions on hotbar yet.</div>'; return; }
+  // Each row: [label] [SB action name] [hotkey input] [×]
+  // The hotkey input accepts any Electron accelerator string:
+  //   F13–F24, Ctrl/Alt/Shift + key, Mouse4, Mouse5
+  // Multi-button mice (6+ buttons) → map each physical button to a
+  // unique combo in your mouse software, then bind those combos here.
   el.innerHTML = hotbarActions.map(function(a, i) {
-    return '<div style="display:flex;align-items:center;gap:7px;padding:5px 8px;background:var(--surf2);border-radius:5px">'
-      + '<input style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:3px 7px;font-size:11px" value="' + esc(a.label || a.name) + '" onchange="renameHotbarAction(' + i + ',this.value)" placeholder="Button label...">'
-      + '<span style="font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">' + esc(a.name) + '</span>'
-      + '<button class="mact block-btn" style="flex-shrink:0" onclick="removeFromHotbar(' + i + ')"><svg class="ic"><use href="#i-x"/></svg></button></div>';
+    var hk = (a.hotkey || '');
+    return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surf2);border-radius:5px">'
+      + '<input style="flex:1;min-width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:3px 7px;font-size:11px" value="' + esc(a.label || a.name) + '" onchange="renameHotbarAction(' + i + ',this.value)" placeholder="Button label...">'
+      + '<span style="font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + esc(a.name) + '</span>'
+      + '<input data-hb-hotkey="' + i + '" style="width:100px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:3px 6px;font-size:10px;font-family:ui-monospace,monospace" value="' + esc(hk) + '" onchange="setHotbarHotkey(' + i + ',this.value)" placeholder="hotkey…" title="Bind a global keyboard accelerator (F13, Ctrl+Shift+1, Alt+Q) or Mouse4 / Mouse5. Press Esc to cancel a capture in progress.">'
+      + '<button class="mact" style="flex-shrink:0;padding:3px 6px;font-size:10px" onclick="captureHotbarHotkey(' + i + ')" title="Click then press your mouse button or key combo">⌨</button>'
+      + '<button class="mact block-btn" style="flex-shrink:0" onclick="removeFromHotbar(' + i + ')" title="Remove from hotbar"><svg class="ic"><use href="#i-x"/></svg></button></div>';
   }).join('');
+  // Append a one-line hint about multi-button mouse usage. Streamers
+  // with ≥3 hotbar slots are the target audience.
+  if (hotbarActions.length >= 1) {
+    el.innerHTML += '<div style="font-size:10px;color:var(--mut);line-height:1.55;margin-top:8px;padding:6px 10px;background:var(--surf2);border-radius:5px;border-left:2px solid var(--accent)">'
+      + '<strong style="color:var(--txt)">6+ button mouse?</strong> Windows only natively distinguishes Mouse4 / Mouse5 (the two side buttons). For additional buttons, open your mouse software (Logitech G HUB, Razer Synapse, Corsair iCUE, etc.) and map each physical button to a unique combo — <code>F13</code>, <code>F14</code>, <code>F15</code>… are great because nothing else uses them. Then bind those combos here.'
+      + '</div>';
+  }
 }
 function addToHotbar(actionId, name) {
   if (hotbarActions.some(function(h) { return h.actionId === actionId; })) return;
-  hotbarActions.push({ actionId: actionId, name: name, label: name });
-  saveSettings(); renderHotbar(); pushPopCfg(); openHotbarEditor(); // refresh modal
+  hotbarActions.push({ actionId: actionId, name: name, label: name, hotkey: '' });
+  saveSettings(); renderHotbar(); pushPopCfg(); syncHotbarHotkeys(); openHotbarEditor(); // refresh modal
 }
 function removeFromHotbar(idx) {
   hotbarActions.splice(idx, 1);
-  saveSettings(); renderHotbar(); renderHotbarCurrentList(); pushPopCfg();
+  // Splice shifts indices for slots after `idx`, so push the fresh map
+  // to main so its registered hotkeys re-target the right slot.
+  saveSettings(); renderHotbar(); renderHotbarCurrentList(); pushPopCfg(); syncHotbarHotkeys();
 }
 function renameHotbarAction(idx, label) {
   if (hotbarActions[idx]) { hotbarActions[idx].label = label.trim() || hotbarActions[idx].name; saveSettings(); renderHotbar(); pushPopCfg(); }
+}
+
+// Set a hotbar slot's keyboard accelerator. accel can be:
+//   ''             — clear any existing binding
+//   'F13'          — any Electron-supported accelerator
+//   'Ctrl+Shift+1' — modifier + key combos
+//   'Mouse4' / 'Mouse5' — routed via the existing mouse-button poller
+// Validation is light here — main.js's globalShortcut.register() is the
+// real arbiter. On register failure (combo already taken by another app
+// or by the overlay-toggle hotkey) we surface a small inline message
+// next to the input.
+function setHotbarHotkey(idx, accel) {
+  if (!hotbarActions[idx]) return;
+  var clean = String(accel || '').trim();
+  // Common conveniences: lowercase mouse4/5 → canonical case
+  if (/^mouse4$/i.test(clean)) clean = 'Mouse4';
+  if (/^mouse5$/i.test(clean)) clean = 'Mouse5';
+  // Reject the same accel on two different slots — that would race.
+  if (clean) {
+    var dupIdx = hotbarActions.findIndex(function(h, j) { return j !== idx && h && h.hotkey === clean; });
+    if (dupIdx !== -1) {
+      var inp = document.querySelector('[data-hb-hotkey="' + idx + '"]');
+      if (inp) inp.value = hotbarActions[idx].hotkey || '';
+      sysMsg('tw', 'Hotbar: ' + clean + ' is already bound to slot ' + (dupIdx + 1) + '.');
+      return;
+    }
+  }
+  hotbarActions[idx].hotkey = clean;
+  saveSettings();
+  syncHotbarHotkeys();
+}
+
+// Build the slot-index → accel map from hotbarActions and push to main.
+// Called on every hotbar mutation. Logs failed/conflicted accels to the
+// events history so the streamer notices when a binding silently failed
+// (Electron's globalShortcut.register returns false silently otherwise).
+function syncHotbarHotkeys() {
+  if (!window.electronAPI || !window.electronAPI.hotbarSyncHotkeys) return;
+  var map = {};
+  hotbarActions.forEach(function(a, i) {
+    if (a && a.hotkey) map[String(i)] = a.hotkey;
+  });
+  Promise.resolve(window.electronAPI.hotbarSyncHotkeys(map)).then(function(res) {
+    if (!res) return;
+    if (res.failed && res.failed.length) {
+      addEvHistory('StreamFusion', 'Hotbar hotkey could not be registered (already taken by another app): ' + res.failed.join(', '), 'tw', false);
+    }
+    if (res.conflicted && res.conflicted.length) {
+      addEvHistory('StreamFusion', 'Hotbar hotkey clashes with overlay hotkey, skipped: ' + res.conflicted.join(', ') + '. Pick a different combo.', 'tw', false);
+    }
+  }).catch(function(){});
+}
+
+// Capture-mode hotkey picker. Click ⌨ next to a slot's input → the next
+// keypress / mouse-side-button gets read and saved. Esc cancels. The
+// capture is local to the input's keydown handler, so it doesn't
+// interfere with global shortcuts.
+function captureHotbarHotkey(idx) {
+  var inp = document.querySelector('[data-hb-hotkey="' + idx + '"]');
+  if (!inp) return;
+  var origPlaceholder = inp.placeholder;
+  var origValue = inp.value;
+  inp.value = '';
+  inp.placeholder = 'press a key combo (Esc to cancel)…';
+  inp.focus();
+  inp.style.borderColor = 'var(--accent)';
+  function onKey(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') { cleanup(); inp.value = origValue; return; }
+    // Skip pure-modifier presses (waiting for a real key)
+    if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') return;
+    var parts = [];
+    if (e.ctrlKey)  parts.push('Ctrl');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.altKey)   parts.push('Alt');
+    if (e.metaKey)  parts.push('Meta');
+    // Normalize the key name to Electron's accelerator vocab.
+    var k = e.key;
+    if (/^[a-z]$/.test(k))      k = k.toUpperCase();
+    else if (k === ' ')         k = 'Space';
+    else if (k === 'ArrowUp')   k = 'Up';
+    else if (k === 'ArrowDown') k = 'Down';
+    else if (k === 'ArrowLeft') k = 'Left';
+    else if (k === 'ArrowRight')k = 'Right';
+    parts.push(k);
+    var accel = parts.join('+');
+    inp.value = accel;
+    cleanup();
+    setHotbarHotkey(idx, accel);
+  }
+  function onMouse(e) {
+    // Forward / Back side-buttons: Browser MouseEvent.button === 3 (XB1) and 4 (XB2)
+    if (e.button === 3 || e.button === 4) {
+      e.preventDefault();
+      e.stopPropagation();
+      var name = e.button === 3 ? 'Mouse4' : 'Mouse5';
+      inp.value = name;
+      cleanup();
+      setHotbarHotkey(idx, name);
+    }
+  }
+  function cleanup() {
+    inp.removeEventListener('keydown', onKey, true);
+    inp.removeEventListener('mousedown', onMouse, true);
+    inp.style.borderColor = '';
+    inp.placeholder = origPlaceholder;
+  }
+  inp.addEventListener('keydown', onKey, true);
+  inp.addEventListener('mousedown', onMouse, true);
 }
 
 // ── Raid Finder (Early Access) ────────────────────────────────────────────────
