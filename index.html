@@ -5816,6 +5816,55 @@ function _loadoutHandleStateDelta(payload) {
   }
 }
 
+// Outcome-event broadcast from the kit. Distinct from state-deltas
+// (aquilo_loadout_state — value changes that mutate widget state) and
+// the manifest channel (aquilo_loadout_manifest — full re-renders).
+//
+// Use this when an action ran and you want the streamer to SEE that
+// it ran in their events feed — sound played, hotkey toggled, chat
+// reply sent, etc. The streamer's Loadout dashboard might not even
+// be open at the time, so the events feed is the durable surface.
+//
+// Payload shape:
+//   {
+//     source:   "aquilo_loadout_event",
+//     schema:   1,                            // bump on wire-shape change
+//     widgetId: "snd_cheer",                  // optional — links to widget
+//     name:     "Cheer",                      // human-readable label
+//     result:   "success" | "failure" | "info",
+//     message:  "Played cheer.mp3",           // optional detail
+//     ts:       <epoch ms>                    // optional
+//   }
+//
+// SF emits one row per event into the events feed via addEvHistory.
+// Tinted 'cc' (Crowd Control orange) so kit activity reads visually
+// distinct from chat / platform events. Failures get a "✗" prefix
+// and an italic "failed —" lead-in so they're scannable in the feed.
+function _loadoutHandleEvent(payload) {
+  if (!payload) return;
+  // Schema gate — refuse forward-incompatible payloads. Unspecified
+  // schema is treated as v1 so simple kit code doesn't have to set it.
+  if (payload.schema !== undefined && Number(payload.schema) > 1) return;
+  var label = String(payload.name || payload.widgetId || 'Loadout').slice(0, 80);
+  var msg   = String(payload.message || '').slice(0, 240);
+  var result = String(payload.result || '').toLowerCase();
+  var failed = (result === 'failure' || result === 'error' || result === 'fail');
+  var rowText;
+  if (failed) {
+    rowText = '✗ ' + label + (msg ? ' failed — ' + msg : ' failed');
+  } else if (msg) {
+    rowText = label + ' — ' + msg;
+  } else {
+    rowText = label + ' fired';
+  }
+  // Display name uses the kit's accent if available so the row reads
+  // as "Loadout activity" rather than belonging to a specific platform.
+  var displayUser = 'Loadout';
+  try {
+    if (typeof addEvHistory === 'function') addEvHistory(displayUser, rowText, 'cc', false);
+  } catch (e) {}
+}
+
 function _loadoutActiveLoadout() {
   if (!_loadoutManifest || !Array.isArray(_loadoutManifest.loadouts)) return null;
   var id = _loadoutManifest.activeLoadoutId;
@@ -7020,6 +7069,10 @@ function handleSBEvent(event, data) {
   }
   else if (key === 'General.Custom' && data && data.source === 'aquilo_loadout_state') {
     if (typeof _loadoutHandleStateDelta === 'function') _loadoutHandleStateDelta(data);
+    return;
+  }
+  else if (key === 'General.Custom' && data && data.source === 'aquilo_loadout_event') {
+    if (typeof _loadoutHandleEvent === 'function') _loadoutHandleEvent(data);
     return;
   } else if (key === 'General.Custom' && (data.name === 'PayPal' || data.name === 'PayPalDonation' || (data.source || '').toLowerCase().includes('paypal'))) {
     handleSETip(data, true);

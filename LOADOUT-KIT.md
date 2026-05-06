@@ -262,6 +262,66 @@ re-broadcasts the manifest payload — SF replaces wholesale.
 
 ---
 
+## Outcome events
+
+State-deltas (`aquilo_loadout_state`) carry value changes that mutate
+the *dashboard widget* (counter goes up, toggle flips). They don't
+say anything about whether the underlying action's *side-effect*
+landed — and the streamer's dashboard might not even be open. For
+that, broadcast an outcome event:
+
+```jsonc
+{
+  "source":   "aquilo_loadout_event",
+  "schema":   1,
+  "widgetId": "snd_cheer",        // optional — links the row back to a widget
+  "name":     "Cheer",            // human-readable label shown in the feed
+  "result":   "success",          // "success" | "failure" | "info"
+  "message":  "Played cheer.mp3", // optional detail
+  "ts":       1764615555000       // optional
+}
+```
+
+SF emits one row per event into the **Events feed** (the same panel
+that surfaces follows / subs / raids), tinted Crowd-Control orange so
+kit activity reads visually distinct from chat / platform events.
+Failures (`result === "failure" | "error" | "fail"`) get a `✗` prefix
+and a `failed —` lead-in so they're scannable.
+
+Use sparingly — every outcome event is a row in the streamer's feed.
+A long-running counter that ticks every second should NOT broadcast
+this on every tick; reserve it for "this was a meaningful action".
+Pair with `aquilo_loadout_state` when both apply (delta updates the
+widget value, event surfaces the row in the feed).
+
+Examples in inline-C# (CPH):
+
+```csharp
+// On success, after the side-effect ran:
+var ev = new JObject {
+    ["source"]   = "aquilo_loadout_event",
+    ["schema"]   = 1,
+    ["widgetId"] = "snd_cheer",
+    ["name"]     = "Cheer",
+    ["result"]   = "success",
+    ["message"]  = "played cheer.mp3"
+};
+CPH.WebsocketBroadcastJson(ev.ToString(Newtonsoft.Json.Formatting.None));
+
+// On failure:
+var err = new JObject {
+    ["source"]   = "aquilo_loadout_event",
+    ["schema"]   = 1,
+    ["widgetId"] = "snd_cheer",
+    ["name"]     = "Cheer",
+    ["result"]   = "failure",
+    ["message"]  = "audio file missing"
+};
+CPH.WebsocketBroadcastJson(err.ToString(Newtonsoft.Json.Formatting.None));
+```
+
+---
+
 ## Loadout switching
 
 The kit ships a special action — **`Aquilo Loadout — Switch`** — that
