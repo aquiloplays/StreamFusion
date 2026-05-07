@@ -1810,6 +1810,9 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(29,185,84,.15);border:1px solid #1db954;color:var(--txt);border-radius:4px" onclick="testEvent('rotation-playing')">♪ Now playing</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(29,185,84,.15);border:1px solid #1db954;color:var(--txt);border-radius:4px" onclick="testEvent('rotation-queued')">♪ Song queued</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(29,185,84,.15);border:1px solid #1db954;color:var(--txt);border-radius:4px" onclick="testEvent('rotation-skipped')">♪ Song skipped</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(245,158,11,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('loadout-fired')">⚙️ Loadout fired</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(245,158,11,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('loadout-success')">⚙️ Loadout success</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(245,158,11,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('loadout-failure')">⚙️ Loadout failure</button>
             </div>
           </div>
           <div class="sec">
@@ -3886,6 +3889,39 @@ function testEvent(kind) {
       break;
     case 'rotation-skipped':
       addEvHistory('♪ Rotation', 'skipped: Test Track', 'rotation', false);
+      break;
+    case 'loadout-fired':
+      // Mimics what _loadoutFireAction now auto-emits when the streamer
+      // clicks a Loadout widget. Useful for confirming the events feed
+      // shows Loadout rows even without a kit emitting outcome events.
+      try {
+        if (typeof addEvHistory === 'function') addEvHistory('Loadout', 'Test Action fired', 'cc', false);
+      } catch (e) {}
+      break;
+    case 'loadout-success':
+      // Mimics a kit broadcasting aquilo_loadout_event with result=success.
+      // Routes through the real handler so any future formatting changes
+      // there get tested too.
+      try {
+        if (typeof _loadoutHandleEvent === 'function') {
+          _loadoutHandleEvent({
+            source: 'aquilo_loadout_event', schema: 1,
+            widgetId: 'snd_test', name: 'Test Action',
+            result: 'success', message: 'played test.mp3'
+          });
+        }
+      } catch (e) {}
+      break;
+    case 'loadout-failure':
+      try {
+        if (typeof _loadoutHandleEvent === 'function') {
+          _loadoutHandleEvent({
+            source: 'aquilo_loadout_event', schema: 1,
+            widgetId: 'snd_test', name: 'Test Action',
+            result: 'failure', message: 'audio file missing'
+          });
+        }
+      } catch (e) {}
       break;
   }
 }
@@ -6115,6 +6151,18 @@ function _loadoutFireAction(spec, runtimeArgs) {
       action:  resolved,
       args:    args
     }));
+    // Auto-surface every fire into the events feed so the streamer sees
+    // activity even when the kit doesn't emit aquilo_loadout_event
+    // outcome broadcasts. Kit-broadcast events still flow through
+    // _loadoutHandleEvent and produce a SECOND row with success/failure
+    // detail when the kit author wires them up — the two rows tell
+    // complementary stories ("I clicked this" + "the side-effect ran").
+    try {
+      if (typeof addEvHistory === 'function') {
+        var label = (spec && (spec.name || spec.actionName)) || resolved.name || 'Action';
+        addEvHistory('Loadout', label + ' fired', 'cc', false);
+      }
+    } catch (e2) {}
   } catch (e) { sysMsg('tw', 'Loadout fire failed: ' + (e && e.message)); }
 }
 
