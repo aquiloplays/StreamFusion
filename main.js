@@ -630,6 +630,165 @@ if (!_gotLock) {
   });
 }
 
+// ── OBS browser-source auto-refresh ─────────────────────────────────────────
+// When SF starts (or auto-updates and re-launches), OBS browser sources
+// pointing at SF's overlay URLs may be stuck on a "this site can't be
+// reached" error page from when SF was off. Browser sources don't auto-
+// retry the page load on failure, so they sit blank until the streamer
+// right-clicks "Refresh cache of current page" on each one. This helper
+// connects to the OBS WebSocket plugin (default port 4455, bundled with
+// OBS Studio 28+), lists every browser-source input, filters to the
+// ones whose URL points at SF's loopback (127.0.0.1 / localhost on
+// ports 8787-8791), and presses the refreshnocache button on each.
+//
+// Best-effort:
+//   - OBS not running / WS plugin off / port mismatch → silently bails
+//   - OBS WS auth enabled and no password stored → silently bails
+//   - User can paste the OBS WS password into Settings to make this
+//     work even with auth on
+//
+// Pure side-effect — no return value, no callback. Failure is invisible
+// by design (we don't want a popup if OBS isn't running on every SF
+// launch).
+function getObsRefreshCfgPath() { return path.join(app.getPath('userData'), 'obs-refresh.json'); }
+function loadObsRefreshCfg() {
+  try {
+    var raw = fs.readFileSync(getObsRefreshCfgPath(), 'utf8');
+    var d = JSON.parse(raw);
+    return {
+      autoRefresh: d.autoRefresh !== false,
+      port:        (typeof d.port === 'number' && d.port > 0) ? d.port : 4455,
+      password:    typeof d.password === 'string' ? d.password : ''
+    };
+  } catch (e) {
+    return { autoRefresh: true, port: 4455, password: '' };
+  }
+}
+function saveObsRefreshCfg(cfg) {
+  try { fs.writeFileSync(getObsRefreshCfgPath(), JSON.stringify(cfg)); } catch (e) {}
+}
+
+function refreshObsBrowserSources(cfg) {
+  cfg = cfg || loadObsRefreshCfg();
+  var WSLib;
+  try { WSLib = require('ws'); } catch (e) { return; }
+  var port     = cfg.port || 4455;
+  var password = cfg.password || '';
+
+  var ws;
+  try { ws = new WSLib('ws://127.0.0.1:' + port); }
+  catch (e) { return; }
+
+  var pending = new Map();        // requestId → metadata
+  // Hard timeout — close after 5s regardless. Catches the "OBS accepted
+  // the WS connection but something downstream is hung" tail.
+  var timer = setTimeout(function() { try { ws.close(); } catch (e) {} }, 5000);
+
+  function send(req) { try { ws.send(JSON.stringify(req)); } catch (e) {} }
+
+  function urlMatchesSF(url) {
+    if (!url) return false;
+    var u = String(url);
+    var ports = [8787, 8788, 8789, 8790, 8791];
+    for (var i = 0; i < ports.length; i++) {
+      if (u.indexOf('127.0.0.1:' + ports[i]) >= 0) return true;
+      if (u.indexOf('localhost:' + ports[i])  >= 0) return true;
+    }
+    return false;
+  }
+
+  ws.on('error', function() { /* OBS not running / WS plugin off / port wrong */ });
+  ws.on('close', function() { try { clearTimeout(timer); } catch (e) {} });
+  ws.on('message', function(raw) {
+    var msg;
+    try { msg = JSON.parse(raw.toString()); } catch (e) { return; }
+
+    if (msg.op === 0) {
+      // Hello — auth section is present iff WS plugin requires it.
+      var auth = msg.d && msg.d.authentication;
+      if (auth) {
+        if (!password) { try { ws.close(); } catch (e) {} return; }
+        // OBS WS v5 auth: response = base64(sha256(secret + challenge))
+        // where secret = base64(sha256(password + salt)).
+        var crypto = require('crypto');
+        var secret   = crypto.createHash('sha256').update(password + auth.salt).digest('base64');
+        var authResp = crypto.createHash('sha256').update(secret + auth.challenge).digest('base64');
+        send({ op: 1, d: { rpcVersion: 1, authentication: authResp } });
+      } else {
+        send({ op: 1, d: { rpcVersion: 1 } });
+      }
+    } else if (msg.op === 2) {
+      // Identified — list browser-source inputs
+      var listId = 'list';
+      pending.set(listId, { kind: 'list' });
+      send({ op: 6, d: { requestType: 'GetInputList', requestId: listId, requestData: { inputKind: 'browser_source' } } });
+    } else if (msg.op === 7) {
+      var d = msg.d;
+      var meta = pending.get(d.requestId);
+      if (!meta) return;
+      pending.delete(d.requestId);
+
+      if (meta.kind === 'list') {
+        var inputs = (d.responseData && d.responseData.inputs) || [];
+        if (!inputs.length) { try { ws.close(); } catch (e) {} return; }
+        meta.expected = inputs.length;
+        meta.checked = 0;
+        meta.matches = 0;
+        // Stash list-meta for cross-reference once settings come back
+        pending.set('list-meta', meta);
+        inputs.forEach(function(input, i) {
+          var sid = 'settings-' + i;
+          pending.set(sid, { kind: 'settings', input: input });
+          send({ op: 6, d: { requestType: 'GetInputSettings', requestId: sid, requestData: { inputName: input.inputName } } });
+        });
+      } else if (meta.kind === 'settings') {
+        var listMeta = pending.get('list-meta');
+        if (listMeta) listMeta.checked += 1;
+        var url = (d.responseData && d.responseData.inputSettings && d.responseData.inputSettings.url) || '';
+        if (urlMatchesSF(url)) {
+          if (listMeta) listMeta.matches += 1;
+          var rid = 'refresh-' + meta.input.inputName;
+          pending.set(rid, { kind: 'refresh', input: meta.input });
+          send({ op: 6, d: { requestType: 'PressInputPropertiesButton', requestId: rid, requestData: {
+            inputName: meta.input.inputName,
+            propertyName: 'refreshnocache'
+          }}});
+        }
+        // After we've checked the last input, close shortly so any
+        // outstanding refresh responses can land first.
+        if (listMeta && listMeta.checked >= listMeta.expected) {
+          if (listMeta.matches > 0) {
+            logToFile('OBS-REFRESH', 'refreshed ' + listMeta.matches + ' SF browser source' + (listMeta.matches === 1 ? '' : 's'));
+          }
+          setTimeout(function() { try { ws.close(); } catch (e) {} }, 400);
+        }
+      }
+    }
+  });
+}
+
+// IPC: let the renderer trigger a manual refresh and read/write the cfg.
+ipcMain.handle('obs-refresh-sources', function() {
+  try { refreshObsBrowserSources(loadObsRefreshCfg()); return { ok: true }; }
+  catch (e) { return { ok: false, error: e && e.message }; }
+});
+ipcMain.handle('obs-refresh-cfg-get', function() {
+  // Don't surface the password back to the renderer — it's stored on
+  // disk in plaintext (same trust level as the user's OBS install) but
+  // there's no need to roundtrip it back through IPC.
+  var c = loadObsRefreshCfg();
+  return { autoRefresh: c.autoRefresh, port: c.port, hasPassword: !!c.password };
+});
+ipcMain.handle('obs-refresh-cfg-set', function(event, patch) {
+  patch = patch || {};
+  var c = loadObsRefreshCfg();
+  if (typeof patch.autoRefresh === 'boolean') c.autoRefresh = patch.autoRefresh;
+  if (typeof patch.port === 'number' && patch.port > 0 && patch.port < 65536) c.port = patch.port;
+  if (typeof patch.password === 'string') c.password = patch.password;
+  saveObsRefreshCfg(c);
+  return { ok: true };
+});
+
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createTray();
@@ -654,6 +813,17 @@ app.whenReady().then(() => {
   // isn't an active Tier 2/3 supporter.
   obsServer.startServer().then(function(ok) {
     if (!ok) logToFile('OBS-SERVER', 'failed to start on default port');
+    // Auto-refresh any OBS browser sources that point at SF's loopback
+    // overlay URLs. Catches the common "SF auto-updated and OBS sources
+    // are still showing the connection-refused error page" case. Best-
+    // effort — silently no-ops if OBS isn't running, the WebSocket
+    // plugin is disabled, or auth is required and we don't have a
+    // password stored. Settings → OBS Overlays → "Auto-refresh OBS on
+    // SF launch" toggles the behaviour.
+    if (ok) setTimeout(function() {
+      var cfg = loadObsRefreshCfg();
+      if (cfg.autoRefresh !== false) refreshObsBrowserSources(cfg);
+    }, 1500);
   }).catch(function(e) {
     logToFile('OBS-SERVER-ERR', 'start threw: ' + (e && e.message));
   });

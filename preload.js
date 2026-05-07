@@ -206,6 +206,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Snapshot of connected Aquilo products. Used by the now-playing card
   // to find a 'aquilo-spotify-widget' entry and read its meta + clientId.
   obsIntegrationList:   ()             => ipcRenderer.invoke('obs-integration-list'),
+  // OBS browser-source auto-refresh — connects to the OBS WebSocket
+  // plugin, lists browser sources, and refreshes those whose URL
+  // points at SF's loopback overlay ports. Used to recover OBS
+  // sources stuck on a "this site can't be reached" error page after
+  // SF auto-update / restart.
+  obsRefreshSources:    ()             => ipcRenderer.invoke('obs-refresh-sources'),
+  obsRefreshCfgGet:     ()             => ipcRenderer.invoke('obs-refresh-cfg-get'),
+  obsRefreshCfgSet:     (patch)        => ipcRenderer.invoke('obs-refresh-cfg-set', patch || {}),
 
   // ── Discord integration (EA-only) ────────────────────────────────────────
   // Webhook POST — fires a stylized embed to a Discord webhook URL. The

@@ -2479,6 +2479,22 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                 Checking&hellip;
               </div>
             </div>
+            <div class="sec">
+              <div class="sec-hd">Auto-refresh OBS browser sources</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When SF starts (or auto-updates and re-launches), browser sources in OBS that point at SF overlay URLs may be stuck on a "this site can't be reached" error from when SF was off. Browser sources don't auto-retry, so they sit blank until you manually refresh each one. Enable this to have SF connect to the OBS WebSocket plugin on launch and refresh those sources for you.</div>
+              <label class="frow" style="font-size:11px;margin-bottom:6px"><span>Auto-refresh on SF launch</span><input type="checkbox" id="obsAutoRefresh" onchange="onObsRefreshCfgChange()"></label>
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+                <label style="flex:0 0 auto;font-size:11px;color:var(--mut)">OBS WebSocket port</label>
+                <input id="obsRefreshPort" type="number" min="1" max="65535" value="4455" onchange="onObsRefreshCfgChange()" style="width:74px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                <span style="font-size:10px;color:var(--mut)">(default 4455)</span>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+                <label style="flex:0 0 auto;font-size:11px;color:var(--mut);min-width:155px">OBS WebSocket password</label>
+                <input id="obsRefreshPassword" type="password" placeholder="leave blank if auth is off" onchange="onObsRefreshCfgChange()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 8px;border-radius:4px;font-size:11px;font-family:ui-monospace,monospace">
+              </div>
+              <div id="obsRefreshPwHint" style="font-size:10px;color:var(--mut);margin-bottom:8px;line-height:1.5">Find this in OBS &rarr; Tools &rarr; WebSocket Server Settings &rarr; Show Connect Info. Stored locally on your machine; never leaves SF.</div>
+              <button class="cbtn tw" style="font-size:11px;height:28px;padding:0 12px" onclick="onObsRefreshNow()">Refresh OBS sources now</button>
+            </div>
           </div>
         </div>
 
@@ -8408,6 +8424,10 @@ function renderObsOverlaysTab() {
       setVal('obsUrlShoutout', u.shoutout);
       setVal('obsUrlVertical', u.vertical);
       setVal('obsUrlTicker',   u.ticker);
+      // Hydrate auto-refresh cfg now that the panel is mounted. Same
+      // call site is fine because the panel renders once on EA unlock
+      // and stays around — the underlying cfg comes from main process.
+      try { if (typeof _hydrateObsRefreshCfg === 'function') _hydrateObsRefreshCfg(); } catch (e) {}
       // Boot the Aquilo product registry tracker now that we know the
       // obs-server base URL. Snapshot once, then keep an SSE connection
       // open so registered/unregistered events update the panel live.
@@ -8508,6 +8528,63 @@ function renderObsOverlaysTab() {
     if (get('obsTickerShowEmotes'))       get('obsTickerShowEmotes').checked = c.ticker.showEmotes !== false;
     if (get('obsTickerMaxQueue'))         get('obsTickerMaxQueue').value = c.ticker.maxQueue || 50;
   }
+}
+
+// Auto-refresh-OBS handlers. The cfg lives on disk (main process owns
+// it via obs-refresh.json) — the renderer is just a UI face for it.
+// The password input never reads back from disk; it's write-only from
+// the renderer's perspective. Field clears on panel reload to avoid
+// a half-typed password lingering in DOM after the user navigates.
+function _hydrateObsRefreshCfg() {
+  if (!window.electronAPI || !window.electronAPI.obsRefreshCfgGet) return;
+  window.electronAPI.obsRefreshCfgGet().then(function(c) {
+    if (!c) return;
+    var auto = document.getElementById('obsAutoRefresh');
+    var port = document.getElementById('obsRefreshPort');
+    var pwHint = document.getElementById('obsRefreshPwHint');
+    var pwInput = document.getElementById('obsRefreshPassword');
+    if (auto) auto.checked = c.autoRefresh !== false;
+    if (port) port.value = c.port || 4455;
+    if (pwInput) pwInput.placeholder = c.hasPassword ? '(stored — paste again to change)' : 'leave blank if auth is off';
+    if (pwHint && c.hasPassword) {
+      pwHint.innerHTML = '<strong style="color:var(--ok,#22c55e)">&#10003; Password saved.</strong> Find this in OBS &rarr; Tools &rarr; WebSocket Server Settings &rarr; Show Connect Info. Stored locally on your machine.';
+    }
+  }).catch(function() {});
+}
+function onObsRefreshCfgChange() {
+  if (!window.electronAPI || !window.electronAPI.obsRefreshCfgSet) return;
+  var auto = document.getElementById('obsAutoRefresh');
+  var port = document.getElementById('obsRefreshPort');
+  var pw   = document.getElementById('obsRefreshPassword');
+  var patch = {};
+  if (auto) patch.autoRefresh = !!auto.checked;
+  if (port) patch.port = parseInt(port.value, 10) || 4455;
+  // Only push the password when the user actually typed something —
+  // an empty input shouldn't clobber a stored password just because
+  // they tabbed through.
+  if (pw && pw.value) patch.password = pw.value;
+  window.electronAPI.obsRefreshCfgSet(patch).then(function() {
+    // Clear the live password input so it doesn't sit in DOM. The hint
+    // updates to confirm save.
+    if (pw && pw.value) { pw.value = ''; }
+    _hydrateObsRefreshCfg();
+  }).catch(function() {});
+}
+function onObsRefreshNow() {
+  if (!window.electronAPI || !window.electronAPI.obsRefreshSources) return;
+  // Push any unsaved password change first so the in-flight refresh
+  // sees the latest value.
+  var pw = document.getElementById('obsRefreshPassword');
+  var savePromise = (pw && pw.value)
+    ? window.electronAPI.obsRefreshCfgSet({ password: pw.value }).then(function() { pw.value = ''; _hydrateObsRefreshCfg(); })
+    : Promise.resolve();
+  savePromise.then(function() {
+    window.electronAPI.obsRefreshSources().then(function() {
+      addEvHistory('StreamFusion', 'Sent refresh request to OBS WebSocket. Browser sources pointing at SF will reload.', 'tw', false);
+    }).catch(function(e) {
+      addEvHistory('StreamFusion', 'OBS refresh failed: ' + ((e && e.message) || 'OBS not reachable'), 'tw', false);
+    });
+  });
 }
 
 function copyObsUrl(which) {
