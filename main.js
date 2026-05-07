@@ -937,12 +937,53 @@ function maybeShowLegacyBetaNotice() {
   }, 1200);
 }
 
+// 1.6.0+: streamers actually running FROM the beta variant (detected
+// by _isBetaVariant — the install path / app name has 'beta' in it)
+// need a different prompt: tell them to download the merged main app
+// because the beta channel is going away. _isBetaVariant returns false
+// in stable runs, so this notice only fires for users who install the
+// 1.6.0-beta.x build into the StreamFusion Beta install path. They
+// click through to the public stable download, install it (lands at
+// the regular StreamFusion path), and from then on auto-update via
+// the stable channel.
+function _betaVariantNoticePath() { return path.join(app.getPath('userData'), 'beta-variant-migration-notice-shown.json'); }
+function maybeShowBetaVariantMigrationNotice() {
+  if (!_isBetaVariant()) return;
+  try { if (fs.existsSync(_betaVariantNoticePath())) return; } catch (e) {}
+  setTimeout(function() {
+    var choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      buttons: ['Open download page', 'Dismiss', 'Don\'t show again'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'StreamFusion Beta is being merged into the main app',
+      message: 'You\'re running StreamFusion Beta — the beta variant is going away.',
+      detail:
+        'In StreamFusion 1.6 the Beta variant has been merged back into the main app. ' +
+        'Tier 3 features now unlock the moment you sign in with Patreon — no separate ' +
+        'StreamFusion Beta install needed.\n\n' +
+        'To migrate: download the latest StreamFusion from the releases page and run ' +
+        'the installer. Your settings are stored under your user profile and will not be ' +
+        'lost. Once the new StreamFusion is running you can uninstall this Beta variant.\n\n' +
+        '"Open download page" launches the StreamFusion releases page in your browser.'
+    });
+    if (choice === 0) {
+      try { shell.openExternal('https://github.com/aquiloplays/StreamFusion/releases/latest'); } catch (e) {}
+      try { fs.writeFileSync(_betaVariantNoticePath(), JSON.stringify({ at: Date.now() })); } catch (e) {}
+    } else if (choice === 2) {
+      try { fs.writeFileSync(_betaVariantNoticePath(), JSON.stringify({ at: Date.now() })); } catch (e) {}
+    }
+    // Dismiss leaves the marker absent so we re-prompt next launch.
+  }, 1500);
+}
+
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createTray();
   createWindow();
   startCtrlPoller();
   maybeShowLegacyBetaNotice();
+  maybeShowBetaVariantMigrationNotice();
 
   // Patreon + Discord entitlement services. Both are optional sign-ins;
   // the app boots for everyone. Users get EA features if EITHER path
