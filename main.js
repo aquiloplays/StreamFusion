@@ -883,10 +883,12 @@ ipcMain.handle('is-beta', () => _isBetaVariant());
 // message or the streamer clicks a shoutout, it forwards the payload
 // here, and we fan it out to every connected OBS browser source.
 ipcMain.on('obs-broadcast-chat', function(event, data) {
-  // Chat messages fan out to BOTH the horizontal chat overlay AND the
-  // vertical bar overlay. Vertical decides for itself (via its config)
-  // whether chat rows should display; no harm in forwarding always.
-  try { obsServer.broadcast('chat', data, ['chat', 'vertical']); } catch (e) {}
+  // Chat messages fan out to the horizontal chat overlay, the vertical
+  // bar overlay, AND the horizontal scrolling ticker. Each overlay
+  // decides for itself (via its config) whether to render the row;
+  // forwarding always is cheap and keeps the dispatch logic on the
+  // overlay side.
+  try { obsServer.broadcast('chat', data, ['chat', 'vertical', 'ticker']); } catch (e) {}
 });
 ipcMain.on('obs-broadcast-alert', function(event, data) {
   // Alerts fan out to the alerts banner, the vertical bar, AND the chat

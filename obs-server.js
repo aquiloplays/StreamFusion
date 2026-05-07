@@ -34,7 +34,7 @@ let heartbeatTimer = null;
 // Last-known state per overlay — replayed to new clients so OBS browser
 // sources render immediately on (re)connect without waiting for the next
 // live event. Covers the "streamer reloads OBS scene" case gracefully.
-let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {} };
+let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {} };
 
 // ── Aquilo product integration registry ────────────────────────────────────
 // Companion products (Aquilo Spotify widget, Aquilo Streamer.Bot kit, future
@@ -158,6 +158,7 @@ function landingPage() {
          '<li><div class="lbl">Alerts banner</div><code>' + urls.alerts + '</code></li>' +
          '<li><div class="lbl">Shoutout card</div><code>' + urls.shoutout + '</code></li>' +
          '<li><div class="lbl">Vertical bar</div><code>' + urls.vertical + '</code></li>' +
+         '<li><div class="lbl">Horizontal ticker</div><code>' + urls.ticker + '</code></li>' +
          '</ul><p class="hint">These URLs work only while StreamFusion is running. Set the browser source width/height in OBS as needed — overlays are transparent-backed.</p></body></html>';
 }
 
@@ -209,12 +210,13 @@ function handleRequest(req, res) {
 
   // Gating: overlays return a branded "requires EA" page if not entitled.
   // Keeps the streamer from wondering why their OBS is blank.
-  if (p === '/chat' || p === '/alerts' || p === '/shoutout' || p === '/vertical') {
+  if (p === '/chat' || p === '/alerts' || p === '/shoutout' || p === '/vertical' || p === '/ticker') {
     if (!isEntitled) { serveHtml(res, gatedPage()); return; }
     var file = (p === '/chat')      ? 'chat.html'
              : (p === '/alerts')    ? 'alerts.html'
              : (p === '/shoutout')  ? 'shoutout.html'
-             : 'vertical.html';
+             : (p === '/vertical')  ? 'vertical.html'
+             : 'ticker.html';
     serveHtml(res, readOverlayFile(file));
     return;
   }
@@ -546,6 +548,7 @@ function getUrls() {
     alerts:      base + '/alerts',
     shoutout:    base + '/shoutout',
     vertical:    base + '/vertical',
+    ticker:      base + '/ticker',
     // The renderer compares port vs defaultPort to decide whether to
     // show a "port shifted — update your OBS sources" banner. Set after
     // a successful bind so the value is always live.

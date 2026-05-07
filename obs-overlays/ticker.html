@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StreamFusion — Chat Ticker</title>
+<style>
+  /* ───────────────────────────────────────────────────────────────────────
+     StreamFusion OBS chat ticker — horizontal-bar overlay where chat
+     messages slide right-to-left across the bar as they arrive.
+
+     Layout:
+       <body><div #track>  <— the moving viewport (overflow:hidden)
+         <div .chip>        <— each chat msg, position:absolute right-edge
+         <div .chip>...
+       </div></body>
+
+     Each chip spawns at right:0 with `transform: translateX(100%)` (one
+     full chip-width off the right edge), then animates leftward by the
+     viewport width plus its own width, ending fully off-screen-left,
+     where it gets removed from the DOM.
+
+     Why CSS animation rather than per-frame JS positioning:
+       - The OBS browser source already runs a hardware-accelerated
+         compositor; CSS transforms stay on the GPU layer.
+       - Animation duration is the streamer's "speed" knob — single CSS
+         variable, no JS scheduler bookkeeping.
+       - Browser handles pause/resume on tab visibility automatically.
+
+     Chip spawn pacing: the next chip waits at least MIN_SPAWN_GAP_MS
+     after the previous one before starting its animation. Without this
+     a sub-bomb burst would crash chips into each other unreadably.
+     Streamers can tune this implicitly via scrollDur (slower scroll →
+     longer spawn gap derived from chip travel speed).
+     ─────────────────────────────────────────────────────────────────── */
+
+  :root {
+    --font-size: 18px;
+    --bar-height: 56px;
+    --bar-bg-op: 0;            /* 0 = transparent. >0 paints a panel. */
+    --bar-color: 14, 14, 16;
+    --scroll-dur: 22s;         /* full traverse: right-edge → fully off-left */
+    --tw: #a970ff;
+    --yt: #ff4545;
+    --tt: #fe2c55;
+    --kk: #53fc18;
+    --rotation: #1db954;
+    --text: #fff;
+    --mut: #cfd2dc;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--text);
+  }
+
+  /* The track is a horizontal strip pinned to the bottom (default) of the
+     OBS source. Streamers can override `bar-position` config to switch
+     anchor to top via the position-top body class. */
+  #track {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 0;
+    height: var(--bar-height);
+    overflow: hidden;
+    background: rgba(var(--bar-color), var(--bar-bg-op));
+    box-shadow: 0 -1px 0 rgba(255,255,255,calc(var(--bar-bg-op) * 0.15)) inset;
+    /* Isolate the compositor layer — chip animations stay on the GPU
+       and don't invalidate sibling layers. */
+    contain: layout paint;
+    transform: translateZ(0);
+  }
+  body.position-top #track { bottom: auto; top: 0; box-shadow: 0 1px 0 rgba(255,255,255,calc(var(--bar-bg-op) * 0.15)) inset; }
+
+  /* Chip = one chat row. Pinned to right edge, starts off-screen-right,
+     slides leftward to off-screen-left over scrollDur. The
+     translateX(100%) start is one chip-width past the right edge so
+     the chip enters smoothly without popping in. The end translates
+     by -100vw - 100% (full viewport plus chip width) so the chip
+     fully exits before being removed. */
+  .chip {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    height: calc(var(--bar-height) - 12px);
+    white-space: nowrap;
+    font-size: var(--font-size);
+    line-height: 1.2;
+    transform: translate(100%, -50%);
+    animation: tickScroll var(--scroll-dur) linear forwards;
+    will-change: transform;
+  }
+  @keyframes tickScroll {
+    from { transform: translate(100%, -50%); }
+    to   { transform: translate(calc(-100vw - 100%), -50%); }
+  }
+
+  .chip.tw       { color: var(--tw); }
+  .chip.yt       { color: var(--yt); }
+  .chip.tt       { color: var(--tt); }
+  .chip.kk       { color: var(--kk); }
+  .chip.rotation { color: var(--rotation); }
+
+  /* Avatar / pico chip on the left of each row. Falls back to a
+     platform-tinted square when no avatar URL is provided. */
+  .chip .pfp {
+    width: calc(var(--font-size) + 8px);
+    height: calc(var(--font-size) + 8px);
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255,255,255,.08);
+    flex-shrink: 0;
+  }
+  .chip .pi {
+    width: calc(var(--font-size) + 4px);
+    height: calc(var(--font-size) + 4px);
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #fff;
+    font-weight: 900;
+    font-size: calc(var(--font-size) - 6px);
+    letter-spacing: .3px;
+  }
+  .chip .pi.tw       { background: var(--tw); }
+  .chip .pi.yt       { background: var(--yt); }
+  .chip .pi.tt       { background: var(--tt); }
+  .chip .pi.kk       { background: var(--kk); color: #0e0e10; }
+  .chip .pi.rotation { background: var(--rotation); color: #0e0e10; }
+  .chip .pi.rotation svg { width: calc(var(--font-size) - 4px); height: calc(var(--font-size) - 4px); display: block; }
+
+  .chip .u {
+    font-weight: 900;
+    /* lean text-shadow recipe — same legibility approach as the
+       vertical overlay's beta.9 reset, two diagonal hard offsets +
+       one soft halo. Keeps text readable on bright scenes without
+       stacking 6 shadow layers per chip. */
+    text-shadow:
+      1px 1px 0 rgba(0,0,0,.95),
+     -1px -1px 0 rgba(0,0,0,.95),
+       0 0 6px rgba(0,0,0,.85);
+  }
+  .chip .sep { color: rgba(255,255,255,.85); margin: 0 4px; text-shadow: 1px 1px 0 rgba(0,0,0,.85); }
+  .chip .m {
+    color: var(--text);
+    font-weight: 500;
+    text-shadow:
+      1px 1px 0 rgba(0,0,0,.95),
+     -1px -1px 0 rgba(0,0,0,.95),
+       0 0 6px rgba(0,0,0,.85);
+  }
+  .chip .m img.emote { height: 1.1em; width: auto; vertical-align: middle; margin: 0 2px; }
+
+  /* Gated state — non-entitled installs show a small inline marker so
+     the streamer realizes the source needs Patreon Tier 2/3. */
+  #gated {
+    position: absolute;
+    left: 12px; bottom: 12px;
+    display: none;
+    background: rgba(14,14,16,.85);
+    border: 1px solid rgba(255,66,77,.5);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #ff424d;
+    backdrop-filter: blur(8px);
+  }
+  #gated.show { display: block; }
+
+  /* Empty-state hint — shown for ~10s after load if no msgs arrive. */
+  #hint {
+    position: absolute;
+    left: 12px; bottom: calc(var(--bar-height) + 8px);
+    font-size: 11px;
+    color: rgba(207,210,220,.55);
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+    opacity: 0;
+    transition: opacity .3s ease;
+    pointer-events: none;
+  }
+  #hint.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="track" aria-hidden="false"></div>
+<div id="gated">Patreon Early Access required<br><span style="font-size:11px;color:#adadb8;letter-spacing:.04em;text-transform:none;font-weight:600">Connect in StreamFusion → Settings → Early Access</span></div>
+<div id="hint">StreamFusion ticker — waiting for messages…</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var CFG = {
+    fontSize:        18,
+    barHeight:       56,
+    bgOpacity:       0,
+    scrollDurSec:    22,        // seconds for a chip to traverse the whole strip
+    position:        'bottom',  // 'bottom' | 'top'
+    showAvatars:     true,
+    showPlatformIcon: true,
+    showEmotes:      true,
+    showPlatforms:   { tw: true, yt: true, tt: true, kk: true, rotation: true },
+    maxQueue:        50,
+  };
+
+  var track = document.getElementById('track');
+  var gated = document.getElementById('gated');
+  var hint  = document.getElementById('hint');
+
+  // Pacing: the next chip starts after at least this many ms past the
+  // previous spawn. Derived from scrollDur so faster scrolls allow
+  // tighter spawn cadence without chips overlapping unreadably.
+  function spawnGapMs() {
+    // Roughly: chips should spawn just after their predecessor clears
+    // the right ~25% of the viewport. With duration D and travel of
+    // (100vw + 100%), that's ~D * 0.18 (~4s on a 22s default).
+    return Math.max(450, Math.round(CFG.scrollDurSec * 1000 * 0.18));
+  }
+
+  var pendingQueue = [];
+  var lastSpawnAt = 0;
+  var spawnTimer = null;
+
+  function scheduleSpawn() {
+    if (spawnTimer) return;
+    var now = Date.now();
+    var wait = Math.max(0, spawnGapMs() - (now - lastSpawnAt));
+    spawnTimer = setTimeout(function() {
+      spawnTimer = null;
+      if (!pendingQueue.length) return;
+      var msg = pendingQueue.shift();
+      spawnChip(msg);
+      lastSpawnAt = Date.now();
+      if (pendingQueue.length) scheduleSpawn();
+    }, wait);
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function renderMessage(text, emotes) {
+    if (!CFG.showEmotes || !emotes || !emotes.length) return escapeHtml(text);
+    var byName = Object.create(null);
+    emotes.forEach(function(e) { if (e && e.name && e.url) byName[e.name] = e.url; });
+    return String(text || '').split(/(\s+)/).map(function(tok) {
+      if (byName[tok]) return '<img class="emote" src="' + byName[tok] + '" alt="' + escapeHtml(tok) + '" onerror="this.outerHTML=this.alt">';
+      return escapeHtml(tok);
+    }).join('');
+  }
+
+  function renderPfp(m) {
+    if (!CFG.showAvatars) return '';
+    if (m.avatar) {
+      return '<img class="pfp" src="' + escapeHtml(m.avatar) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+    }
+    return '';
+  }
+
+  function renderPlatIcon(plat) {
+    if (!CFG.showPlatformIcon || !plat) return '';
+    if (plat === 'rotation') {
+      return '<span class="pi rotation"><svg viewBox="0 0 24 24" fill="currentColor">'
+           + '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/>'
+           + '</svg></span>';
+    }
+    var label = { tw: 'TW', yt: 'YT', tt: 'TT', kk: 'KK' }[plat] || plat.toUpperCase();
+    return '<span class="pi ' + plat + '">' + label + '</span>';
+  }
+
+  function spawnChip(m) {
+    if (hint) hint.classList.remove('show');
+    var plat = (m.platform || '').toLowerCase();
+    if (plat && CFG.showPlatforms && CFG.showPlatforms[plat] === false) return;
+
+    var div = document.createElement('div');
+    div.className = 'chip ' + plat;
+    var userColor = m.userColor ? ' style="color:' + escapeHtml(m.userColor) + ';"' : '';
+    div.innerHTML =
+      renderPfp(m) +
+      renderPlatIcon(plat) +
+      '<span class="u"' + userColor + '>' + escapeHtml(m.user || 'anon') + '</span>' +
+      '<span class="sep">:</span>' +
+      '<span class="m">' + renderMessage(m.message || '', m.emotes) + '</span>';
+    track.appendChild(div);
+
+    // Remove the chip after the animation finishes. animationend would
+    // also work, but a hard timeout keeps cleanup deterministic when
+    // the tab loses focus and animations pause/resume.
+    var lifeMs = CFG.scrollDurSec * 1000 + 500;
+    setTimeout(function() {
+      if (div.parentNode) div.parentNode.removeChild(div);
+    }, lifeMs);
+  }
+
+  function enqueueMessage(m) {
+    if (!m) return;
+    pendingQueue.push(m);
+    // Drop oldest if we're past the queue cap — better to lose the
+    // oldest unread message than starve newer ones during a burst.
+    while (pendingQueue.length > CFG.maxQueue) pendingQueue.shift();
+    scheduleSpawn();
+  }
+
+  function applyConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return;
+    Object.keys(cfg).forEach(function(k) { CFG[k] = cfg[k]; });
+    var root = document.documentElement;
+    root.style.setProperty('--font-size',  (CFG.fontSize  || 18) + 'px');
+    root.style.setProperty('--bar-height', (CFG.barHeight || 56) + 'px');
+    root.style.setProperty('--bar-bg-op',  String(CFG.bgOpacity != null ? CFG.bgOpacity : 0));
+    root.style.setProperty('--scroll-dur', (CFG.scrollDurSec || 22) + 's');
+    document.body.classList.toggle('position-top', CFG.position === 'top');
+  }
+
+  function setEntitled(v) {
+    gated.classList.toggle('show', !v);
+    track.style.display = v ? '' : 'none';
+  }
+
+  // The ticker subscribes to the same /events stream as the other
+  // overlays — the server uses the ?type filter to fan out. 'ticker'
+  // type is added so server can short-circuit non-relevant events.
+  var es = new EventSource('/events?type=ticker');
+  es.addEventListener('hello', function(e) {
+    try { var d = JSON.parse(e.data); if (d.cfg) applyConfig(d.cfg); setEntitled(!!d.entitled); } catch (err) {}
+  });
+  es.addEventListener('chat', function(e) {
+    try { enqueueMessage(JSON.parse(e.data)); } catch (err) {}
+  });
+  es.addEventListener('config', function(e) {
+    try { applyConfig(JSON.parse(e.data)); } catch (err) {}
+  });
+  es.addEventListener('entitlement', function(e) {
+    try { setEntitled(!!JSON.parse(e.data).entitled); } catch (err) {}
+  });
+  es.addEventListener('shutdown', function() { es.close(); });
+
+  setTimeout(function() {
+    if (!track.children.length && !gated.classList.contains('show')) hint.classList.add('show');
+  }, 10000);
+})();
+</script>
+</body>
+</html>

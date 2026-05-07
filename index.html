@@ -2417,6 +2417,38 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
                 </div>
               </div>
+              <!-- Horizontal ticker overlay row -->
+              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Horizontal Ticker</span>
+                  <span style="font-size:10px;color:var(--mut)">Right-to-left scrolling chat strip — drop on top or bottom of your scene</span>
+                  <span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:700;background:rgba(58,134,255,0.1);padding:2px 8px;border-radius:4px" title="Recommended OBS browser source dimensions (full-width strip)">Recommended: 1920 &times; 60</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input id="obsUrlTicker" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                  <button class="cbtn tw" onclick="copyObsUrl('ticker')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  <button class="cbtn" onclick="previewObsUrl('ticker')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
+                </div>
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsTickerFontSize" min="12" max="40" value="18" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px"><span>Bar height (px)</span><input type="number" id="obsTickerBarHeight" min="32" max="120" value="56" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px" title="Higher = slower scroll. 22s is roughly 'reading speed' for a one-line message on a 1080p source."><span>Scroll duration (s)</span><input type="number" id="obsTickerScrollDur" min="8" max="60" value="22" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px"><span>Bar opacity</span><input type="range" id="obsTickerBgOpacity" min="0" max="100" value="0" onchange="updateObsConfig('ticker')" style="width:80px"></label>
+                    <label class="frow" style="font-size:11px" title="Where the ticker strip anchors on the OBS source — bottom (default) or top."><span>Position</span>
+                      <select id="obsTickerPosition" onchange="updateObsConfig('ticker')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="bottom">Bottom</option>
+                        <option value="top">Top</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px" title="Hard cap on pending messages. Beyond this the OLDEST queued message gets dropped — better to lose stale msgs than starve newer ones during a sub-bomb."><span>Max queue depth</span><input type="number" id="obsTickerMaxQueue" min="10" max="200" value="50" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px"><span>Profile pictures</span><input type="checkbox" id="obsTickerShowAvatars" checked onchange="updateObsConfig('ticker')"></label>
+                    <label class="frow" style="font-size:11px"><span>Platform icon</span><input type="checkbox" id="obsTickerShowPlatformIcon" checked onchange="updateObsConfig('ticker')"></label>
+                    <label class="frow" style="font-size:11px"><span>Emotes</span><input type="checkbox" id="obsTickerShowEmotes" checked onchange="updateObsConfig('ticker')"></label>
+                  </div>
+                  <div style="font-size:10px;color:var(--mut);margin-top:8px;line-height:1.5">Each chat message slides in from the right edge of the strip and exits on the left. Faster scroll = tighter spawn cadence. The strip is full-width on the OBS source — pick recommended 1920&times;<em>barHeight</em> for a 1080p stream and drop it as a top or bottom band over your scene.</div>
+                </div>
+              </div>
               <!-- Shoutout overlay row -->
               <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
@@ -8375,6 +8407,7 @@ function renderObsOverlaysTab() {
       setVal('obsUrlAlerts',   u.alerts);
       setVal('obsUrlShoutout', u.shoutout);
       setVal('obsUrlVertical', u.vertical);
+      setVal('obsUrlTicker',   u.ticker);
       // Boot the Aquilo product registry tracker now that we know the
       // obs-server base URL. Snapshot once, then keep an SSE connection
       // open so registered/unregistered events update the panel live.
@@ -8464,6 +8497,17 @@ function renderObsOverlaysTab() {
     if (get('obsVerticalShowPlatformIcon'))     get('obsVerticalShowPlatformIcon').checked = !!c.vertical.showPlatformIcon;
     if (get('obsVerticalShowUserBadges'))       get('obsVerticalShowUserBadges').checked = c.vertical.showUserBadges !== false;
   }
+  if (c.ticker) {
+    if (get('obsTickerFontSize'))         get('obsTickerFontSize').value = c.ticker.fontSize || 18;
+    if (get('obsTickerBarHeight'))        get('obsTickerBarHeight').value = c.ticker.barHeight || 56;
+    if (get('obsTickerBgOpacity'))        get('obsTickerBgOpacity').value = Math.round((c.ticker.bgOpacity != null ? c.ticker.bgOpacity : 0) * 100);
+    if (get('obsTickerScrollDur'))        get('obsTickerScrollDur').value = c.ticker.scrollDurSec || 22;
+    if (get('obsTickerPosition'))         get('obsTickerPosition').value = c.ticker.position || 'bottom';
+    if (get('obsTickerShowAvatars'))      get('obsTickerShowAvatars').checked = c.ticker.showAvatars !== false;
+    if (get('obsTickerShowPlatformIcon')) get('obsTickerShowPlatformIcon').checked = c.ticker.showPlatformIcon !== false;
+    if (get('obsTickerShowEmotes'))       get('obsTickerShowEmotes').checked = c.ticker.showEmotes !== false;
+    if (get('obsTickerMaxQueue'))         get('obsTickerMaxQueue').value = c.ticker.maxQueue || 50;
+  }
 }
 
 function copyObsUrl(which) {
@@ -8503,7 +8547,8 @@ function previewObsUrl(which) {
     chat:     { w: 360, h: 520 },
     alerts:   { w: 720, h: 220 },
     shoutout: { w: 720, h: 300 },
-    vertical: { w: 720, h: 140 }
+    vertical: { w: 720, h: 140 },
+    ticker:   { w: 920, h: 80 }
   }[which] || { w: 560, h: 400 };
 
   m.innerHTML = ''
@@ -9022,6 +9067,20 @@ function updateObsConfig(which) {
       showPlatforms:      S.show || { tw: true, yt: true, tt: true, kk: true }
     };
     S.obsCfg.vertical = cfg;
+  } else if (which === 'ticker') {
+    cfg = {
+      fontSize:         parseInt((get('obsTickerFontSize') || {}).value, 10) || 18,
+      barHeight:        parseInt((get('obsTickerBarHeight') || {}).value, 10) || 56,
+      bgOpacity:        (parseInt((get('obsTickerBgOpacity') || {}).value, 10) || 0) / 100,
+      scrollDurSec:     parseInt((get('obsTickerScrollDur') || {}).value, 10) || 22,
+      position:         ((get('obsTickerPosition') || {}).value) || 'bottom',
+      showAvatars:      !!(get('obsTickerShowAvatars')      && get('obsTickerShowAvatars').checked),
+      showPlatformIcon: !!(get('obsTickerShowPlatformIcon') && get('obsTickerShowPlatformIcon').checked),
+      showEmotes:       !!(get('obsTickerShowEmotes')       && get('obsTickerShowEmotes').checked),
+      maxQueue:         parseInt((get('obsTickerMaxQueue') || {}).value, 10) || 50,
+      showPlatforms:    S.show || { tw: true, yt: true, tt: true, kk: true, rotation: true }
+    };
+    S.obsCfg.ticker = cfg;
   }
   window.electronAPI.obsSetConfig(which, cfg);
   if (typeof saveSettings === 'function') saveSettings();
