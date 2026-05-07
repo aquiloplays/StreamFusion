@@ -2482,7 +2482,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec">
               <div class="sec-hd">Auto-refresh OBS browser sources</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When SF starts (or auto-updates and re-launches), browser sources in OBS that point at SF overlay URLs may be stuck on a "this site can't be reached" error from when SF was off. Browser sources don't auto-retry, so they sit blank until you manually refresh each one. Enable this to have SF connect to the OBS WebSocket plugin on launch and refresh those sources for you.</div>
-              <label class="frow" style="font-size:11px;margin-bottom:6px"><span>Auto-refresh on SF launch</span><input type="checkbox" id="obsAutoRefresh" onchange="onObsRefreshCfgChange()"></label>
+              <label class="frow" style="font-size:11px;margin-bottom:6px"><span>Auto-refresh on SF launch</span><input type="checkbox" id="obsAutoRefresh" checked onchange="onObsRefreshCfgChange()"></label>
               <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
                 <label style="flex:0 0 auto;font-size:11px;color:var(--mut)">OBS WebSocket port</label>
                 <input id="obsRefreshPort" type="number" min="1" max="65535" value="4455" onchange="onObsRefreshCfgChange()" style="width:74px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
