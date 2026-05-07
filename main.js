@@ -668,16 +668,32 @@ function saveObsRefreshCfg(cfg) {
   try { fs.writeFileSync(getObsRefreshCfgPath(), JSON.stringify(cfg)); } catch (e) {}
 }
 
+// Last refresh outcome — surfaced to the renderer via obs-refresh-cfg-get
+// so the settings panel can show the streamer whether the auto-refresh
+// actually did anything ("✓ Refreshed 3 sources @ 14:32" / "OBS not
+// detected" / "auth required — paste WS password" / etc). Without this
+// the streamer has no signal whether the feature is wired up correctly.
+var _lastObsRefresh = { outcome: null, matches: 0, at: 0, message: '' };
+
+function _setObsRefreshOutcome(outcome, message, matches) {
+  _lastObsRefresh = {
+    outcome: outcome,                              // 'success' | 'no_obs' | 'auth_required' | 'error'
+    matches: typeof matches === 'number' ? matches : 0,
+    at:      Date.now(),
+    message: message || ''
+  };
+}
+
 function refreshObsBrowserSources(cfg) {
   cfg = cfg || loadObsRefreshCfg();
   var WSLib;
-  try { WSLib = require('ws'); } catch (e) { return; }
+  try { WSLib = require('ws'); } catch (e) { _setObsRefreshOutcome('error', 'ws module unavailable', 0); return; }
   var port     = cfg.port || 4455;
   var password = cfg.password || '';
 
   var ws;
   try { ws = new WSLib('ws://127.0.0.1:' + port); }
-  catch (e) { return; }
+  catch (e) { _setObsRefreshOutcome('no_obs', 'connect threw: ' + (e && e.message), 0); return; }
 
   var pending = new Map();        // requestId → metadata
   // Hard timeout — close after 5s regardless. Catches the "OBS accepted
@@ -697,7 +713,18 @@ function refreshObsBrowserSources(cfg) {
     return false;
   }
 
-  ws.on('error', function() { /* OBS not running / WS plugin off / port wrong */ });
+  ws.on('error', function(err) {
+    // ECONNREFUSED is the common case — OBS not running or WS plugin off.
+    var m = (err && err.message) || '';
+    var code = err && err.code;
+    if (code === 'ECONNREFUSED' || /ECONNREFUSED/i.test(m)) {
+      _setObsRefreshOutcome('no_obs', 'OBS not detected on port ' + port, 0);
+    } else if (!_lastObsRefresh.at || Date.now() - _lastObsRefresh.at > 1000) {
+      // Don't clobber a more specific outcome (e.g. auth_required) that
+      // the message handler may have already set.
+      _setObsRefreshOutcome('error', m || 'connection error', 0);
+    }
+  });
   ws.on('close', function() { try { clearTimeout(timer); } catch (e) {} });
   ws.on('message', function(raw) {
     var msg;
@@ -707,7 +734,10 @@ function refreshObsBrowserSources(cfg) {
       // Hello — auth section is present iff WS plugin requires it.
       var auth = msg.d && msg.d.authentication;
       if (auth) {
-        if (!password) { try { ws.close(); } catch (e) {} return; }
+        if (!password) {
+          _setObsRefreshOutcome('auth_required', 'OBS WebSocket auth is on but no password is stored', 0);
+          try { ws.close(); } catch (e) {} return;
+        }
         // OBS WS v5 auth: response = base64(sha256(secret + challenge))
         // where secret = base64(sha256(password + salt)).
         var crypto = require('crypto');
@@ -759,6 +789,12 @@ function refreshObsBrowserSources(cfg) {
         if (listMeta && listMeta.checked >= listMeta.expected) {
           if (listMeta.matches > 0) {
             logToFile('OBS-REFRESH', 'refreshed ' + listMeta.matches + ' SF browser source' + (listMeta.matches === 1 ? '' : 's'));
+            _setObsRefreshOutcome('success', '', listMeta.matches);
+          } else {
+            // Connected to OBS fine, but no SF-pointing browser sources
+            // exist. Worth surfacing — could mean the URLs got moved or
+            // the streamer hasn't added the sources yet.
+            _setObsRefreshOutcome('success', 'connected to OBS but found no browser sources pointing at SF loopback (8787-8791)', 0);
           }
           setTimeout(function() { try { ws.close(); } catch (e) {} }, 400);
         }
@@ -777,7 +813,15 @@ ipcMain.handle('obs-refresh-cfg-get', function() {
   // disk in plaintext (same trust level as the user's OBS install) but
   // there's no need to roundtrip it back through IPC.
   var c = loadObsRefreshCfg();
-  return { autoRefresh: c.autoRefresh, port: c.port, hasPassword: !!c.password };
+  return {
+    autoRefresh: c.autoRefresh,
+    port: c.port,
+    hasPassword: !!c.password,
+    // Last refresh outcome — surfaced to the settings panel so the
+    // streamer sees whether the wiring works without having to dig
+    // through logs. Cleared on every fresh refresh attempt.
+    last: _lastObsRefresh
+  };
 });
 ipcMain.handle('obs-refresh-cfg-set', function(event, patch) {
   patch = patch || {};

@@ -1813,6 +1813,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(245,158,11,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('loadout-fired')">⚙️ Loadout fired</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(245,158,11,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('loadout-success')">⚙️ Loadout success</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(245,158,11,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('loadout-failure')">⚙️ Loadout failure</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(58,134,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('ticker-chat')" title="Fires a sample chat msg through the OBS chat broadcast pipe — appears in the chat/vertical/ticker overlay browser sources.">📺 Ticker chat msg</button>
             </div>
           </div>
           <div class="sec">
@@ -2493,7 +2494,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
                 <input id="obsRefreshPassword" type="password" placeholder="leave blank if auth is off" onchange="onObsRefreshCfgChange()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 8px;border-radius:4px;font-size:11px;font-family:ui-monospace,monospace">
               </div>
               <div id="obsRefreshPwHint" style="font-size:10px;color:var(--mut);margin-bottom:8px;line-height:1.5">Find this in OBS &rarr; Tools &rarr; WebSocket Server Settings &rarr; Show Connect Info. Stored locally on your machine; never leaves SF.</div>
-              <button class="cbtn tw" style="font-size:11px;height:28px;padding:0 12px" onclick="onObsRefreshNow()">Refresh OBS sources now</button>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <button class="cbtn tw" style="font-size:11px;height:28px;padding:0 12px" onclick="onObsRefreshNow()">Refresh OBS sources now</button>
+                <div id="obsRefreshStatus" style="font-size:10.5px;color:var(--mut);line-height:1.5;flex:1;min-width:160px"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -3967,6 +3971,25 @@ function testEvent(kind) {
             source: 'aquilo_loadout_event', schema: 1,
             widgetId: 'snd_test', name: 'Test Action',
             result: 'failure', message: 'audio file missing'
+          });
+        }
+      } catch (e) {}
+      break;
+    case 'ticker-chat':
+      // Fires a sample chat msg through the same obsBroadcastChat IPC
+      // real chat uses — the message fans out to the chat / vertical /
+      // ticker overlay browser sources. Useful for confirming the
+      // ticker overlay is rendering correctly without waiting for a
+      // real chat message to arrive.
+      try {
+        if (window.electronAPI && window.electronAPI.obsBroadcastChat) {
+          window.electronAPI.obsBroadcastChat({
+            platform: 'tw',
+            user: 'test_chatter',
+            userColor: '#a970ff',
+            message: 'Testing the ticker overlay scroll &mdash; this should slide right-to-left across the strip.',
+            badges: [],
+            avatar: ''
           });
         }
       } catch (e) {}
@@ -6127,11 +6150,29 @@ function _loadoutHandleStateDelta(payload) {
 // Tinted 'cc' (Crowd Control orange) so kit activity reads visually
 // distinct from chat / platform events. Failures get a "✗" prefix
 // and an italic "failed —" lead-in so they're scannable in the feed.
+// Map of widgetId → { el, ts } for recently-fired auto-rows from
+// _loadoutFireAction. When a kit broadcasts an outcome event for the
+// same widgetId within ~2s, _loadoutHandleEvent removes the auto-row
+// before adding the kit's richer row — avoids the "two rows per click"
+// noise that beta.10's auto-surface caused on kit-aware setups. Map
+// entries auto-evict 2.5s after add so the structure can't grow.
+var _loadoutAutoRows = new Map();
+var LOADOUT_DEDUP_WINDOW_MS = 2000;
+
 function _loadoutHandleEvent(payload) {
   if (!payload) return;
   // Schema gate — refuse forward-incompatible payloads. Unspecified
   // schema is treated as v1 so simple kit code doesn't have to set it.
   if (payload.schema !== undefined && Number(payload.schema) > 1) return;
+  // Dedup: if an auto-row for this widget was just added, remove it
+  // so the kit-broadcast outcome below replaces it instead of stacking.
+  if (payload.widgetId) {
+    var entry = _loadoutAutoRows.get(payload.widgetId);
+    if (entry && (Date.now() - entry.ts) < LOADOUT_DEDUP_WINDOW_MS) {
+      try { if (entry.el && entry.el.parentNode) entry.el.parentNode.removeChild(entry.el); } catch (e) {}
+      _loadoutAutoRows.delete(payload.widgetId);
+    }
+  }
   var label = String(payload.name || payload.widgetId || 'Loadout').slice(0, 80);
   var msg   = String(payload.message || '').slice(0, 240);
   var result = String(payload.result || '').toLowerCase();
@@ -6202,13 +6243,34 @@ function _loadoutFireAction(spec, runtimeArgs) {
     // Auto-surface every fire into the events feed so the streamer sees
     // activity even when the kit doesn't emit aquilo_loadout_event
     // outcome broadcasts. Kit-broadcast events still flow through
-    // _loadoutHandleEvent and produce a SECOND row with success/failure
-    // detail when the kit author wires them up — the two rows tell
-    // complementary stories ("I clicked this" + "the side-effect ran").
+    // _loadoutHandleEvent — but if the kit also broadcasts within ~2s
+    // for the same widgetId, the dedup map below makes _loadoutHandleEvent
+    // remove this auto-row before adding the richer kit-broadcast row
+    // (avoids the "two rows per click" noise on kit-aware setups).
     try {
       if (typeof addEvHistory === 'function') {
         var label = (spec && (spec.name || spec.actionName)) || resolved.name || 'Action';
         addEvHistory('Loadout', label + ' fired', 'cc', false);
+        // Record the freshly-added row for potential dedup. addEvHistory
+        // inserts at the start of #evFeed, so the new row is feed.firstElementChild.
+        // Only track entries that have a stable widget id (action /
+        // chat-template widgets pass `spec` === the widget). For
+        // counter +/- sub-actions spec.id is the sub-action UUID,
+        // which won't match a kit's widgetId — the dedup just skips.
+        var widgetId = spec && spec.id;
+        if (widgetId) {
+          var feed = document.getElementById('evFeed');
+          var newRow = feed && feed.firstElementChild;
+          if (newRow) {
+            _loadoutAutoRows.set(widgetId, { el: newRow, ts: Date.now() });
+            // Auto-evict so the map stays bounded even when no kit
+            // broadcast arrives.
+            setTimeout(function() {
+              var cur = _loadoutAutoRows.get(widgetId);
+              if (cur && cur.el === newRow) _loadoutAutoRows.delete(widgetId);
+            }, LOADOUT_DEDUP_WINDOW_MS + 500);
+          }
+        }
       }
     } catch (e2) {}
   } catch (e) { sysMsg('tw', 'Loadout fire failed: ' + (e && e.message)); }
@@ -8543,13 +8605,41 @@ function _hydrateObsRefreshCfg() {
     var port = document.getElementById('obsRefreshPort');
     var pwHint = document.getElementById('obsRefreshPwHint');
     var pwInput = document.getElementById('obsRefreshPassword');
+    var status = document.getElementById('obsRefreshStatus');
     if (auto) auto.checked = c.autoRefresh !== false;
     if (port) port.value = c.port || 4455;
     if (pwInput) pwInput.placeholder = c.hasPassword ? '(stored — paste again to change)' : 'leave blank if auth is off';
     if (pwHint && c.hasPassword) {
       pwHint.innerHTML = '<strong style="color:var(--ok,#22c55e)">&#10003; Password saved.</strong> Find this in OBS &rarr; Tools &rarr; WebSocket Server Settings &rarr; Show Connect Info. Stored locally on your machine.';
     }
+    // Surface last refresh outcome so the streamer can tell at a glance
+    // whether the wiring is actually doing anything. No outcome yet =
+    // the refresh hasn't run since launch (likely because the panel
+    // mounted before the 1.5s post-boot tick fired).
+    if (status) {
+      var last = c.last || {};
+      var ago = last.at ? _obsRefreshTsAgo(last.at) : '';
+      if (!last.outcome) {
+        status.innerHTML = '<span style="color:var(--mut)">Not run yet this session.</span>';
+      } else if (last.outcome === 'success' && last.matches > 0) {
+        status.innerHTML = '<span style="color:var(--ok,#22c55e)">&#10003; Refreshed ' + last.matches + ' SF browser source' + (last.matches === 1 ? '' : 's') + ago + '</span>';
+      } else if (last.outcome === 'success') {
+        status.innerHTML = '<span style="color:#f59e0b">Connected to OBS, but no SF browser sources detected' + ago + '</span><div style="font-size:10px;color:var(--mut);margin-top:2px">Have you added at least one SF overlay URL as a Browser Source in OBS?</div>';
+      } else if (last.outcome === 'no_obs') {
+        status.innerHTML = '<span style="color:var(--mut)">OBS not detected on port ' + (c.port || 4455) + ago + '</span><div style="font-size:10px;color:var(--mut);margin-top:2px">Open OBS first, or check Tools &rarr; WebSocket Server Settings is enabled on the right port.</div>';
+      } else if (last.outcome === 'auth_required') {
+        status.innerHTML = '<span style="color:var(--err,#f87171)">Auth required &mdash; paste OBS WS password above' + ago + '</span>';
+      } else {
+        status.innerHTML = '<span style="color:var(--err,#f87171)">' + esc(last.message || 'refresh failed') + ago + '</span>';
+      }
+    }
   }).catch(function() {});
+}
+function _obsRefreshTsAgo(ts) {
+  var d = Date.now() - ts;
+  if (d < 60_000) return ' &middot; <span style="color:var(--mut)">' + Math.round(d / 1000) + 's ago</span>';
+  if (d < 3_600_000) return ' &middot; <span style="color:var(--mut)">' + Math.round(d / 60_000) + 'm ago</span>';
+  return ' &middot; <span style="color:var(--mut)">' + Math.round(d / 3_600_000) + 'h ago</span>';
 }
 function onObsRefreshCfgChange() {
   if (!window.electronAPI || !window.electronAPI.obsRefreshCfgSet) return;
@@ -8580,7 +8670,9 @@ function onObsRefreshNow() {
     : Promise.resolve();
   savePromise.then(function() {
     window.electronAPI.obsRefreshSources().then(function() {
-      addEvHistory('StreamFusion', 'Sent refresh request to OBS WebSocket. Browser sources pointing at SF will reload.', 'tw', false);
+      // Re-hydrate after a short delay so the status indicator picks up
+      // the WS roundtrip outcome (the OBS dialog finishes in ~500ms).
+      setTimeout(_hydrateObsRefreshCfg, 800);
     }).catch(function(e) {
       addEvHistory('StreamFusion', 'OBS refresh failed: ' + ((e && e.message) || 'OBS not reachable'), 'tw', false);
     });
