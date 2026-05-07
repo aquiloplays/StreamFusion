@@ -87,6 +87,12 @@
     line-height: 1.3;
     opacity: 0;
     transform: translateY(100%);
+    /* contain: paint isolates each bar's repaint zone so a marquee
+       scroll inside one bar doesn't invalidate the rest of the page.
+       Cuts repaint area on multi-bar busts (raid pile-ons, sub-bombs)
+       and is the single biggest perf win we can give the vertical
+       overlay short of pre-rendering text to canvas. */
+    contain: layout paint style;
   }
 
   .bar.in  { animation: barIn  .45s cubic-bezier(.22,1.1,.36,1) forwards; }
@@ -107,6 +113,7 @@
   .bar.yt { color: var(--yt); } .bar.yt::before { background: var(--yt); }
   .bar.tt { color: var(--tt); } .bar.tt::before { background: var(--tt); }
   .bar.kk { color: var(--kk); } .bar.kk::before { background: var(--kk); }
+  .bar.rotation { color: #1db954; } .bar.rotation::before { background: #1db954; }
 
   .pfp {
     width: calc(var(--font-size) + 8px);
@@ -128,6 +135,11 @@
   .pi.yt { background: var(--yt); color: #fff; }
   .pi.tt { background: var(--tt); color: #fff; }
   .pi.kk { background: var(--kk); color: #0e0e10; }
+  /* Rotation = Spotify-green pill with the Spotify wordmark glyph
+     instead of a 2-letter text label. Used when the cloud relay
+     pipes a song event through the OBS chat overlay broadcast. */
+  .pi.rotation { background: #1db954; color: #0e0e10; }
+  .pi.rotation svg { width: 16px; height: 16px; display: block; }
 
   .ub {
     display: inline-block;
@@ -148,30 +160,27 @@
     flex-shrink: 0;
     white-space: nowrap;
     color: currentColor;
-    /* Without the bar background, the username needs its own contrast
-       so it reads on bright scenes. Four 1px hard offsets create a
-       sharp dark outline that survives any background color; stack a
-       soft dark blur + the platform-tint glow on top so the colour
-       still pops without becoming illegible. */
+    /* Lean text-shadow recipe (1.5.5-beta.9): two hard 1px offsets +
+       one soft halo. The pre-beta.9 6-layer stack (4 hard + soft +
+       currentColor glow) was the dominant cost in vertical-overlay
+       lag — every glyph repaint composited 6 shadow layers and the
+       currentColor glow forced a recompute on every bright-scene
+       color shift. Two hard offsets still create a recognizable
+       dark outline; the soft halo softens the edge. Skips the
+       platform-tint glow — the 4px ::before accent already cues
+       which platform the message is from. */
     text-shadow:
-      -1px -1px 0 rgba(0,0,0,.95),
-       1px -1px 0 rgba(0,0,0,.95),
-      -1px  1px 0 rgba(0,0,0,.95),
-       1px  1px 0 rgba(0,0,0,.95),
-       0 0 8px rgba(0,0,0,.85),
-       0 0 14px currentColor;
+      1px 1px 0 rgba(0,0,0,.95),
+     -1px -1px 0 rgba(0,0,0,.95),
+       0 0 6px rgba(0,0,0,.85);
   }
   .sep {
     color: rgba(255,255,255,.95);
     flex-shrink: 0;
-    /* Same outline recipe as .user / .text — separator is small but
-       still needs to survive on bright scenes. */
     text-shadow:
-      -1px -1px 0 rgba(0,0,0,.95),
-       1px -1px 0 rgba(0,0,0,.95),
-      -1px  1px 0 rgba(0,0,0,.95),
-       1px  1px 0 rgba(0,0,0,.95),
-       0 0 8px rgba(0,0,0,.85);
+      1px 1px 0 rgba(0,0,0,.95),
+     -1px -1px 0 rgba(0,0,0,.95),
+       0 0 6px rgba(0,0,0,.85);
   }
 
   /* 1.4.9: left-edge mask removed — text never scrolls past the left,
@@ -185,16 +194,14 @@
     white-space: nowrap;
     /* font-weight bump from inherited 400 → 600 makes the message body
        read clearly against any background without a panel behind it.
-       Combined with the hard-edged text-shadow outline it survives
-       bright scenes where a single soft shadow gets swallowed. */
+       Combined with the lean two-offset + halo text-shadow it stays
+       legible on bright scenes without the 6-layer stack pre-beta.9
+       was paying for. */
     font-weight: 600;
     text-shadow:
-      -1px -1px 0 rgba(0,0,0,.95),
-       1px -1px 0 rgba(0,0,0,.95),
-      -1px  1px 0 rgba(0,0,0,.95),
-       1px  1px 0 rgba(0,0,0,.95),
-       0 0 8px rgba(0,0,0,.85),
-       0 0 14px rgba(0,0,0,.55);
+      1px 1px 0 rgba(0,0,0,.95),
+     -1px -1px 0 rgba(0,0,0,.95),
+       0 0 6px rgba(0,0,0,.85);
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), rgba(0,0,0,0) 100%);
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), rgba(0,0,0,0) 100%);
     padding-right: 4px;
@@ -346,17 +353,17 @@
     position: relative;
     width: 88px; height: 88px;
     margin: 0 auto;
-    animation: giftWobble 1.8s ease-in-out infinite;
+    /* 1.5.5-beta.9: dropped the infinite giftWobble + giftHalo
+       animations on vertical. Each gift's primary giftFloat drift is
+       motion enough; the wobble + halo were paying compositor cost
+       for 5+ simultaneous gifts during sub-bomb / Rose-spam streaks
+       and were the dominant cause of overlay-lag reports. The
+       horizontal overlay keeps them — its larger canvas / sparser
+       gift cadence absorbs the cost without dropping frames. */
   }
-  .gift .g-art::before {
-    content: '';
-    position: absolute;
-    inset: -20px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(254,44,85,.45) 0%, rgba(254,44,85,0.18) 45%, transparent 70%);
-    animation: giftHalo 1.4s ease-in-out infinite;
-    z-index: -1;
-  }
+  /* Halo dropped along with the wobble (see .g-art note above). The
+     drop-shadow on the img below carries enough visual weight on its
+     own. */
   .gift .g-art img {
     width: 88px; height: 88px;
     object-fit: contain;
@@ -493,6 +500,13 @@
 
   function renderPlatIcon(plat) {
     if (!CFG.showPlatformIcon || !plat) return '';
+    // Rotation rows render the Spotify wordmark instead of a 2-letter
+    // text label so song activity reads as music, not "ROTATION" text.
+    if (plat === 'rotation') {
+      return '<span class="pi rotation"><svg viewBox="0 0 24 24" fill="currentColor">'
+           + '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/>'
+           + '</svg></span>';
+    }
     return '<span class="pi ' + plat + '">' + plat.toUpperCase() + '</span>';
   }
 

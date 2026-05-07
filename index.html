@@ -490,6 +490,9 @@ body.has-sf-notice { padding-top: 42px !important; }
 .ev-pico{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--ev)}
 .ev-pico svg{width:14px;height:14px;fill:#fff}
 .ev-item.tw .ev-pico{background:var(--tw)}.ev-item.yt .ev-pico{background:var(--yt)}.ev-item.tt .ev-pico{background:var(--tt)}.ev-item.kk .ev-pico{background:var(--kk)}.ev-item.se .ev-pico{background:#7cdf21}
+.ev-item.rotation{border-color:#1db954;background:rgba(29,185,84,.08)}
+.ev-item.rotation .ev-item-user{color:#1db954}
+.ev-item.rotation .ev-pico{background:#1db954;color:#0e0e10}
 .ev-body{flex:1;min-width:0}
 .ev-item-user{font-weight:700;color:var(--ev);font-size:17px}
 .ev-item-text{color:var(--txt);line-height:1.5;margin-top:3px;font-size:17px}
@@ -1793,6 +1796,22 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
         <!-- ═══ EVENTS TAB ═══ -->
         <div class="settings-pane" id="pane-events">
+          <div class="sec">
+            <div class="sec-hd">Test Triggers</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Fire a sample event so you can see how it lands in the events panel, the pop-out overlay, and your OBS chat browser source. Useful for confirming a layout change or debugging "why doesn't this show up where I expect".</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px">
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-follow')">+ Twitch follow</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-sub')">+ Twitch sub</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-cheer')">+ Twitch cheer</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-raid')">+ Twitch raid</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(0,242,234,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tt-gift')">+ TikTok gift</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(83,252,24,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('kk-sub')">+ Kick sub</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(124,223,33,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tip')">+ Tip</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(29,185,84,.15);border:1px solid #1db954;color:var(--txt);border-radius:4px" onclick="testEvent('rotation-playing')">♪ Now playing</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(29,185,84,.15);border:1px solid #1db954;color:var(--txt);border-radius:4px" onclick="testEvent('rotation-queued')">♪ Song queued</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(29,185,84,.15);border:1px solid #1db954;color:var(--txt);border-radius:4px" onclick="testEvent('rotation-skipped')">♪ Song skipped</button>
+            </div>
+          </div>
           <div class="sec">
             <div class="sec-hd">Event Filters</div>
             <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
@@ -3825,6 +3844,52 @@ function checkKeywords(text) {
 }
 
 // ── Event history ─────────────────────────────────────────────────────────────
+// Fire a sample event to confirm flow + styling. Routes through
+// addEvHistory (which mirrors to the events feed + pop-out overlay)
+// and obsBroadcastChat for rotation rows so the OBS chat browser
+// source sees them too. Useful when changing event-feed CSS or
+// debugging "why doesn't <surface X> show this row".
+function testEvent(kind) {
+  switch (kind) {
+    case 'tw-follow':
+      addEvHistory('test_follower', 'test_follower followed!', 'tw', false);
+      break;
+    case 'tw-sub':
+      addEvHistory('test_subscriber', 'test_subscriber subscribed (Tier 1) — "loving the stream!"', 'tw', true, '', 'loving the stream!');
+      break;
+    case 'tw-cheer':
+      addEvHistory('test_cheerer', 'test_cheerer cheered 500 bits — "Kappa Kappa Kappa"', 'tw', true, '', 'Kappa Kappa Kappa');
+      break;
+    case 'tw-raid':
+      addEvHistory('test_raider', 'test_raider raided with 42 viewers!', 'tw', true);
+      break;
+    case 'tt-gift':
+      addEvHistory('test_tiktok', 'test_tiktok sent Rose ×10 (10 coins)', 'tt', false);
+      break;
+    case 'kk-sub':
+      addEvHistory('test_kick', 'test_kick subscribed on Kick!', 'kk', true);
+      break;
+    case 'tip':
+      addEvHistory('test_supporter', 'test_supporter tipped $5.00 — "thanks for the stream!"', 'se', true, '', 'thanks for the stream!');
+      break;
+    case 'rotation-playing':
+      // Mirror what onRotationEvent does for rotation.song.playing —
+      // exact same path, just with synthetic payload.
+      try {
+        var d = { title: 'Test Track', artist: 'Test Artist', art: '', requestedBy: 'test_viewer', durationMs: 200000, progressMs: 0, isPlaying: true };
+        addEvHistory('♪ Now playing', d.title + ' — ' + d.artist + '  · req @' + d.requestedBy, 'rotation', true, null, '', d.art);
+        if (typeof _npApplyRotationEvent === 'function') _npApplyRotationEvent(d);
+      } catch (e) {}
+      break;
+    case 'rotation-queued':
+      addEvHistory('@test_viewer', 'queued Test Track — Test Artist  (#3)', 'rotation', false);
+      break;
+    case 'rotation-skipped':
+      addEvHistory('♪ Rotation', 'skipped: Test Track', 'rotation', false);
+      break;
+  }
+}
+
 function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
   var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   evHistory.unshift({ user: user, text: text, plat: plat, time: t, evMessage: evMessage || '' });
@@ -3853,7 +3918,7 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
     else if (plat === 'yt' && /^[a-z0-9_-]{1,40}$/.test(_evUserKey)) _unaSlug = 'youtube/' + encodeURIComponent(_evUserKey);
     if (_unaSlug) avSrc = 'https://unavatar.io/' + _unaSlug;
   }
-  var _evPlatSvgs = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>'};
+  var _evPlatSvgs = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>',rotation:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/></svg>'};
   var _sfBoltSvg = '<svg viewBox="0 0 24 24"><defs><linearGradient id="sfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3A86FF"/><stop offset="100%" stop-color="#00E5A0"/></linearGradient></defs><path fill="url(#sfg)" d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></svg>';
   var isSFSystem = (user === 'StreamFusion');
   var picoSvg = isSFSystem ? _sfBoltSvg : (_evPlatSvgs[plat] || '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>');
@@ -11889,7 +11954,7 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
 
     var name      = 'Rotation';
     var text      = '';
-    var color     = 'se';   // tints the row label — 'se' is the existing green-ish tint
+    var color     = 'rotation';   // tints the events-history row Spotify-green + uses the rotation pico
     var isPinned  = false;
     var avatar    = '';
     var oneLine   = '';     // for sysMsg in chat panel
