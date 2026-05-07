@@ -17,6 +17,21 @@
   --grn:#3fb950;--org:#f0883e;--red:#f85149;
   --r:8px;--chat-size:13px;
 }
+/* 1.6.0+: tier-driven theme. body.tier-3 swaps the accent palette to
+   gold/violet so Tier 3 supporters see a visibly distinct app chrome
+   from Tier 2 supporters — at-a-glance "I'm getting the EA+ treatment"
+   without needing a separate install or download. Tier 2 keeps the
+   default blue/teal palette (no override needed). The tier swap mirrors
+   the runtime tray + window icon swap in main.js's
+   _refreshIconForTier — keeps the visual identity coherent across
+   chrome (icon) and content (UI accent). */
+body.tier-3 {
+  --accent: #ffd700;        /* gold (treasure) */
+  --accent-d: #ffd70022;
+  --accent2: #a755f7;       /* violet-500 (royal) */
+}
+body.tier-3 .ic { color: var(--accent); }
+body.tier-3 .lb-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column}
@@ -3134,6 +3149,15 @@ function applyPatreonState(state) {
   if (!state) return;
   S.patreon = state;
   _recomputeCombinedEntitlement();
+  // 1.6.0+: tier-driven theme. Body class drives CSS overrides for the
+  // accent color, top-bar tint, etc. Tier 3 = "Early Access +" gets a
+  // distinct gold/violet palette so supporters see their tier reflected
+  // in the app chrome. Tier 2 keeps the default Streamfusion blue/teal.
+  // Removing both classes first means transitions between tiers cascade
+  // cleanly without leaving stale state.
+  document.body.classList.remove('tier-2', 'tier-3');
+  if (state.tier === 'tier3') document.body.classList.add('tier-3');
+  else if (state.tier === 'tier2') document.body.classList.add('tier-2');
 }
 
 // Discord entitlement update. Mirrors applyPatreonState and feeds the

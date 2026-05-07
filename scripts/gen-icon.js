@@ -33,3 +33,18 @@ console.log('[gen-icon] wrote assets/icon.png (' + bigPng.length + ' bytes, 512x
 const ico = buildIco([16, 24, 32, 48, 64, 128, 256]);
 fs.writeFileSync(path.join(ASSETS, 'icon.ico'), ico);
 console.log('[gen-icon] wrote assets/icon.ico (' + ico.length + ' bytes, 7 sizes embedded)');
+
+// 1.6.0+: also generate the tier3 palette variant (the "Early Access +"
+// theme). Used at runtime by main.js + tray.js when patreon-auth reports
+// tier === 'tier3' — the window icon, tray icon, and renderer theme
+// flip to the gold/violet palette so Tier 3 supporters see a visibly
+// distinct app at-a-glance from Tier 2 supporters. Pre-1.6 this was a
+// separate StreamFusion-Beta .exe; the merge collapses them into a
+// single download with runtime tier-driven theming.
+const { PALETTES } = require('../icon-gen');
+const tier3Big = buildRawIcon(512, PALETTES.tier3);
+fs.writeFileSync(path.join(ASSETS, 'icon-tier3.png'),
+  encodePNG(tier3Big.W, tier3Big.H, tier3Big.px));
+const tier3Ico = buildIco([16, 24, 32, 48, 64, 128, 256], PALETTES.tier3);
+fs.writeFileSync(path.join(ASSETS, 'icon-tier3.ico'), tier3Ico);
+console.log('[gen-icon] wrote assets/icon-tier3.png + icon-tier3.ico (gold/violet — Tier 3 / Early Access +)');

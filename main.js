@@ -123,8 +123,43 @@ function _isBetaVariant() {
   return false;
 }
 
+// 1.6.0+: tier-driven palette resolution. The pre-1.6 split was one
+// .exe per tier (stable + StreamFusion-Beta). 1.6 ships a single .exe;
+// the streamer's Patreon tier picks the runtime palette so a Tier 3
+// supporter sees a visibly distinct app from a Tier 2 supporter
+// without having to download a different installer.
+//
+// _currentTier is set by the patreon entitlement subscription wired in
+// app.whenReady — null on startup until the first entitlement-changed
+// event arrives. The legacy `beta` palette stays as a fallback for the
+// (now deprecated) StreamFusion-Beta install variant during the merge
+// transition window — _isBetaVariant() will eventually be removed once
+// existing beta installs migrate.
+let _currentTier = null;
 function _sfIconPalette() {
-  return _isBetaVariant() ? PALETTES.beta : PALETTES.stable;
+  if (_currentTier === 'tier3') return PALETTES.tier3;
+  if (_currentTier === 'tier2') return PALETTES.tier2;
+  // Fallback to stable for non-authed / non-entitled users + as the
+  // pre-entitlement-event default before patreon-auth fires.
+  if (_isBetaVariant()) return PALETTES.beta;
+  return PALETTES.stable;
+}
+
+// Re-render tray + window icon with the current palette. Called by the
+// entitlement subscription whenever the streamer's tier changes.
+function _refreshIconForTier() {
+  try {
+    const iconBuf = buildSFIcon(256, _sfIconPalette());
+    const img     = nativeImage.createFromBuffer(iconBuf);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try { mainWindow.setIcon(img); } catch (e) {}
+    }
+    if (tray) {
+      try { tray.setImage(img.resize({ width: 16, height: 16 })); } catch (e) {}
+    }
+  } catch (e) {
+    logToFile('TIER-ICON', 'refresh failed: ' + (e && e.message));
+  }
 }
 
 // Keep references so they don't get garbage collected
@@ -833,11 +868,81 @@ ipcMain.handle('obs-refresh-cfg-set', function(event, patch) {
   return { ok: true };
 });
 
+// ── 1.6.0 merge: legacy beta-install detection + one-time notice ────────────
+// Pre-1.6 there were two separate installs — StreamFusion (stable) and
+// StreamFusion Beta (private/Tier-3). 1.6.0 merges them into a single
+// app where Tier 3 unlocks via the same install + Patreon sign-in. On
+// first launch we check for the old beta install and surface a friendly
+// notice telling the streamer they can uninstall it (we don't auto-
+// uninstall — keeps the user in control). Notice fires once per
+// install, gated by a marker file in userData.
+function _legacyBetaInstallExists() {
+  if (process.platform !== 'win32') return false;
+  try {
+    var local = process.env.LOCALAPPDATA || '';
+    if (!local) return false;
+    var betaDir = path.join(local, 'Programs', 'StreamFusion Beta');
+    return fs.existsSync(betaDir);
+  } catch (e) { return false; }
+}
+function _legacyBetaNoticePath() { return path.join(app.getPath('userData'), 'legacy-beta-notice-shown.json'); }
+function _legacyBetaNoticeAlreadyShown() {
+  try { return fs.existsSync(_legacyBetaNoticePath()); } catch (e) { return false; }
+}
+function _markLegacyBetaNoticeShown() {
+  try { fs.writeFileSync(_legacyBetaNoticePath(), JSON.stringify({ at: Date.now() })); } catch (e) {}
+}
+function maybeShowLegacyBetaNotice() {
+  // Only on win32 (the only platform the old beta shipped to), only when
+  // the old install is actually present, and only once per user-data
+  // dir (so the notice doesn't reappear after a stable update).
+  if (!_legacyBetaInstallExists()) return;
+  if (_legacyBetaNoticeAlreadyShown()) return;
+  // Defer slightly so the splash / window has time to mount before the
+  // dialog steals focus.
+  setTimeout(function() {
+    var choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      buttons: ['Open beta uninstaller', 'Dismiss', 'Don\'t show again'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'StreamFusion Beta is merged into the main app',
+      message: 'StreamFusion 1.6 merges the Beta install into the main app.',
+      detail:
+        'Tier 3 features now unlock the moment you sign in with Patreon — ' +
+        'no separate StreamFusion Beta download needed.\n\n' +
+        'You still have the old StreamFusion Beta install on this machine. ' +
+        'It\'s safe to leave it (it just sits unused), but you can remove it ' +
+        'to clean up your taskbar / Start Menu / disk space.\n\n' +
+        '"Open beta uninstaller" launches the StreamFusion Beta uninstaller ' +
+        'directly. "Dismiss" leaves it for now (we\'ll remind you next launch). ' +
+        '"Don\'t show again" silences the notice without removing the install.'
+    });
+    if (choice === 0) {
+      try {
+        var local = process.env.LOCALAPPDATA || '';
+        var unins = path.join(local, 'Programs', 'StreamFusion Beta', 'Uninstall StreamFusion Beta.exe');
+        if (fs.existsSync(unins)) {
+          shell.openPath(unins);
+        } else {
+          shell.openPath(path.join(local, 'Programs', 'StreamFusion Beta'));
+        }
+      } catch (e) { logToFile('LEGACY-BETA', 'open uninstaller failed: ' + (e && e.message)); }
+      _markLegacyBetaNoticeShown();
+    } else if (choice === 2) {
+      _markLegacyBetaNoticeShown();
+    }
+    // choice === 1 (Dismiss) leaves the marker absent so we re-prompt
+    // on the next launch.
+  }, 1200);
+}
+
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createTray();
   createWindow();
   startCtrlPoller();
+  maybeShowLegacyBetaNotice();
 
   // Patreon + Discord entitlement services. Both are optional sign-ins;
   // the app boots for everyone. Users get EA features if EITHER path
@@ -892,6 +997,15 @@ app.whenReady().then(() => {
   patreonAuth.onEntitlementChange(function(state) {
     _lastPatreonEntitled = !!(state && state.entitled);
     _syncCombinedEntitlement();
+    // 1.6.0+: tier-driven theme. Patreon is the canonical tier source
+    // (Discord auth is binary entitled-or-not). When the tier changes,
+    // re-render the tray + window icon so the streamer's Patreon
+    // status visually reflects in the app chrome immediately.
+    var newTier = (state && state.tier) || null;
+    if (newTier !== _currentTier) {
+      _currentTier = newTier;
+      _refreshIconForTier();
+    }
   });
   discordAuth.onEntitlementChange(function(state) {
     _lastDiscordEntitled = !!(state && state.entitled);

@@ -43,6 +43,30 @@ const PALETTES = {
     // icon reads as "amber top to bottom" with no off-tone pixel.
     WHITE: [253, 230, 138],  // amber-200 (was amber-50 — too close to white)
     DARK:  [ 20,  14,   4]   // warm near-black (still reads as "app bg")
+  },
+  // 1.6.0+: tier-driven theme palettes. The pre-1.6 split was one .exe
+  // per tier (stable + StreamFusion-Beta). 1.6 ships a single .exe that
+  // swaps tray / window icon based on the streamer's Patreon tier:
+  //   tier2 = "Early Access" — uses the stable palette but renamed for
+  //           clarity at call sites. (Same icon as before — Tier 2 users
+  //           keep the look they know.)
+  //   tier3 = "Early Access +" — gold + violet accent, distinct from
+  //           both stable AND beta so it reads at a glance as the
+  //           top-tier badge color rather than "the beta variant".
+  //           Picked gold-500 + violet-500 to land in the supporter
+  //           color vocab (treasure / royal) rather than amber/orange
+  //           which read as "warning" or "incomplete".
+  tier2: {
+    BLUE:  [ 58, 134, 255],
+    TEAL:  [ 42, 212, 185],
+    WHITE: [239, 239, 241],
+    DARK:  [ 14,  14,  16]
+  },
+  tier3: {
+    BLUE:  [255, 215,   0],  // gold (treasure)
+    TEAL:  [167,  85, 247],  // violet-500 (royal)
+    WHITE: [255, 245, 200],  // pale cream highlight
+    DARK:  [ 22,  10,  30]   // deep violet-tinted near-black
   }
 };
 
