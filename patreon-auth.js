@@ -755,6 +755,48 @@ function getRawAccessToken() {
   return state && state.access_token ? state.access_token : null;
 }
 
+// Async variant that proactively refreshes the access token when the
+// stored copy has expired. The shared-bot service hits Patreon's
+// identity API with whatever token we hand it — if the token has
+// expired (Patreon issues short-lived ~1-month access tokens) the
+// service gets a 401 from Patreon, treats the user as "not entitled",
+// and returns 403 to SF. The renderer surfaces that as
+// "bot_service_rejected — disconnect + reconnect Discord". But the
+// access token IS refreshable via the long-lived refresh_token we
+// stored at sign-in time — no need to drag the user through a
+// manual re-auth.
+//
+// Returns the freshest access token we have, or null if there's no
+// stored sign-in. Callers should treat null as "user not signed in".
+async function getRawAccessTokenAsync() {
+  var state = readState();
+  if (!state || !state.access_token) return null;
+  // Refresh proactively when within 60s of expiry — gives the bot
+  // service room to do its own roundtrip before the token actually
+  // dies. If we have no expires_at (legacy state), fall back to the
+  // stored token without attempting refresh — if it's stale, the
+  // bot service will reject and the renderer's user-friendly notice
+  // will tell the streamer to re-auth.
+  var nearExpiry = state.expires_at && (Date.now() >= state.expires_at - 60_000);
+  if (nearExpiry && state.refresh_token) {
+    try {
+      var refreshed = await refreshTokens(state.refresh_token);
+      if (refreshed && refreshed.access_token) {
+        state.access_token  = refreshed.access_token;
+        state.refresh_token = refreshed.refresh_token || state.refresh_token;
+        state.expires_at    = refreshed.expires_in ? (Date.now() + refreshed.expires_in * 1000) : null;
+        writeState(state);
+      }
+    } catch (e) {
+      // Refresh failed (network blip, refresh token revoked, etc.).
+      // Fall through to returning the stale access token; if the bot
+      // service then rejects, the user-friendly bot_service_rejected
+      // notice prompts the manual re-auth.
+    }
+  }
+  return state.access_token || null;
+}
+
 module.exports = {
   registerIpcHandlers:  registerIpcHandlers,
   setMainWindow:        setMainWindow,
@@ -764,5 +806,6 @@ module.exports = {
   startRuntimeChecks:   startRuntimeChecks,
   stopRuntimeChecks:    stopRuntimeChecks,
   onEntitlementChange:  onEntitlementChange,
-  getRawAccessToken:    getRawAccessToken
+  getRawAccessToken:    getRawAccessToken,
+  getRawAccessTokenAsync: getRawAccessTokenAsync
 };

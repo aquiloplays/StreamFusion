@@ -1356,10 +1356,19 @@ ipcMain.handle('discord-bot-status', function() {
 // access token here rather than let the renderer hand us one — the token
 // is intentionally kept out of the renderer for the same reason the
 // refresh token is.
-ipcMain.handle('shared-bot-connect', function(event, cfg) {
+ipcMain.handle('shared-bot-connect', async function(event, cfg) {
   cfg = cfg || {};
-  var token = patreonAuth.getRawAccessToken();
-  if (!token) return Promise.resolve({ ok: false, reason: 'not_signed_in' });
+  // Proactively refresh the Patreon access token before handing it to
+  // the bot service. Without this, a stale (~1-month-old) access token
+  // would get rejected by Patreon's identity endpoint, the bot service
+  // would treat the user as "not entitled" and return 403, and the
+  // renderer would surface "bot_service_rejected" — even though we
+  // have a perfectly good refresh_token sitting in state and could
+  // renew silently. getRawAccessTokenAsync handles the renewal.
+  var token = null;
+  try { token = await patreonAuth.getRawAccessTokenAsync(); }
+  catch (e) { token = patreonAuth.getRawAccessToken(); }
+  if (!token) return { ok: false, reason: 'not_signed_in' };
   return discordBot.sharedBotConnect({
     botServiceUrl: cfg.botServiceUrl,
     guildId:       cfg.guildId,
