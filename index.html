@@ -1282,6 +1282,170 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   POLISH PASS — focus rings, press feedback, smooth modals, toast system,
+   styled confirm dialog, empty-state motion. Lives at the end of the
+   stylesheet so its rules win specificity ties without rewriting earlier
+   selectors. The aim is to lift perceived professionalism without changing
+   any layout or color identity.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Keyboard focus rings — only show on real keyboard focus (:focus-visible),
+   never on click. Inputs already have a glow ring (line ~1188); we leave
+   them alone here and just cover buttons + role=button + clickable rows. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible,
+.tog:focus-visible,
+.ptog:focus-visible,
+.frow:focus-visible,
+.sound-row:focus-visible,
+.cmd-item:focus-visible,
+.w-link:focus-visible,
+.snd-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Subtle press feedback on real buttons. Mirrors the native macOS/Windows
+   "tap-down" so clicks feel tactile rather than instant. brightness(.92)
+   composes cleanly with whatever transition each button already defines
+   (most use `transition: all .15s`, which already animates filter). We
+   skip :disabled, and skip buttons that have their own explicit transform
+   on :active so we don't fight them — those are the toggle-style ones
+   like .pop-preset-btn and .send-btn. */
+button:not(:disabled):active {
+  filter: brightness(.92);
+}
+
+/* Smoother overlay/modal entrance — these were instant display:flex toggles.
+   .overlay and .w-overlay are the two backdrops; .modal and .w-box are the
+   cards. Backdrop fades in, card eases up. */
+.overlay.show { animation: sfOverlayIn .18s ease-out both; }
+.overlay.show .modal { animation: sfModalIn .22s cubic-bezier(.16,1,.3,1) both; }
+.w-overlay:not(.hidden) { animation: sfOverlayIn .18s ease-out both; }
+.w-overlay:not(.hidden) .w-box { animation: sfModalIn .26s cubic-bezier(.16,1,.3,1) both; }
+.upd-prompt.show { animation: sfOverlayIn .18s ease-out both; }
+.upd-prompt.show .upd-prompt-card { animation: sfModalIn .24s cubic-bezier(.16,1,.3,1) both; }
+@keyframes sfOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sfModalIn { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+/* ── Toast notifications ──────────────────────────────────────────────
+   Replaces the few alert() calls scattered through the codebase. Stack
+   bottom-right, z-index between the boot splash (99999) and the OBS
+   overlay window picker (9500). showToast(msg, kind, opts) is the API. */
+#sfToasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 99998;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 380px;
+}
+.sf-toast {
+  pointer-events: auto;
+  background: var(--surf);
+  border: 1px solid var(--bdr);
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  padding: 11px 12px 11px 13px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--txt);
+  animation: sfToastIn .26s cubic-bezier(.16,1,.3,1) both;
+  min-width: 240px;
+  max-width: 380px;
+  backdrop-filter: blur(6px);
+}
+.sf-toast.out { animation: sfToastOut .22s ease-in forwards; }
+.sf-toast.ok { border-left-color: var(--grn); }
+.sf-toast.warn { border-left-color: var(--org); }
+.sf-toast.err { border-left-color: var(--red); }
+.sf-toast .sft-ic { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; color: var(--accent); display: inline-flex; }
+.sf-toast .sft-ic svg { width: 100%; height: 100%; display: block; }
+.sf-toast.ok .sft-ic { color: var(--grn); }
+.sf-toast.warn .sft-ic { color: var(--org); }
+.sf-toast.err .sft-ic { color: var(--red); }
+.sf-toast .sft-body { flex: 1; min-width: 0; word-break: break-word; }
+.sf-toast .sft-title { font-weight: 700; margin-bottom: 1px; }
+.sf-toast .sft-x {
+  background: transparent;
+  border: none;
+  color: var(--mut);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: .55;
+  transition: opacity .12s, color .12s;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.sf-toast .sft-x:hover { opacity: 1; color: var(--txt); background: var(--surf2); }
+@keyframes sfToastIn { from { opacity: 0; transform: translateX(28px) scale(.96); } to { opacity: 1; transform: translateX(0) scale(1); } }
+@keyframes sfToastOut { from { opacity: 1; transform: translateX(0); max-height: 100px; margin-top: 0; } to { opacity: 0; transform: translateX(28px); max-height: 0; margin-top: -8px; padding-top: 0; padding-bottom: 0; } }
+
+/* ── Styled confirm dialog ────────────────────────────────────────────
+   Replaces native confirm() prompts. Reuses .overlay/.modal chrome so it
+   inherits the focus ring + animation polish above. confirmDialog()
+   returns a Promise<bool>. */
+.sf-confirm-msg { font-size: 13px; line-height: 1.6; color: var(--txt); margin-bottom: 4px; }
+.sf-confirm-msg strong { color: var(--accent); font-weight: 700; }
+.sf-confirm-sub { font-size: 11.5px; color: var(--mut); line-height: 1.55; margin-top: 8px; }
+.sf-confirm-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.sf-confirm-btns button { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid var(--bdr); background: var(--surf2); color: var(--txt); transition: background .15s, border-color .15s, transform .08s; }
+.sf-confirm-btns button:hover { background: var(--surf3); border-color: #555; }
+.sf-confirm-btns button:active:not(:disabled) { transform: scale(.97); }
+.sf-confirm-btns .sfc-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sf-confirm-btns .sfc-primary:hover { background: #2B6AD4; border-color: #2B6AD4; }
+.sf-confirm-btns .sfc-danger { background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.45); color: var(--red); }
+.sf-confirm-btns .sfc-danger:hover { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* ── Empty-state float ────────────────────────────────────────────────
+   The empty .feed and event-panel placeholders looked dead-static. A
+   slow vertical drift on the icon makes the surface feel alive without
+   stealing focus from real content when it arrives. Direct child only —
+   nested .ic icons inside the copy (e.g. the cog inside "Open Settings")
+   shouldn't drift. */
+.empty > svg {
+  animation: sfEmptyFloat 3.6s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes sfEmptyFloat {
+  0%, 100% { transform: translateY(0); opacity: .22; }
+  50% { transform: translateY(-4px); opacity: .32; }
+}
+.ev-empty {
+  padding: 28px 14px !important;
+  font-size: 12px !important;
+  color: var(--mut);
+  letter-spacing: .2px;
+  opacity: .8;
+}
+
+/* Make scrollbars a touch more refined — the existing 4-5px tracks were
+   fine; this just rounds the thumb caps and gives a soft hover state so
+   long scrolls feel less industrial. */
+::-webkit-scrollbar-thumb { border-radius: 4px; transition: background .15s; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a42 !important; }
+
+/* Disabled-state consistency — many native disabled buttons were just
+   greyed text on the same background. Adding cursor + slight desaturation
+   reads as "intentionally inactive" rather than "weirdly muted". */
+button:disabled, .tbtn:disabled, .cbtn:disabled {
+  cursor: not-allowed;
+  filter: saturate(.4);
+}
+
 </style>
 </head>
 <body>
@@ -1517,7 +1681,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
     <div class="sf-boot-p kk"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg></div>
   </div>
   <div class="sf-boot-bw"><div class="sf-boot-bf"></div></div>
-  <div class="sf-boot-v">v1.2.0</div>
+  <div class="sf-boot-v" id="sfBootVer"></div>
 </div>
 <!-- Raid splash -->
 <div id="sfRaid">
@@ -1882,21 +2046,21 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
             <div class="sec-hd">Sound Alerts</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Click <strong style="color:var(--txt)">Custom</strong> to use your own .mp3/.wav file instead of the built-in tone.</div>
             <div class="vol-row"><label>Volume</label><input type="range" id="soundVol" min="0" max="100" step="5" value="80" oninput="updateSoundVol(this.value)"><span class="vol-val" id="volVal">80%</span></div>
-            <div class="sound-row"><span>Chat messages</span><button class="snd-pick" data-snd="chat" onclick="pickCustomSound('chat')">Custom</button><button class="snd-clear" data-snd="chat" onclick="clearCustomSound('chat')">&times;</button><input type="checkbox" id="snd-chat" onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Twitch Follow</span><button class="snd-pick" data-snd="follow" onclick="pickCustomSound('follow')">Custom</button><button class="snd-clear" data-snd="follow" onclick="clearCustomSound('follow')">&times;</button><input type="checkbox" id="snd-tw-follow" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Twitch Sub / Resub</span><button class="snd-pick" data-snd="sub" onclick="pickCustomSound('sub')">Custom</button><button class="snd-clear" data-snd="sub" onclick="clearCustomSound('sub')">&times;</button><input type="checkbox" id="snd-tw-sub" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Twitch Gift Sub</span><button class="snd-pick" data-snd="gift" onclick="pickCustomSound('gift')">Custom</button><button class="snd-clear" data-snd="gift" onclick="clearCustomSound('gift')">&times;</button><input type="checkbox" id="snd-tw-gift" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Twitch Raid</span><button class="snd-pick" data-snd="raid" onclick="pickCustomSound('raid')">Custom</button><button class="snd-clear" data-snd="raid" onclick="clearCustomSound('raid')">&times;</button><input type="checkbox" id="snd-tw-raid" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Twitch Cheer</span><button class="snd-pick" data-snd="cheer" onclick="pickCustomSound('cheer')">Custom</button><button class="snd-clear" data-snd="cheer" onclick="clearCustomSound('cheer')">&times;</button><input type="checkbox" id="snd-tw-cheer" onchange="saveSettings()"></div>
-            <div class="sound-row"><span>YouTube Sub / Member</span><button class="snd-pick" data-snd="yt-sub" onclick="pickCustomSound('yt-sub')">Custom</button><button class="snd-clear" data-snd="yt-sub" onclick="clearCustomSound('yt-sub')">&times;</button><input type="checkbox" id="snd-yt-sub" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>YouTube Super Chat</span><button class="snd-pick" data-snd="super" onclick="pickCustomSound('super')">Custom</button><button class="snd-clear" data-snd="super" onclick="clearCustomSound('super')">&times;</button><input type="checkbox" id="snd-yt-super" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>TikTok Follow</span><button class="snd-pick" data-snd="tt-follow" onclick="pickCustomSound('tt-follow')">Custom</button><button class="snd-clear" data-snd="tt-follow" onclick="clearCustomSound('tt-follow')">&times;</button><input type="checkbox" id="snd-tt-follow" onchange="saveSettings()"></div>
-            <div class="sound-row"><span>TikTok Gift</span><button class="snd-pick" data-snd="tt-gift" onclick="pickCustomSound('tt-gift')">Custom</button><button class="snd-clear" data-snd="tt-gift" onclick="clearCustomSound('tt-gift')">&times;</button><input type="checkbox" id="snd-tt-gift" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Kick Follow</span><button class="snd-pick" data-snd="kk-follow" onclick="pickCustomSound('kk-follow')">Custom</button><button class="snd-clear" data-snd="kk-follow" onclick="clearCustomSound('kk-follow')">&times;</button><input type="checkbox" id="snd-kk-follow" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Kick Sub / Gift</span><button class="snd-pick" data-snd="kk-sub" onclick="pickCustomSound('kk-sub')">Custom</button><button class="snd-clear" data-snd="kk-sub" onclick="clearCustomSound('kk-sub')">&times;</button><input type="checkbox" id="snd-kk-sub" checked onchange="saveSettings()"></div>
-            <div class="sound-row"><span>Third-party extensions</span><button class="snd-pick" data-snd="ext" onclick="pickCustomSound('ext')">Custom</button><button class="snd-clear" data-snd="ext" onclick="clearCustomSound('ext')">&times;</button><input type="checkbox" id="snd-ext" onchange="saveSettings()"></div>
-            <div class="sound-row"><span>SE/PayPal Tip</span><button class="snd-pick" data-snd="tip" onclick="pickCustomSound('tip')">Custom</button><button class="snd-clear" data-snd="tip" onclick="clearCustomSound('tip')">&times;</button><input type="checkbox" id="snd-se-tip" checked></div>
-            <div class="sound-row"><span>Keyword Match</span><button class="snd-pick" data-snd="keyword" onclick="pickCustomSound('keyword')">Custom</button><button class="snd-clear" data-snd="keyword" onclick="clearCustomSound('keyword')">&times;</button><input type="checkbox" id="snd-kw" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Chat messages</span><button class="snd-pick" data-snd="chat" onclick="pickCustomSound('chat')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="chat" onclick="clearCustomSound('chat')">&times;</button><input type="checkbox" id="snd-chat" onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Twitch Follow</span><button class="snd-pick" data-snd="follow" onclick="pickCustomSound('follow')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="follow" onclick="clearCustomSound('follow')">&times;</button><input type="checkbox" id="snd-tw-follow" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Twitch Sub / Resub</span><button class="snd-pick" data-snd="sub" onclick="pickCustomSound('sub')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="sub" onclick="clearCustomSound('sub')">&times;</button><input type="checkbox" id="snd-tw-sub" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Twitch Gift Sub</span><button class="snd-pick" data-snd="gift" onclick="pickCustomSound('gift')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="gift" onclick="clearCustomSound('gift')">&times;</button><input type="checkbox" id="snd-tw-gift" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Twitch Raid</span><button class="snd-pick" data-snd="raid" onclick="pickCustomSound('raid')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="raid" onclick="clearCustomSound('raid')">&times;</button><input type="checkbox" id="snd-tw-raid" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Twitch Cheer</span><button class="snd-pick" data-snd="cheer" onclick="pickCustomSound('cheer')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="cheer" onclick="clearCustomSound('cheer')">&times;</button><input type="checkbox" id="snd-tw-cheer" onchange="saveSettings()"></div>
+            <div class="sound-row"><span>YouTube Sub / Member</span><button class="snd-pick" data-snd="yt-sub" onclick="pickCustomSound('yt-sub')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="yt-sub" onclick="clearCustomSound('yt-sub')">&times;</button><input type="checkbox" id="snd-yt-sub" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>YouTube Super Chat</span><button class="snd-pick" data-snd="super" onclick="pickCustomSound('super')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="super" onclick="clearCustomSound('super')">&times;</button><input type="checkbox" id="snd-yt-super" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>TikTok Follow</span><button class="snd-pick" data-snd="tt-follow" onclick="pickCustomSound('tt-follow')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="tt-follow" onclick="clearCustomSound('tt-follow')">&times;</button><input type="checkbox" id="snd-tt-follow" onchange="saveSettings()"></div>
+            <div class="sound-row"><span>TikTok Gift</span><button class="snd-pick" data-snd="tt-gift" onclick="pickCustomSound('tt-gift')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="tt-gift" onclick="clearCustomSound('tt-gift')">&times;</button><input type="checkbox" id="snd-tt-gift" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Kick Follow</span><button class="snd-pick" data-snd="kk-follow" onclick="pickCustomSound('kk-follow')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="kk-follow" onclick="clearCustomSound('kk-follow')">&times;</button><input type="checkbox" id="snd-kk-follow" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Kick Sub / Gift</span><button class="snd-pick" data-snd="kk-sub" onclick="pickCustomSound('kk-sub')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="kk-sub" onclick="clearCustomSound('kk-sub')">&times;</button><input type="checkbox" id="snd-kk-sub" checked onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Third-party extensions</span><button class="snd-pick" data-snd="ext" onclick="pickCustomSound('ext')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="ext" onclick="clearCustomSound('ext')">&times;</button><input type="checkbox" id="snd-ext" onchange="saveSettings()"></div>
+            <div class="sound-row"><span>SE/PayPal Tip</span><button class="snd-pick" data-snd="tip" onclick="pickCustomSound('tip')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="tip" onclick="clearCustomSound('tip')">&times;</button><input type="checkbox" id="snd-se-tip" checked></div>
+            <div class="sound-row"><span>Keyword Match</span><button class="snd-pick" data-snd="keyword" onclick="pickCustomSound('keyword')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="keyword" onclick="clearCustomSound('keyword')">&times;</button><input type="checkbox" id="snd-kw" checked onchange="saveSettings()"></div>
           </div>
           <input type="file" id="sndFilePicker" accept="audio/*" style="display:none">
         </div>
@@ -2496,6 +2660,11 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
               </div>
             </div>
             <div class="sec">
+              <div class="sec-hd">Chat overlay filter</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Replace common curse words with asterisks (same length) on chat messages going to your OBS overlays and pop-out — your main chat panel keeps the raw text so you + your mods still see what was said. Useful for family-friendly streams or platforms with stricter content rules. Word-boundary matching; covers ~40 common stems.</div>
+              <label class="frow" style="font-size:11px"><span>Filter curse words from chat overlays</span><input type="checkbox" id="settings-filter-profanity" onchange="onFilterProfanityToggle(this.checked)"></label>
+            </div>
+            <div class="sec">
               <div class="sec-hd">Auto-refresh OBS browser sources</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When SF starts (or auto-updates and re-launches), browser sources in OBS that point at SF overlay URLs may be stuck on a "this site can't be reached" error from when SF was off. Browser sources don't auto-retry, so they sit blank until you manually refresh each one. Enable this to have SF connect to the OBS WebSocket plugin on launch and refresh those sources for you.</div>
               <label class="frow" style="font-size:11px;margin-bottom:6px"><span>Auto-refresh on SF launch</span><input type="checkbox" id="obsAutoRefresh" checked onchange="onObsRefreshCfgChange()"></label>
@@ -2701,7 +2870,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
           <div class="sec" style="text-align:center;padding:20px 14px">
             <svg class="ic" style="width:48px;height:48px;color:var(--accent);margin-bottom:8px"><use href="#i-bolt"/></svg>
             <div style="font-size:20px;font-weight:800;letter-spacing:.5px;color:var(--txt);margin-bottom:2px">StreamFusion</div>
-            <div style="font-size:12px;color:var(--mut);margin-bottom:14px" id="aboutVersion">v1.2.0</div>
+            <div style="font-size:12px;color:var(--mut);margin-bottom:14px" id="aboutVersion">&nbsp;</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:18px">Multi-platform streaming hub.<br>Made by <strong style="color:var(--txt)">aquilo_plays</strong></div>
             <button onclick="replayOnboarding()" style="padding:7px 18px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s"><svg class="ic" style="margin-right:4px"><use href="#i-play"/></svg>Setup Guide</button>
           </div>
@@ -2747,12 +2916,14 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 
   <div class="chat-wrap">
     <div class="chat-modes" id="chatModes"></div>
-    <div class="chat-search-wrap" id="chatSearchWrap"><input class="chat-search" id="chatSearchInput" placeholder="Search chat..." oninput="filterChat()"><span class="chat-search-count" id="chatSearchCount"></span><button class="chat-search-close" onclick="toggleChatSearch()">&times;</button></div>
+    <div class="chat-search-wrap" id="chatSearchWrap"><input class="chat-search" id="chatSearchInput" placeholder="Search chat..." oninput="filterChat()"><span class="chat-search-count" id="chatSearchCount"></span><button class="chat-search-close" onclick="toggleChatSearch()" title="Close search" aria-label="Close search">&times;</button></div>
     <div class="pins-bar" id="pinsBar"></div>
     <div class="feed" id="feed">
       <div class="empty" id="emptyState">
-        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        <p>Connect <strong>Streamer.bot</strong> for Twitch &amp; YouTube,<br>and <strong>Tikfinity</strong> for TikTok.<br><br>Click <svg class="ic"><use href="#i-cog"/></svg> Settings to get started.</p>
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <p style="font-weight:600;color:var(--txt);font-size:15px;margin-bottom:2px">Your stream is quiet.</p>
+        <p>Connect <strong>Streamer.bot</strong> for Twitch &amp; YouTube and <strong>TikFinity</strong> for TikTok, then chat from every platform will land here.</p>
+        <p style="font-size:12px;margin-top:4px;opacity:.85">Open <svg class="ic"><use href="#i-cog"/></svg> Settings to get started.</p>
       </div>
     </div>
     <div class="scroll-snap" id="scrollSnap" onclick="snapBottom()"><svg class="ic"><use href="#i-arrow-dn"/></svg> New messages &#8212; click to scroll down</div>
@@ -2796,7 +2967,7 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
     <div class="ev-likes" id="evLikes"><div class="hearts-wrap" id="heartsWrap"><svg class="ic" style="color:#ff4d6d"><use href="#i-heart"/></svg> <span id="evLikeCount">0</span> likes</div></div>
     <div class="ev-pinned-wrap"><div class="ev-pinned" id="evPinned"></div></div>
     <div class="ev-feed" id="evFeed">
-      <div class="ev-empty" id="evEmpty">No events yet</div>
+      <div class="ev-empty" id="evEmpty">No events yet &mdash; follows, subs, gifts and tips will appear here.</div>
     </div>
   </div>
 </div>
@@ -3426,6 +3597,13 @@ var hideMainAnimations = false;
 // the live-bar when the Rotation widget is connected. Toggle lives in
 // Settings → Integrations → Rotation Widget; default on.
 var showNowPlaying = true;
+// Filter common curse words from chat messages being broadcast to OBS
+// overlays + the pop-out overlay. Default off so existing streams keep
+// their current behaviour. Toggle lives in Settings → OBS Overlays →
+// Profanity filter. Applies to text + html on the way out via
+// sendOverlayChat / sendObsChat — main app chat panel keeps the raw
+// text so the streamer + their mods still see the unfiltered version.
+var filterChatProfanity = false;
 var _avatarCache = {};
 var _sessionChatters = new Set();
 var _chatterMap = new Map(); // lowerUser → { display, plat, lastSeen }
@@ -3496,6 +3674,7 @@ function loadSettings() {
     if (d.ttsGiftCoinMin !== undefined) ttsGiftCoinMin = Math.max(0, parseInt(d.ttsGiftCoinMin) || 0);
     if (d.hideMainAnimations !== undefined) hideMainAnimations = !!d.hideMainAnimations;
     if (d.showNowPlaying !== undefined) showNowPlaying = !!d.showNowPlaying;
+    if (d.filterChatProfanity !== undefined) filterChatProfanity = !!d.filterChatProfanity;
     // Raid Finder persisted preferences
     if (d.rfRangeMode) S.raidFinder.rangeMode = d.rfRangeMode;
     if (d.rfRangeLowPct !== undefined) S.raidFinder.rangeLowPct = d.rfRangeLowPct;
@@ -3549,6 +3728,7 @@ function saveSettings() {
     ttsInstant: ttsInstant, ttsGiftCoinMin: ttsGiftCoinMin,
     hideMainAnimations: hideMainAnimations,
     showNowPlaying: showNowPlaying,
+    filterChatProfanity: filterChatProfanity,
     rfRangeMode: S.raidFinder.rangeMode, rfRangeLowPct: S.raidFinder.rangeLowPct,
     rfRangeHighPct: S.raidFinder.rangeHighPct, rfRangeLowAbs: S.raidFinder.rangeLowAbs,
     rfRangeHighAbs: S.raidFinder.rangeHighAbs, rfWantCount: S.raidFinder.wantCount,
@@ -3587,6 +3767,8 @@ loadSettings();
   if (avChk) avChk.checked = showAvatars;
   var npChk = document.getElementById('settings-show-now-playing');
   if (npChk) npChk.checked = !!showNowPlaying;
+  var fpChk = document.getElementById('settings-filter-profanity');
+  if (fpChk) fpChk.checked = !!filterChatProfanity;
   // Push the persisted hotbar hotkeys to main so global shortcuts get
   // registered. Without this the saved hotkeys stay dormant until the
   // user opens the editor and changes something. Defer slightly so the
@@ -3739,7 +3921,7 @@ function pickCustomSound(type) {
 document.getElementById('sndFilePicker').addEventListener('change', function(e) {
   if (!_pendingSndType || !e.target.files || !e.target.files[0]) return;
   var file = e.target.files[0];
-  if (file.size > 2 * 1024 * 1024) { alert('File too large (max 2 MB)'); return; }
+  if (file.size > 2 * 1024 * 1024) { showToast({ title: 'File too large', message: 'Pick a sound under 2 MB.', kind: 'warn' }); return; }
   var reader = new FileReader();
   reader.onload = function(ev) {
     _customSounds[_pendingSndType] = ev.target.result;
@@ -4109,7 +4291,7 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
 }
 function clearEvHistory() {
   evHistory.length = 0;
-  document.getElementById('evFeed').innerHTML = '<div class="ev-empty" id="evEmpty">No events yet</div>';
+  document.getElementById('evFeed').innerHTML = '<div class="ev-empty" id="evEmpty">No events yet &mdash; follows, subs, gifts and tips will appear here.</div>';
   document.getElementById('evPinned').style.display = 'none';
 }
 function updateLikeCounter(n) {
@@ -5685,7 +5867,18 @@ function _rfStartRaid(login, displayName, opts) {
     sysMsg('tw', 'Streamer.bot is not connected. Reconnect and try again.');
     return;
   }
-  if (!opts.skipConfirm && !confirm('Raid ' + (displayName || login) + ' now?')) return;
+  if (!opts.skipConfirm) {
+    confirmDialog({
+      title: 'Start raid?',
+      message: 'Raid <strong>' + esc(displayName || login) + '</strong> now?',
+      sub: 'Twitch will end your stream after the countdown and send your viewers to their channel.',
+      okLabel: 'Raid now',
+      cancelLabel: 'Cancel'
+    }).then(function(yes) {
+      if (yes) _rfStartRaid(login, displayName, Object.assign({}, opts, { skipConfirm: true, _confirmed: true }));
+    });
+    return;
+  }
 
   // Pre-raid message: post to streamer's own Twitch chat so viewers can
   // copy + paste into the target channel's chat. Fires BEFORE the raid
@@ -5711,7 +5904,13 @@ function _rfStartRaid(login, displayName, opts) {
   }));
   var prefix = opts.fromSchedule ? 'Scheduled raid firing now: ' : 'Raiding ';
   sysMsg('tw', prefix + (displayName || login) + '\u2026 give Twitch a few seconds.');
-  if (!opts.skipConfirm) closeModal();
+  // closeModal() shuts the Raid Finder UI after a user-initiated raid lands.
+  // Was previously gated on !opts.skipConfirm, but the polish-pass refactor
+  // (1.6.3+) splits the confirm into a styled dialog, so the post-confirm
+  // re-entry now also has skipConfirm=true. Switch to !opts.fromSchedule
+  // so the user path closes the modal and the scheduler path (which has
+  // no modal open) still skips it.
+  if (!opts.fromSchedule) closeModal();
 }
 
 // ── Outgoing Raid Scheduler ──────────────────────────────────────────────────
@@ -7998,6 +8197,164 @@ function sysMsg(plat, text) {
   // System messages go to events panel
   addEvHistory('StreamFusion', text, plat);
 }
+
+// ── Toast notifications ─────────────────────────────────────────────────────
+// Lightweight alert() replacement. Pops a card bottom-right with optional
+// title + body, auto-dismisses after `duration` ms (default 4000), and
+// returns a handle so callers can dismiss early. Use sparingly — for events
+// that should leave a record, addEvHistory / sysMsg are still the right call.
+//
+// API: showToast(message)
+//      showToast(message, 'ok' | 'err' | 'warn' | 'info')
+//      showToast({ title, message, kind, duration })
+var _SF_TOAST_ICONS = {
+  ok:   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2V9h2v5z"/></svg>',
+  err:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>'
+};
+function showToast(arg, kindArg) {
+  var opts = (arg && typeof arg === 'object') ? arg : { message: String(arg || ''), kind: kindArg };
+  var kind = opts.kind || 'info';
+  if (!_SF_TOAST_ICONS[kind]) kind = 'info';
+  var duration = (typeof opts.duration === 'number') ? opts.duration : 4000;
+
+  var host = document.getElementById('sfToasts');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'sfToasts';
+    document.body.appendChild(host);
+  }
+
+  var t = document.createElement('div');
+  t.className = 'sf-toast ' + kind;
+  t.setAttribute('role', kind === 'err' || kind === 'warn' ? 'alert' : 'status');
+  t.setAttribute('aria-live', kind === 'err' || kind === 'warn' ? 'assertive' : 'polite');
+
+  var ic = document.createElement('span');
+  ic.className = 'sft-ic';
+  ic.innerHTML = _SF_TOAST_ICONS[kind];
+
+  var body = document.createElement('div');
+  body.className = 'sft-body';
+  if (opts.title) {
+    var ttl = document.createElement('div');
+    ttl.className = 'sft-title';
+    ttl.textContent = opts.title;
+    body.appendChild(ttl);
+  }
+  if (opts.message) {
+    var msg = document.createElement('div');
+    msg.textContent = opts.message;
+    body.appendChild(msg);
+  }
+
+  var x = document.createElement('button');
+  x.className = 'sft-x';
+  x.type = 'button';
+  x.setAttribute('aria-label', 'Dismiss');
+  x.innerHTML = '&times;';
+
+  t.appendChild(ic); t.appendChild(body); t.appendChild(x);
+  host.appendChild(t);
+
+  var timer = null;
+  var killed = false;
+  function dismiss() {
+    if (killed) return;
+    killed = true;
+    if (timer) { clearTimeout(timer); timer = null; }
+    t.classList.add('out');
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 240);
+  }
+  x.addEventListener('click', dismiss);
+  if (duration > 0) timer = setTimeout(dismiss, duration);
+
+  // Pause auto-dismiss on hover so users get time to read longer messages.
+  t.addEventListener('mouseenter', function(){ if (timer) { clearTimeout(timer); timer = null; } });
+  t.addEventListener('mouseleave', function(){ if (!killed && duration > 0) timer = setTimeout(dismiss, 1500); });
+
+  return { dismiss: dismiss };
+}
+
+// ── Styled confirm dialog ───────────────────────────────────────────────────
+// Drop-in replacement for native window.confirm(). Returns Promise<boolean>.
+// Built on top of the same .overlay/.modal chrome the rest of the app uses,
+// so it picks up the modal scale-in animation + focus ring + ESC-to-close
+// for free. Supports a danger variant for destructive actions (red primary).
+//
+// confirmDialog({ title, message, sub, okLabel, cancelLabel, danger }).then(yes => ...)
+function confirmDialog(opts) {
+  opts = opts || {};
+  return new Promise(function(resolve) {
+    var overlay = document.createElement('div');
+    overlay.className = 'overlay show';
+    overlay.style.zIndex = '9700'; // above settings + most other modals
+
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.width = '380px';
+
+    var h = document.createElement('div');
+    h.className = 'mh';
+    h.textContent = opts.title || 'Confirm';
+
+    var msg = document.createElement('div');
+    msg.className = 'sf-confirm-msg';
+    // Use innerHTML so callers can pass a small bit of markup (e.g.
+    // <strong>username</strong>) — callers must escape user-controlled input
+    // before passing. The two in-house call sites pass app-controlled text.
+    msg.innerHTML = opts.message || '';
+
+    var sub = null;
+    if (opts.sub) {
+      sub = document.createElement('div');
+      sub.className = 'sf-confirm-sub';
+      sub.textContent = opts.sub;
+    }
+
+    var btns = document.createElement('div');
+    btns.className = 'sf-confirm-btns';
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = opts.cancelLabel || 'Cancel';
+
+    var ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = opts.danger ? 'sfc-danger' : 'sfc-primary';
+    ok.textContent = opts.okLabel || 'Confirm';
+
+    btns.appendChild(cancel); btns.appendChild(ok);
+    modal.appendChild(h);
+    modal.appendChild(msg);
+    if (sub) modal.appendChild(sub);
+    modal.appendChild(btns);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    var done = false;
+    function close(answer) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKey, true);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      resolve(!!answer);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); close(true); }
+    }
+    cancel.addEventListener('click', function(){ close(false); });
+    ok.addEventListener('click', function(){ close(true); });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) close(false); });
+    document.addEventListener('keydown', onKey, true);
+
+    // Focus the primary so Enter just works.
+    setTimeout(function(){ ok.focus(); }, 30);
+  });
+}
+
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escA(s) { return String(s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
@@ -9188,6 +9545,15 @@ function onShowNowPlayingToggle(checked) {
   _renderNowPlayingBar();
 }
 
+// User toggle for the chat-overlay profanity filter. Takes effect on
+// the next chat message — already-sent messages keep their original
+// text (the SSE stream doesn't replay) which is fine, the streamer
+// flipped the toggle going forward.
+function onFilterProfanityToggle(checked) {
+  filterChatProfanity = !!checked;
+  if (typeof saveSettings === 'function') saveSettings();
+}
+
 function updateObsConfig(which) {
   if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsSetConfig) return;
   var get = function(id) { return document.getElementById(id); };
@@ -9513,6 +9879,15 @@ function submitTF() {
 function sfBoot() {
   var boot = document.getElementById('sfBoot');
   if (!boot) return;
+  // Stamp the boot screen with the live app version (was hardcoded "v1.2.0"
+  // for the entire 1.3.x → 1.6.x line). Falls back to silent if the IPC
+  // isn't available — better an empty stamp than a wrong one.
+  var verEl = document.getElementById('sfBootVer');
+  if (verEl && window.electronAPI && electronAPI.getVersion) {
+    electronAPI.getVersion().then(function(v) {
+      if (v) verEl.textContent = 'v' + v;
+    }).catch(function(){});
+  }
   setTimeout(function() {
     boot.classList.add('out');
     setTimeout(function() { boot.style.display = 'none'; }, 700);
@@ -11282,7 +11657,7 @@ function toggleOverlay() {
     if (result === false) {
       _overlayOpen = false;
       document.getElementById('overlayBtn').classList.remove('on');
-      alert('Failed to open overlay window. Check console for details.');
+      showToast({ title: 'Couldn’t open the pop-out', message: 'Check the developer console for details.', kind: 'err' });
       return;
     }
     _overlayOpen = true;
@@ -11346,7 +11721,7 @@ function togglePromoOverlay() {
     if (result === false) {
       _promoOpen = false;
       _updatePromoBtnState();
-      alert('Failed to open promo overlay. Check console for details.');
+      showToast({ title: 'Couldn’t open the promo overlay', message: 'Check the developer console for details.', kind: 'err' });
       return;
     }
     _promoOpen = true;
@@ -11415,7 +11790,64 @@ function sendToPromo(data) {
   if (!_promoOpen) return;
   if (window.electronAPI && window.electronAPI.sendPromoData) window.electronAPI.sendPromoData(data);
 }
+// ── Profanity filter for chat overlays ─────────────────────────────────
+// Single moderate wordlist with common stem forms. Replaces matches with
+// asterisks of the same length so message layout (line length, marquee
+// timing, etc.) stays the same. Word-boundary regex so embedded fragments
+// like "asses" inside "passes" don't false-positive. The list is
+// intentionally not exhaustive — streamers who want stricter filtering
+// run a Streamer.bot / chatmod tool on top. Sorted longest-first so
+// "motherfucker" matches before "fucker" before "fuck" (regex alternation
+// is left-to-right, takes the first match).
+var _profanityList = [
+  'motherfucker', 'motherfuckers',
+  'fucking', 'fucked', 'fucker', 'fuckers', 'fuck',
+  'shitty', 'shithead', 'bullshit', 'shits', 'shit',
+  'bitches', 'bitching', 'bitch',
+  'asshole', 'assholes', 'asses', 'ass',
+  'bastard', 'bastards',
+  'cunts', 'cunt',
+  'dickhead', 'dicks', 'dick',
+  'pissed', 'pissing', 'piss',
+  'damned', 'damn',
+  'whores', 'whore',
+  'pricks', 'prick',
+  'sluts', 'slut',
+  'crap',
+  'nigger', 'niggers',
+  'faggot', 'faggots', 'fag',
+  'retard', 'retards', 'retarded'
+];
+var _profanityRegex = (function() {
+  var sorted = _profanityList.slice().sort(function(a, b) { return b.length - a.length; });
+  return new RegExp('\\b(' + sorted.join('|') + ')\\b', 'gi');
+})();
+
+// Replace each match with asterisks of the same length, preserving
+// surrounding punctuation. Returns the input unchanged when filtering is
+// off or the input isn't a string. Safe to run on plain text AND on the
+// html variant — word-boundary matching keeps HTML tag / attribute
+// content from getting hit (emote names virtually never contain curse
+// words in word-boundary form).
+function _filterProfanity(text) {
+  if (!filterChatProfanity || !text || typeof text !== 'string') return text;
+  return text.replace(_profanityRegex, function(match) {
+    return '*'.repeat(match.length);
+  });
+}
+
 function sendOverlayChat(m) {
+  if (!m) return;
+  // Filter text + html on the way to overlays so the OBS chat overlay,
+  // the OBS vertical bar, the OBS ticker AND the pop-out chat feed
+  // all see the same scrubbed message. Mutating m.text/m.html in
+  // place is fine here — the chat-panel render already finished
+  // before this call (see addMsg → m.text used in innerHTML before
+  // sendOverlayChat is invoked).
+  if (filterChatProfanity) {
+    if (m.text) m.text = _filterProfanity(m.text);
+    if (m.html) m.html = _filterProfanity(m.html);
+  }
   sendToOverlay({ type: 'chat', plat: m.plat, user: m.user, text: m.text || '', html: m.html || null, color: m.color || null, badges: m.badges || [], avatar: m.avatar || null, isFirstMsg: !!m.isFirstMsg, isFirstWords: !!m.isFirstWords, msgId: m.msgId || '' });
   sendObsChat(m);
 }
@@ -11964,12 +12396,22 @@ function postRecordsNow() {
 }
 
 function resetRecords() {
-  if (!confirm('Reset all-time records? This cannot be undone.')) return;
-  dcRecords = { twGift: null, kkGift: null, cheer: null, ttGift: null, seTip: null };
-  dcRecordsMessageId = '';
-  saveDiscordSettings();
-  renderDiscordTab();
-  addEvHistory('StreamFusion', 'Records reset.', 'tw', false);
+  confirmDialog({
+    title: 'Reset all-time records?',
+    message: 'Top gift, top tip, biggest cheer — every personal best you’ve tracked will be cleared.',
+    sub: 'This cannot be undone.',
+    okLabel: 'Reset records',
+    cancelLabel: 'Keep them',
+    danger: true
+  }).then(function(yes) {
+    if (!yes) return;
+    dcRecords = { twGift: null, kkGift: null, cheer: null, ttGift: null, seTip: null };
+    dcRecordsMessageId = '';
+    saveDiscordSettings();
+    renderDiscordTab();
+    addEvHistory('StreamFusion', 'Records reset.', 'tw', false);
+    showToast({ title: 'All-time records reset', kind: 'ok' });
+  });
 }
 
 function openDiscordSetupGuide() {
