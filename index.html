@@ -13662,5 +13662,213 @@ window.addEventListener('load', function() {
   });
 });
 </script>
+<script>
+/* ─── aquilo.gg live-status sharing ──────────────────────────────────
+   Opt-in feature: when enabled, StreamFusion posts a heartbeat to the
+   aquilo-live worker while the streamer is live, so they appear on the
+   aquilo.gg "live now" radar (and, once a webhook is wired up on the
+   worker, the community Discord). Fully self-contained — its own
+   localStorage key, injects its own Settings tab + pane at runtime —
+   so it never touches the app's existing settings save/load or the
+   static settings markup. Safe to lift out as one block. */
+(function () {
+  var LIVE_API = 'https://live.aquilo.gg';
+  var LIVE_KEY = 'aql-live-k7m2x9q4';
+  var STORE = 'sf_aquilo_live';
+  var LOOP_MS = 90000; // heartbeat / live-recheck cadence (worker TTL is 6 min)
+  var isWebDemo = !!window.__SF_WEB_DEMO__;
+
+  var cfg = { enabled: false, displayName: '' };
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || '{}');
+    if (saved && typeof saved === 'object') {
+      cfg.enabled = !!saved.enabled;
+      cfg.displayName = String(saved.displayName || '');
+    }
+  } catch (e) {}
+
+  function persist() {
+    try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {}
+  }
+
+  // Twitch login from Streamer.bot's GetBroadcaster is the most
+  // reliable channel handle the app holds. `S` may be a script-scope
+  // binding rather than a window property — probe both, safely.
+  function channelLogin() {
+    try {
+      if (typeof S !== 'undefined' && S && S.twLogin) {
+        return String(S.twLogin).toLowerCase();
+      }
+    } catch (e) {}
+    try {
+      if (window.S && window.S.twLogin) {
+        return String(window.S.twLogin).toLowerCase();
+      }
+    } catch (e) {}
+    return '';
+  }
+  function reportName() {
+    return cfg.displayName.trim() || channelLogin();
+  }
+
+  function setStatus(txt, tone) {
+    var el = document.getElementById('aql-live-status');
+    if (!el) return;
+    el.textContent = txt;
+    el.style.color = tone === 'live' ? 'var(--grn)'
+      : tone === 'err' ? 'var(--red)' : 'var(--mut)';
+  }
+
+  // decapi.me — keyless Twitch metadata. cb(isLive, gameName).
+  function checkLive(cb) {
+    var login = channelLogin();
+    if (!login) { cb(false, ''); return; }
+    fetch('https://decapi.me/twitch/uptime/' + encodeURIComponent(login))
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        if (/offline|not live|unable|error/i.test(t)) { cb(false, ''); return; }
+        fetch('https://decapi.me/twitch/game/' + encodeURIComponent(login))
+          .then(function (r) { return r.text(); })
+          .then(function (g) {
+            cb(true, /not live|unknown|unable|error/i.test(g) ? '' : g.trim());
+          })
+          .catch(function () { cb(true, ''); });
+      })
+      .catch(function () { cb(false, ''); });
+  }
+
+  function post(body) {
+    return fetch(LIVE_API + '/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Live-Key': LIVE_KEY },
+      body: JSON.stringify(body)
+    }).catch(function () {});
+  }
+
+  var prevLive = false;
+  var loopTimer = null;
+
+  function tick() {
+    if (!cfg.enabled) return;
+    var login = channelLogin();
+    if (!login) {
+      setStatus('Connect Streamer.bot (Twitch) so we know your channel.', 'err');
+      return;
+    }
+    if (isWebDemo) {
+      setStatus('Sharing is on — heartbeats are disabled in the web demo.', '');
+      return;
+    }
+    checkLive(function (live, game) {
+      var name = reportName();
+      if (live) {
+        post({ name: name, platform: 'twitch',
+               url: 'https://twitch.tv/' + login, game: game, live: true });
+        setStatus('You’re live — showing on the aquilo.gg radar'
+          + (game ? ' · ' + game : '') + '.', 'live');
+      } else {
+        if (prevLive) post({ name: name, platform: 'twitch', live: false });
+        setStatus('Sharing is on. You’ll appear on the radar once you go live.', '');
+      }
+      prevLive = live;
+    });
+  }
+
+  function startLoop() {
+    stopLoop();
+    tick();
+    loopTimer = setInterval(tick, LOOP_MS);
+  }
+  function stopLoop() {
+    if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+  }
+
+  function onToggle(on) {
+    cfg.enabled = on;
+    persist();
+    if (on) {
+      startLoop();
+    } else {
+      stopLoop();
+      // Drop off the radar immediately rather than waiting for the TTL.
+      if (!isWebDemo && channelLogin()) {
+        post({ name: reportName(), platform: 'twitch', live: false });
+      }
+      prevLive = false;
+      setStatus('Live-status sharing is off.', '');
+    }
+  }
+
+  // Builds the Settings → Community tab + pane via the DOM, using the
+  // app's own .sec / .frow / .minput classes so it matches every other
+  // pane. switchSettingsTab() already keys purely off data-tab + the
+  // pane id convention, so an injected tab works with no extra wiring.
+  function inject() {
+    var tabs = document.getElementById('settingsTabs');
+    var aboutPane = document.getElementById('pane-about');
+    if (!tabs || !aboutPane || document.getElementById('pane-community')) return;
+
+    var tab = document.createElement('div');
+    tab.className = 'settings-tab';
+    tab.setAttribute('data-tab', 'community');
+    tab.textContent = 'Community';
+    tab.onclick = function () { switchSettingsTab('community'); };
+    var aboutTab = tabs.querySelector('[data-tab="about"]');
+    if (aboutTab) tabs.insertBefore(tab, aboutTab);
+    else tabs.appendChild(tab);
+
+    var pane = document.createElement('div');
+    pane.className = 'settings-pane';
+    pane.id = 'pane-community';
+    pane.innerHTML =
+      '<div class="sec">'
+      + '<div class="sec-hd" style="color:#9a82ff">aquilo.gg — Live status sharing</div>'
+      + '<div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">'
+      + 'Opt in to show up on the <strong>aquilo.gg live radar</strong> and the community '
+      + 'Discord whenever you go live. Off by default — turn it off any time and you '
+      + 'drop off the radar within a few minutes.'
+      + '</div>'
+      + '<label class="frow" style="margin-bottom:6px"><span>Share my live status on aquilo.gg</span>'
+      + '<input type="checkbox" id="aql-live-enabled"></label>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">'
+      + 'Display name on the radar — leave blank to use your Twitch channel name.</div>'
+      + '<input class="minput" id="aql-live-name" placeholder="(your Twitch name)" '
+      + 'style="font-size:11px;padding:5px 8px;width:100%;box-sizing:border-box;background:var(--surf2)">'
+      + '<div id="aql-live-status" style="font-size:10.5px;color:var(--mut);margin-top:8px;min-height:14px"></div>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">'
+      + 'Shares only public stream info — channel name, platform, current game and '
+      + 'title. Nothing else, ever.</div>'
+      + '</div>';
+    aboutPane.parentNode.insertBefore(pane, aboutPane);
+
+    var chk = document.getElementById('aql-live-enabled');
+    var nameI = document.getElementById('aql-live-name');
+    if (chk) {
+      chk.checked = cfg.enabled;
+      chk.addEventListener('change', function () { onToggle(this.checked); });
+    }
+    if (nameI) {
+      nameI.value = cfg.displayName;
+      nameI.addEventListener('change', function () {
+        cfg.displayName = String(this.value || '');
+        persist();
+      });
+    }
+    setStatus(cfg.enabled
+      ? 'Sharing is on. You’ll appear on the radar once you go live.'
+      : 'Live-status sharing is off.', '');
+  }
+
+  function boot() {
+    inject();
+    if (cfg.enabled) startLoop();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
 </body>
 </html>
