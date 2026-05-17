@@ -1,0 +1,14 @@
+{
+  "name": "sf-release-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker for StreamFusion's /post-release endpoint - split out from bot-service so the always-on Gateway+SSE service can stay slim.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

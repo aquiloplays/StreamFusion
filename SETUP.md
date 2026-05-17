@@ -1,6 +1,6 @@
 # StreamFusion — Setup Guide
 
-Made by **aquilo_plays**
+Made by **aquiloGG**
 
 StreamFusion is a desktop chat aggregator for Twitch, YouTube, and TikTok LIVE. It connects to **Streamer.bot** (for Twitch & YouTube) and **Tikfinity** (for TikTok) and brings all your chats into one clean window.
 
@@ -133,11 +133,11 @@ Each Twitch chat message has a small shield icon on the right. Click it to open 
 
 ---
 
-## Raid Finder (Early Access)
+## Raid Finder
 
 The Raid Finder helps you find streamers playing the same game with a similar viewer count to raid when you end your stream. It uses your existing Streamer.bot Twitch login — no extra tokens or API keys needed.
 
-> **Early Access:** Raid Finder is available to Patreon Tier 2+ supporters. Connect your Patreon in **Settings → Early Access** to unlock it.
+> Raid Finder is free for everyone, like every feature in StreamFusion.
 
 ### How it works
 

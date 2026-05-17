@@ -42,50 +42,6 @@ body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans
 .titlebar-btn:hover{background:var(--surf3);color:var(--txt)}
 .titlebar-btn.close:hover{background:#c42b1c;color:#fff}
 body:not(.is-electron) .titlebar{display:none}
-/* .sf-beta-only elements only render on the beta variant (body.is-beta
-   is toggled by the isBeta IPC resolve at boot). Use this to gate
-   beta-exclusive UI — currently the "Style" picker under OBS Alerts
-   (minimalistic variant, shipping on beta first per release policy).
-   On stable installs body.is-beta is absent so these are hidden. */
-body:not(.is-beta) .sf-beta-only { display: none !important; }
-/* Beta wordmark badge — only visible when electronAPI.isBeta() resolves true
-   and boot.js adds `is-beta` to <body>. Inline next to the "StreamFusion"
-   wordmark in both the titlebar and the top sidebar logo. Amber palette
-   matches the beta app icon so the whole app reads beta at a glance. */
-.sf-beta-badge{display:none;margin-left:6px;padding:1px 5px;font-size:9px;font-weight:800;letter-spacing:.8px;color:#140e04;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);border-radius:3px;vertical-align:middle;-webkit-background-clip:border-box;-webkit-text-fill-color:#140e04;box-shadow:0 0 8px rgba(249,115,22,.35)}
-.sf-beta-badge.lg{font-size:10px;padding:2px 6px;margin-left:7px;letter-spacing:1px}
-body.is-beta .sf-beta-badge{display:inline-block}
-/* Paint the sidebar logo in amber/orange when on beta, so the wordmark
-   color matches the icon palette instead of the stable blue/teal. */
-body.is-beta .logo{background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-/* Boot splash wordmark on beta: matching amber gradient instead of
-   the stable blue/teal. Applies to the 1.5 sec startup overlay only. */
-body.is-beta .sf-boot-logo{background:linear-gradient(135deg,#f59e0b 0%,#f97316 70%,#fde68a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 40px rgba(249,115,22,.45))}
-/* Beta access gate — full-screen overlay that blocks UI interaction
-   until the user is Patreon Tier 3 entitled. Styled to match the beta
-   amber palette so it reads as a natural part of the app, not an
-   error. z-index sits above the onboarding flow (which may also open
-   on first launch) so a non-tier3 beta user can never bypass the
-   gate by navigating the onboarding. */
-.sf-beta-gate{position:fixed;inset:0;z-index:99999;background:radial-gradient(ellipse at center,#201604 0%,#0a0605 75%);display:flex;align-items:center;justify-content:center;padding:24px;animation:sfBetaGateFade .35s ease forwards;-webkit-app-region:drag}
-.sf-beta-gate-card{max-width:540px;width:100%;background:#140e04;border:1px solid rgba(245,158,11,.35);border-radius:14px;padding:36px 32px;text-align:center;box-shadow:0 0 60px rgba(249,115,22,.18),inset 0 1px 0 rgba(254,243,199,.06);-webkit-app-region:no-drag}
-.sf-beta-gate-logo{font-size:34px;font-weight:900;letter-spacing:-1px;margin-bottom:4px;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.sf-beta-gate-badge{display:inline-block;margin-left:6px;padding:3px 8px;font-size:14px;font-weight:800;letter-spacing:1.5px;color:#140e04;background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);border-radius:5px;vertical-align:6px;-webkit-text-fill-color:#140e04}
-.sf-beta-gate-title{font-size:18px;font-weight:700;color:#fde68a;margin:18px 0 8px;letter-spacing:.2px}
-.sf-beta-gate-sub{font-size:13px;line-height:1.55;color:#c9b89a;margin-bottom:20px}
-.sf-beta-gate-sub strong{color:#fde68a;font-weight:700}
-.sf-beta-gate-status{font-size:12px;color:#a08a6a;min-height:18px;margin-bottom:18px;padding:8px 12px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-radius:6px;display:none}
-.sf-beta-gate-status.show{display:block}
-.sf-beta-gate-btns{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
-.sf-beta-gate-btn{height:40px;padding:0 18px;border:1px solid rgba(245,158,11,.35);background:#1f1608;color:#fde68a;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;transition:background .15s,border-color .15s,transform .08s}
-.sf-beta-gate-btn:hover{background:#2a1d0c;border-color:rgba(245,158,11,.55)}
-.sf-beta-gate-btn:active{transform:scale(.98)}
-.sf-beta-gate-btn.primary{background:linear-gradient(135deg,#f59e0b 0%,#f97316 100%);color:#140e04;border-color:#f59e0b;font-weight:800}
-.sf-beta-gate-btn.primary:hover{background:linear-gradient(135deg,#fbbf24 0%,#fb923c 100%)}
-.sf-beta-gate-btn.quiet{background:transparent;border-color:rgba(245,158,11,.15);color:#8a7555;font-weight:500}
-.sf-beta-gate-btn.quiet:hover{background:rgba(245,158,11,.06)}
-.sf-beta-gate-foot{font-size:11px;color:#6f5a3f;line-height:1.45}
-@keyframes sfBetaGateFade{from{opacity:0}to{opacity:1}}
 .topbar{background:var(--surf);border-bottom:1px solid var(--bdr);padding:8px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
 .logo{font-size:18px;font-weight:900;background:linear-gradient(135deg,var(--accent),#00E5A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;margin-right:4px}
 .vcounts{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
@@ -916,13 +872,14 @@ body.has-sf-notice { padding-top: 42px !important; }
 .settings-pane .sec:last-child{border-bottom:none;margin-bottom:0}
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Early Access blur-gate pattern. Applied to settings panes whose
-   features are supporter-only (OBS Overlays, Theme). When the user
-   isn't entitled, the REAL feature UI is still rendered beneath but
-   blurred + click-blocked; a lock card hovers above it with the
-   upgrade CTA. Renders the paywall as marketing instead of hiding
-   features entirely, so every free user sees exactly what they'd
-   unlock at Tier 2/3.
+   Early-access blur-gate pattern — DORMANT / not currently applied.
+   Every current feature is free for everyone, so nothing wears the
+   .ea-gate class today. These rules stay defined so a FUTURE feature
+   can ship to Patreon supporters first (early access): add .ea-gate to
+   its settings pane and toggle .ea-unlocked from S.hasEarlyAccess. The
+   pattern keeps the real feature UI rendered beneath, blurred +
+   click-blocked, with a card hovering above for the not-yet-available
+   state. Unused until then.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* The pane itself acts as positioning context for the overlay. */
@@ -1498,10 +1455,10 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     <!-- Page 0: Welcome -->
     <div class="ob-page active" id="obPage0">
       <div class="w-logo"><svg class="ic"><use href="#i-bolt"/></svg> StreamFusion</div>
-      <div class="w-made">Made by <strong>aquilo_plays</strong></div>
+      <div class="w-made">Made by <strong>aquiloGG</strong></div>
       <div class="ob-sub">Your all-in-one multi-platform streaming dashboard.<br><strong>Twitch + YouTube + TikTok + Kick</strong> &mdash; unified chat, events, alerts, and analytics in a single window.</div>
       <div class="w-links">
-        <a class="w-link twitch" href="https://www.twitch.tv/aquilo_plays" target="_blank">
+        <a class="w-link twitch" href="https://www.twitch.tv/aquiloGG" target="_blank">
           <div class="wl-left">
             <!-- Profile photo for aquilo. Save to assets/aquilo.jpg — if the
                  image is missing (e.g. fresh build without the asset), the
@@ -1643,10 +1600,10 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     <!-- Page 9: Early Access (Patreon) -->
     <div class="ob-page" id="obPage9">
       <div class="ob-ic" style="background:linear-gradient(135deg,#ff424d 0%,#f59e0b 100%)"><svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#fff"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg></div>
-      <div class="ob-hd">Unlock Early Access</div>
+      <div class="ob-hd">Early Access on Patreon</div>
       <div class="ob-sub" style="text-align:left">
-        Want new features <strong>before everyone else</strong>? Support StreamFusion on Patreon and connect your account here &mdash; <strong>Tier 2</strong> and <strong>Tier 3</strong> supporters get Early Access features automatically.<br><br>
-        Sign in whenever you&rsquo;re ready. StreamFusion checks your membership in the background and unlocks / locks features live &mdash; no restart needed.
+        Every feature in StreamFusion is <strong>free for everyone</strong> &mdash; nothing here is locked behind payment.<br><br>
+        Supporting StreamFusion on Patreon gets you <strong>early access</strong>: brand-new features reach <strong>Tier 2</strong> and <strong>Tier 3</strong> supporters first, then roll out to everyone shortly after. It also helps fund development. Connecting is completely optional &mdash; you can do it now or any time later from <strong>Settings &rarr; Early Access</strong>.
       </div>
       <div id="obEaStatus" style="min-height:18px;font-size:11px;color:var(--mut);margin:4px 0;text-align:center"></div>
       <div class="ob-nav">
@@ -1761,28 +1718,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
 <div id="sfBanner"><div class="sfBn-inner"><svg class="ic ic-lg" id="sfBnIcon"><use href="#i-party"/></svg><div class="sfBn-title" id="sfBnTitle">Event</div><div class="sfBn-sub" id="sfBnSub"></div><span class="sfBn-amt" id="sfBnAmt" style="display:none"></span></div></div>
 <!-- Hype Train LEVEL UP fullscreen fanfare -->
 <div id="sfHypeLevelUp"><div class="hlu-rays" id="hluRays"></div><div class="hlu-card"><div class="hlu-label">Hype Train</div><div class="hlu-title">LEVEL UP!</div><div class="hlu-level">Level <b id="hluLvNum">1</b></div></div></div>
-<!-- Tier 3 access gate. Only injected into the DOM on beta installs
-     (main.js IPC is-beta -> true). Hidden until the entitlement check
-     resolves with a non-tier3 state; shown as a full-screen blocker
-     that requires Patreon Tier 3 sign-in before the rest of the UI
-     is usable. Owner email bypass in patreon-auth.js means the creator
-     never sees this. -->
-<div id="sfBetaGate" class="sf-beta-gate" style="display:none">
-  <div class="sf-beta-gate-card">
-    <div class="sf-beta-gate-logo">StreamFusion <span class="sf-beta-gate-badge">BETA</span></div>
-    <div class="sf-beta-gate-title" id="sfBetaGateTitle">Tier 3 Patreon supporters only</div>
-    <div class="sf-beta-gate-sub" id="sfBetaGateSub">StreamFusion Beta is a pre-release channel reserved for Patreon <strong>Tier 3 (Contributor)</strong> supporters. Sign in with your Patreon account to unlock access.</div>
-    <div class="sf-beta-gate-status" id="sfBetaGateStatus"></div>
-    <div class="sf-beta-gate-btns">
-      <button class="sf-beta-gate-btn primary" id="sfBetaGateSignInBtn" onclick="_sfBetaGateSignIn()">Sign in with Patreon</button>
-      <a class="sf-beta-gate-btn" href="https://www.patreon.com/cw/aquilo" target="_blank" rel="noopener" style="text-decoration:none;display:flex;align-items:center;justify-content:center">Upgrade to Tier 3</a>
-      <button class="sf-beta-gate-btn quiet" onclick="_sfBetaGateQuit()">Quit</button>
-    </div>
-    <div class="sf-beta-gate-foot">You can still run the stable version of StreamFusion — it's free for everyone.</div>
-  </div>
-</div>
 <div class="titlebar">
-  <span class="titlebar-title"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion<span class="sf-beta-badge" title="Beta channel (Patreon Tier 3)">BETA</span></span>
+  <span class="titlebar-title"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion</span>
   <div class="titlebar-btns">
     <button class="titlebar-btn" onclick="window.electronAPI&&window.electronAPI.minimize()" title="Minimize"><svg class="ic"><use href="#i-min"/></svg></button>
     <button class="titlebar-btn" onclick="window.electronAPI&&window.electronAPI.maximize()" title="Maximize"><svg class="ic"><use href="#i-max"/></svg></button>
@@ -1791,7 +1728,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
 </div>
 
 <div class="topbar">
-  <div class="logo"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion<span class="sf-beta-badge lg" title="Beta channel (Patreon Tier 3)">BETA</span></div>
+  <div class="logo"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion</div>
   <div class="vcounts" id="vcounts"><div class="vc total"><svg class="ic"><use href="#i-eye"/></svg><span id="vcTotal">0</span> total</div></div>
   <button class="tbtn" id="sbBtn" onclick="toggleSettingsModal()"><svg class="ic"><use href="#i-cog"/></svg>Settings</button>
   <button class="tbtn" id="overlayLockBtn" onclick="toggleOverlayLockFromMain()" title="Lock pop-out (click-through)" style="display:none"><svg class="ic"><use href="#i-unlock"/></svg>Lock</button>
@@ -1811,7 +1748,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
   <a class="tbtn tbtn-discord" href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" title="Join the StreamFusion Discord"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
-  <a class="tbtn tbtn-kofi" href="https://ko-fi.com/aquilo_plays" target="_blank" rel="noopener" title="Support aquilo_plays on Ko-Fi"><svg class="ic"><use href="#i-kofi"/></svg>Ko-Fi</a>
+  <a class="tbtn tbtn-kofi" href="https://ko-fi.com/aquilo_plays" target="_blank" rel="noopener" title="Support aquiloGG on Ko-Fi"><svg class="ic"><use href="#i-kofi"/></svg>Ko-Fi</a>
   <!-- Floating "Update Available" button: hidden until the auto-updater fires
        'update-available'. Sits next to the credit so it stays visible no
        matter which tab the user is on. Clicking opens the update prompt. -->
@@ -2348,7 +2285,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           <div class="sec">
             <div class="sec-hd">Patreon &mdash; Early Access</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
-              Support StreamFusion on Patreon and connect your account to unlock <strong style="color:var(--txt)">Early Access</strong> features &mdash; available to <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> supporters.
+              Every StreamFusion feature is <strong style="color:var(--txt)">free for everyone</strong> &mdash; nothing is locked behind payment. Supporting on Patreon gets you <strong style="color:var(--txt)">early access</strong>: new features land for <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> supporters first, then roll out to everyone shortly after. It also helps fund development. Connecting is optional and never required to use anything.
             </div>
             <!-- Status card: shows current connection state. Updated live via
                  renderEaSettings() whenever the entitlement changes. -->
@@ -2407,25 +2344,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
         </div>
 
-        <!-- ═══ OBS OVERLAYS TAB (EA-only) ═══ -->
-        <!-- Pane uses the ea-gate pattern: real feature UI always rendered
-             below (blurred + click-blocked when not entitled), lock card
-             hovers above with the upgrade CTA. renderObsOverlaysTab()
-             toggles .ea-unlocked based on S.hasEarlyAccess. -->
-        <div class="settings-pane ea-gate" id="pane-obsoverlays">
-          <div class="ea-lock-overlay" id="obsLockOverlay">
-            <div class="ea-lock-card">
-              <div class="ea-lock-icon">&#128274;</div>
-              <div class="ea-lock-title">This feature is coming soon!</div>
-              <div class="ea-lock-desc">Become a <strong>Tier 2</strong> or <strong>Tier 3</strong> Patron on Patreon to access now.<br><br>Get browser-source overlays for OBS &mdash; chat feed, alerts banner, shoutout card.</div>
-              <button class="ea-lock-cta" onclick="connectPatreon()">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg>
-                Connect Patreon
-              </button>
-              <a class="ea-lock-pledge" onclick="window.open('https://www.patreon.com/cw/aquilo','_blank');return false">Not a supporter yet? <strong>Join on Patreon &rarr;</strong></a>
-            </div>
-          </div>
-          <div class="ea-content" id="obsContent">
+        <!-- ═══ OBS OVERLAYS TAB ═══ -->
+        <!-- Free for everyone. Browser-source overlays for OBS — chat feed,
+             alerts banner, shoutout card, vertical bar, horizontal ticker. -->
+        <div class="settings-pane" id="pane-obsoverlays">
+          <div id="obsContent">
             <div class="sec">
               <div class="sec-hd">Browser Source URLs</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
@@ -2542,8 +2465,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                     <label class="frow" style="font-size:11px"><span>Tips</span><input type="checkbox" id="obsAlertsTip" checked onchange="updateObsConfig('alerts')"></label>
                   </div>
                   <label class="frow" style="font-size:11px;margin-top:6px"><span>Display duration (seconds)</span><input type="number" id="obsAlertsDuration" min="2" max="30" value="6" onchange="updateObsConfig('alerts')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label class="frow sf-beta-only" style="font-size:11px;margin-top:6px" title="Default is the big card with confetti and pulse ring. Minimal is a compact single-row chip — no confetti, no ambient glow, a slim platform accent on the left edge. Use minimal if you don't want alerts to steal attention from gameplay.">
-                    <span>Style <span style="font-size:9px;font-weight:800;color:#f59e0b;margin-left:4px;padding:1px 5px;background:rgba(245,158,11,.15);border-radius:3px">BETA</span></span>
+                  <label class="frow" style="font-size:11px;margin-top:6px" title="Default is the big card with confetti and pulse ring. Minimal is a compact single-row chip — no confetti, no ambient glow, a slim platform accent on the left edge. Use minimal if you don't want alerts to steal attention from gameplay.">
+                    <span>Style</span>
                     <select id="obsAlertsStyle" onchange="updateObsConfig('alerts')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
                       <option value="default">Default (full card, confetti)</option>
                       <option value="minimal">Minimal (subtle, no confetti)</option>
@@ -2686,24 +2609,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
         </div>
 
-        <!-- ═══ THEME TAB (EA-only) ═══ -->
-        <!-- Same blur-gate pattern as OBS Overlays — free users see the
-             color pickers and layout options teased through the blur,
-             with the lock card prompting them to upgrade. -->
-        <div class="settings-pane ea-gate" id="pane-theme">
-          <div class="ea-lock-overlay" id="themeLockOverlay">
-            <div class="ea-lock-card">
-              <div class="ea-lock-icon">&#127912;</div>
-              <div class="ea-lock-title">This feature is coming soon!</div>
-              <div class="ea-lock-desc">Become a <strong>Tier 2</strong> or <strong>Tier 3</strong> Patron on Patreon to access now.<br><br>Customize accent colors, background depth, and pop-out layout presets.</div>
-              <button class="ea-lock-cta" onclick="connectPatreon()">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg>
-                Connect Patreon
-              </button>
-              <a class="ea-lock-pledge" onclick="window.open('https://www.patreon.com/cw/aquilo','_blank');return false">Not a supporter yet? <strong>Join on Patreon &rarr;</strong></a>
-            </div>
-          </div>
-          <div class="ea-content" id="themeContent">
+        <!-- ═══ THEME TAB ═══ -->
+        <!-- Free for everyone. Accent colors, background depth, and
+             pop-out layout presets. -->
+        <div class="settings-pane" id="pane-theme">
+          <div id="themeContent">
             <div class="sec">
               <div class="sec-hd">Accent &amp; Background</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:12px">
@@ -2736,26 +2646,14 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
         </div>
 
-        <!-- ═══ DISCORD+ TAB (EA-only) ═══ -->
-        <!-- Expanded Discord integration: live event posts (stylized embeds),
-             all-time records with delete-and-repost, plus an optional bot
-             Gateway connection so member/voice joins in your Discord surface
-             in StreamFusion's Events panel. Uses the .ea-gate blur pattern
-             so free users see what they'd unlock. -->
-        <div class="settings-pane ea-gate" id="pane-discordea">
-          <div class="ea-lock-overlay">
-            <div class="ea-lock-card">
-              <div class="ea-lock-icon">&#128274;</div>
-              <div class="ea-lock-title">This feature is coming soon!</div>
-              <div class="ea-lock-desc">Become a <strong>Tier 2</strong> or <strong>Tier 3</strong> Patron on Patreon to access now.<br><br>Stylized Discord event posts, all-time stream records, and a bot that surfaces your Discord community joins inside StreamFusion.</div>
-              <button class="ea-lock-cta" onclick="connectPatreon()">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg>
-                Connect Patreon
-              </button>
-              <a class="ea-lock-pledge" onclick="window.open('https://www.patreon.com/cw/aquilo','_blank');return false">Not a supporter yet? <strong>Join on Patreon &rarr;</strong></a>
-            </div>
-          </div>
-          <div class="ea-content">
+        <!-- ═══ DISCORD+ TAB ═══ -->
+        <!-- Free for everyone. Expanded Discord integration: live event
+             posts (stylized embeds), all-time stream records with
+             delete-and-repost, plus an optional bot Gateway connection so
+             member/voice joins in your Discord surface in StreamFusion's
+             Events panel. -->
+        <div class="settings-pane" id="pane-discordea">
+          <div>
             <!-- Section 1: Event feed webhook — fires a stylized embed for
                  each configured event type. Can share the same webhook as
                  the recap or point at a dedicated #stream-alerts channel. -->
@@ -2871,7 +2769,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <svg class="ic" style="width:48px;height:48px;color:var(--accent);margin-bottom:8px"><use href="#i-bolt"/></svg>
             <div style="font-size:20px;font-weight:800;letter-spacing:.5px;color:var(--txt);margin-bottom:2px">StreamFusion</div>
             <div style="font-size:12px;color:var(--mut);margin-bottom:14px" id="aboutVersion">&nbsp;</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:18px">Multi-platform streaming hub.<br>Made by <strong style="color:var(--txt)">aquilo_plays</strong></div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:18px">Multi-platform streaming hub.<br>Made by <strong style="color:var(--txt)">aquiloGG</strong></div>
             <button onclick="replayOnboarding()" style="padding:7px 18px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s"><svg class="ic" style="margin-right:4px"><use href="#i-play"/></svg>Setup Guide</button>
           </div>
           <div class="sec">
@@ -2994,109 +2892,6 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
 "use strict";
 
 if (window.electronAPI) document.body.classList.add('is-electron');
-
-// Beta variant detection. Resolved asynchronously via IPC so we can't
-// gate the boot-splash wordmark on it synchronously — but the IPC
-// round-trip is ~1ms in practice, so by the time the user notices
-// the splash (>200ms) the class is already applied. The amber
-// `.sf-beta-badge` and `body.is-beta .logo` rules then take over.
-// Also overwrite document.title because Electron lets the loaded
-// HTML <title> win over the BrowserWindow constructor's title arg
-// once the page loads — so without this, the taskbar hover would
-// revert to "StreamFusion" even on the beta install.
-var _sfIsBeta = false;  // set by IPC resolution below; other code reads this flag
-if (window.electronAPI && electronAPI.isBeta) {
-  electronAPI.isBeta().then(function(isBeta) {
-    _sfIsBeta = !!isBeta;
-    if (isBeta) {
-      document.body.classList.add('is-beta');
-      document.title = 'StreamFusion BETA';
-      // Kick off the initial gate check once entitlement resolves.
-      // applyPatreonState (invoked by the entitlement listener below)
-      // will call _sfBetaGateSync each time state changes.
-      if (electronAPI.patreonGetEntitlement) {
-        electronAPI.patreonGetEntitlement().then(_sfBetaGateSync).catch(function() {
-          // If even reading cached entitlement fails, show the gate
-          // in its "not signed in" state so the user isn't stuck with
-          // a blank app — they can still click Sign In.
-          _sfBetaGateSync({ signedIn: false, entitled: false, tier: 'none', reason: 'boot_check_failed' });
-        });
-      }
-    }
-  }).catch(function() { /* non-fatal — default (stable) branding wins */ });
-}
-
-// Beta Tier 3 access gate. Full-screen overlay that blocks the app
-// until the user authenticates with Patreon AND holds Tier 3. Owner
-// email bypass lives in patreon-auth.js so the creator never hits
-// this. Runs only on beta installs (_sfIsBeta). applyPatreonState
-// calls _sfBetaGateSync(state) on every entitlement change so the
-// gate opens / closes live — if a user's Tier 3 membership lapses,
-// the app re-locks within the next runtime check (~1h).
-function _sfBetaGateSync(state) {
-  if (!_sfIsBeta) return;
-  var gate = document.getElementById('sfBetaGate');
-  if (!gate) return;
-  var title  = document.getElementById('sfBetaGateTitle');
-  var sub    = document.getElementById('sfBetaGateSub');
-  var status = document.getElementById('sfBetaGateStatus');
-  var signBtn = document.getElementById('sfBetaGateSignInBtn');
-
-  state = state || {};
-  var tier3 = state.entitled && state.tier === 'tier3';
-
-  if (tier3) {
-    gate.style.display = 'none';
-    return;
-  }
-
-  // Customize the messaging based on exactly why they're gated out.
-  // Keep the primary message concise — the detail goes in the status
-  // chip below so users can see both their tier AND what's needed.
-  if (!state.signedIn) {
-    title.textContent = 'Tier 3 Patreon supporters only';
-    sub.innerHTML = 'StreamFusion Beta is a pre-release channel reserved for Patreon <strong>Tier 3 (Contributor)</strong> supporters. Sign in with your Patreon account to unlock access.';
-    status.className = 'sf-beta-gate-status';
-    signBtn.textContent = 'Sign in with Patreon';
-  } else if (state.reason === 'insufficient_tier' || state.tier === 'tier2' || state.tier === 'tier1' || state.tier === 'follower') {
-    title.textContent = 'Upgrade to Tier 3 to continue';
-    sub.innerHTML = 'You\'re signed in, but StreamFusion Beta requires the <strong>Tier 3 (Contributor)</strong> pledge. Tier 2 supporters have full access to the stable release\'s Early Access features.';
-    status.className = 'sf-beta-gate-status show';
-    var tierLabel = state.tier === 'tier2' ? 'Tier 2' : (state.tier === 'tier1' ? 'Tier 1' : 'Follower');
-    status.textContent = 'Connected as ' + (state.userName || 'you') + ' — ' + tierLabel;
-    signBtn.textContent = 'Refresh entitlement';
-  } else if (state.reason === 'reverify_failed' || state.reason === 'boot_check_failed') {
-    title.textContent = 'Couldn\'t verify your Tier 3 access';
-    sub.innerHTML = 'We couldn\'t reach Patreon to verify your membership. Check your internet connection and try again.';
-    status.className = 'sf-beta-gate-status show';
-    status.textContent = 'Network error during entitlement check';
-    signBtn.textContent = 'Retry sign in';
-  } else {
-    // Signed in, inactive patron (declined/former), or some edge case.
-    title.textContent = 'Your Patreon membership is inactive';
-    sub.innerHTML = 'Your Patreon pledge isn\'t currently active at Tier 3. Renew or upgrade to continue with StreamFusion Beta.';
-    status.className = 'sf-beta-gate-status show';
-    status.textContent = 'Status: ' + (state.reason || 'unknown') + (state.userName ? ' · ' + state.userName : '');
-    signBtn.textContent = 'Re-sign in with Patreon';
-  }
-  gate.style.display = 'flex';
-}
-
-function _sfBetaGateSignIn() {
-  if (!window.electronAPI || !electronAPI.patreonBeginAuth) return;
-  var btn = document.getElementById('sfBetaGateSignInBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Opening browser…'; }
-  electronAPI.patreonBeginAuth().then(function(state) {
-    _sfBetaGateSync(state);
-    if (btn) btn.disabled = false;
-  }).catch(function() {
-    if (btn) { btn.disabled = false; btn.textContent = 'Sign in with Patreon'; }
-  });
-}
-
-function _sfBetaGateQuit() {
-  if (window.electronAPI && electronAPI.quit) electronAPI.quit();
-}
 
 // ── Onboarding ───────────────────────────────────────────────────────────────
 var _obPage = 0, _obTotal = 11;
@@ -3256,7 +3051,7 @@ function renderDiscordEaSettings() {
   } else if (st.entitled) {
     var tierLabel = st.tier === 'tier3' ? 'Tier 3' : 'Tier 2';
     title = 'Connected as @' + (st.userName || 'you') + ' \u2014 ' + tierLabel + ' Patron';
-    sub = 'Early Access unlocked via your Discord role. Thanks for supporting!';
+    sub = 'You’ll get new features early, verified via your Discord role. Thanks for supporting!';
   } else if (st.reason === 'not_in_guild') {
     title = 'Connected as @' + (st.userName || 'you') + ' \u2014 not in server';
     sub = 'You\u2019re not a member of aquilo.gg\u2019s Discord yet. Join, then re-check.';
@@ -3276,44 +3071,23 @@ function renderDiscordEaSettings() {
   btnText.textContent    = _discordSigningInBusy ? 'Opening Discord\u2026' : (st.signedIn ? 'Re-check roles' : 'Connect Discord');
 }
 
-// Single point of truth for EA entitlement: every path that changes
-// entitlement from EITHER Patreon or Discord routes here. S.hasEarlyAccess
-// is the UNION of the two sources — either grants access. Most EA-gated
-// UI reads only S.hasEarlyAccess and doesn't care which path unlocked it.
-// Downstream renders refresh so gate banners flip live when either path
-// flips. Both applyPatreonState and applyDiscordState call into this.
+// Single point of truth for early-access entitlement: every path that
+// changes entitlement from EITHER Patreon or Discord routes here.
+// S.hasEarlyAccess is the UNION of the two sources — either grants it.
+// No current feature is gated; the flag stays computed and live so a
+// FUTURE new feature can ship to supporters first. Both applyPatreonState
+// and applyDiscordState call into this.
 function _recomputeCombinedEntitlement() {
   var patreonOk = !!(S.patreon && S.patreon.entitled);
   var discordOk = !!(S.discord && S.discord.entitled);
-  var wasEntitled = S.hasEarlyAccess;
   S.hasEarlyAccess = patreonOk || discordOk;
-  // Refresh EA-gated tabs so their gate banners flip live. No-ops if
-  // those panes aren't yet mounted.
+  // Refresh the EA status panels so the connection state shows live.
+  // No-ops if those panes aren't yet mounted. S.hasEarlyAccess stays
+  // computed and available so FUTURE early-access features can gate on
+  // it — no current feature is gated.
   try { renderEaOnboarding(); } catch (e) {}
   try { renderEaSettings(); } catch (e) {}
   try { renderDiscordEaSettings(); } catch (e) {}
-  try { renderObsOverlaysTab(); } catch (e) {}
-  try { renderThemeTab(); } catch (e) {}
-  try { renderDiscordTab(); } catch (e) {}
-  // On first entitlement (from either path), re-apply saved theme so
-  // the user sees their customization immediately.
-  if (!wasEntitled && S.hasEarlyAccess && typeof applyTheme === 'function') {
-    try { applyTheme(); } catch (e) {}
-  }
-  // Sync the beta Tier 3 gate with whichever source is currently
-  // entitled. No-op on stable installs (_sfIsBeta false).
-  // Prefer the more specific state for messaging: if Patreon granted
-  // tier3, use that; else if Discord granted tier3, synthesize.
-  try {
-    var gateState = null;
-    if (patreonOk && S.patreon.tier === 'tier3') gateState = S.patreon;
-    else if (discordOk && S.discord.tier === 'tier3') gateState = {
-      signedIn: true, entitled: true, tier: 'tier3',
-      userName: S.discord.userName, reason: 'entitled'
-    };
-    else gateState = S.patreon;  // fall through to patreon's message for non-tier3
-    _sfBetaGateSync(gateState);
-  } catch (e) {}
 }
 
 function applyPatreonState(state) {
@@ -3347,23 +3121,23 @@ function _eaMessages(state) {
   var title, sub;
   if (!state || !state.signedIn) {
     title = 'Not connected';
-    sub = 'Sign in with Patreon to check your tier.';
+    sub = 'Connect Patreon to get early access to new features. Every current feature is already free.';
   } else if (state.entitled) {
     var tierLabel = state.tier === 'tier3' ? 'Tier 3' : 'Tier 2';
     title = 'Connected as ' + (state.userName || 'you') + ' — ' + tierLabel;
-    sub = 'Early Access features are unlocked. Thanks for supporting!';
+    sub = 'You’ll get new features early. Thanks for supporting StreamFusion!';
   } else if (state.reason === 'insufficient_tier') {
     title = 'Connected as ' + (state.userName || 'you') + ' — below Tier 2';
-    sub = 'Early Access requires Tier 2 or Tier 3. Upgrade on Patreon to unlock.';
+    sub = 'Tier 2 and Tier 3 patrons get new features early. Every current feature is free regardless.';
   } else if (state.reason === 'declined_patron') {
     title = 'Payment declined';
-    sub = 'Your last Patreon payment didn’t go through. Update it on Patreon to restore Early Access.';
+    sub = 'Your last Patreon payment didn’t go through. Update it on Patreon to keep getting new features early.';
   } else if (state.reason === 'former_patron') {
     title = 'Membership ended';
-    sub = 'Re-pledge at Tier 2 or higher to get Early Access back.';
+    sub = 'Re-pledge at Tier 2 or Tier 3 any time to get new features early again.';
   } else if (state.reason === 'not_a_member' || state.reason === 'follower') {
     title = 'Connected as ' + (state.userName || 'you') + ' — not a supporter yet';
-    sub = 'Pledge at Tier 2 or Tier 3 on Patreon to unlock Early Access.';
+    sub = 'Pledge at Tier 2 or Tier 3 to get new features early. Everything in StreamFusion is already free.';
   } else if (state.reason === 'offline_grace') {
     title = 'Couldn’t reach Patreon';
     sub = 'Running on cached membership status — we’ll re-check automatically.';
@@ -3706,6 +3480,13 @@ function loadSettings() {
       if (d.discordAnnounce.endBehavior !== undefined) S.discordAnnounce.endBehavior = d.discordAnnounce.endBehavior;
       if (d.discordAnnounce.pingRole !== undefined) S.discordAnnounce.pingRole = d.discordAnnounce.pingRole;
     }
+    // Theme customization + pop-out layout — free for everyone.
+    if (d.theme) {
+      if (d.theme.accent !== undefined)  S.theme.accent  = d.theme.accent;
+      if (d.theme.accent2 !== undefined) S.theme.accent2 = d.theme.accent2;
+      if (d.theme.bgDepth !== undefined) S.theme.bgDepth = d.theme.bgDepth;
+    }
+    if (d.popoutLayout !== undefined) S.popoutLayout = d.popoutLayout;
   } catch(e) {}
 }
 
@@ -3748,7 +3529,10 @@ function saveSettings() {
       enabled: S.discordAnnounce.enabled, liveTemplate: S.discordAnnounce.liveTemplate,
       endTemplate: S.discordAnnounce.endTemplate, endBehavior: S.discordAnnounce.endBehavior,
       pingRole: S.discordAnnounce.pingRole
-    }
+    },
+    // Theme customization + pop-out layout — free for everyone.
+    theme: S.theme,
+    popoutLayout: S.popoutLayout
   }));
 }
 
@@ -3808,6 +3592,13 @@ loadSettings();
     if (daETW) daETW.style.display = S.discordAnnounce.endBehavior === 'edit' ? 'block' : 'none';
   }
   var daPR = document.getElementById('daPingRole'); if (daPR) daPR.value = S.discordAnnounce.pingRole || '';
+  // Theme customization — free for everyone. Hydrate the picker controls
+  // from the saved theme, then apply it so the streamer's accent colors /
+  // background depth are live from launch (not just after opening the
+  // Theme settings tab). renderThemeTab + applyTheme are function
+  // declarations defined later in this script — hoisted, so safe to call.
+  try { if (typeof renderThemeTab === 'function') renderThemeTab(); } catch (e) {}
+  try { if (typeof applyTheme === 'function') applyTheme(); } catch (e) {}
 })();
 
 // Re-arm Raid Finder schedule + render toolbar countdown chip on startup.
@@ -5256,7 +5047,6 @@ var SF_RF_FIND_UUID = 'a33f0c26-a7dd-49e8-a707-63aaf23fb4e2';
 var SF_RF_RAID_UUID = '7fafc95d-4e7a-4111-ad7c-b5f7713d2e7f';
 
 function openRaidFinder() {
-  if (!S.hasEarlyAccess) { _rfShowUpsell(); return; }
   if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
     sysMsg('tw', 'Connect to Streamer.bot to use the Raid Finder.');
     return;
@@ -5386,24 +5176,6 @@ function _rfCheckActions(done) {
     done(!!(find && raid));
   };
   S.sbWS.send(JSON.stringify({ request: 'GetActions', id: reqId }));
-}
-
-// ── Non-patron upsell ────────────────────────────────────────────────────────
-function _rfShowUpsell() {
-  var m = document.getElementById('modal');
-  document.getElementById('overlay').classList.add('show');
-  var msg = _eaMessages(S.patreon);
-  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-rocket"/></svg> Raid Finder &mdash; Early Access</div>'
-    + '<p class="mp">Find streamers playing your game with a similar audience, and raid with one click.</p>'
-    + '<p class="mp" style="color:var(--mut);font-size:12px">Available for Patreon Tier 2+ supporters.</p>'
-    + '<div style="background:var(--surf2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">'
-    + '<div style="font-weight:600">' + esc(msg.title) + '</div>'
-    + (msg.sub ? '<div style="color:var(--mut);margin-top:4px">' + esc(msg.sub) + '</div>' : '')
-    + '</div>'
-    + '<div class="mbtns">'
-    + '<button class="btn-tw" onclick="connectPatreon();closeModal()"><svg class="ic"><use href="#i-bolt"/></svg> Connect Patreon</button>'
-    + '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
-    + '</div>';
 }
 
 // ── Install SB actions modal ─────────────────────────────────────────────────
@@ -6036,7 +5808,7 @@ function _rfUpdateToolbarChip() {
   _rfChipTickTimer = setInterval(tick, 1000);
 }
 
-// ── Smart Shoutout Queue (Tier 2 EA) ─────────────────────────────────────────
+// ── Smart Shoutout Queue ─────────────────────────────────────────────────────
 // When a Twitch chatter is themselves a live streamer, queue them for a
 // /shoutout. Detection uses decapi.me (no SB action needed, no auth) and
 // per-stream-session dedup so a regular doesn't trigger a re-check every
@@ -6048,7 +5820,6 @@ function _rfUpdateToolbarChip() {
 function _shoutoutCheckChatter(login, displayName) {
   var s = S.shoutout;
   if (!s.enabled) return;
-  if (!S.hasEarlyAccess) return; // Tier 2+ feature
   if (!login) return;
   var key = String(login).toLowerCase();
   // Skip the broadcaster themselves
@@ -6155,21 +5926,6 @@ function _shoutoutOpen() {
   var m = document.getElementById('modal');
   if (!m) return;
   document.getElementById('overlay').classList.add('show');
-  if (!S.hasEarlyAccess) {
-    var msg = (typeof _eaMessages === 'function') ? _eaMessages(S.patreon) : { title: 'Early Access feature', sub: '' };
-    m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-megaphone"/></svg> Smart Shoutout Queue &mdash; Early Access</div>'
-      + '<p class="mp">Auto-detects when a fellow Twitch streamer chats, looks up their game, and queues a one-click shoutout. Optional auto-fire mode.</p>'
-      + '<p class="mp" style="color:var(--mut);font-size:12px">Available for Patreon Tier 2+ supporters.</p>'
-      + '<div style="background:var(--surf2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">'
-      +   '<div style="font-weight:600">' + esc(msg.title) + '</div>'
-      +   (msg.sub ? '<div style="color:var(--mut);margin-top:4px">' + esc(msg.sub) + '</div>' : '')
-      + '</div>'
-      + '<div class="mbtns">'
-      +   '<button class="btn-tw" onclick="connectPatreon();closeModal()"><svg class="ic"><use href="#i-bolt"/></svg> Connect Patreon</button>'
-      +   '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
-      + '</div>';
-    return;
-  }
   _shoutoutRenderPanel();
 }
 
@@ -7593,12 +7349,11 @@ function handleSBEvent(event, data) {
   } else if (key === 'StreamElements.Donation' || key === 'StreamElements.Tip' || key === 'SE.Tip' || key === 'SE.Donation' || key === 'StreamElements.Latest') {
     handleSETip(data, false);
   }
-  // ── SB integration events (EA-only) — Patreon, Fourthwall, Ko-fi ───────
+  // ── SB integration events — Patreon, Fourthwall, Ko-fi ─────────────────
   // These surface in the in-app Events panel AND broadcast to the OBS
   // alerts + vertical overlays when enabled. Each section is guarded on
-  // both the user's S.hasEarlyAccess + their per-integration toggle so
-  // non-EA users and opt-outs skip silently.
-  else if (S.hasEarlyAccess && dcSb.patreon && /^Patreon\./.test(key)) {
+  // the streamer's per-integration toggle so opt-outs skip silently.
+  else if (dcSb.patreon && /^Patreon\./.test(key)) {
     var pU = gu(data) || data.patronFullName || data.patronName || 'Supporter';
     var pAmt = Number(data.pledgeAmount || data.amount || 0);
     var pText, pType;
@@ -7610,7 +7365,7 @@ function handleSBEvent(event, data) {
     addEvHistory(pU, pText, 'pa', true);
     sendObsAlert({ eventType: pType, platform: 'pa', user: pU, amount: pAmt, message: pText });
   }
-  else if (S.hasEarlyAccess && dcSb.fourthwall && /^Fourthwall\./.test(key)) {
+  else if (dcSb.fourthwall && /^Fourthwall\./.test(key)) {
     var fwU = gu(data) || data.buyerName || data.customerName || 'Customer';
     var fwAmt = Number(data.amount || data.orderTotal || data.total || 0);
     var fwProduct = data.productName || data.product || data.itemName || '';
@@ -7628,7 +7383,7 @@ function handleSBEvent(event, data) {
     addEvHistory(fwU, fwText, 'fw', true);
     sendObsAlert({ eventType: fwType, platform: 'fw', user: fwU, amount: fwAmt, message: fwProduct });
   }
-  else if (S.hasEarlyAccess && dcSb.kofi && /^Kofi\./.test(key)) {
+  else if (dcSb.kofi && /^Kofi\./.test(key)) {
     var kfU = gu(data) || data.fromName || data.donorName || 'Supporter';
     var kfAmt = Number(data.amount || 0);
     var kfMsg = data.message || '';
@@ -8841,20 +8596,10 @@ function switchSettingsTab(tab) {
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
-// The pane uses the .ea-gate blur pattern: content is always rendered so
-// free users see exactly what they'd unlock, but blurred + click-blocked.
-// We toggle .ea-unlocked based on entitlement, which flips the overlay
-// off and un-blurs the content in one CSS transition.
+// Free for everyone — populate the overlay URLs + server status.
 function renderObsOverlaysTab() {
   var pane = document.getElementById('pane-obsoverlays');
   if (!pane) return;
-  pane.classList.toggle('ea-unlocked', !!S.hasEarlyAccess);
-
-  // Even when gated, we still populate the underlying content so the
-  // blurred tease looks real (not a bunch of empty placeholders).
-  // Skipping the server-status fetch for non-entitled users saves a
-  // pointless round-trip though.
-  if (!S.hasEarlyAccess) return;
 
   // Populate URLs + status from the main process.
   if (window.electronAPI && window.electronAPI.obsGetStatus) {
@@ -9132,7 +8877,6 @@ function toggleObsLivePreview(which) {
   startObsLivePreview(which);
 }
 function startObsLivePreview(which) {
-  if (!S.hasEarlyAccess) { addEvHistory('StreamFusion', 'Live preview requires Early Access.', 'tw', false); return; }
   stopObsLivePreview();
   _obsLivePreview.which = which;
   _obsLivePreview.step = 0;
@@ -9195,10 +8939,7 @@ function syncObsPrevButtons() {
 // exactly matches what a live stream would look like. Spreads the events
 // out over ~10 seconds so animations don't all overlap.
 function fireObsDemo(which) {
-  if (!S.hasEarlyAccess || !window.electronAPI) {
-    addEvHistory('StreamFusion', 'OBS demo requires Early Access.', 'tw', false);
-    return;
-  }
+  if (!window.electronAPI) return;
   var queue;
   if (which === 'shoutout') {
     // Single rich shoutout — overlays only render one at a time.
@@ -9555,7 +9296,7 @@ function onFilterProfanityToggle(checked) {
 }
 
 function updateObsConfig(which) {
-  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsSetConfig) return;
+  if (!window.electronAPI || !window.electronAPI.obsSetConfig) return;
   var get = function(id) { return document.getElementById(id); };
   var cfg = {};
   if (which === 'chat') {
@@ -9649,7 +9390,6 @@ function updateObsConfig(which) {
 // so the streamer can see the card render without waiting for a real
 // event. Useful for positioning the browser source in OBS.
 function testShoutout() {
-  if (!S.hasEarlyAccess) return;
   if (!window.electronAPI || !window.electronAPI.obsBroadcastShoutout) return;
   window.electronAPI.obsBroadcastShoutout({
     user: 'TestViewer',
@@ -9662,11 +9402,10 @@ function testShoutout() {
 }
 
 // ── Theme tab ─────────────────────────────────────────────────────────────
+// Free for everyone.
 function renderThemeTab() {
   var pane = document.getElementById('pane-theme');
   if (!pane) return;
-  pane.classList.toggle('ea-unlocked', !!S.hasEarlyAccess);
-  if (!S.hasEarlyAccess) return;
   var t = S.theme || {};
   var a  = document.getElementById('themeAccent');
   var a2 = document.getElementById('themeAccent2');
@@ -9680,7 +9419,6 @@ function renderThemeTab() {
 }
 
 function applyTheme() {
-  if (!S.hasEarlyAccess) return;
   var a  = (document.getElementById('themeAccent')  || {}).value || '#3A86FF';
   var a2 = (document.getElementById('themeAccent2') || {}).value || '#2AD4B9';
   var bd = (document.getElementById('themeBgDepth') || {}).value || 'default';
@@ -9705,7 +9443,6 @@ function resetTheme() {
 }
 
 function applyPopoutLayout() {
-  if (!S.hasEarlyAccess) return;
   var picked = document.querySelector('input[name="popoutLayout"]:checked');
   var layout = picked ? picked.value : 'default';
   // Migrate away from the legacy 'hud' layout — removed in 1.5.1. Any
@@ -10785,12 +10522,12 @@ function sendDiscordRecap(manual) {
       if (manual) sysMsg('tw', warn); else addEvHistory('StreamFusion', warn, 'tw', false);
     });
 
-  // Community sharing (EA-only) — fire the same recap embed to the
-  // aquilo.gg community Discord via the Cloudflare Worker proxy. This
-  // runs in parallel with the user's own webhook post above; failures
-  // are silent (a community-post hiccup shouldn't spam the streamer's
+  // Community sharing — fire the same recap embed to the aquilo.gg
+  // community Discord via the Cloudflare Worker proxy. This runs in
+  // parallel with the user's own webhook post above; failures are
+  // silent (a community-post hiccup shouldn't spam the streamer's
   // event feed with warnings about somebody else's server).
-  if (S.hasEarlyAccess && dcCommunityRecap && payload.embeds && payload.embeds[0]) {
+  if (dcCommunityRecap && payload.embeds && payload.embeds[0]) {
     var twHandle = S.twLogin || '';
     var ytHandle = S.ytBroadcastId || '';
     var kkHandle = S.kkLogin || '';
@@ -10810,7 +10547,7 @@ function sendDiscordRecap(manual) {
     }).catch(function() {});
   }
 }
-// ── Discord Live-Announce + Auto-Recall (Tier 2 EA) ─────────────────────────
+// ── Discord Live-Announce + Auto-Recall ─────────────────────────────────────
 // On stream-start, posts "🔴 Live now" via the existing discordWebhook and
 // stores the returned message id. On stream-end, edits or deletes that
 // message based on endBehavior. Reuses the same webhook the recap uses,
@@ -10843,7 +10580,6 @@ function _discordAnnounceWebhookMsgUrl(webhookUrl, msgId) {
 function _discordAnnounceFireGoLive() {
   var da = S.discordAnnounce;
   if (!da.enabled) return;
-  if (!S.hasEarlyAccess) return; // EA-gated
   if (!discordWebhook) {
     addEvHistory('StreamFusion', 'Live-announce skipped: no Discord webhook URL set.', 'tw', false);
     return;
@@ -10963,7 +10699,6 @@ function _discordAnnounceFireGoOffline() {
 // Manual fire button — useful for testing the template / role-ping setup
 // without waiting for a real stream-start signal.
 function _discordAnnounceTestFire() {
-  if (!S.hasEarlyAccess) { sysMsg('tw', 'Live-announce is an Early Access feature.'); return; }
   if (!discordWebhook) { sysMsg('tw', 'Set a Discord webhook URL first.'); return; }
   var wasEnabled = S.discordAnnounce.enabled;
   S.discordAnnounce.enabled = true;
@@ -11689,11 +11424,11 @@ if (window.electronAPI && window.electronAPI.onOverlayReady) {
     _pushOverlayHotkey(_overlayHotkey);
     sendOverlayStats();
     sendOverlayHype();
-    // Push the saved EA-only layout preset so the overlay opens with
-    // the streamer's pick even before they touch the Theme settings
-    // tab. Without this, a fresh overlay launch always shows the
-    // Default layout until applyPopoutLayout fires.
-    if (S.hasEarlyAccess && S.popoutLayout && S.popoutLayout !== 'default') {
+    // Push the saved layout preset so the overlay opens with the
+    // streamer's pick even before they touch the Theme settings tab.
+    // Without this, a fresh overlay launch always shows the Default
+    // layout until applyPopoutLayout fires.
+    if (S.popoutLayout && S.popoutLayout !== 'default') {
       sendToOverlay({ type: 'popout-layout', layout: S.popoutLayout });
     }
   });
@@ -11886,7 +11621,7 @@ function _extractObsEmotes(html) {
 }
 
 function sendObsChat(m) {
-  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastChat) return;
+  if (!window.electronAPI || !window.electronAPI.obsBroadcastChat) return;
   if (!m || !m.plat) return;
   // Filter by the renderer's existing per-platform toggle so the OBS
   // overlay respects "Show Platforms" from the sidebar without needing
@@ -11905,7 +11640,7 @@ function sendObsChat(m) {
   });
 }
 function sendObsAlert(obj) {
-  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastAlert) return;
+  if (!window.electronAPI || !window.electronAPI.obsBroadcastAlert) return;
   if (!obj || !obj.eventType) return;
   // Check against user's configured alert-type toggles before sending —
   // saves a no-op round-trip for disabled event types.
@@ -12141,7 +11876,6 @@ function _dcWarnOnce(typeKey, res) {
 // console and surface a throttled hint in the Events panel — previously
 // they were swallowed by a bare .catch() with no visibility anywhere.
 function postDiscordEvent(typeKey, payload) {
-  if (!S.hasEarlyAccess) return;
   if (!dcEventWebhook) return;
   if (!dcPost[typeKey]) {
     console.log('[SF discord] skip', typeKey, '— toggle off');
@@ -12282,7 +12016,6 @@ function discordPostHype(level, total, goal) {
 // Check each new event against the stored max; if it beats the record,
 // update state + trigger a Discord delete-and-repost of the records msg.
 function updateRecord(key, user, amount, meta) {
-  if (!S.hasEarlyAccess) return false;
   var prev = dcRecords[key];
   var a = Number(amount) || 0;
   if (a <= 0) return false;
@@ -12373,7 +12106,6 @@ function buildRecordsPayload() {
 // delete happens before the post so, in the rare race condition where
 // two records break back-to-back, we never end up with two live embeds.
 function postRecordsNow() {
-  if (!S.hasEarlyAccess) return;
   if (!dcRecordsWebhook) { addEvHistory('StreamFusion', 'Records webhook URL not set.', 'tw', false); return; }
   if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
   var payload = buildRecordsPayload();
@@ -12422,7 +12154,6 @@ function openDiscordSetupGuide() {
 // embed so the streamer can confirm the URL is right + the bot has
 // channel permissions without waiting for a real event.
 function testEventWebhook() {
-  if (!S.hasEarlyAccess) { addEvHistory('StreamFusion', 'Early Access required.', 'tw', false); return; }
   if (!dcEventWebhook) { addEvHistory('StreamFusion', 'Paste an event webhook URL first.', 'tw', false); return; }
   if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
   var payload = dcEmbed({
@@ -12462,7 +12193,6 @@ function testEventWebhook() {
 // with fake numbers so the streamer can confirm the channel is set up
 // before a real record fires.
 function testRecordsWebhook() {
-  if (!S.hasEarlyAccess) { addEvHistory('StreamFusion', 'Early Access required.', 'tw', false); return; }
   if (!dcRecordsWebhook) { addEvHistory('StreamFusion', 'Paste a records webhook URL first.', 'tw', false); return; }
   if (!window.electronAPI || !window.electronAPI.discordWebhookPost) return;
   var payload = {
@@ -12510,7 +12240,6 @@ function inviteSharedBot() {
 }
 
 function toggleSharedBot() {
-  if (!S.hasEarlyAccess) return;
   if (dcBot.enabled) { disconnectSharedBot(); return; }
   if (dcBotToken) {
     // Custom-bot mode — delegate to the main-process Gateway WS.
@@ -12855,7 +12584,7 @@ if (window.electronAPI && window.electronAPI.onRotationRelayBroadcast) {
 // Receive bot events from main process → Events panel.
 if (window.electronAPI && window.electronAPI.onDiscordEvent) {
   window.electronAPI.onDiscordEvent(function(e) {
-    if (!e || !S.hasEarlyAccess) return;
+    if (!e) return;
     var kind = e.kind, data = e.data || {};
     if (kind === 'ready')        renderDiscordBotStatus();
     if (kind === 'gateway_connected') renderDiscordBotStatus();
@@ -12903,11 +12632,10 @@ if (window.electronAPI && window.electronAPI.onDiscordEvent) {
 }
 
 // ── Discord+ tab rendering ────────────────────────────────────────────────
+// Free for everyone.
 function renderDiscordTab() {
   var pane = document.getElementById('pane-discordea');
   if (!pane) return;
-  pane.classList.toggle('ea-unlocked', !!S.hasEarlyAccess);
-  if (!S.hasEarlyAccess) return;
   var get = function(id) { return document.getElementById(id); };
   if (get('dcEventWebhookInput'))   get('dcEventWebhookInput').value   = dcEventWebhook;
   if (get('dcRecordsWebhookInput')) get('dcRecordsWebhookInput').value = dcRecordsWebhook;
@@ -12949,7 +12677,7 @@ function renderDiscordTab() {
 loadDiscordSettings();
 
 function sendObsShoutout(user, plat) {
-  if (!S.hasEarlyAccess || !window.electronAPI || !window.electronAPI.obsBroadcastShoutout) return;
+  if (!window.electronAPI || !window.electronAPI.obsBroadcastShoutout) return;
   if (!user) return;
   var userLc = String(user).toLowerCase();
   // Find the most recent meaningful event for this user from the shared

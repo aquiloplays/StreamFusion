@@ -9,11 +9,8 @@
 // SSE ships in the Node `http` module with zero npm deps. The browser's
 // EventSource API handles auto-reconnect on its own.
 //
-// Entitlement gate: the HTTP routes that serve overlays check the module
-// `isEntitled` flag, which main.js toggles from Patreon entitlement events.
-// If a non-Tier-2/3 user somehow has the URL loaded, they see a "requires
-// Early Access" page instead of the overlay. The server itself keeps
-// listening so URLs stay valid across sign-in / sign-out transitions.
+// The OBS overlays are free for everyone — the server serves them to any
+// request with no entitlement check.
 
 'use strict';
 
@@ -27,7 +24,6 @@ const HEARTBEAT_MS = 25000;     // keep SSE connections from idling out
 
 let server = null;
 let serverPort = DEFAULT_PORT;
-let isEntitled = false;         // flipped by setEntitled() from main.js
 let sseClients = new Set();     // { res, overlayType }
 let heartbeatTimer = null;
 
@@ -126,21 +122,6 @@ function readOverlayFile(name) {
   }
 }
 
-// Tiny gated page shown when a request arrives but EA isn't active. OBS
-// will render this transparent-ish; the text is mostly a signal to the
-// streamer when they preview the URL in a real browser.
-function gatedPage() {
-  return '<!doctype html><html><head><meta charset="utf-8"><title>StreamFusion — Early Access</title>' +
-         '<style>html,body{margin:0;padding:0;background:transparent;font-family:-apple-system,Segoe UI,sans-serif;color:#efeff1}' +
-         '.wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;box-sizing:border-box}' +
-         '.card{background:rgba(14,14,16,.85);border:1px solid rgba(255,66,77,.5);border-radius:12px;padding:20px 24px;max-width:420px;text-align:center;backdrop-filter:blur(8px)}' +
-         '.t{font-size:14px;font-weight:800;color:#ff424d;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}' +
-         '.m{font-size:13px;line-height:1.5;color:#adadb8}</style></head>' +
-         '<body><div class="wrap"><div class="card"><div class="t">Early Access only</div>' +
-         '<div class="m">This OBS overlay requires an active StreamFusion Patreon supporter sign-in at Tier&nbsp;2 or Tier&nbsp;3.<br><br>Open StreamFusion → Settings → <strong>Early Access</strong> to connect your Patreon.</div>' +
-         '</div></div></body></html>';
-}
-
 // Very small landing page listing the three overlay URLs, for when the
 // streamer hits http://127.0.0.1:8787/ in a browser to check the server
 // is alive. OBS never loads this — it's purely for humans.
@@ -176,11 +157,10 @@ function handleRequest(req, res) {
   var p = u.pathname;
 
   // Health / ping endpoint — used by the settings panel to verify the
-  // server is up without actually opening the overlay. Always 200s
-  // regardless of entitlement.
+  // server is up without actually opening the overlay.
   if (p === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ ok: true, entitled: isEntitled, port: serverPort }));
+    res.end(JSON.stringify({ ok: true, entitled: true, port: serverPort }));
     return;
   }
 
@@ -198,9 +178,11 @@ function handleRequest(req, res) {
     });
     // Initial "hello" with the last-known config for this overlay type,
     // so a fresh OBS connection renders with the right settings without
-    // waiting for the streamer to touch the settings panel.
+    // waiting for the streamer to touch the settings panel. `entitled`
+    // is always true — overlays are free for everyone — and is kept in
+    // the payload only so existing overlay clients parse it cleanly.
     var cfg = lastConfig[overlayType] || {};
-    res.write('event: hello\ndata: ' + JSON.stringify({ entitled: isEntitled, cfg: cfg }) + '\n\n');
+    res.write('event: hello\ndata: ' + JSON.stringify({ entitled: true, cfg: cfg }) + '\n\n');
 
     var client = { res: res, overlayType: overlayType };
     sseClients.add(client);
@@ -208,10 +190,8 @@ function handleRequest(req, res) {
     return;
   }
 
-  // Gating: overlays return a branded "requires EA" page if not entitled.
-  // Keeps the streamer from wondering why their OBS is blank.
+  // Overlays serve to everyone — no entitlement check.
   if (p === '/chat' || p === '/alerts' || p === '/shoutout' || p === '/vertical' || p === '/ticker') {
-    if (!isEntitled) { serveHtml(res, gatedPage()); return; }
     var file = (p === '/chat')      ? 'chat.html'
              : (p === '/alerts')    ? 'alerts.html'
              : (p === '/shoutout')  ? 'shoutout.html'
@@ -222,7 +202,6 @@ function handleRequest(req, res) {
   }
 
   if (p === '/' || p === '/index.html') {
-    if (!isEntitled) { serveHtml(res, gatedPage()); return; }
     serveHtml(res, landingPage());
     return;
   }
@@ -505,7 +484,6 @@ function stopServer() {
 //     AND the vertical bar, for instance)
 //   - omitted / null — broadcast to every connected client
 function broadcast(type, data, targetOverlay) {
-  if (!isEntitled) return;
   var payload = 'event: ' + type + '\ndata: ' + JSON.stringify(data || {}) + '\n\n';
   var targets = targetOverlay
     ? (Array.isArray(targetOverlay) ? targetOverlay : [targetOverlay])
@@ -527,18 +505,10 @@ function setConfig(overlayType, cfg) {
   broadcast('config', cfg, overlayType);
 }
 
-function setEntitled(v) {
-  var was = isEntitled;
-  isEntitled = !!v;
-  // Tell existing overlay clients the gate flipped so they can show/hide
-  // themselves without needing an OBS-side refresh.
-  if (was !== isEntitled) {
-    sseClients.forEach(function(c) {
-      try { c.res.write('event: entitlement\ndata: ' + JSON.stringify({ entitled: isEntitled }) + '\n\n'); }
-      catch (e) { sseClients.delete(c); }
-    });
-  }
-}
+// Retained as a no-op so main.js's existing call site stays valid.
+// OBS overlays are free for everyone — there is no entitlement gate to
+// toggle. (Kept rather than removed to preserve the module's exports.)
+function setEntitled(/* v */) {}
 
 function getUrls() {
   var base = 'http://' + BIND_HOST + ':' + serverPort;

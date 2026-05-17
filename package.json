@@ -1,10 +1,10 @@
 {
   "name": "streamfusion",
-  "version": "1.6.3",
-  "description": "Unified multi-platform stream chat viewer for Twitch, YouTube, TikTok, and Kick. Built by aquilo_plays.",
+  "version": "1.7.0",
+  "description": "Unified multi-platform stream chat viewer for Twitch, YouTube, TikTok, and Kick. Built by aquiloGG.",
   "main": "main.js",
   "author": {
-    "name": "aquilo_plays",
+    "name": "aquiloGG",
     "email": "bisherclay@gmail.com",
     "url": "https://aquilo.gg"
   },
@@ -19,7 +19,6 @@
     "start": "electron .",
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --publish never",
     "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win portable --publish never",
-    "build:beta": "set CSC_IDENTITY_AUTO_DISCOVERY=false && node scripts/build-beta.js",
     "release": "electron-builder --win --publish always"
   },
   "dependencies": {
@@ -33,7 +32,7 @@
   "build": {
     "appId": "gg.aquilo.streamfusion",
     "productName": "StreamFusion",
-    "copyright": "Copyright © 2025 aquilo_plays · https://aquilo.gg",
+    "copyright": "Copyright © 2025 aquiloGG · https://aquilo.gg",
     "directories": {
       "output": "dist"
     },
@@ -46,8 +45,8 @@
       "!sf-obs/**",
       "!preview-icon.js",
       "!icon-preview.png",
-      "!dist-beta/**",
       "!release-worker/**",
+      "!dist-beta/**",
       "!scripts/sbae-decoded.json",
       "!scripts/sf-rf-import-new.txt",
       "!scripts/release-notes-*.md",
@@ -81,9 +80,9 @@
         "sha256"
       ],
       "sign": null,
-      "publisherName": "aquilo_plays",
+      "publisherName": "aquiloGG",
       "verifyUpdateCodeSignature": false,
-      "legalTrademarks": "StreamFusion is a trademark of aquilo_plays."
+      "legalTrademarks": "StreamFusion is a trademark of aquiloGG."
     },
     "mac": {
       "target": [

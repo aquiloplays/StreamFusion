@@ -67,21 +67,6 @@ try {
   // Discord, VS Code) ship by default and was the top 1.4.5 ask.
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  // 1.5.1: beta channel detection. The build-beta script produces a
-  // separate "StreamFusion Beta" variant with a distinct appId that
-  // installs alongside the main app. At runtime, check whether we're
-  // that variant (by productName / app name / package.json `name`)
-  // and pin the auto-updater to the 'beta' channel — makes it pull
-  // beta.yml instead of latest.yml. Main SF installs stay on the
-  // stable channel, so beta users don't accidentally "demote" to a
-  // production release.
-  try {
-    var pname = app.getName() || '';
-    if (pname.toLowerCase().indexOf('beta') !== -1 ||
-        (app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) {
-      autoUpdater.channel = 'beta';
-    }
-  } catch (e) {}
   // electron-updater's electron-log dependency expects a full logger interface.
   // Missing methods (debug/verbose/silly) throw "X is not a function" and kill
   // the update flow silently. Provide all methods to be safe.
@@ -108,40 +93,21 @@ try {
 // the taskbar + desktop shortcuts stayed on the old .ico.
 const { buildSFIcon, PALETTES } = require('./icon-gen');
 
-// 1.5.1: single source of truth for "are we the beta variant?".
-// Check both app.getName() (driven by build-beta.js's extraMetadata
-// rewrite of package.json name → streamfusion-beta) AND the exe path
-// (driven by productName → "StreamFusion Beta" install folder). Two
-// signals so a rename or manual copy of the exe doesn't mis-classify.
-// Used by: icon palette, window title, in-app BETA badge, Tier 3 gate.
-function _isBetaVariant() {
-  try {
-    var n = (app.getName() || '').toLowerCase();
-    if (n.indexOf('beta') !== -1) return true;
-    if ((app.getPath('exe') || '').toLowerCase().indexOf('beta') !== -1) return true;
-  } catch (e) {}
-  return false;
-}
-
-// 1.6.0+: tier-driven palette resolution. The pre-1.6 split was one
-// .exe per tier (stable + StreamFusion-Beta). 1.6 ships a single .exe;
-// the streamer's Patreon tier picks the runtime palette so a Tier 3
-// supporter sees a visibly distinct app from a Tier 2 supporter
-// without having to download a different installer.
+// Tier-driven palette resolution. StreamFusion ships a single .exe; the
+// streamer's Patreon tier picks the runtime palette so a Tier 3 supporter
+// sees a visibly distinct app from a Tier 2 supporter without having to
+// download a different installer. This is purely cosmetic — every feature
+// is free for everyone regardless of tier.
 //
 // _currentTier is set by the patreon entitlement subscription wired in
 // app.whenReady — null on startup until the first entitlement-changed
-// event arrives. The legacy `beta` palette stays as a fallback for the
-// (now deprecated) StreamFusion-Beta install variant during the merge
-// transition window — _isBetaVariant() will eventually be removed once
-// existing beta installs migrate.
+// event arrives.
 let _currentTier = null;
 function _sfIconPalette() {
   if (_currentTier === 'tier3') return PALETTES.tier3;
   if (_currentTier === 'tier2') return PALETTES.tier2;
   // Fallback to stable for non-authed / non-entitled users + as the
   // pre-entitlement-event default before patreon-auth fires.
-  if (_isBetaVariant()) return PALETTES.beta;
   return PALETTES.stable;
 }
 
@@ -457,10 +423,8 @@ function createWindow() {
     height: 750,
     minWidth: 520,
     minHeight: 400,
-    // Taskbar hover / Alt+Tab label. Title bar inside the app is a
-    // custom HTML element (see index.html .titlebar) that reads the
-    // same signal via electronAPI.isBeta().
-    title: _isBetaVariant() ? 'StreamFusion BETA' : 'StreamFusion',
+    // Taskbar hover / Alt+Tab label.
+    title: 'StreamFusion',
     icon: appIcon || path.join(__dirname, 'assets', 'icon.png'),
     backgroundColor: '#0e0e10',
     webPreferences: {
@@ -937,53 +901,12 @@ function maybeShowLegacyBetaNotice() {
   }, 1200);
 }
 
-// 1.6.0+: streamers actually running FROM the beta variant (detected
-// by _isBetaVariant — the install path / app name has 'beta' in it)
-// need a different prompt: tell them to download the merged main app
-// because the beta channel is going away. _isBetaVariant returns false
-// in stable runs, so this notice only fires for users who install the
-// 1.6.0-beta.x build into the StreamFusion Beta install path. They
-// click through to the public stable download, install it (lands at
-// the regular StreamFusion path), and from then on auto-update via
-// the stable channel.
-function _betaVariantNoticePath() { return path.join(app.getPath('userData'), 'beta-variant-migration-notice-shown.json'); }
-function maybeShowBetaVariantMigrationNotice() {
-  if (!_isBetaVariant()) return;
-  try { if (fs.existsSync(_betaVariantNoticePath())) return; } catch (e) {}
-  setTimeout(function() {
-    var choice = dialog.showMessageBoxSync(mainWindow, {
-      type: 'info',
-      buttons: ['Open download page', 'Dismiss', 'Don\'t show again'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'StreamFusion Beta is being merged into the main app',
-      message: 'You\'re running StreamFusion Beta — the beta variant is going away.',
-      detail:
-        'In StreamFusion 1.6 the Beta variant has been merged back into the main app. ' +
-        'Tier 3 features now unlock the moment you sign in with Patreon — no separate ' +
-        'StreamFusion Beta install needed.\n\n' +
-        'To migrate: download the latest StreamFusion from the releases page and run ' +
-        'the installer. Your settings are stored under your user profile and will not be ' +
-        'lost. Once the new StreamFusion is running you can uninstall this Beta variant.\n\n' +
-        '"Open download page" launches the StreamFusion releases page in your browser.'
-    });
-    if (choice === 0) {
-      try { shell.openExternal('https://github.com/aquiloplays/StreamFusion/releases/latest'); } catch (e) {}
-      try { fs.writeFileSync(_betaVariantNoticePath(), JSON.stringify({ at: Date.now() })); } catch (e) {}
-    } else if (choice === 2) {
-      try { fs.writeFileSync(_betaVariantNoticePath(), JSON.stringify({ at: Date.now() })); } catch (e) {}
-    }
-    // Dismiss leaves the marker absent so we re-prompt next launch.
-  }, 1500);
-}
-
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createTray();
   createWindow();
   startCtrlPoller();
   maybeShowLegacyBetaNotice();
-  maybeShowBetaVariantMigrationNotice();
 
   // Patreon + Discord entitlement services. Both are optional sign-ins;
   // the app boots for everyone. Users get EA features if EITHER path
@@ -1107,116 +1030,12 @@ app.whenReady().then(() => {
     autoUpdater.on('error', (err) => {
       logToFile('UPDATE-ERR', 'autoUpdater error: ' + (err && err.stack || err));
     });
-    // Beta installs publish to a PRIVATE repo (aquiloplays/StreamFusion-beta),
-    // so electron-updater needs a PAT with `repo` read scope to fetch the
-    // manifest. v1.5.5 onwards: SF asks the Cloudflare Worker for that PAT
-    // on every launch — the Worker verifies the user is currently a Tier 3
-    // patron (via their Patreon access token) and returns GITHUB_BETA_TOKEN.
-    // SF caches the returned PAT to userData/beta-updater-token.txt so:
-    //   - subsequent launches work even when the Worker is unreachable
-    //     (network down, deploy in progress, etc.)
-    //   - manual PAT-file management is no longer required for new patrons
-    //   - existing patrons with a hand-managed PAT keep working unchanged
-    //
-    // On an explicit 403 from the Worker (patron demoted below Tier 3) the
-    // cached PAT is deleted so they lose beta-update access next launch.
-    // On a network/5xx error the cached PAT is preserved.
-    //
-    // Stable installs skip this whole flow.
-    var _skipAutoUpdate = false;
-    var _betaPatPath = path.join(app.getPath('userData'), 'beta-updater-token.txt');
-    var WORKER_BASE = 'https://streamfusion-patreon-proxy.bisherclay.workers.dev';
-
-    function _setBetaFeed(token) {
-      autoUpdater.setFeedURL({
-        provider: 'github',
-        owner:    'aquiloplays',
-        repo:     'StreamFusion-beta',
-        private:  true,
-        token:    token,
-        channel:  'beta'
-      });
-    }
-
-    // Fetches a fresh PAT from the Worker, writes it to disk, returns it.
-    // Resolves with { ok, token, status } so the caller can decide whether
-    // to fall back to the cached value or wipe the cache outright.
-    async function _fetchBetaPatFromWorker() {
-      var pat = patreonAuth.getRawAccessToken && patreonAuth.getRawAccessToken();
-      if (!pat) return { ok: false, status: 'no-patreon-token' };
-      try {
-        var resp = await fetch(WORKER_BASE + '/beta-updater-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ patreonAccessToken: pat })
-        });
-        var body = null;
-        try { body = await resp.json(); } catch (e) {}
-        if (resp.ok && body && body.token) {
-          try {
-            fs.writeFileSync(_betaPatPath, body.token, { encoding: 'utf-8', mode: 0o600 });
-          } catch (writeErr) {
-            logToFile('UPDATE-ERR', 'beta: failed to write fetched PAT to disk: ' + (writeErr && writeErr.message));
-          }
-          logToFile('UPDATE', 'beta: Worker vended a fresh PAT (tier=' + (body.tier || '?') + ') and cached to disk');
-          return { ok: true, status: 'fresh', token: body.token };
-        }
-        if (resp.status === 403) {
-          // Patron demoted — wipe cached PAT so they don't keep using a stale one.
-          try { if (fs.existsSync(_betaPatPath)) fs.unlinkSync(_betaPatPath); } catch (e) {}
-          logToFile('UPDATE', 'beta: Worker said 403 (' + (body && body.error) + '); wiped cached PAT — auto-update disabled until re-entitled');
-          return { ok: false, status: '403', error: (body && body.error) || 'forbidden' };
-        }
-        logToFile('UPDATE-ERR', 'beta: Worker returned ' + resp.status + ' (' + (body && body.error) + ') — falling back to cached PAT');
-        return { ok: false, status: 'http-' + resp.status };
-      } catch (e) {
-        logToFile('UPDATE-ERR', 'beta: Worker fetch threw (' + (e && e.message) + ') — falling back to cached PAT');
-        return { ok: false, status: 'network-error' };
-      }
-    }
-
-    function _readCachedBetaPat() {
-      try {
-        if (!fs.existsSync(_betaPatPath)) return null;
-        var t = fs.readFileSync(_betaPatPath, 'utf-8').trim();
-        return t || null;
-      } catch (e) { return null; }
-    }
-
-    async function _setupBetaFeedAndCheck() {
-      if (!_isBetaVariant()) return;   // stable: nothing to do
-      // Worker fetch first. On 403 the cache is wiped inside the helper.
-      var fresh = await _fetchBetaPatFromWorker();
-      var token = null;
-      if (fresh.ok && fresh.token) {
-        token = fresh.token;
-      } else if (fresh.status !== '403') {
-        // Network / Worker / signed-out: try the cached PAT.
-        token = _readCachedBetaPat();
-        if (token) logToFile('UPDATE', 'beta: using cached PAT from disk (Worker unavailable: ' + fresh.status + ')');
-      }
-      if (!token) {
-        _skipAutoUpdate = true;
-        logToFile('UPDATE', 'beta: no PAT available (Worker=' + fresh.status + ', cache=empty) — auto-update disabled');
-        return;
-      }
-      try { _setBetaFeed(token); }
-      catch (e) {
-        logToFile('UPDATE-ERR', 'beta: setFeedURL threw: ' + (e && e.message));
-        _skipAutoUpdate = true;
-        return;
-      }
-      logToFile('UPDATE', 'beta: feed pinned to StreamFusion-beta with ' + (fresh.ok ? 'fresh Worker-vended' : 'cached on-disk') + ' PAT');
-    }
-
+    // Single public release channel — the update feed comes from the
+    // `publish` config in package.json (the public streamfusion-downloads
+    // repo). Check for updates shortly after launch.
     setTimeout(() => {
-      _setupBetaFeedAndCheck()
-        .catch(function(e) { logToFile('UPDATE-ERR', 'beta setup threw: ' + (e && e.message)); _skipAutoUpdate = true; })
-        .finally(function() {
-          if (_skipAutoUpdate) { logToFile('UPDATE', 'beta: checkForUpdates skipped (no PAT)'); return; }
-          try { autoUpdater.checkForUpdates(); }
-          catch (e) { logToFile('UPDATE-ERR', 'checkForUpdates threw: ' + (e && e.message)); }
-        });
+      try { autoUpdater.checkForUpdates(); }
+      catch (e) { logToFile('UPDATE-ERR', 'checkForUpdates threw: ' + (e && e.message)); }
     }, 8000);
   }
 
@@ -1242,9 +1061,6 @@ app.on('before-quit', () => {
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
 ipcMain.handle('app-version', () => app.getVersion());
-// Renderer asks this on boot to decide whether to render the BETA
-// badge + "StreamFusion BETA" wordmark + any beta-only UI affordances.
-ipcMain.handle('is-beta', () => _isBetaVariant());
 
 // ── OBS overlay IPC ─────────────────────────────────────────────────────────
 // The renderer is the single source of truth for chat/events/shoutouts —

@@ -51,7 +51,12 @@
 
 const https = require('https');
 
-const BOT_BASE = (process.env.SF_BOT_SERVICE_URL || 'https://streamfusion-production-0bdd.up.railway.app').replace(/\/$/, '');
+// Default: the Cloudflare Worker that owns /post-release (free tier,
+// always-on, no idle cost). The original Railway bot-service still hosts
+// the Gateway WebSocket + SSE forwarding for EA users — just not the
+// release-notes endpoint anymore. Override SF_BOT_SERVICE_URL only if
+// you're running your own deployment.
+const BOT_BASE = (process.env.SF_BOT_SERVICE_URL || 'https://sf-release.aquiloplays.workers.dev').replace(/\/$/, '');
 const SECRET   = process.env.SF_RELEASE_POST_SECRET || '';
 const CHANNEL  = process.env.SF_RELEASE_CHANNEL_ID  || '1494765819891159202';
 const GH_PAT   = process.env.SF_GITHUB_PAT          || '';

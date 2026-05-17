@@ -1,0 +1,9 @@
+name = "sf-release"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+# Secrets:
+#   wrangler secret put DISCORD_BOT_TOKEN
+#   wrangler secret put RELEASE_POST_SECRET
+
+# routes = [{ pattern = "release.aquilo.gg/*", zone_name = "aquilo.gg" }]

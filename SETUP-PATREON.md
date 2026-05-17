@@ -1,16 +1,20 @@
 # StreamFusion — Patreon Early Access Setup
 
-This guide covers the one-time setup needed to let Patreon supporters unlock Early Access features inside StreamFusion. Ship this once, then every new EA feature just needs a `if (S.hasEarlyAccess)` check.
+This guide covers the one-time setup needed to connect Patreon to StreamFusion.
+
+**What Patreon is for:** every feature in StreamFusion is free for everyone — nothing is locked behind payment. Patreon supporters (Tier 2 and Tier 3) get **early access**: brand-new features ship to them first, then roll out to everyone shortly after. Patreon is a way to support development and get a head start on new features — it is never required to use anything.
+
+The Patreon + Discord sign-in stays wired up so future new features can be offered to supporters early. Until a new feature ships, this flow does nothing visible — connecting is purely optional.
 
 ---
 
 ## How it works at a glance
 
-- **One installer.** Everyone runs the same `StreamFusion.exe`.
-- **Optional sign-in.** The onboarding wizard has a "Connect Patreon" step (Page 9). Users can skip it; the app works normally without a Patreon connection. They can connect later via **Settings → Early Access**.
-- **Tier-gated.** Only users with an active membership on **Tier 2** or **Tier 3** of your campaign are considered entitled. Tier 1, followers, and declined/former patrons are not.
-- **Live check.** StreamFusion verifies against Patreon on every launch and once per hour while running. If a supporter cancels their pledge, their Early Access unlocks disappear within an hour — no restart needed.
-- **Offline grace.** If Patreon is unreachable, the last known entitlement is honored for 7 days before locking out.
+- **One installer.** Everyone runs the same `StreamFusion.exe`. There is no separate build.
+- **Optional sign-in.** The onboarding wizard has a "Connect Patreon" step (Page 9). Users can skip it; the app works fully without a Patreon connection. They can connect later via **Settings → Early Access**.
+- **Tier-aware.** Users with an active membership on **Tier 2** or **Tier 3** get early access to new features. Tier 1, followers, and declined/former patrons do not — but they still have every released feature, free.
+- **Live check.** StreamFusion verifies against Patreon on every launch and once per hour while running. If a supporter cancels, their early-access status updates within an hour — no restart needed.
+- **Offline grace.** If Patreon is unreachable, the last known status is honored for 7 days.
 - **Client secret never ships.** Token exchange is proxied through a Cloudflare Worker that holds the secret server-side.
 
 ---
@@ -95,63 +99,71 @@ Alternatively, leave the placeholders and set env vars at build time:
 ### 5. Build + ship
 
 ```bash
-npm run build         # → dist/StreamFusion Setup 1.2.3.exe
+npm run build         # → dist/StreamFusion-Setup-<version>.exe
 ```
 
-No separate EA installer — this is the only build you need.
+One build for everyone — there is no separate beta or supporter installer.
 
 ---
 
-## Adding an Early Access feature
+## Adding an early-access feature
+
+Every released feature is free for everyone. When you build a **brand-new** feature and want Patreon supporters to get it first, gate the new feature on `S.hasEarlyAccess` while it's in its early-access window, then remove the gate when it rolls out to everyone.
+
+The `S.hasEarlyAccess` flag is computed by `_recomputeCombinedEntitlement()` and stays live at all times — it's the union of Patreon entitlement and the Discord patron-role check, so either path grants early access.
 
 ### In the renderer (anywhere inside `index.html` and its scripts)
 
 ```js
 if (S.hasEarlyAccess) {
-  // Show / enable the EA-only thing
+  // New feature — available to Tier 2 / Tier 3 supporters during its
+  // early-access window. Remove this guard when the feature rolls out
+  // to everyone.
 }
 ```
 
-To react to changes (e.g. a feature panel that should hide live when a user signs out):
+For panes, the dormant `.ea-gate` / `.ea-lock-overlay` CSS pattern (defined in `index.html`) renders the feature blurred with a card above for users who don't have early access yet. Add `.ea-gate` to the pane and toggle `.ea-unlocked` from `S.hasEarlyAccess`.
+
+To react to changes live (e.g. a feature panel that should appear the moment a user connects):
 
 ```js
 window.electronAPI.onPatreonEntitlementChanged(function(state) {
-  document.getElementById('myEaPanel').style.display = state.entitled ? '' : 'none';
+  // re-render whatever depends on early-access status
 });
 ```
 
 ### In the main process (`main.js`)
 
-If you need to register an IPC handler that only the entitled user should hit, guard the handler body:
+If a new feature needs an IPC handler that should be supporter-only during early access, guard the handler body:
 
 ```js
-ipcMain.handle('my-ea-feature', async function() {
+ipcMain.handle('my-new-feature', async function() {
   var state = await patreonAuth.getEntitlement();
-  if (!state.entitled) return { error: 'requires_early_access' };
+  if (!state.entitled) return { error: 'not_in_early_access' };
   // ... do the thing
 });
 ```
 
-### Graduating a feature to stable
+### Graduating a feature to everyone
 
-Delete the check. That's it.
+Delete the check. That's it — the feature is now free for all users, like everything else.
 
 ---
 
 ## What users see
 
 **First launch (new user):**
-1. App opens normally (no gate)
+1. App opens normally (no gate — every feature is available)
 2. Onboarding walks through 11 steps
-3. Step 9 — "Unlock Early Access" — with a red **Connect Patreon** button and a **Skip for now** button
-4. If they click Connect → Patreon opens in browser → they authorize → browser tab closes → StreamFusion updates live showing their tier and whether Early Access is unlocked
+3. Step 9 — "Early Access on Patreon" — explains that every feature is free and Patreon supporters just get new features early. Red **Connect Patreon** button + a **Skip for now** button.
+4. If they click Connect → Patreon opens in browser → they authorize → browser tab closes → StreamFusion updates live showing their tier and early-access status
 5. Step 10 — "You're ready to stream!" — familiar finale
 
 **Existing user (skipped onboarding or wants to change accounts):**
 - **Settings → Early Access** — shows current connection status, Connect / Re-check / Sign out buttons
 
 **Runtime:**
-- No status indicator by default (add one wherever you like using `S.hasEarlyAccess`). The entitlement is re-checked every hour automatically.
+- The entitlement is re-checked every hour automatically.
 
 ---
 
@@ -164,7 +176,7 @@ Delete the check. That's it.
 | User is Tier 2 but sees "insufficient_tier" | Your `PATREON_TIER_IDS.tier2` value doesn't match the actual tier ID. Re-check via the campaigns endpoint in step 2. |
 | "OAuth error: invalid_grant" on retry | Auth codes are single-use — the user probably clicked the callback twice. They just need to start the flow again. |
 | "No loopback port available" | Another app is using all three of 17823/17824/17825 at once, which is extremely unusual. Pick different ports in `patreon-auth.js` and re-register the redirect URIs on the Patreon OAuth client page. |
-| Entitlement doesn't update after the user upgrades their tier | Wait up to an hour (runtime re-check interval), or have them click **Re-check membership** in Settings → Early Access. |
+| Early-access status doesn't update after the user upgrades their tier | Wait up to an hour (runtime re-check interval), or have them click **Re-check membership** in Settings → Early Access. |
 
 ---
 
@@ -182,7 +194,7 @@ Patreon-related files:
 
 ## Community recap sharing (optional)
 
-EA supporters can opt into sharing their stream recap to your aquilo.gg community Discord. SF posts the recap embed to your Cloudflare Worker at `/community-recap`; the Worker adds your webhook URL server-side and forwards to Discord. The webhook URL is never exposed to the app or the repo.
+Supporters can opt into sharing their stream recap to your aquilo.gg community Discord. SF posts the recap embed to your Cloudflare Worker at `/community-recap`; the Worker adds your webhook URL server-side and forwards to Discord. The webhook URL is never exposed to the app or the repo.
 
 To enable:
 
@@ -193,13 +205,13 @@ To enable:
    - `COMMUNITY_RECAP_WEBHOOK` = the URL you copied (encrypted secret)
 5. Deploy the Worker
 
-Supporters will see the toggle in **Settings → Discord+ → Community Sharing**. When on, every stream recap posts to both their own webhook AND the community channel.
+Streamers will see the toggle in **Settings → Discord+ → Community Sharing**. When on, every stream recap posts to both their own webhook AND the community channel.
 
 ---
 
 ## Shared StreamFusion bot (Railway)
 
-For the Discord bot that surfaces member/voice/message joins into supporters' Events panels, you host **one bot** that every EA supporter invites. The bot lives in [`bot-service/`](bot-service/) and deploys to Railway.
+For the Discord bot that surfaces member/voice/message joins into the Events panel, you host **one bot** that streamers invite. The bot lives in [`bot-service/`](bot-service/) and deploys to Railway.
 
 ### 1. Register the Discord application
 
@@ -258,18 +270,18 @@ Visit `https://your-railway-url.up.railway.app/health` — you should see:
 
 If `gateway: false`, the bot couldn't connect to Discord. Check the Railway logs for which close code came back — most commonly you need to toggle on the SERVER MEMBERS intent (step 1.3).
 
-### How supporters use it
+### How streamers use it
 
 1. In StreamFusion → Settings → **Discord+**
 2. Click **Invite StreamFusion bot** — opens Discord, they pick their server, click Authorize
 3. Back in StreamFusion, paste their **server ID** (Discord settings → enable Developer Mode, right-click server name → Copy Server ID)
-4. Click **Connect** — SF opens an SSE stream to your Railway service, authenticated by the user's Patreon access token
+4. Click **Connect** — SF opens an SSE stream to your Railway service
 5. From then on, member/voice/message joins in their server appear in SF's Events panel
 
-**No dev-portal setup on the supporter's end.** They just invite a button and paste an ID.
+**No dev-portal setup on the streamer's end.** They just invite a button and paste an ID.
 
 ### Scale notes
 
 - **In-memory storage.** The service keeps `guildId → users` and `userId → SSE connections` in RAM. A restart drops associations; SF clients re-POST `/associate` on reconnect, so the system self-heals within seconds. For multi-instance deployments swap in Redis or Railway Postgres.
-- **Pre-verification only.** Discord requires bot verification at 100 servers and limits new invites to unverified bots at 75. For EA supporter scale this is plenty of headroom. When you approach that ceiling, apply for verification — Discord has an EU-based team and the process takes 2–4 weeks.
+- **Pre-verification only.** Discord requires bot verification at 100 servers and limits new invites to unverified bots at 75. When you approach that ceiling, apply for verification — Discord has an EU-based team and the process takes 2–4 weeks.
 - **Cost.** Free tier on Railway gives $5/month of usage credit; a single always-on Node service runs well under that. Upgrade if you exceed it.

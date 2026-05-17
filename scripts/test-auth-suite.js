@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 // Comprehensive auth-path test suite for StreamFusion.
 //
-// Covers all four decision layers:
+// Covers the three entitlement decision layers:
 //   1. patreon-auth.js verifyMembership      (Patreon /identity → tier + entitled)
 //   2. discord-auth.js verifyMembership      (Discord guild member → tier + entitled)
 //   3. renderer _recomputeCombinedEntitlement (S.hasEarlyAccess = union)
-//   4. renderer _sfBetaGateSync              (is beta Tier 3 gate open?)
 //
 // Each layer is ported from the production code line-for-line (minus the
 // electron / network calls) so the logic tested here IS the logic that
@@ -134,29 +133,6 @@ function recomputeCombinedEntitlement(S) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// LAYER 4 — Beta Tier 3 gate
-// Ported from _sfBetaGateSync in index.html
-// Returns true if the gate is HIDDEN (user unlocked), false if BLOCKED.
-// ═══════════════════════════════════════════════════════════════════════
-function betaGateOpen(S, isBetaInstall) {
-  if (!isBetaInstall) return true;  // gate doesn't exist on stable
-
-  const patreonOk = !!(S.patreon && S.patreon.entitled);
-  const discordOk = !!(S.discord && S.discord.entitled);
-
-  // Pick which state drives the gate message (prefer tier3 source).
-  let gateState;
-  if (patreonOk && S.patreon.tier === 'tier3') gateState = S.patreon;
-  else if (discordOk && S.discord.tier === 'tier3') gateState = {
-    signedIn: true, entitled: true, tier: 'tier3',
-    userName: S.discord.userName, reason: 'entitled'
-  };
-  else gateState = S.patreon;
-
-  return !!(gateState && gateState.entitled && gateState.tier === 'tier3');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 // Scenario builders
 // ═══════════════════════════════════════════════════════════════════════
 function mkPatreonResp(opts) {
@@ -276,28 +252,6 @@ scenarios.push(
     expect: { entitled: true } },
 );
 
-// ── LAYER 4 tests (Beta Tier 3 gate) ──────────────────────────────────
-scenarios.push(
-  { layer: 'beta-gate', name: 'Beta gate OPEN: Tier 3 via Patreon',
-    input: { S: { patreon: { entitled: true, tier: 'tier3' }, discord: { entitled: false, tier: 'none' } }, isBeta: true },
-    expect: { open: true } },
-  { layer: 'beta-gate', name: 'Beta gate OPEN: Tier 3 via Discord (Patreon broken)',
-    input: { S: { patreon: { entitled: false, tier: 'none' }, discord: { entitled: true, tier: 'tier3', userName: 'p3' } }, isBeta: true },
-    expect: { open: true } },
-  { layer: 'beta-gate', name: 'Beta gate OPEN: Tier 3 via Discord, Tier 2 via Patreon (upgrade-via-Discord)',
-    input: { S: { patreon: { entitled: true, tier: 'tier2' }, discord: { entitled: true, tier: 'tier3', userName: 'p3' } }, isBeta: true },
-    expect: { open: true } },
-  { layer: 'beta-gate', name: 'Beta gate BLOCKED: Tier 2 everywhere (no Tier 3 anywhere)',
-    input: { S: { patreon: { entitled: true, tier: 'tier2' }, discord: { entitled: true, tier: 'tier2' } }, isBeta: true },
-    expect: { open: false } },
-  { layer: 'beta-gate', name: 'Beta gate BLOCKED: non-patron',
-    input: { S: { patreon: { entitled: false, tier: 'follower' }, discord: { entitled: false, tier: 'none' } }, isBeta: true },
-    expect: { open: false } },
-  { layer: 'beta-gate', name: 'Beta gate N/A: non-beta install (always open)',
-    input: { S: { patreon: { entitled: false }, discord: { entitled: false } }, isBeta: false },
-    expect: { open: true } },
-);
-
 // ═══════════════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════════════
@@ -310,8 +264,6 @@ for (const s of scenarios) {
     got = verifyDiscordMembership(s.input.discord);
   } else if (s.layer === 'combined') {
     got = { entitled: recomputeCombinedEntitlement(s.input.S) };
-  } else if (s.layer === 'beta-gate') {
-    got = { open: betaGateOpen(s.input.S, s.input.isBeta) };
   }
   const keys = Object.keys(s.expect);
   const mismatches = keys.filter(k => got[k] !== s.expect[k]);
