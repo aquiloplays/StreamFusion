@@ -1,0 +1,37 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bolt" x1="300" y1="150" x2="700" y2="880" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a98fff"/>
+      <stop offset="0.42" stop-color="#7c5cff"/>
+      <stop offset="0.78" stop-color="#6ee0c0"/>
+      <stop offset="1" stop-color="#5bff95"/>
+    </linearGradient>
+    <radialGradient id="bg" cx="0.5" cy="0.38" r="0.92">
+      <stop offset="0" stop-color="#1e2236"/>
+      <stop offset="0.55" stop-color="#11131c"/>
+      <stop offset="1" stop-color="#080910"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7c5cff" stop-opacity="0.62"/>
+      <stop offset="0.62" stop-color="#7c5cff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9a82ff"/>
+      <stop offset="0.5" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#5bff95"/>
+    </linearGradient>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+  </defs>
+  <circle cx="512" cy="512" r="504" fill="url(#bg)"/>
+  <circle cx="512" cy="516" r="330" fill="url(#glow)"/>
+  <g transform="translate(512 512) scale(0.9) translate(-512 -512)">
+    <path d="M624 150 L360 562 L516 562 L404 876 L664 462 L508 462 Z" fill="#8a72ff" filter="url(#blur)" opacity="0.9"/>
+    <path d="M624 150 L360 562 L516 562 L404 876 L664 462 L508 462 Z" fill="url(#bolt)"/>
+    <path d="M624 150 L360 562 L516 562 L508 462 Z" fill="#ffffff" opacity="0.16"/>
+  </g>
+  <circle cx="512" cy="512" r="495" fill="none" stroke="url(#ring)" stroke-width="16"/>
+  <circle cx="512" cy="512" r="476" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.06"/>
+</svg>

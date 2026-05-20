@@ -44,7 +44,7 @@ broadcasts the manifest as a `General.Custom` event:
     "name":        "Aquilo Loadout",
     "version":     "0.1.0",
     "description": "Pre-built streamer dashboard kit",
-    "accentColor": "#3A86FF",         // optional — themes the SF panel header
+    "accentColor": "#7c5cff",         // optional — themes the SF panel header
     "supportUrl":  "https://aquilo.gg/loadout"
   },
 

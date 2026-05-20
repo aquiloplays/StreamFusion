@@ -29,8 +29,8 @@
     --pa: #ff424d;
     --fw: #f0b429;
     --kf: #29abe0;
-    --accent: #3A86FF;
-    --accent2: #2AD4B9;
+    --accent: #7c5cff;
+    --accent2: #5bff95;
     --gold: #f0b429;
     --text: #ffffff;
     --text-dim: rgba(255,255,255,.85);
@@ -42,7 +42,7 @@
     width: 100vw; height: 100vh;
     background: transparent;
     overflow: hidden;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     color: var(--text);
   }
@@ -67,12 +67,12 @@
     padding: 20px 28px 20px 24px;
     border-radius: 14px;
     background:
-      linear-gradient(135deg, rgba(14,14,16,.92), rgba(24,24,27,.92));
+      linear-gradient(135deg, rgba(10,11,18,.92), rgba(17,19,28,.92));
     border: 1px solid rgba(255,255,255,.08);
     box-shadow:
       0 20px 60px rgba(0,0,0,.5),
-      0 0 0 1px rgba(58,134,255,.15),
-      0 0 40px rgba(58,134,255,.25);
+      0 0 0 1px rgba(124,92,255,.15),
+      0 0 40px rgba(124,92,255,.25);
     backdrop-filter: blur(12px);
     display: flex;
     align-items: center;
@@ -130,13 +130,13 @@
     justify-content: center;
     font-size: 32px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    box-shadow: 0 8px 20px rgba(58,134,255,.4), inset 0 1px 0 rgba(255,255,255,.2);
+    box-shadow: 0 8px 20px rgba(124,92,255,.4), inset 0 1px 0 rgba(255,255,255,.2);
     position: relative;
   }
   .alert.tw .icon { background: linear-gradient(135deg, var(--tw), #7d3fff); box-shadow: 0 8px 20px rgba(169,112,255,.5), inset 0 1px 0 rgba(255,255,255,.2); }
   .alert.yt .icon { background: linear-gradient(135deg, var(--yt), #ff7373); box-shadow: 0 8px 20px rgba(255,69,69,.5), inset 0 1px 0 rgba(255,255,255,.2); }
   .alert.tt .icon { background: linear-gradient(135deg, var(--tt), #25f4ee); box-shadow: 0 8px 20px rgba(254,44,85,.5), inset 0 1px 0 rgba(255,255,255,.2); }
-  .alert.kk .icon { background: linear-gradient(135deg, var(--kk), #00e573); color: #0e0e10; box-shadow: 0 8px 20px rgba(83,252,24,.5), inset 0 1px 0 rgba(255,255,255,.3); }
+  .alert.kk .icon { background: linear-gradient(135deg, var(--kk), #00e573); color: #0a0b12; box-shadow: 0 8px 20px rgba(83,252,24,.5), inset 0 1px 0 rgba(255,255,255,.3); }
 
   /* Pulsing ring around the icon for high-value events (big gift, raid,
      large tip, large cheer). */
@@ -213,10 +213,10 @@
     font-size: 18px;
     font-weight: 900;
     background: var(--gold);
-    color: #0e0e10;
+    color: #0a0b12;
     box-shadow: 0 2px 8px rgba(240,180,41,.5);
   }
-  .amt.tip { background: linear-gradient(135deg, #00e573, #2AD4B9); color: #0e0e10; box-shadow: 0 2px 8px rgba(42,212,185,.5); }
+  .amt.tip { background: linear-gradient(135deg, #00e573, #5bff95); color: #0a0b12; box-shadow: 0 2px 8px rgba(91,255,149,.5); }
   .amt.bits { background: linear-gradient(135deg, #9146ff, #c398ff); color: #fff; box-shadow: 0 2px 8px rgba(145,70,255,.5); }
 
   /* Named gift chip — sits inline in the primary line for TikTok gifts
@@ -276,7 +276,7 @@
     padding: 10px 16px 10px 14px;
     border-radius: 10px;
     gap: 10px;
-    background: linear-gradient(135deg, rgba(14,14,16,.88), rgba(24,24,27,.88));
+    background: linear-gradient(135deg, rgba(10,11,18,.88), rgba(17,19,28,.88));
     box-shadow: 0 8px 24px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.06);
     backdrop-filter: blur(10px);
   }
@@ -466,7 +466,7 @@
   function spawnConfetti(root, colors) {
     var c = document.createElement('div');
     c.className = 'confetti';
-    var palette = colors && colors.length ? colors : ['#3A86FF','#2AD4B9','#f0b429','#ec4899'];
+    var palette = colors && colors.length ? colors : ['#7c5cff','#5bff95','#f0b429','#ec4899'];
     for (var i = 0; i < 22; i++) {
       var p = document.createElement('div');
       p.className = 'p';

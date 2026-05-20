@@ -8,17 +8,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    /* StreamFusion app palette — exact match */
-    --bg:     #0e0e10;
-    --surf:   #18181b;
-    --surf2:  #1f1f23;
-    --surf3:  #26262c;
-    --bdr:    #2a2a30;
-    --txt:    #efeff1;
-    --mut:    #adadb8;
-    --sub:    #7d7f83;
-    --accent: #3A86FF;
-    --cyan:   #2AD4B9;
+    /* aquilo.gg brand palette — matches the StreamFusion app exactly. */
+    --bg:     #0a0b12;
+    --surf:   #11131c;
+    --surf2:  #161929;
+    --surf3:  #2a2f44;
+    --bdr:    #1f2233;
+    --bdr-strong: #2a2f44;
+    --txt:    #ffffff;
+    --mut:    #94a3b8;
+    --mut-strong: #cbd5e1;
+    --sub:    #7c819a;
+    --accent: #7c5cff;
+    --accent-bright: #9a82ff;
+    --cyan:   #5bff95;
+    --brand-green: #5bff95;
+    --brand-grad: linear-gradient(135deg, #9a82ff 0%, #5bff95 100%);
     --gold:   #f0b429;
     --warn:   #f0883e;
   }
@@ -29,7 +34,7 @@
     height: 100%;
     background: var(--bg);
     color: var(--txt);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.01em;
   }
@@ -55,8 +60,8 @@
     height: 900px;
     background: radial-gradient(
       circle at center,
-      rgba(58, 134, 255, 0.22) 0%,
-      rgba(58, 134, 255, 0.08) 30%,
+      rgba(124, 92, 255, 0.22) 0%,
+      rgba(124, 92, 255, 0.08) 30%,
       transparent 65%
     );
     pointer-events: none;
@@ -201,8 +206,8 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     border-radius: 999px;
-    background: rgba(58, 134, 255, 0.1);
-    border: 1px solid rgba(58, 134, 255, 0.25);
+    background: rgba(124, 92, 255, 0.1);
+    border: 1px solid rgba(124, 92, 255, 0.25);
     color: var(--accent);
   }
 
@@ -223,13 +228,13 @@
     cursor: pointer;
     text-decoration: none;
     transition: all 0.25s ease;
-    box-shadow: 0 4px 16px rgba(58,134,255,.25);
+    box-shadow: 0 4px 16px rgba(124,92,255,.25);
   }
 
   .btn:hover {
     background: #2b6fe0;
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(58,134,255,.4);
+    box-shadow: 0 8px 24px rgba(124,92,255,.4);
   }
 
   .btn:active {
@@ -307,11 +312,11 @@
     color: var(--accent);
     text-decoration: none;
     font-weight: 600;
-    border-bottom: 1px dashed rgba(58, 134, 255, 0.35);
+    border-bottom: 1px dashed rgba(124, 92, 255, 0.35);
   }
   .alt-dl a:hover {
     color: var(--cyan);
-    border-bottom-color: rgba(42, 212, 185, 0.4);
+    border-bottom-color: rgba(91, 255, 149, 0.4);
   }
 
   /* SF OBS cross-promo card. For streamers who don't want the full
@@ -322,8 +327,8 @@
   .sfobs {
     margin-top: 20px;
     padding: 16px 18px;
-    background: linear-gradient(135deg, rgba(42, 212, 185, 0.08), rgba(58, 134, 255, 0.04));
-    border: 1px solid rgba(42, 212, 185, 0.25);
+    background: linear-gradient(135deg, rgba(91, 255, 149, 0.08), rgba(124, 92, 255, 0.04));
+    border: 1px solid rgba(91, 255, 149, 0.25);
     border-radius: 10px;
     text-align: left;
   }
@@ -342,7 +347,7 @@
     letter-spacing: 0.08em;
     padding: 2px 7px;
     border-radius: 999px;
-    background: rgba(42, 212, 185, 0.18);
+    background: rgba(91, 255, 149, 0.18);
     color: var(--cyan);
     text-transform: uppercase;
   }
@@ -405,22 +410,29 @@
 <body>
   <div class="card">
 
-    <!-- StreamFusion bolt logo -->
+    <!-- StreamFusion bolt logo (aquilo.gg rebrand mark) -->
     <div class="logo-mark">
       <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="bolt-ring" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#3A86FF"/>
-            <stop offset="100%" stop-color="#2AD4B9"/>
+            <stop offset="0%" stop-color="#9a82ff"/>
+            <stop offset="50%" stop-color="#7c5cff"/>
+            <stop offset="100%" stop-color="#5bff95"/>
           </linearGradient>
           <linearGradient id="bolt-fill" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#efeff1"/>
-            <stop offset="40%" stop-color="#3A86FF"/>
-            <stop offset="100%" stop-color="#2AD4B9"/>
+            <stop offset="0%" stop-color="#a98fff"/>
+            <stop offset="42%" stop-color="#7c5cff"/>
+            <stop offset="78%" stop-color="#6ee0c0"/>
+            <stop offset="100%" stop-color="#5bff95"/>
           </linearGradient>
+          <radialGradient id="bolt-bg" cx="50%" cy="38%" r="92%">
+            <stop offset="0%" stop-color="#1e2236"/>
+            <stop offset="55%" stop-color="#11131c"/>
+            <stop offset="100%" stop-color="#080910"/>
+          </radialGradient>
         </defs>
+        <circle cx="50" cy="50" r="48" fill="url(#bolt-bg)"/>
         <circle cx="50" cy="50" r="48" fill="none" stroke="url(#bolt-ring)" stroke-width="3"/>
-        <circle cx="50" cy="50" r="42" fill="#0e0e10"/>
         <path d="M 55 22 L 32 52 L 46 52 L 42 78 L 66 46 L 52 46 Z" fill="url(#bolt-fill)"/>
       </svg>
     </div>

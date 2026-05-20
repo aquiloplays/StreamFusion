@@ -9,7 +9,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:transparent}
-body{font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+body{font-family:'Geist','Geist Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center}
 
 /* ── Banner slide animations ─────────────────────────────────── */
 @keyframes bnrSlideInRight{
@@ -35,7 +35,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center
 /* Glow halo cycling around the banner */
 @keyframes bnrGlow{
   0%,100%{box-shadow:0 0 38px rgba(255,200,80,.65),0 0 80px rgba(255,200,80,.35),inset 0 0 22px rgba(255,200,80,.12)}
-  25%{box-shadow:0 0 46px rgba(58,134,255,.75),0 0 96px rgba(58,134,255,.45),inset 0 0 24px rgba(58,134,255,.16)}
+  25%{box-shadow:0 0 46px rgba(124,92,255,.75),0 0 96px rgba(124,92,255,.45),inset 0 0 24px rgba(124,92,255,.16)}
   50%{box-shadow:0 0 50px rgba(255,80,180,.78),0 0 100px rgba(255,80,180,.48),inset 0 0 26px rgba(255,80,180,.18)}
   75%{box-shadow:0 0 46px rgba(80,200,255,.75),0 0 96px rgba(80,200,255,.45),inset 0 0 24px rgba(80,200,255,.16)}
 }
@@ -51,9 +51,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center
 /* Border color cycling */
 @keyframes bnrBorder{
   0%,100%{border-color:#ffd700}
-  25%{border-color:#3A86FF}
+  25%{border-color:#7c5cff}
   50%{border-color:#ff66cc}
-  75%{border-color:#00E5A0}
+  75%{border-color:#5bff95}
 }
 /* Icon bounce */
 @keyframes bnrIcon{
@@ -114,7 +114,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center
   inset:-4px;
   border-radius:22px;
   padding:3px;
-  background:conic-gradient(from 0deg,#ffd700,#3A86FF,#ff66cc,#00E5A0,#53fc18,#ffd700);
+  background:conic-gradient(from 0deg,#ffd700,#7c5cff,#ff66cc,#5bff95,#53fc18,#ffd700);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
@@ -395,7 +395,7 @@ function spawnSparkles(color) {
 }
 
 function fireConfetti(count) {
-  var colors = ['#ffd700','#3A86FF','#ff66cc','#00E5A0','#53fc18','#ff3355','#2b9bff','#f0883e'];
+  var colors = ['#ffd700','#7c5cff','#ff66cc','#5bff95','#53fc18','#ff3355','#2b9bff','#f0883e'];
   for (var i = 0; i < count; i++) {
     var p = document.createElement('div');
     p.className = 'confetti-piece';
