@@ -1,0 +1,120 @@
+name: Release
+
+# Tag-driven release builds. Push a tag like `v1.8.0` (and a matching
+# package.json bump) and this workflow:
+#   1. Verifies package.json version matches the tag
+#   2. npm-installs and runs electron-builder (Windows nsis + portable)
+#   3. Uploads the build artifacts AND a fresh latest.yml/.blockmap to a
+#      draft release on aquiloplays/streamfusion-downloads — that's the
+#      public binaries repo electron-updater talks to (see package.json
+#      `build.publish`).
+#   4. Flip the draft to Published when ready. Every installed copy of
+#      StreamFusion polls latest.yml on launch and 4h after, so the
+#      moment the release goes live it propagates without any manual
+#      step on the user's side. The .blockmap means electron-updater
+#      only downloads the changed bytes — installs feel near-instant on
+#      a typical broadband link.
+#   5. post-release-notes.yml on streamfusion-downloads takes over once
+#      you publish (if you've configured it there).
+#
+# ─── Required repo secret ─────────────────────────────────────────────
+#   STREAMFUSION_DOWNLOADS_TOKEN  Fine-grained GitHub PAT with
+#                                 `Contents: read & write` scoped to
+#                                 aquiloplays/streamfusion-downloads.
+#                                 The default GITHUB_TOKEN is scoped to
+#                                 THIS repo only and can't push to a
+#                                 different one, so we need a PAT.
+#                                 Generate at
+#                                 https://github.com/settings/personal-access-tokens
+#                                 then add it as a repo secret named
+#                                 STREAMFUSION_DOWNLOADS_TOKEN on
+#                                 aquiloplays/StreamFusion.
+#
+# Versioning convention: package.json `version` MUST match the tag with
+# the leading `v` stripped (tag v1.8.0 → version "1.8.0"). The workflow
+# fails fast if they diverge so we don't ship a release whose installer
+# reports a different version than the tag claims.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to (re-)build a release for (must already exist on a commit whose package.json matches)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build + publish StreamFusion
+    # Windows runner — electron-builder shells out to makensis/signtool and
+    # those are reliable on windows-latest. We don't try to cross-compile
+    # from Linux because the nsis build path on wine has subtle path-case
+    # bugs (latest.yml URL slugging) that have bitten this project before.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          # electron-builder reads git for release notes generation;
+          # keep the full history so the auto-notes aren't truncated.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Resolve tag + version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = if ('${{ inputs.tag }}') { '${{ inputs.tag }}' } else { '${{ github.ref_name }}' }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+') {
+            throw "Tag '$tag' must look like v1.8.0"
+          }
+          $version = $tag.TrimStart('v')
+
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          if ($pkg.version -ne $version) {
+            throw "package.json version '$($pkg.version)' does not match tag '$tag'. Bump package.json and re-commit before tagging."
+          }
+
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build + publish via electron-builder
+        shell: pwsh
+        env:
+          # electron-builder reads GH_TOKEN to push artifacts to the
+          # `publish` target configured in package.json
+          # (aquiloplays/streamfusion-downloads). The PAT must have
+          # Contents:write on that repo — the workflow-scoped GITHUB_TOKEN
+          # is scoped to THIS repo and can't reach the downloads one.
+          GH_TOKEN: ${{ secrets.STREAMFUSION_DOWNLOADS_TOKEN }}
+          # We don't auto-sign Windows builds (no EV cert) — explicit
+          # null sign in package.json `build.win.sign` already disables
+          # signing, but force the CSC lookup off so CI doesn't hunt
+          # for a non-existent certificate store.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          if (-not $env:GH_TOKEN) {
+            throw "STREAMFUSION_DOWNLOADS_TOKEN secret is not set. Add a PAT with Contents:write on aquiloplays/streamfusion-downloads to repo secrets."
+          }
+          # --publish always = upload artifacts to the GitHub release
+          # named after the tag. Creates a DRAFT release so you get to
+          # paste release notes from scripts/release-notes-${version}.md
+          # before flipping it to Published. NSIS Setup .exe + portable
+          # .exe + .blockmap + latest.yml all land on the same release.
+          npx electron-builder --win --publish always
