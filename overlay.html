@@ -5,8 +5,13 @@
 <title>StreamFusion Overlay</title>
 <style>
 :root{
-  --surf:rgba(14,14,16,.82);--surf2:rgba(14,14,16,.65);--bdr:rgba(42,42,48,.5);
-  --txt:#efeff1;--mut:#adadb8;
+  /* aquilo.gg brand tokens — pop-out overlay variant. Surfaces use an
+     alpha-darkened brand surface so the overlay glass effect stays
+     readable in front of OBS / desktop captures. */
+  --surf:rgba(10,11,18,.82);--surf2:rgba(17,19,28,.65);--bdr:rgba(31,34,51,.65);
+  --txt:#ffffff;--mut:#94a3b8;--mut-strong:#cbd5e1;
+  --accent:#7c5cff;--accent-bright:#9a82ff;--brand-green:#5bff95;
+  --brand-grad:linear-gradient(135deg,#9a82ff 0%,#5bff95 100%);
   --tw:#9147ff;--yt:#ff0000;--tt:#00f2ea;--kk:#53fc18;--cc:#f5a524;--ev:#f0b429;
   --grn:#3fb950;--org:#f0883e;--red:#f85149;--se:#7cdf21;
   --r:6px;--chat-size:13px;
@@ -17,7 +22,7 @@ html,body{height:100%;overflow:hidden;background:transparent}
    feed and input; before that, fixed-position at bottom:0 covering
    chat). Events never overlap chat now — the stack is capped to 3
    cards via OV_EV_MAX so it stays bounded even on tall pop-out windows. */
-body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;box-sizing:border-box}
+body{color:var(--txt);font-family:'Geist','Geist Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;box-sizing:border-box}
 
 /* ── Drag bar ─────────────────────────────────────────────────── */
 .ov-drag{height:28px;background:var(--surf);display:flex;align-items:center;padding:0 8px;flex-shrink:0;-webkit-app-region:drag;user-select:none;border-bottom:1px solid var(--bdr);gap:6px;border-radius:8px 8px 0 0}
@@ -27,24 +32,24 @@ body{color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;display:flex;f
 .ov-drag-btn.close:hover{background:#c42b1c;color:#fff}
 .ov-ctrl-hint{font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.3px;flex-shrink:0;display:none;font-weight:600}
 body.clickthrough .ov-ctrl-hint{display:block}
-body.clickthrough.interactive .ov-ctrl-hint{color:#3A86FF}
+body.clickthrough.interactive .ov-ctrl-hint{color:var(--accent)}
 
 /* Click-through mode: all non-interactive unless temporarily unlocked */
 body.clickthrough{pointer-events:none}
 body.clickthrough.interactive{pointer-events:auto}
-body.clickthrough.interactive .ov-drag{border-bottom-color:#3A86FF;box-shadow:0 0 12px rgba(58,134,255,.4)}
-body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
+body.clickthrough.interactive .ov-drag{border-bottom-color:var(--accent);box-shadow:0 0 12px rgba(124,92,255,.4)}
+body.clickthrough.interactive .ov-drag-title{color:var(--accent)}
 
 /* ── Settings panel ───────────────────────────────────────────── */
 .ov-settings{background:var(--surf);border-bottom:1px solid var(--bdr);padding:8px 10px;display:none;flex-direction:column;gap:6px;flex-shrink:0;max-height:80vh;overflow-y:auto}
-.ov-drag-btn.lock-on{background:#3A86FF;color:#fff}
-.ov-drag-btn.lock-on:hover{background:#5CA3FF}
+.ov-drag-btn.lock-on{background:var(--accent);color:#fff}
+.ov-drag-btn.lock-on:hover{background:var(--accent-bright)}
 .ov-settings.show{display:flex}
 .ov-settings::-webkit-scrollbar{width:3px}.ov-settings::-webkit-scrollbar-thumb{background:var(--bdr)}
 .ov-s-hd{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut)}
 .ov-s-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--txt);padding:2px 0}
-.ov-s-row input[type=checkbox]{accent-color:#3A86FF;width:13px;height:13px;cursor:pointer}
-.ov-s-row input[type=range]{flex:1;max-width:100px;accent-color:#3A86FF;cursor:pointer;margin:0 6px}
+.ov-s-row input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;cursor:pointer}
+.ov-s-row input[type=range]{flex:1;max-width:100px;accent-color:var(--accent);cursor:pointer;margin:0 6px}
 .ov-s-val{font-size:10px;color:var(--mut);min-width:28px;text-align:right}
 
 /* ── Live-on bar ──────────────────────────────────────────────── */
@@ -112,7 +117,7 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-goal-track{height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
 .ov-goal-fill{height:100%;border-radius:3px;transition:width .5s ease;min-width:0}
 .ov-goal-fill.followers{background:linear-gradient(90deg,#3fb950,#7af2a1)}
-.ov-goal-fill.subs{background:linear-gradient(90deg,#3A86FF,#7BB8FF)}
+.ov-goal-fill.subs{background:linear-gradient(90deg,#7c5cff,#9a82ff)}
 .ov-goal-fill.bits{background:linear-gradient(90deg,#bf94ff,#e2c4ff)}
 .ov-goal-fill.revenue{background:linear-gradient(90deg,#ffd700,#ffe680)}
 .ov-goal.done .ov-goal-fill{filter:brightness(1.3)}.ov-goal.done .ov-goal-hd{color:var(--grn)}
@@ -349,10 +354,10 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 }
 /* Multi-color glow halo cycling around the banner */
 @keyframes ovBnrGlow{
-  0%,100%{box-shadow:0 0 38px rgba(255,200,80,.65),0 0 80px rgba(255,200,80,.35),inset 0 0 22px rgba(255,200,80,.12)}
-  25%{box-shadow:0 0 46px rgba(58,134,255,.75),0 0 96px rgba(58,134,255,.45),inset 0 0 24px rgba(58,134,255,.16)}
-  50%{box-shadow:0 0 50px rgba(255,80,180,.78),0 0 100px rgba(255,80,180,.48),inset 0 0 26px rgba(255,80,180,.18)}
-  75%{box-shadow:0 0 46px rgba(80,200,255,.75),0 0 96px rgba(80,200,255,.45),inset 0 0 24px rgba(80,200,255,.16)}
+  0%,100%{box-shadow:0 0 38px rgba(154,130,255,.65),0 0 80px rgba(154,130,255,.35),inset 0 0 22px rgba(154,130,255,.12)}
+  25%{box-shadow:0 0 46px rgba(124,92,255,.75),0 0 96px rgba(124,92,255,.45),inset 0 0 24px rgba(124,92,255,.16)}
+  50%{box-shadow:0 0 50px rgba(110,224,192,.78),0 0 100px rgba(110,224,192,.48),inset 0 0 26px rgba(110,224,192,.18)}
+  75%{box-shadow:0 0 46px rgba(91,255,149,.75),0 0 96px rgba(91,255,149,.45),inset 0 0 24px rgba(91,255,149,.16)}
 }
 /* Conic gradient ring rotating behind the banner */
 @keyframes ovBnrRing{to{transform:rotate(360deg)}}
@@ -365,10 +370,10 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 }
 /* Border color cycling for paid events */
 @keyframes ovBnrBorder{
-  0%,100%{border-color:#ffd700}
-  25%{border-color:#3A86FF}
-  50%{border-color:#ff66cc}
-  75%{border-color:#00E5A0}
+  0%,100%{border-color:#9a82ff}
+  25%{border-color:#7c5cff}
+  50%{border-color:#6ee0c0}
+  75%{border-color:#5bff95}
 }
 /* Halo ring that expands outward continuously */
 @keyframes ovBnrHalo{
@@ -387,7 +392,7 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-banner{
   position:fixed;
   top:64px;left:auto;right:auto;bottom:auto;
-  background:linear-gradient(135deg,#1a1a1f 0%,#1a2440 50%,#1a1a1f 100%);
+  background:linear-gradient(135deg,#11131c 0%,#1a1a3a 50%,#11131c 100%);
   border:3px solid var(--ev);
   border-radius:clamp(14px,1.8vw,22px);
   padding:clamp(14px,2.4vw,26px) clamp(18px,3vw,36px);
@@ -414,7 +419,7 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
   inset:-4px;
   border-radius:20px;
   padding:3px;
-  background:conic-gradient(from 0deg,#ffd700,#3A86FF,#ff66cc,#00E5A0,#53fc18,#ffd700);
+  background:conic-gradient(from 0deg,#9a82ff,#7c5cff,#6ee0c0,#5bff95,#9a82ff);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
@@ -558,21 +563,21 @@ body.clickthrough.interactive .ov-drag-title{color:#3A86FF}
 .ov-chat-bar{display:flex;align-items:flex-end;gap:6px;padding:6px 8px;background:var(--surf);border-top:1px solid var(--bdr);flex-shrink:0}
 .ov-chat-bar.hidden{display:none}
 .ov-chat-input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;resize:none;outline:none;max-height:90px;min-height:28px;line-height:1.4}
-.ov-chat-input:focus{border-color:#3A86FF;background:rgba(58,134,255,.08)}
+.ov-chat-input:focus{border-color:var(--accent);background:rgba(124,92,255,.08)}
 .ov-chat-input::placeholder{color:var(--mut);opacity:.7}
-.ov-chat-send{background:#3A86FF;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:11px;padding:0 12px;height:28px;cursor:pointer;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
-.ov-chat-send:hover{background:#5CA3FF}
+.ov-chat-send{background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:11px;padding:0 12px;height:28px;cursor:pointer;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
+.ov-chat-send:hover{background:var(--accent-bright)}
 .ov-chat-send:disabled{background:rgba(255,255,255,.08);color:var(--mut);cursor:not-allowed}
 
 /* ── Quick-actions hotbar (mirrors the main app's SB actions hotbar) ── */
 .ov-hotbar{display:flex;gap:5px;padding:6px 8px;background:var(--surf);border-top:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap;align-items:center;border-radius:0 0 8px 8px}
 .ov-hotbar.hidden{display:none}
 .ov-hotbar-lbl{font-size:9px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;padding-right:2px;flex-shrink:0}
-.ov-hbtn{background:linear-gradient(180deg,rgba(58,134,255,.22),rgba(58,134,255,.12));border:1px solid rgba(58,134,255,.45);color:#efeff1;font-size:11px;font-weight:700;padding:5px 10px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap;letter-spacing:.3px;max-width:160px;overflow:hidden;text-overflow:ellipsis}
-.ov-hbtn:hover{background:linear-gradient(180deg,rgba(58,134,255,.38),rgba(58,134,255,.22));border-color:rgba(58,134,255,.75);transform:translateY(-1px);box-shadow:0 3px 10px rgba(58,134,255,.35)}
+.ov-hbtn{background:linear-gradient(180deg,rgba(124,92,255,.22),rgba(124,92,255,.12));border:1px solid rgba(124,92,255,.45);color:#ffffff;font-size:11px;font-weight:700;padding:5px 10px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap;letter-spacing:.3px;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.ov-hbtn:hover{background:linear-gradient(180deg,rgba(124,92,255,.38),rgba(124,92,255,.22));border-color:rgba(124,92,255,.75);transform:translateY(-1px);box-shadow:0 3px 10px rgba(124,92,255,.35)}
 .ov-hbtn:active{transform:translateY(0)}
 .ov-hbtn-firing{animation:ovHbtnFire .55s ease}
-@keyframes ovHbtnFire{0%{box-shadow:0 0 0 0 rgba(58,134,255,.9)}50%{box-shadow:0 0 0 8px rgba(58,134,255,0)}100%{box-shadow:0 0 0 0 rgba(58,134,255,0)}}
+@keyframes ovHbtnFire{0%{box-shadow:0 0 0 0 rgba(124,92,255,.9)}50%{box-shadow:0 0 0 8px rgba(124,92,255,0)}100%{box-shadow:0 0 0 0 rgba(124,92,255,0)}}
 .ov-hotbar-empty{font-size:10px;color:var(--mut);font-style:italic;padding:4px 0}
 
 /* ── Window shake for big paid events ──────────────────────────── */
@@ -721,17 +726,17 @@ body.layout-hud .ov-text {
   text-shadow: 0 0 4px rgba(0,0,0,.6);
 }
 body.layout-hud .ov-drag {
-  background: linear-gradient(90deg, rgba(58,134,255,.25), rgba(42,212,185,.25));
-  border-bottom: 1px solid rgba(58,134,255,.4);
+  background: linear-gradient(90deg, rgba(124,92,255,.25), rgba(91,255,149,.25));
+  border-bottom: 1px solid rgba(124,92,255,.4);
 }
 body.layout-hud .ov-drag-title {
   color: #fff;
-  text-shadow: 0 0 8px rgba(58,134,255,.8);
+  text-shadow: 0 0 8px rgba(124,92,255,.8);
 }
 body.layout-hud .ov-stats {
-  background: rgba(14,14,16,.6);
-  border-top: 1px solid rgba(58,134,255,.3);
-  border-bottom: 1px solid rgba(58,134,255,.3);
+  background: rgba(10,11,18,.6);
+  border-top: 1px solid rgba(124,92,255,.3);
+  border-bottom: 1px solid rgba(124,92,255,.3);
 }
 /* Scanline overlay — tiny striped gradient sitting on top of everything
    non-interactive. pointer-events:none + z-index just under the drag
@@ -907,8 +912,8 @@ cfg.clickThrough = false;
 // ── Opacity helper — sets CSS custom properties for surface backgrounds ──
 function applyBgOpacity() {
   var a = cfg.bgOpacity;
-  document.documentElement.style.setProperty('--surf', 'rgba(14,14,16,' + a + ')');
-  document.documentElement.style.setProperty('--surf2', 'rgba(14,14,16,' + (a * 0.8) + ')');
+  document.documentElement.style.setProperty('--surf', 'rgba(10,11,18,' + a + ')');
+  document.documentElement.style.setProperty('--surf2', 'rgba(17,19,28,' + (a * 0.8) + ')');
 }
 
 // ── Apply config to UI ──────────────────────────────────────
@@ -1565,7 +1570,7 @@ _resizeConf();
 
 function fireConfetti(count) {
   if (cfg.hideAnimations) return;
-  var colors = ['#3A86FF','#ff0000','#00E5A0','#53fc18','#ffd700','#ff66cc','#ffffff'];
+  var colors = ['#7c5cff','#9a82ff','#5bff95','#6ee0c0','#ffffff','#ff66cc','#ffd700'];
   var w = _confCanvas.width;
   for (var i = 0; i < count; i++) {
     _confParticles.push({

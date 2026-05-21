@@ -6,7 +6,7 @@
     "name": "Aquilo Loadout (demo)",
     "version": "0.0.1-demo",
     "description": "Mock manifest for previewing the SF Loadout dashboard without a real SB kit installed.",
-    "accentColor": "#3A86FF",
+    "accentColor": "#7c5cff",
     "supportUrl": "https://aquilo.gg/loadout"
   },
   "activeLoadoutId": "default",

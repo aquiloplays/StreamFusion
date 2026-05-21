@@ -117,7 +117,7 @@ function readOverlayFile(name) {
   try {
     return fs.readFileSync(path.join(__dirname, 'obs-overlays', name), 'utf8');
   } catch (e) {
-    return '<!doctype html><html><body style="font-family:sans-serif;color:#f87171;background:#0e0e10;padding:24px">' +
+    return '<!doctype html><html><body style="font-family:Geist,system-ui,sans-serif;color:#f87171;background:#0a0b12;padding:24px">' +
            '<h2>StreamFusion overlay missing</h2><p>File not found: ' + name + '</p></body></html>';
   }
 }
@@ -128,12 +128,12 @@ function readOverlayFile(name) {
 function landingPage() {
   var urls = getUrls();
   return '<!doctype html><html><head><meta charset="utf-8"><title>StreamFusion — OBS Overlays</title>' +
-         '<style>body{font-family:-apple-system,Segoe UI,sans-serif;background:#0e0e10;color:#efeff1;padding:32px;max-width:640px;margin:0 auto}' +
-         'h1{font-size:20px;font-weight:800;letter-spacing:-0.01em;margin:0 0 4px} .sub{color:#adadb8;margin:0 0 24px;font-size:13px}' +
-         'ul{list-style:none;padding:0;margin:0} li{background:#18181b;border:1px solid #2a2a30;border-radius:10px;padding:14px 16px;margin-bottom:10px}' +
-         '.lbl{font-size:11px;font-weight:700;color:#8a8a98;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}' +
-         'code{font-family:SFMono-Regular,Consolas,monospace;font-size:12px;color:#3A86FF;user-select:all}' +
-         'p.hint{font-size:11px;color:#8a8a98;margin-top:18px;line-height:1.6}</style></head>' +
+         '<style>body{font-family:Geist,"Geist Sans",-apple-system,Segoe UI,sans-serif;background:#0a0b12;color:#ffffff;padding:32px;max-width:640px;margin:0 auto}' +
+         'h1{font-size:20px;font-weight:800;letter-spacing:-0.01em;margin:0 0 4px} .sub{color:#94a3b8;margin:0 0 24px;font-size:13px}' +
+         'ul{list-style:none;padding:0;margin:0} li{background:#11131c;border:1px solid #1f2233;border-radius:10px;padding:14px 16px;margin-bottom:10px}' +
+         '.lbl{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}' +
+         'code{font-family:SFMono-Regular,Consolas,monospace;font-size:12px;color:#9a82ff;user-select:all}' +
+         'p.hint{font-size:11px;color:#94a3b8;margin-top:18px;line-height:1.6}</style></head>' +
          '<body><h1>StreamFusion — OBS Browser Source Overlays</h1><p class="sub">Paste these URLs into OBS → Sources → + → Browser Source.</p><ul>' +
          '<li><div class="lbl">Chat feed</div><code>' + urls.chat + '</code></li>' +
          '<li><div class="lbl">Alerts banner</div><code>' + urls.alerts + '</code></li>' +

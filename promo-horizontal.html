@@ -5,16 +5,16 @@
 <title>StreamFusion — Promo Overlay (Horizontal)</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+html,body{height:100%;overflow:hidden;background:transparent;font-family:'Geist','Geist Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 
 .promo{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
   display:flex;align-items:center;gap:16px;
   padding:14px 28px 14px 20px;
-  background:rgba(14,14,16,.88);
-  border:1px solid rgba(58,134,255,.35);
+  background:rgba(10,11,18,.88);
+  border:1px solid rgba(124,92,255,.35);
   border-radius:16px;
-  box-shadow:0 4px 30px rgba(0,0,0,.5),0 0 40px rgba(58,134,255,.12);
+  box-shadow:0 4px 30px rgba(0,0,0,.5),0 0 40px rgba(124,92,255,.12);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   animation:slideUp .6s cubic-bezier(.16,1,.3,1) forwards;
   opacity:0;
@@ -28,7 +28,7 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 /* Glow pulse on the border */
 .promo::before{
   content:'';position:absolute;inset:-1px;border-radius:17px;
-  background:linear-gradient(135deg,rgba(58,134,255,.4),rgba(0,229,160,.3),rgba(145,71,255,.3));
+  background:linear-gradient(135deg,rgba(124,92,255,.4),rgba(91,255,149,.3),rgba(145,71,255,.3));
   z-index:-1;opacity:0;
   animation:glowPulse 3s ease-in-out infinite;
 }
@@ -37,10 +37,10 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 /* Logo icon */
 .promo-icon{
   width:40px;height:40px;flex-shrink:0;
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#9a82ff,#5bff95);
   border-radius:10px;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 20px rgba(58,134,255,.4);
+  box-shadow:0 0 20px rgba(124,92,255,.4);
 }
 .promo-icon svg{width:22px;height:22px;color:#fff;filter:drop-shadow(0 0 4px rgba(255,255,255,.5))}
 
@@ -48,10 +48,10 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 .promo-text{display:flex;flex-direction:column;gap:2px}
 .promo-name{
   font-size:18px;font-weight:900;letter-spacing:.3px;
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#9a82ff,#5bff95);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   background-clip:text;
-  filter:drop-shadow(0 0 8px rgba(58,134,255,.5));
+  filter:drop-shadow(0 0 8px rgba(124,92,255,.5));
   line-height:1.1;
 }
 .promo-tagline{
@@ -72,12 +72,12 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
   font-size:16px;font-weight:800;color:#fff;letter-spacing:.5px;
 }
 .promo-url span{
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#9a82ff,#5bff95);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   background-clip:text;
 }
 .promo-arrow{
-  width:24px;height:24px;color:rgba(58,134,255,.8);
+  width:24px;height:24px;color:rgba(124,92,255,.8);
   animation:arrowBounce 1.5s ease-in-out infinite;
 }
 @keyframes arrowBounce{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}

@@ -5,23 +5,23 @@
 <title>StreamFusion — Rotating Info Bar</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+html,body{height:100%;overflow:hidden;background:transparent;font-family:'Geist','Geist Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 
 .bar{
   position:fixed;left:0;right:0;bottom:0;
   height:56px;
   display:flex;align-items:center;
   padding:0 20px;gap:18px;
-  background:linear-gradient(180deg,rgba(14,14,16,.86),rgba(14,14,16,.96));
-  border-top:1px solid rgba(58,134,255,.35);
-  box-shadow:0 -4px 30px rgba(0,0,0,.5),0 -2px 20px rgba(58,134,255,.12);
+  background:linear-gradient(180deg,rgba(10,11,18,.86),rgba(17,19,28,.96));
+  border-top:1px solid rgba(124,92,255,.35);
+  box-shadow:0 -4px 30px rgba(0,0,0,.5),0 -2px 20px rgba(124,92,255,.12);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   isolation:isolate;
 }
 /* Animated gradient glow line along the top edge */
 .bar::before{
   content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent 0%,#3A86FF 20%,#00E5A0 50%,#9147ff 80%,transparent 100%);
+  background:linear-gradient(90deg,transparent 0%,#7c5cff 20%,#5bff95 50%,#9147ff 80%,transparent 100%);
   background-size:200% 100%;
   animation:scanGlow 6s linear infinite;
   opacity:.85;
@@ -36,18 +36,18 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 .brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .brand-icon{
   width:30px;height:30px;border-radius:8px;
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#7c5cff,#5bff95);
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 16px rgba(58,134,255,.4);
+  box-shadow:0 0 16px rgba(124,92,255,.4);
   flex-shrink:0;
 }
 .brand-icon svg{width:17px;height:17px;color:#fff;filter:drop-shadow(0 0 3px rgba(255,255,255,.5))}
 .brand-name{
   font-size:14px;font-weight:900;letter-spacing:.4px;
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#7c5cff,#5bff95);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   background-clip:text;
-  filter:drop-shadow(0 0 6px rgba(58,134,255,.4));
+  filter:drop-shadow(0 0 6px rgba(124,92,255,.4));
 }
 
 /* Vertical separator */
@@ -66,7 +66,7 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
   position:absolute;left:50%;top:50%;
   transform:translate(-50%,-50%);
   display:flex;align-items:center;gap:9px;
-  font-size:16px;font-weight:600;color:#efeff1;
+  font-size:16px;font-weight:600;color:#ffffff;
   letter-spacing:.2px;white-space:nowrap;
   text-shadow:0 1px 6px rgba(0,0,0,.6);
   opacity:0;
@@ -80,11 +80,11 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 .msg.pre{opacity:0;transform:translate(-50%,calc(-50% + 8px))}
 
 .msg .hi{
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#7c5cff,#5bff95);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   background-clip:text;
   font-weight:900;
-  filter:drop-shadow(0 0 6px rgba(58,134,255,.4));
+  filter:drop-shadow(0 0 6px rgba(124,92,255,.4));
 }
 .msg .coins{
   color:#ffd700;font-weight:900;
@@ -92,7 +92,7 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 }
 .msg .pink{color:#ff66cc;font-weight:800;text-shadow:0 0 10px rgba(255,102,204,.45)}
 .msg .galaxy{color:#c39dff;font-weight:900;text-shadow:0 0 10px rgba(145,71,255,.55)}
-.msg .burpees{color:#00E5A0;font-weight:900;text-shadow:0 0 10px rgba(0,229,160,.45)}
+.msg .burpees{color:#5bff95;font-weight:900;text-shadow:0 0 10px rgba(91,255,149,.45)}
 
 .gift-icon{
   width:30px;height:30px;object-fit:contain;flex-shrink:0;
@@ -112,8 +112,8 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 }
 .right .dot{
   width:6px;height:6px;border-radius:50%;
-  background:#00E5A0;
-  box-shadow:0 0 8px rgba(0,229,160,.8);
+  background:#5bff95;
+  box-shadow:0 0 8px rgba(91,255,149,.8);
   animation:pulseDot 2s ease-in-out infinite;
 }
 @keyframes pulseDot{
@@ -121,7 +121,7 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
   50%{opacity:1;transform:scale(1.1)}
 }
 .right .url{
-  background:linear-gradient(135deg,#3A86FF,#00E5A0);
+  background:linear-gradient(135deg,#7c5cff,#5bff95);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   background-clip:text;
   font-weight:900;
@@ -130,8 +130,8 @@ html,body{height:100%;overflow:hidden;background:transparent;font-family:'Segoe 
 /* Progress indicator */
 .progress{
   position:absolute;bottom:0;left:0;height:2px;
-  background:linear-gradient(90deg,#3A86FF,#00E5A0);
-  box-shadow:0 0 8px rgba(0,229,160,.6);
+  background:linear-gradient(90deg,#7c5cff,#5bff95);
+  box-shadow:0 0 8px rgba(91,255,149,.6);
   width:0%;
   pointer-events:none;
 }

@@ -23,8 +23,8 @@
     --yt: #ff4545;
     --tt: #fe2c55;
     --kk: #53fc18;
-    --accent: #3A86FF;
-    --accent2: #2AD4B9;
+    --accent: #7c5cff;
+    --accent2: #5bff95;
     --gold: #f0b429;
     --text: #ffffff;
   }
@@ -35,7 +35,7 @@
     width: 100vw; height: 100vh;
     background: transparent;
     overflow: hidden;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     color: var(--text);
   }
@@ -56,12 +56,12 @@
     padding: 30px 40px;
     border-radius: 18px;
     background:
-      linear-gradient(135deg, rgba(14,14,16,.94), rgba(24,24,27,.92));
+      linear-gradient(135deg, rgba(10,11,18,.94), rgba(17,19,28,.92));
     border: 1px solid rgba(255,255,255,.1);
     backdrop-filter: blur(14px);
     box-shadow:
       0 30px 80px rgba(0,0,0,.6),
-      0 0 60px rgba(58,134,255,.35),
+      0 0 60px rgba(124,92,255,.35),
       inset 0 1px 0 rgba(255,255,255,.08);
     display: flex;
     align-items: center;
@@ -123,7 +123,7 @@
     width: 100%; height: 100%;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border: 4px solid #0e0e10;
+    border: 4px solid #0a0b12;
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -156,13 +156,13 @@
     font-size: 12px;
     font-weight: 900;
     color: #fff;
-    border: 3px solid #0e0e10;
+    border: 3px solid #0a0b12;
     z-index: 2;
   }
   .card.tw .plat-chip { background: var(--tw); }
   .card.yt .plat-chip { background: var(--yt); }
   .card.tt .plat-chip { background: var(--tt); }
-  .card.kk .plat-chip { background: var(--kk); color: #0e0e10; }
+  .card.kk .plat-chip { background: var(--kk); color: #0a0b12; }
 
   .body {
     flex: 1 1 auto;
@@ -235,9 +235,9 @@
   .ctx.sub,
   .ctx.gift  { background: linear-gradient(135deg, rgba(240,180,41,.15), rgba(240,180,41,.08)); border-color: rgba(240,180,41,.35); color: var(--gold); }
   .ctx.cheer { background: linear-gradient(135deg, rgba(145,70,255,.15), rgba(145,70,255,.08)); border-color: rgba(145,70,255,.35); color: #c8a6ff; }
-  .ctx.tip   { background: linear-gradient(135deg, rgba(42,212,185,.15), rgba(42,212,185,.08)); border-color: rgba(42,212,185,.35); color: var(--accent2); }
+  .ctx.tip   { background: linear-gradient(135deg, rgba(91,255,149,.15), rgba(91,255,149,.08)); border-color: rgba(91,255,149,.35); color: var(--accent2); }
   .ctx.raid  { background: linear-gradient(135deg, rgba(255,69,85,.15), rgba(255,69,85,.08)); border-color: rgba(255,69,85,.35); color: #ff8a95; }
-  .ctx.follow { background: linear-gradient(135deg, rgba(58,134,255,.15), rgba(58,134,255,.08)); border-color: rgba(58,134,255,.35); color: var(--accent); }
+  .ctx.follow { background: linear-gradient(135deg, rgba(124,92,255,.15), rgba(124,92,255,.08)); border-color: rgba(124,92,255,.35); color: var(--accent); }
 
   /* Sparkle burst — firing once when the card appears. */
   .sparkles {
@@ -332,7 +332,7 @@
       el.style.setProperty('--tx2', Math.cos(a) * d2 + 'px');
       el.style.setProperty('--ty2', Math.sin(a) * d2 + 'px');
       el.style.animationDelay = (Math.random() * 0.3) + 's';
-      el.style.color = ['#f0b429','#3A86FF','#2AD4B9','#ec4899'][i % 4];
+      el.style.color = ['#f0b429','#7c5cff','#5bff95','#ec4899'][i % 4];
       s.appendChild(el);
     }
     root.appendChild(s);
