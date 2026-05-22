@@ -13757,6 +13757,474 @@ window.addEventListener('load', function() {
     boot();
   }
 })();
+
+/* ─── Community-night queue manager ──────────────────────────────────
+   Settings → Queue tab. Lists today's queue from loadout-discord with
+   per-joiner Steam/Epic identity, lets the streamer cycle each joiner
+   through up-next → in-game → done. "Done" drops the joiner from the
+   worker queue so Discord /queue view counts stay accurate.
+
+   Steam invite path: opens steam://friends/message/<steamid64> — Steam
+   client surfaces a chat window; the streamer drops a lobby invite
+   link in chat (or uses Shift+Tab → Invite in-game). Steamworks is
+   game-only, so no external app can directly fire a party invite.
+
+   Epic invite path: copies the linked Epic display name to clipboard.
+   Epic has no public deep-link protocol for friend operations from
+   outside the launcher — clipboard + manual paste into the friend
+   search is the most we can do today.
+
+   Polls /sf/queue every 10s while the pane is visible. Local-only
+   "stage" state (up/in/done) per discordUserId — survives Settings
+   close/reopen via localStorage, cleared per stream date. */
+(function () {
+  var WORKER_BASE  = 'https://loadout-discord.aquiloplays.workers.dev';
+  var QUEUE_READ   = WORKER_BASE + '/sf/queue';
+  var QUEUE_REMOVE = WORKER_BASE + '/sf/queue/remove';
+  // Soft-spam-prevent header matching env.SF_QUEUE_KEY on the worker.
+  // Embedded in shipped binary — same model as SF_COMMUNITY_KEY. The
+  // exposed surface is per-guild joiner identity, no more sensitive
+  // than what Discord members already see in-server.
+  var QUEUE_KEY    = 'sf-queue-k7m2x9q4';
+  var POLL_MS      = 10000;
+  var STAGE_STORE  = 'sf_queue_stage_v1';
+  var isWebDemo    = !!window.__SF_WEB_DEMO__;
+
+  // Local per-joiner state, keyed by streamDate so a new night starts
+  // fresh. Shape: { date: 'YYYY-MM-DD', stages: { '<discordUserId>:<gameId>': 'up'|'in'|'done' } }
+  var stage = { date: '', stages: {} };
+  try {
+    var saved = JSON.parse(localStorage.getItem(STAGE_STORE) || '{}');
+    if (saved && typeof saved === 'object') {
+      stage.date = String(saved.date || '');
+      stage.stages = (saved.stages && typeof saved.stages === 'object') ? saved.stages : {};
+    }
+  } catch (e) {}
+  function persistStage() {
+    try { localStorage.setItem(STAGE_STORE, JSON.stringify(stage)); } catch (e) {}
+  }
+  function stageKey(gameId, discordUserId) { return discordUserId + ':' + gameId; }
+  function getStage(gameId, discordUserId) { return stage.stages[stageKey(gameId, discordUserId)] || ''; }
+  function setStage(gameId, discordUserId, value) {
+    if (value) stage.stages[stageKey(gameId, discordUserId)] = value;
+    else delete stage.stages[stageKey(gameId, discordUserId)];
+    persistStage();
+  }
+
+  var pollTimer = null;
+  var paneVisible = false;
+  var lastSnapshot = null;
+  var lastError = '';
+  var lastRefreshAt = 0;
+
+  function setHint(txt, tone) {
+    var el = document.getElementById('q-hint');
+    if (!el) return;
+    el.textContent = txt;
+    el.style.color = tone === 'err' ? 'var(--red)'
+                   : tone === 'ok'  ? 'var(--grn)'
+                   : 'var(--mut)';
+  }
+
+  function fetchQueue() {
+    if (isWebDemo) {
+      lastError = 'Queue manager is disabled in the web demo.';
+      lastSnapshot = null;
+      render();
+      return Promise.resolve();
+    }
+    return fetch(QUEUE_READ, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-SF-Queue-Key': QUEUE_KEY },
+      body: '{}'
+    })
+    .then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok || !j || !j.ok) {
+          throw new Error((j && j.error) || ('HTTP ' + r.status));
+        }
+        return j;
+      });
+    })
+    .then(function (data) {
+      lastError = '';
+      lastSnapshot = data;
+      lastRefreshAt = Date.now();
+      // Reset local stages when the stream date rolls over so a fresh
+      // night doesn't inherit yesterday's done/in/up flags.
+      if (data.streamDate && data.streamDate !== stage.date) {
+        stage.date = data.streamDate;
+        stage.stages = {};
+        persistStage();
+      }
+      render();
+    })
+    .catch(function (e) {
+      lastError = String(e && e.message || e);
+      render();
+    });
+  }
+
+  function removeJoiner(gameId, discordUserId) {
+    return fetch(QUEUE_REMOVE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-SF-Queue-Key': QUEUE_KEY },
+      body: JSON.stringify({ gameId: gameId, discordUserId: discordUserId })
+    })
+    .then(function (r) { return r.json(); })
+    .catch(function () { return { ok: false }; });
+  }
+
+  // Steam: opens a Steam chat window with the player. Closest practical
+  // invite path — Steamworks SDK is game-only, so no external app can
+  // directly fire a party invite. The streamer drops a lobby-invite
+  // link in chat OR uses Shift+Tab → Invite from in-game.
+  function openSteamChat(steamId64) {
+    if (!/^\d{17}$/.test(String(steamId64 || ''))) return;
+    try { window.electronAPI && window.electronAPI.openExternalUrl('steam://friends/message/' + steamId64); }
+    catch (e) {}
+  }
+  function openSteamProfile(steamId64) {
+    if (!/^\d{17}$/.test(String(steamId64 || ''))) return;
+    try { window.electronAPI && window.electronAPI.openExternalUrl('steam://url/SteamIDPage/' + steamId64); }
+    catch (e) {}
+  }
+  // Epic has no public deep-link protocol for friend operations from
+  // outside the launcher. Best we can do is hand the streamer the
+  // display name on the clipboard so they paste it into Epic's friend
+  // search / their game's invite UI.
+  function copyEpicName(name) {
+    if (!name) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(String(name));
+        setHint('Epic name "' + name + '" copied — paste it into Epic friend search.', 'ok');
+        return;
+      }
+    } catch (e) {}
+    // Fallback for environments without the async clipboard API.
+    var ta = document.createElement('textarea');
+    ta.value = String(name);
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); setHint('Epic name copied.', 'ok'); }
+    catch (e) { setHint('Could not copy Epic name automatically.', 'err'); }
+    document.body.removeChild(ta);
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function renderJoinerRow(game, joiner) {
+    var st = getStage(game.gameId, joiner.discordUserId);
+    var links = joiner.links || {};
+    var steam = links.steam || '';
+    var epic  = links.epic  || '';
+    var twitch = links.twitch || '';
+
+    // Per-platform identity blocks. The dot is green when linked and
+    // grey when missing; the action button only renders when there's
+    // something actionable to do (steam id valid / epic name present).
+    var steamHtml;
+    if (/^\d{17}$/.test(steam)) {
+      steamHtml = '<span class="q-link q-link-ok" title="Steam ID linked">●</span>'
+        + '<span class="q-lid">Steam · ' + escapeHtml(steam) + '</span>'
+        + '<button class="q-mini" data-act="steam-chat" data-id="' + escapeHtml(steam) + '" title="Open Steam chat with this player">Chat</button>'
+        + '<button class="q-mini" data-act="steam-prof" data-id="' + escapeHtml(steam) + '" title="Open Steam profile">Profile</button>';
+    } else {
+      steamHtml = '<span class="q-link q-link-no" title="No Steam linked">○</span>'
+        + '<span class="q-lid q-lid-no">Steam · not linked</span>';
+    }
+    var epicHtml;
+    if (epic) {
+      epicHtml = '<span class="q-link q-link-ok" title="Epic linked">●</span>'
+        + '<span class="q-lid">Epic · ' + escapeHtml(epic) + '</span>'
+        + '<button class="q-mini" data-act="epic-copy" data-name="' + escapeHtml(epic) + '" title="Copy Epic name — paste into Epic friend search">Copy</button>';
+    } else {
+      epicHtml = '<span class="q-link q-link-no" title="No Epic linked">○</span>'
+        + '<span class="q-lid q-lid-no">Epic · not linked</span>';
+    }
+    var twitchHtml = twitch
+      ? '<span class="q-link q-link-ok" title="Twitch linked">●</span>'
+        + '<span class="q-lid">Twitch · ' + escapeHtml(twitch) + '</span>'
+      : '';
+
+    var stageCls = st ? ' q-row-' + st : '';
+    var stageBadge = st === 'up'   ? '<span class="q-badge q-badge-up">UP NEXT</span>'
+                   : st === 'in'   ? '<span class="q-badge q-badge-in">IN GAME</span>'
+                   : st === 'done' ? '<span class="q-badge q-badge-done">DONE</span>'
+                   : '';
+
+    // Action buttons swap based on stage. Up-next is the "start" action
+    // — it also fires the Steam chat invite automatically as a
+    // convenience (the streamer's intent at that moment is "get this
+    // player in my game"). In/Done are explicit transitions the
+    // streamer drives.
+    var actions = '';
+    if (st === 'done') {
+      actions = '<span class="q-act-note">Removed from queue.</span>';
+    } else {
+      actions += st === 'up'
+        ? '<button class="q-act q-act-active" disabled>Up next</button>'
+        : '<button class="q-act" data-act="up"   data-game="' + escapeHtml(game.gameId) + '" data-uid="' + escapeHtml(joiner.discordUserId) + '" data-steam="' + escapeHtml(steam) + '">Up next</button>';
+      actions += st === 'in'
+        ? '<button class="q-act q-act-active" disabled>In game</button>'
+        : '<button class="q-act" data-act="in"   data-game="' + escapeHtml(game.gameId) + '" data-uid="' + escapeHtml(joiner.discordUserId) + '">In game</button>';
+      actions += '<button class="q-act q-act-done" data-act="done" data-game="' + escapeHtml(game.gameId) + '" data-uid="' + escapeHtml(joiner.discordUserId) + '">Done</button>';
+    }
+
+    return '<div class="q-row' + stageCls + '" data-uid="' + escapeHtml(joiner.discordUserId) + '">'
+      + '<div class="q-pos">' + joiner.position + '</div>'
+      + '<div class="q-main">'
+      +   '<div class="q-name">' + escapeHtml(joiner.display || ('user ' + joiner.discordUserId)) + ' ' + stageBadge + '</div>'
+      +   '<div class="q-links">' + steamHtml + (epicHtml ? ' &nbsp;·&nbsp; ' + epicHtml : '') + (twitchHtml ? ' &nbsp;·&nbsp; ' + twitchHtml : '') + '</div>'
+      + '</div>'
+      + '<div class="q-actions">' + actions + '</div>'
+      + '</div>';
+  }
+
+  function render() {
+    var root = document.getElementById('q-body');
+    if (!root) return;
+    if (isWebDemo) {
+      root.innerHTML = '<div class="q-empty">Queue manager is disabled in the web demo.</div>';
+      return;
+    }
+    if (lastError) {
+      // 503 no_active_guild surfaces in plain English so Clay knows
+      // exactly what to fix without having to read worker logs.
+      var msg = /no_active_guild/.test(lastError)
+        ? 'No active guild set on the loadout-discord worker. Use aquilo.gg /admin → "Set active guild" first.'
+        : ('Queue fetch failed — ' + lastError);
+      root.innerHTML = '<div class="q-empty q-empty-err">' + escapeHtml(msg) + '</div>';
+      return;
+    }
+    if (!lastSnapshot) {
+      root.innerHTML = '<div class="q-empty">Loading…</div>';
+      return;
+    }
+    var s = lastSnapshot;
+    var headerBits = [
+      'Stream date: ' + escapeHtml(s.streamDate || '?'),
+      'Kind: ' + escapeHtml(s.kind || '?'),
+      s.open ? 'OPEN' : 'CLOSED',
+    ];
+    if (s.capMode === 'per-match' && s.perMatchCap) headerBits.push('cap ' + s.perMatchCap + '/match');
+    if (s.capMode === 'per-night' && s.perNightCap) headerBits.push('cap ' + s.perNightCap + '/night');
+    headerBits.push(s.totals.joiners + ' joined across ' + s.totals.games + ' game' + (s.totals.games === 1 ? '' : 's'));
+
+    var html = '<div class="q-meta">' + headerBits.map(escapeHtml).join(' &nbsp;·&nbsp; ') + '</div>';
+
+    if (!s.games || !s.games.length) {
+      html += '<div class="q-empty">No game queue open for today.<br>'
+        + '<span style="font-size:10.5px;color:var(--mut)">Open one via <code>/queue open game:&lt;gameId&gt;</code> in Discord, or via the aquilo.gg /admin queue page.</span></div>';
+    } else {
+      for (var i = 0; i < s.games.length; i++) {
+        var g = s.games[i];
+        html += '<div class="q-game">'
+          + '<div class="q-game-hd">'
+          +   '<span class="q-game-id">' + escapeHtml(g.gameId) + '</span>'
+          +   '<span class="q-game-count">' + g.count + ' queued</span>'
+          + '</div>';
+        if (!g.joiners || !g.joiners.length) {
+          html += '<div class="q-empty">Nobody queued yet.</div>';
+        } else {
+          for (var j = 0; j < g.joiners.length; j++) {
+            html += renderJoinerRow(g, g.joiners[j]);
+          }
+        }
+        html += '</div>';
+      }
+    }
+    root.innerHTML = html;
+    if (lastRefreshAt) {
+      var since = Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000));
+      setHint('Last refresh ' + since + 's ago · polling every ' + (POLL_MS / 1000) + 's', '');
+    }
+  }
+
+  // Single delegated handler for every per-joiner button — the action
+  // is encoded in data-act so we don't have to wire dozens of
+  // listeners on each render.
+  function onPaneClick(e) {
+    var t = e.target;
+    if (!t || !t.dataset) return;
+    var act = t.dataset.act;
+    if (!act) return;
+    if (act === 'steam-chat')  { openSteamChat(t.dataset.id);          return; }
+    if (act === 'steam-prof')  { openSteamProfile(t.dataset.id);       return; }
+    if (act === 'epic-copy')   { copyEpicName(t.dataset.name);         return; }
+    if (act === 'up' || act === 'in' || act === 'done') {
+      var gameId = t.dataset.game;
+      var uid    = t.dataset.uid;
+      if (!gameId || !uid) return;
+      if (act === 'up') {
+        setStage(gameId, uid, 'up');
+        // Auto-open Steam chat if we have a SteamID64 — saves the
+        // streamer one click on the most common case.
+        var sid = t.dataset.steam;
+        if (/^\d{17}$/.test(String(sid || ''))) openSteamChat(sid);
+      } else if (act === 'in') {
+        setStage(gameId, uid, 'in');
+      } else if (act === 'done') {
+        setStage(gameId, uid, 'done');
+        removeJoiner(gameId, uid).then(function () {
+          // Force-refresh after removal so the row drops out of the
+          // worker snapshot too, not just the local stage flag.
+          fetchQueue();
+        });
+        return;
+      }
+      render();
+    }
+  }
+
+  function inject() {
+    var tabs = document.getElementById('settingsTabs');
+    var communityPane = document.getElementById('pane-community');
+    var aboutPane = document.getElementById('pane-about');
+    if (!tabs || !aboutPane || document.getElementById('pane-queue')) return;
+
+    var tab = document.createElement('div');
+    tab.className = 'settings-tab';
+    tab.setAttribute('data-tab', 'queue');
+    tab.textContent = 'Queue';
+    tab.onclick = function () { switchSettingsTab('queue'); };
+    // Insert between Community and About — same ordering as the rest
+    // of the community-night surface.
+    var aboutTab = tabs.querySelector('[data-tab="about"]');
+    if (aboutTab) tabs.insertBefore(tab, aboutTab);
+    else tabs.appendChild(tab);
+
+    // Pane styles inline so we don't have to coordinate with the
+    // app's static CSS — same convention the Community pane uses.
+    var style = document.createElement('style');
+    style.textContent = ''
+      + '#pane-queue .q-meta{font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.55}'
+      + '#pane-queue .q-game{margin-bottom:14px;padding:8px 10px;background:var(--surf2);border-radius:8px;border:1px solid var(--bord, rgba(255,255,255,.06))}'
+      + '#pane-queue .q-game-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;font-weight:600;color:#9a82ff}'
+      + '#pane-queue .q-game-count{color:var(--mut);font-weight:400}'
+      + '#pane-queue .q-empty{padding:18px 10px;text-align:center;color:var(--mut);font-size:11px;line-height:1.6}'
+      + '#pane-queue .q-empty-err{color:var(--red)}'
+      + '#pane-queue .q-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:6px;background:rgba(255,255,255,.02);margin-bottom:5px}'
+      + '#pane-queue .q-row-up{background:rgba(154,130,255,.12);outline:1px solid rgba(154,130,255,.35)}'
+      + '#pane-queue .q-row-in{background:rgba(91,255,149,.10);outline:1px solid rgba(91,255,149,.30)}'
+      + '#pane-queue .q-row-done{opacity:.45}'
+      + '#pane-queue .q-pos{font-size:13px;font-weight:700;width:24px;text-align:center;color:var(--mut)}'
+      + '#pane-queue .q-main{flex:1;min-width:0}'
+      + '#pane-queue .q-name{font-size:12.5px;font-weight:600;color:var(--fg);margin-bottom:3px}'
+      + '#pane-queue .q-links{font-size:10.5px;color:var(--mut);line-height:1.5;display:flex;flex-wrap:wrap;align-items:center;gap:4px}'
+      + '#pane-queue .q-link{font-size:11px}'
+      + '#pane-queue .q-link-ok{color:#5bff95}'
+      + '#pane-queue .q-link-no{color:#555}'
+      + '#pane-queue .q-lid{color:var(--mut)}'
+      + '#pane-queue .q-lid-no{color:#555}'
+      + '#pane-queue .q-mini{font-size:10px;padding:2px 6px;margin-left:3px;background:var(--surf2);border:1px solid rgba(255,255,255,.10);color:var(--fg);border-radius:4px;cursor:pointer}'
+      + '#pane-queue .q-mini:hover{background:rgba(154,130,255,.18);border-color:rgba(154,130,255,.45)}'
+      + '#pane-queue .q-actions{display:flex;gap:4px;flex-shrink:0}'
+      + '#pane-queue .q-act{font-size:10.5px;padding:4px 9px;background:var(--surf2);border:1px solid rgba(255,255,255,.10);color:var(--fg);border-radius:5px;cursor:pointer}'
+      + '#pane-queue .q-act:hover:not(:disabled){background:rgba(154,130,255,.22);border-color:rgba(154,130,255,.55)}'
+      + '#pane-queue .q-act-active{background:rgba(154,130,255,.35);border-color:rgba(154,130,255,.7);color:#fff;font-weight:600}'
+      + '#pane-queue .q-act-done{background:rgba(91,255,149,.08);border-color:rgba(91,255,149,.35)}'
+      + '#pane-queue .q-act-done:hover{background:rgba(91,255,149,.22)}'
+      + '#pane-queue .q-act-note{font-size:10.5px;color:var(--mut);font-style:italic}'
+      + '#pane-queue .q-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:6px;letter-spacing:.5px;vertical-align:middle}'
+      + '#pane-queue .q-badge-up{background:rgba(154,130,255,.35);color:#fff}'
+      + '#pane-queue .q-badge-in{background:rgba(91,255,149,.35);color:#fff}'
+      + '#pane-queue .q-badge-done{background:rgba(120,120,120,.35);color:#ccc}'
+      + '#pane-queue code{font-family:monospace;font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px}';
+    document.head.appendChild(style);
+
+    var pane = document.createElement('div');
+    pane.className = 'settings-pane';
+    pane.id = 'pane-queue';
+    pane.innerHTML =
+      '<div class="sec">'
+      + '<div class="sec-hd" style="color:#9a82ff">Community-night queue</div>'
+      + '<div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">'
+      + 'Pulls today\'s queue from the loadout-discord worker. Cycle joiners through '
+      + '<strong>Up next</strong> → <strong>In game</strong> → <strong>Done</strong>. '
+      + '"Up next" auto-opens a Steam chat window with the player if they have a Steam ID linked.'
+      + '</div>'
+      + '<div id="q-hint" style="font-size:10.5px;color:var(--mut);margin-bottom:8px;min-height:14px"></div>'
+      + '<div style="display:flex;gap:6px;margin-bottom:10px">'
+      +   '<button class="q-mini" id="q-refresh" style="padding:4px 10px">Refresh now</button>'
+      + '</div>'
+      + '<div id="q-body"><div class="q-empty">Loading…</div></div>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.55;margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">'
+      + '<strong>Platform notes.</strong> Steam: clicking <em>Up next</em> or the per-row <em>Chat</em> '
+      + 'button opens a Steam chat window with the player — Steamworks SDK is game-only, so no external '
+      + 'app can trigger a real game/party invite directly. Drop a lobby invite link in chat, or use '
+      + 'in-game Shift+Tab → Invite Friend. Epic: no public deep-link API exists; the <em>Copy</em> '
+      + 'button copies the linked Epic display name to clipboard so you can paste it into Epic friend '
+      + 'search / the game\'s invite UI.'
+      + '</div>'
+      + '</div>';
+    aboutPane.parentNode.insertBefore(pane, aboutPane);
+
+    pane.addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'q-refresh') { fetchQueue(); return; }
+      onPaneClick(e);
+    });
+
+    // Tab-switch listener: only poll while the streamer is actually
+    // looking at the pane. Settings live behind a hidden modal; idle
+    // poll bills KV reads for no reason.
+    var settingsRoot = document.getElementById('settingsTabs');
+    if (settingsRoot) {
+      var obs = new MutationObserver(function () { syncPolling(); });
+      // Watch every tab's class so we know which is .active.
+      Array.prototype.forEach.call(settingsRoot.querySelectorAll('.settings-tab'), function (t) {
+        obs.observe(t, { attributes: true, attributeFilter: ['class'] });
+      });
+    }
+    // Also pause when Settings modal closes (id="settings" hidden).
+    var settingsModal = document.getElementById('settings');
+    if (settingsModal) {
+      var obs2 = new MutationObserver(syncPolling);
+      obs2.observe(settingsModal, { attributes: true, attributeFilter: ['class', 'style'] });
+    }
+  }
+
+  function isQueueTabActive() {
+    var tab = document.querySelector('#settingsTabs [data-tab="queue"]');
+    if (!tab) return false;
+    if (!tab.classList.contains('active')) return false;
+    var modal = document.getElementById('settings');
+    if (modal) {
+      var hidden = modal.classList.contains('hidden') || modal.style.display === 'none';
+      if (hidden) return false;
+    }
+    return true;
+  }
+
+  function syncPolling() {
+    var shouldPoll = isQueueTabActive();
+    if (shouldPoll && !pollTimer) {
+      paneVisible = true;
+      fetchQueue();
+      pollTimer = setInterval(fetchQueue, POLL_MS);
+    } else if (!shouldPoll && pollTimer) {
+      paneVisible = false;
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function boot() {
+    inject();
+    syncPolling();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
 </script>
 </body>
 </html>

@@ -254,4 +254,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onRotationEvent:        (fn)        => ipcRenderer.on('rotation-event',           (e, payload) => fn(payload)),
   onRotationRelayStatus:  (fn)        => ipcRenderer.on('rotation-relay-status',    (e, status)  => fn(status)),
   onRotationRelayBroadcast: (fn)      => ipcRenderer.on('rotation-relay-broadcast', (e, row)     => fn(row)),
+
+  // Open an external URL via the OS. Protocol-allowlisted in main so
+  // only http(s), steam:, and com.epicgames.launcher: get through.
+  // Used by the community-night queue manager for Steam chat
+  // deep-links (steam://friends/message/<id64>).
+  openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
 });

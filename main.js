@@ -1202,6 +1202,31 @@ ipcMain.on('maximize-window', () => {
 ipcMain.on('close-window', () => mainWindow?.hide()); // hides to tray
 ipcMain.on('quit-app', () => { isQuitting = true; app.quit(); });
 
+// Open an external URL via shell.openExternal. Used by the community
+// queue manager's Steam-chat button (steam://friends/message/<id64>)
+// and any other panel that needs to hand off to the OS handler for a
+// protocol the renderer can't navigate to directly.
+//
+// Allowlist by protocol so a future bug elsewhere in the renderer
+// can't trick this IPC into launching arbitrary handlers. http(s)
+// covers profile links; steam covers Steam client deep-links; epic
+// is the launcher protocol (mostly inert today, but allowed so we
+// can light it up when something useful exists).
+ipcMain.handle('open-external-url', (event, url) => {
+  try {
+    const s = String(url || '');
+    if (!/^(https?:|steam:|com\.epicgames\.launcher:)/i.test(s)) {
+      logToFile('OPEN-EXT', 'rejected ' + s.slice(0, 80));
+      return { ok: false, error: 'bad-protocol' };
+    }
+    shell.openExternal(s);
+    return { ok: true };
+  } catch (e) {
+    logToFile('OPEN-EXT', 'threw: ' + (e && e.message));
+    return { ok: false, error: String(e && e.message || e) };
+  }
+});
+
 // Kick viewer count — public API, no auth required, fetched from main process to avoid CORS
 ipcMain.handle('fetch-kick-viewers', async (event, slug) => {
   return new Promise((resolve) => {
