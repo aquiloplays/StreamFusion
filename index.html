@@ -4082,6 +4082,25 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
           amount:    amount,
           message:   evMessage || ''
         });
+
+        // aquilo.gg community events relay (opt-in, double-gated by the
+        // toggle in Settings → Community). The community IIFE owns the
+        // permission check + fetch — we just hand it the structured
+        // event. Follow events are skipped at the IIFE on purpose;
+        // they're too high-volume to surface in a shared Discord
+        // channel. Other big events (sub/resub/gift/cheer/raid/tip)
+        // flow through.
+        if (eventType !== 'follow' && typeof window.__sfCommunityRelayEvent === 'function') {
+          try {
+            window.__sfCommunityRelayEvent({
+              eventType: eventType,
+              platform:  plat || 'tw',
+              user:      user,
+              amount:    amount,
+              message:   evMessage || ''
+            });
+          } catch (e) { /* non-fatal */ }
+        }
       }
     } catch (err) { /* non-fatal; event still shows in the in-app feed */ }
   }
@@ -13397,29 +13416,68 @@ window.addEventListener('load', function() {
 });
 </script>
 <script>
-/* ─── aquilo.gg live-status sharing ──────────────────────────────────
-   Opt-in feature: when enabled, StreamFusion posts a heartbeat to the
-   aquilo-live worker while the streamer is live, so they appear on the
-   aquilo.gg "live now" radar (and, once a webhook is wired up on the
-   worker, the community Discord). Fully self-contained — its own
-   localStorage key, injects its own Settings tab + pane at runtime —
-   so it never touches the app's existing settings save/load or the
-   static settings markup. Safe to lift out as one block. */
+/* ─── aquilo.gg community sharing ───────────────────────────────────
+   Opt-in feature surface (Settings → Community):
+     1. Share live status — heartbeat to loadout-discord's
+        /sf/community-live while the streamer is live. Drives the
+        aquilo.gg community radar (GET /community/live) + a Discord
+        embed announcement on the binding's configured channel.
+     2. Share channel events — when (1) is on AND this toggle is on,
+        each big event (sub / resub / gift / cheer / raid / tip) gets
+        teed to /sf/community-event, which posts an embed in the same
+        Discord channel. NO @-pings, embeds only.
+   Fully self-contained — own localStorage key, injects its own
+   Settings tab + pane at runtime, so it never touches the app's
+   existing settings save/load or the static settings markup. The
+   event-tee hook (`window.__sfCommunityRelayEvent`) is the only
+   global it exports, called from addEvHistory's structured-event
+   block. Safe to lift out as one block. */
 (function () {
-  var LIVE_API = 'https://live.aquilo.gg';
-  var LIVE_KEY = 'aql-live-k7m2x9q4';
+  // loadout-discord worker — single endpoint for both live + events +
+  // the public radar. Replaces the standalone aquilo-live worker that
+  // used to handle heartbeats on its own; loadout-discord owns the
+  // canonical surface now because the channel binding lives in the
+  // same /admin UI as the rest of the bot's bindings.
+  var WORKER_BASE     = 'https://loadout-discord.aquiloplays.workers.dev';
+  var LIVE_ENDPOINT   = WORKER_BASE + '/sf/community-live';
+  var EVENT_ENDPOINT  = WORKER_BASE + '/sf/community-event';
+  // Soft-spam-prevent header. Embedded in the shipped binary — not a
+  // real secret, just keeps casual abuse off the endpoints. Matches
+  // the SF_COMMUNITY_KEY wrangler secret on the worker.
+  var COMMUNITY_KEY   = 'sf-community-k7m2x9q4';
   var STORE = 'sf_aquilo_live';
-  var LOOP_MS = 90000; // heartbeat / live-recheck cadence (worker TTL is 6 min)
+  var LOOP_MS = 90000; // heartbeat / live-recheck cadence (worker stale TTL is 6 min)
   var isWebDemo = !!window.__SF_WEB_DEMO__;
 
-  var cfg = { enabled: false, displayName: '' };
+  var cfg = { enabled: false, displayName: '', shareEvents: false, userId: '' };
   try {
     var saved = JSON.parse(localStorage.getItem(STORE) || '{}');
     if (saved && typeof saved === 'object') {
-      cfg.enabled = !!saved.enabled;
+      cfg.enabled     = !!saved.enabled;
       cfg.displayName = String(saved.displayName || '');
+      cfg.shareEvents = !!saved.shareEvents;
+      cfg.userId      = String(saved.userId || '');
     }
   } catch (e) {}
+
+  // Stable opaque ID per install so the worker can dedupe a single
+  // streamer across heartbeats without needing them to log in. Stored
+  // in localStorage; if they reinstall they get a new one (the old
+  // entry expires within 6 min). Never sent over the wire as anything
+  // user-identifying — it's just a UUID-like random 24-char hex.
+  function ensureUserId() {
+    if (cfg.userId && /^[a-f0-9]{16,32}$/.test(cfg.userId)) return cfg.userId;
+    var bytes = new Uint8Array(12);
+    try { (window.crypto || {}).getRandomValues && window.crypto.getRandomValues(bytes); }
+    catch (e) { for (var i = 0; i < 12; i++) bytes[i] = Math.floor(Math.random() * 256); }
+    var hex = '';
+    for (var j = 0; j < bytes.length; j++) {
+      var h = bytes[j].toString(16); if (h.length === 1) h = '0' + h; hex += h;
+    }
+    cfg.userId = hex;
+    persist();
+    return hex;
+  }
 
   function persist() {
     try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {}
@@ -13453,28 +13511,44 @@ window.addEventListener('load', function() {
       : tone === 'err' ? 'var(--red)' : 'var(--mut)';
   }
 
-  // decapi.me — keyless Twitch metadata. cb(isLive, gameName).
+  // decapi.me — keyless Twitch metadata. cb(isLive, { game, title, viewers }).
+  // title + viewers are optional context we pass to the community embed;
+  // if decapi gives us a "not live"-ish response for a field we just
+  // drop it and let the worker render without that piece.
   function checkLive(cb) {
     var login = channelLogin();
-    if (!login) { cb(false, ''); return; }
+    if (!login) { cb(false, {}); return; }
     fetch('https://decapi.me/twitch/uptime/' + encodeURIComponent(login))
       .then(function (r) { return r.text(); })
       .then(function (t) {
-        if (/offline|not live|unable|error/i.test(t)) { cb(false, ''); return; }
-        fetch('https://decapi.me/twitch/game/' + encodeURIComponent(login))
-          .then(function (r) { return r.text(); })
-          .then(function (g) {
-            cb(true, /not live|unknown|unable|error/i.test(g) ? '' : g.trim());
-          })
-          .catch(function () { cb(true, ''); });
+        if (/offline|not live|unable|error/i.test(t)) { cb(false, {}); return; }
+        // Fetch game + title + viewers in parallel; one or two failing
+        // shouldn't block the heartbeat — we just send what we have.
+        var meta = { game: '', title: '', viewers: null };
+        function clean(s) {
+          if (!s) return '';
+          var x = String(s).trim();
+          return /not live|unknown|unable|error/i.test(x) ? '' : x;
+        }
+        Promise.all([
+          fetch('https://decapi.me/twitch/game/'        + encodeURIComponent(login)).then(function (r) { return r.text(); }).catch(function () { return ''; }),
+          fetch('https://decapi.me/twitch/title/'       + encodeURIComponent(login)).then(function (r) { return r.text(); }).catch(function () { return ''; }),
+          fetch('https://decapi.me/twitch/viewercount/' + encodeURIComponent(login)).then(function (r) { return r.text(); }).catch(function () { return ''; }),
+        ]).then(function (parts) {
+          meta.game  = clean(parts[0]);
+          meta.title = clean(parts[1]);
+          var vc = clean(parts[2]);
+          if (/^\d+$/.test(vc)) meta.viewers = parseInt(vc, 10);
+          cb(true, meta);
+        });
       })
-      .catch(function () { cb(false, ''); });
+      .catch(function () { cb(false, {}); });
   }
 
-  function post(body) {
-    return fetch(LIVE_API + '/heartbeat', {
+  function post(url, body) {
+    return fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Live-Key': LIVE_KEY },
+      headers: { 'Content-Type': 'application/json', 'X-SF-Community-Key': COMMUNITY_KEY },
       body: JSON.stringify(body)
     }).catch(function () {});
   }
@@ -13493,20 +13567,60 @@ window.addEventListener('load', function() {
       setStatus('Sharing is on — heartbeats are disabled in the web demo.', '');
       return;
     }
-    checkLive(function (live, game) {
+    checkLive(function (live, meta) {
       var name = reportName();
+      var uid = ensureUserId();
       if (live) {
-        post({ name: name, platform: 'twitch',
-               url: 'https://twitch.tv/' + login, game: game, live: true });
+        post(LIVE_ENDPOINT, {
+          userId:   uid,
+          name:     name,
+          platform: 'twitch',
+          channel:  login,
+          url:      'https://twitch.tv/' + login,
+          title:    meta.title || '',
+          game:     meta.game  || '',
+          viewers:  meta.viewers != null ? meta.viewers : undefined,
+          live:     true
+        });
         setStatus('You’re live — showing on the aquilo.gg radar'
-          + (game ? ' · ' + game : '') + '.', 'live');
+          + (meta.game ? ' · ' + meta.game : '') + '.', 'live');
       } else {
-        if (prevLive) post({ name: name, platform: 'twitch', live: false });
+        if (prevLive) post(LIVE_ENDPOINT, { userId: uid, name: name, platform: 'twitch', live: false });
         setStatus('Sharing is on. You’ll appear on the radar once you go live.', '');
       }
       prevLive = live;
     });
   }
+
+  // Event-relay export. addEvHistory calls this from outside the IIFE
+  // for every recognised "big" event. Cheap fast-paths so we don't
+  // spin up a fetch for users who haven't opted in.
+  //
+  // Expected shape:
+  //   { eventType: 'sub'|'resub'|'gift'|'cheer'|'raid'|'tip'|'follow',
+  //     platform:  'tw'|'tt'|'yt'|'kk',
+  //     user:      'viewer name',
+  //     amount:    optional number,
+  //     message:   optional string }
+  window.__sfCommunityRelayEvent = function (ev) {
+    if (!cfg.enabled || !cfg.shareEvents) return;
+    if (isWebDemo) return;
+    if (!ev || !ev.eventType) return;
+    var login = channelLogin();
+    if (!login) return;
+    var uid = ensureUserId();
+    var streamerName = reportName();
+    post(EVENT_ENDPOINT, {
+      userId:    uid,
+      name:      streamerName,
+      platform:  ev.platform || 'tw',
+      url:       'https://twitch.tv/' + login,
+      eventType: ev.eventType,
+      user:      ev.user || '',
+      amount:    ev.amount != null ? ev.amount : undefined,
+      message:   ev.message || ''
+    });
+  };
 
   function startLoop() {
     stopLoop();
@@ -13520,16 +13634,37 @@ window.addEventListener('load', function() {
   function onToggle(on) {
     cfg.enabled = on;
     persist();
+    syncEventsToggleEnabled();
     if (on) {
       startLoop();
     } else {
       stopLoop();
       // Drop off the radar immediately rather than waiting for the TTL.
       if (!isWebDemo && channelLogin()) {
-        post({ name: reportName(), platform: 'twitch', live: false });
+        post(LIVE_ENDPOINT, { userId: ensureUserId(), name: reportName(), platform: 'twitch', live: false });
       }
       prevLive = false;
       setStatus('Live-status sharing is off.', '');
+    }
+  }
+
+  function onEventsToggle(on) {
+    // Live-status share is the gate — if it's off, ignore an attempt
+    // to flip event-share on. UI keeps the checkbox disabled in that
+    // state, but this guards an out-of-band flip from settings import.
+    if (on && !cfg.enabled) on = false;
+    cfg.shareEvents = on;
+    persist();
+  }
+
+  function syncEventsToggleEnabled() {
+    var ev = document.getElementById('aql-events-enabled');
+    if (!ev) return;
+    ev.disabled = !cfg.enabled;
+    if (!cfg.enabled && ev.checked) {
+      ev.checked = false;
+      cfg.shareEvents = false;
+      persist();
     }
   }
 
@@ -13572,11 +13707,25 @@ window.addEventListener('load', function() {
       + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">'
       + 'Shares only public stream info — channel name, platform, current game and '
       + 'title. Nothing else, ever.</div>'
+      + '</div>'
+      + '<div class="sec" style="margin-top:14px">'
+      + '<div class="sec-hd" style="color:#9a82ff">Community events relay</div>'
+      + '<div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">'
+      + 'With your permission, StreamFusion can also forward big events from your chat '
+      + '— subs, gift subs, cheers, raids, tips — to the aquilo.gg community Discord as '
+      + 'embed messages. <strong>Embeds only, never @-pings.</strong> Off by default.'
+      + '</div>'
+      + '<label class="frow"><span>Relay my channel events to the community Discord</span>'
+      + '<input type="checkbox" id="aql-events-enabled" disabled></label>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">'
+      + 'Requires live-status sharing above to be on. Follows are skipped (too noisy); '
+      + 'only headline events fire.</div>'
       + '</div>';
     aboutPane.parentNode.insertBefore(pane, aboutPane);
 
     var chk = document.getElementById('aql-live-enabled');
     var nameI = document.getElementById('aql-live-name');
+    var evChk = document.getElementById('aql-events-enabled');
     if (chk) {
       chk.checked = cfg.enabled;
       chk.addEventListener('change', function () { onToggle(this.checked); });
@@ -13588,6 +13737,11 @@ window.addEventListener('load', function() {
         persist();
       });
     }
+    if (evChk) {
+      evChk.checked = cfg.shareEvents && cfg.enabled;
+      evChk.addEventListener('change', function () { onEventsToggle(this.checked); });
+    }
+    syncEventsToggleEnabled();
     setStatus(cfg.enabled
       ? 'Sharing is on. You’ll appear on the radar once you go live.'
       : 'Live-status sharing is off.', '');
