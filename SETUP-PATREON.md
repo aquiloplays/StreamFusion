@@ -2,7 +2,7 @@
 
 This guide covers the one-time setup needed to connect Patreon to StreamFusion.
 
-**What Patreon is for:** every feature in StreamFusion is free for everyone — nothing is locked behind payment. Patreon supporters (Tier 2 and Tier 3) get **early access**: brand-new features ship to them first, then roll out to everyone shortly after. Patreon is a way to support development and get a head start on new features — it is never required to use anything.
+**What Patreon is for:** every feature in StreamFusion is free for everyone — nothing is locked behind payment. Patrons get **early access**: brand-new features ship to them first, then roll out to everyone shortly after. Patreon is a way to support development and get a head start on new features — it is never required to use anything.
 
 The Patreon + Discord sign-in stays wired up so future new features can be offered to supporters early. Until a new feature ships, this flow does nothing visible — connecting is purely optional.
 
@@ -12,7 +12,7 @@ The Patreon + Discord sign-in stays wired up so future new features can be offer
 
 - **One installer.** Everyone runs the same `StreamFusion.exe`. There is no separate build.
 - **Optional sign-in.** The onboarding wizard has a "Connect Patreon" step (Page 9). Users can skip it; the app works fully without a Patreon connection. They can connect later via **Settings → Early Access**.
-- **Tier-aware.** Users with an active membership on **Tier 2** or **Tier 3** get early access to new features. Tier 1, followers, and declined/former patrons do not — but they still have every released feature, free.
+- **Patron-aware.** Users with an active pledge on the **Patron** tier get early access to new features. Free followers and declined/former patrons do not — but they still have every released feature, free.
 - **Live check.** StreamFusion verifies against Patreon on every launch and once per hour while running. If a supporter cancels, their early-access status updates within an hour — no restart needed.
 - **Offline grace.** If Patreon is unreachable, the last known status is honored for 7 days.
 - **Client secret never ships.** Token exchange is proxied through a Cloudflare Worker that holds the secret server-side.
@@ -35,20 +35,18 @@ The Patreon + Discord sign-in stays wired up so future new features can be offer
    - **Scopes**: `identity`, `identity.memberships`
 3. Save and copy the **Client ID** and **Client Secret** (secret is only shown once — grab it now).
 
-### 2. Find your Campaign ID + Tier IDs
+### 2. Find your Campaign ID
 
 On the Patreon OAuth client page you'll also see a **Creator's Access Token**. Use it:
 
 ```bash
 curl -H "Authorization: Bearer <creator-access-token>" \
-  "https://www.patreon.com/api/oauth2/v2/campaigns?include=tiers&fields%5Btier%5D=title,amount_cents"
+  "https://www.patreon.com/api/oauth2/v2/campaigns"
 ```
 
-The response gives you:
-- `data[0].id` → your **Campaign ID**
-- `included[]` (where `type === "tier"`) → each of your tiers with `id`, `title`, and `amount_cents`
+`data[0].id` is your **Campaign ID** — save it.
 
-Identify your Tier 2 and Tier 3 IDs from the titles / amounts. Save all three IDs.
+There are no tier IDs to track: the campaign has a single paid tier, so any active pledge counts. A price change or tier rename on Patreon needs no app update.
 
 ### 3. Deploy the Cloudflare Worker
 
@@ -80,20 +78,14 @@ Open [`patreon-auth.js`](patreon-auth.js) and replace these at the top of the fi
 ```js
 const PATREON_CLIENT_ID   = 'REPLACE_WITH_YOUR_PATREON_CLIENT_ID';
 const PATREON_CAMPAIGN_ID = 'REPLACE_WITH_YOUR_CAMPAIGN_ID';
-const PATREON_TIER_IDS = {
-  tier2: 'REPLACE_WITH_TIER2_ID',
-  tier3: 'REPLACE_WITH_TIER3_ID'
-};
 const TOKEN_PROXY_URL     = 'https://auth.aquilo.gg/patreon/token';
 ```
 
-All four values are public info — Client ID, Campaign ID, Tier IDs, and proxy URL are safe to commit. The only secret (Client Secret) lives on the Worker.
+All three values are public info — Client ID, Campaign ID, and proxy URL are safe to commit. The only secret (Client Secret) lives on the Worker.
 
 Alternatively, leave the placeholders and set env vars at build time:
 - `SF_PATREON_CLIENT_ID`
 - `SF_PATREON_CAMPAIGN_ID`
-- `SF_PATREON_TIER2_ID`
-- `SF_PATREON_TIER3_ID`
 - `SF_TOKEN_PROXY_URL`
 
 ### 5. Build + ship
@@ -116,9 +108,8 @@ The `S.hasEarlyAccess` flag is computed by `_recomputeCombinedEntitlement()` and
 
 ```js
 if (S.hasEarlyAccess) {
-  // New feature — available to Tier 2 / Tier 3 supporters during its
-  // early-access window. Remove this guard when the feature rolls out
-  // to everyone.
+  // New feature — available to Patrons during its early-access window.
+  // Remove this guard when the feature rolls out to everyone.
 }
 ```
 
@@ -172,11 +163,10 @@ Delete the check. That's it — the feature is now free for all users, like ever
 | Problem | Fix |
 |---|---|
 | "Sign-in failed" with no detail | Check Cloudflare Worker logs: `wrangler tail`. Most commonly the Client Secret isn't set or is wrong. |
-| User is an active Tier 2 patron but shows "not_a_member" | Your `PATREON_CAMPAIGN_ID` is wrong, or they pledged to a different campaign. Verify with `/api/oauth2/v2/identity?include=memberships,memberships.campaign` using their token. |
-| User is Tier 2 but sees "insufficient_tier" | Your `PATREON_TIER_IDS.tier2` value doesn't match the actual tier ID. Re-check via the campaigns endpoint in step 2. |
+| An active patron shows "not_a_member" | Your `PATREON_CAMPAIGN_ID` is wrong, or they pledged to a different campaign. Verify with `/api/oauth2/v2/identity?include=memberships,memberships.campaign` using their token. |
 | "OAuth error: invalid_grant" on retry | Auth codes are single-use — the user probably clicked the callback twice. They just need to start the flow again. |
 | "No loopback port available" | Another app is using all three of 17823/17824/17825 at once, which is extremely unusual. Pick different ports in `patreon-auth.js` and re-register the redirect URIs on the Patreon OAuth client page. |
-| Early-access status doesn't update after the user upgrades their tier | Wait up to an hour (runtime re-check interval), or have them click **Re-check membership** in Settings → Early Access. |
+| Early-access status doesn't update after the user pledges | Wait up to an hour (runtime re-check interval), or have them click **Re-check membership** in Settings → Early Access. |
 
 ---
 
@@ -244,8 +234,6 @@ Open your Railway project → Variables tab → add:
 DISCORD_BOT_TOKEN         = <from step 1>
 DISCORD_BOT_CLIENT_ID     = <from step 1>
 PATREON_CAMPAIGN_ID       = <same value as patreon-auth.js>
-PATREON_TIER2_ID          = <same value as patreon-auth.js>
-PATREON_TIER3_ID          = <same value as patreon-auth.js>
 ```
 
 Redeploy after saving. Railway gives you a public URL like `https://streamfusion-bot-production.up.railway.app`.

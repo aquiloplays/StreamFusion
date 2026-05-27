@@ -5,16 +5,16 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 // ── Patreon entitlement service ─────────────────────────────────────────────
-// Optional sign-in; the app boots for everyone. Active Tier 2 / Tier 3
-// supporters unlock Early Access (EA) features live. See patreon-auth.js.
+// Optional sign-in; the app boots for everyone. Active Patrons unlock
+// Early Access (EA) features live. See patreon-auth.js.
 const patreonAuth = require('./patreon-auth');
 
 // ── Discord entitlement service (parallel path to EA) ───────────────────────
 // Second way to unlock EA for users whose Patreon OAuth has edge cases
 // (new-pledge sync lag, Apple private-relay email quirks where patron_status
-// returns null). Patreon ↔ Discord integration assigns Tier 2 / Tier 3
-// Patron roles automatically in aquilo.gg's Discord when someone pledges
-// — checking those roles is a more reliable signal than hitting Patreon's
+// returns null). Patreon ↔ Discord integration assigns the Patron role
+// automatically in aquilo.gg's Discord when someone pledges — checking
+// that role is a more reliable signal than hitting Patreon's
 // /identity endpoint for edge-case accounts. Entitlement from EITHER path
 // grants EA (renderer OR's them: S.hasEarlyAccess = patreon.entitled ||
 // discord.entitled). See discord-auth.js.
@@ -93,21 +93,18 @@ try {
 // the taskbar + desktop shortcuts stayed on the old .ico.
 const { buildSFIcon, PALETTES } = require('./icon-gen');
 
-// Tier-driven palette resolution. StreamFusion ships a single .exe; the
-// streamer's Patreon tier picks the runtime palette so a Tier 3 supporter
-// sees a visibly distinct app from a Tier 2 supporter without having to
-// download a different installer. This is purely cosmetic — every feature
-// is free for everyone regardless of tier.
+// Patron-driven palette resolution. StreamFusion ships a single .exe;
+// active Patrons get a distinct runtime tray / window icon as a visible
+// thank-you. Purely cosmetic — every feature is free for everyone.
 //
 // _currentTier is set by the patreon entitlement subscription wired in
 // app.whenReady — null on startup until the first entitlement-changed
-// event arrives.
+// event arrives. Values: 'patron' | 'follower' | 'none' | null.
 let _currentTier = null;
 function _sfIconPalette() {
-  if (_currentTier === 'tier3') return PALETTES.tier3;
-  if (_currentTier === 'tier2') return PALETTES.tier2;
-  // Fallback to stable for non-authed / non-entitled users + as the
-  // pre-entitlement-event default before patreon-auth fires.
+  // Active Patrons get the gold/violet icon; everyone else gets the
+  // standard palette (also the pre-entitlement-event default).
+  if (_currentTier === 'patron') return PALETTES.patron;
   return PALETTES.stable;
 }
 
@@ -834,8 +831,8 @@ ipcMain.handle('obs-refresh-cfg-set', function(event, patch) {
 
 // ── 1.6.0 merge: legacy beta-install detection + one-time notice ────────────
 // Pre-1.6 there were two separate installs — StreamFusion (stable) and
-// StreamFusion Beta (private/Tier-3). 1.6.0 merges them into a single
-// app where Tier 3 unlocks via the same install + Patreon sign-in. On
+// StreamFusion Beta (private). 1.6.0 merges them into a single app
+// where Early Access unlocks via the same install + Patreon sign-in. On
 // first launch we check for the old beta install and surface a friendly
 // notice telling the streamer they can uninstall it (we don't auto-
 // uninstall — keeps the user in control). Notice fires once per
@@ -873,7 +870,7 @@ function maybeShowLegacyBetaNotice() {
       title: 'StreamFusion Beta is merged into the main app',
       message: 'StreamFusion 1.6 merges the Beta install into the main app.',
       detail:
-        'Tier 3 features now unlock the moment you sign in with Patreon — ' +
+        'Early Access features now unlock the moment you sign in with Patreon — ' +
         'no separate StreamFusion Beta download needed.\n\n' +
         'You still have the old StreamFusion Beta install on this machine. ' +
         'It\'s safe to leave it (it just sits unused), but you can remove it ' +
@@ -923,7 +920,7 @@ app.whenReady().then(() => {
   // OBS overlay server comes up alongside the main window. It always
   // listens (so the streamer can bookmark the URLs without worrying about
   // whether SF is "ready"), but it returns the gated page if the user
-  // isn't an active Tier 2/3 supporter.
+  // isn't an active Patron.
   obsServer.startServer().then(function(ok) {
     if (!ok) logToFile('OBS-SERVER', 'failed to start on default port');
     // Auto-refresh any OBS browser sources that point at SF's loopback
@@ -961,10 +958,9 @@ app.whenReady().then(() => {
   patreonAuth.onEntitlementChange(function(state) {
     _lastPatreonEntitled = !!(state && state.entitled);
     _syncCombinedEntitlement();
-    // 1.6.0+: tier-driven theme. Patreon is the canonical tier source
-    // (Discord auth is binary entitled-or-not). When the tier changes,
-    // re-render the tray + window icon so the streamer's Patreon
-    // status visually reflects in the app chrome immediately.
+    // Patron-driven icon. Patreon is the canonical source for the
+    // 'patron' palette flag. When it changes, re-render the tray +
+    // window icon so the streamer's Patreon status reflects immediately.
     var newTier = (state && state.tier) || null;
     if (newTier !== _currentTier) {
       _currentTier = newTier;

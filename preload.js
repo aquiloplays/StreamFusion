@@ -125,12 +125,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // also the payload of the `patreon-entitlement-changed` event):
   //   {
   //     signedIn:     bool,            // a Patreon token is cached
-  //     entitled:     bool,            // signedIn AND active on Tier 2 or Tier 3
-  //     tier:         'tier3' | 'tier2' | 'tier1' | 'follower' | 'none',
+  //     entitled:     bool,            // signedIn AND an active paying patron
+  //     tier:         'patron' | 'follower' | 'none',
   //     patronStatus: 'active_patron' | 'declined_patron' | 'former_patron' | null,
-  //     reason:       'entitled' | 'insufficient_tier' | 'declined_patron'
-  //                   | 'former_patron' | 'follower' | 'not_a_member'
-  //                   | 'no_memberships' | 'offline_grace' | 'reverify_failed'
+  //     reason:       'entitled' | 'declined_patron' | 'former_patron'
+  //                   | 'follower' | 'not_a_member' | 'no_memberships'
+  //                   | 'offline_grace' | 'reverify_failed'
   //                   | 'not_signed_in' | 'unknown',
   //     userName:     string,          // Patreon full_name, blank when signed out
   //     verifiedAt:   number | null    // epoch ms of last successful check
@@ -143,7 +143,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   //
   // Starts the OAuth flow. Opens Patreon in the system browser, catches the
   // loopback callback, exchanges tokens via the Cloudflare proxy, and
-  // verifies Tier 2 / Tier 3 membership. Returns the entitlement state.
+  // verifies the user's Patreon membership. Returns the entitlement state.
   patreonBeginAuth:              ()  => ipcRenderer.invoke('patreon-begin-auth'),
   // Returns the current entitlement state. Uses cache when fresh; reverifies
   // against Patreon when the cache is older than 24h. Safe to call anytime.
@@ -158,7 +158,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Discord entitlement (parallel EA path, see discord-auth.js) ─────────
   // Second route to EA features: if the user connects their Discord and
-  // has Tier 2 or Tier 3 Patron role in aquilo.gg, they're entitled.
+  // has the Patron role in aquilo.gg, they're entitled.
   // Useful when Patreon OAuth misses (Apple private-relay emails, new-
   // pledge sync lag). Either path alone is enough — renderer ORs them.
   //
@@ -166,8 +166,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // of `discord-entitlement-changed` event:
   //   {
   //     signedIn:     bool,            // a Discord token is cached
-  //     entitled:     bool,            // signedIn AND Tier 2/3 role in guild
-  //     tier:         'tier3' | 'tier2' | 'none',
+  //     entitled:     bool,            // signedIn AND Patron role in guild
+  //     tier:         'patron' | 'none',
   //     reason:       'entitled' | 'no_role' | 'not_in_guild'
   //                   | 'reverify_failed' | 'offline_grace' | 'not_signed_in',
   //     userName:     string,          // Discord global_name or username

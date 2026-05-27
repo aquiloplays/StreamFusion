@@ -10,12 +10,12 @@
 //     stays `null` even longer
 //   - Patreon API 5xx / rate-limit windows where verifyMembership fails
 //
-// In parallel, the aquilo.gg Discord server already assigns Tier 2 /
-// Tier 3 Patron roles automatically when supporters connect their
-// Patreon to Discord (built-in Patreon ↔ Discord integration). Those
-// role assignments are durable and don't suffer from the above bugs.
-// So: let the user Connect Discord in SF, check for those roles,
-// grant EA access via that path too. Either path works.
+// In parallel, the aquilo.gg Discord server already assigns a Patron
+// role automatically when supporters connect their Patreon to Discord
+// (built-in Patreon ↔ Discord integration). Those role assignments are
+// durable and don't suffer from the above bugs. So: let the user
+// Connect Discord in SF, check for that role, grant EA access via that
+// path too. Either path works.
 //
 // Responsibilities (mirror patreon-auth.js shape so main.js can wire
 // this up the same way):
@@ -26,7 +26,7 @@
 //      ships in the app binary.
 //   3. Call Discord's GET /users/@me/guilds/{GUILD_ID}/member with the
 //      user's access token to read their role IDs in the aquilo.gg
-//      guild. Check for Tier 2 or Tier 3 Patron role IDs.
+//      guild. Check for the Patron role ID.
 //   4. Persist the result (safeStorage-encrypted) so we don't OAuth
 //      every launch. Re-check hourly while running + on-launch if
 //      cache is >24h old.
@@ -38,9 +38,9 @@
 // payload of the IPC event):
 //   {
 //     signedIn:     bool,    // Discord token is cached
-//     entitled:     bool,    // signedIn AND has Tier 2 or Tier 3 role
+//     entitled:     bool,    // signedIn AND has the Patron role
 //                            //   in the configured guild
-//     tier:         'tier3' | 'tier2' | 'none',
+//     tier:         'patron' | 'none',
 //     reason:       'entitled' | 'no_role' | 'not_in_guild'
 //                 | 'reverify_failed' | 'not_signed_in' | 'unknown',
 //     userName:     string,  // Discord global_name or username,
@@ -86,15 +86,16 @@ const path = require('path');
 const DISCORD_CLIENT_ID = process.env.SF_DISCORD_CLIENT_ID || '1494759611922645003';
 
 // Guild we check membership + roles against. This is aquilo.gg Discord.
-const DISCORD_GUILD_ID  = process.env.SF_DISCORD_GUILD_ID  || '1334146273854619709';
+const DISCORD_GUILD_ID  = process.env.SF_DISCORD_GUILD_ID  || '1504103035951906883';
 
-// Role IDs assigned by Patreon ↔ Discord integration when supporters
-// connect their Patreon and pledge. Tier 3 takes precedence over
-// Tier 2 when both are present.
-const DISCORD_ROLE_IDS = {
-  tier2: process.env.SF_DISCORD_TIER2_ROLE_ID || '1482092449609420982',
-  tier3: process.env.SF_DISCORD_TIER3_ROLE_ID || '1483242263961407670'
-};
+// Role IDs assigned by the Patreon ↔ Discord integration to active
+// patrons in the aquilo.gg guild. There's one patron role; the value is
+// still parsed as an allow-list so a future role-ID change can be
+// absorbed via SF_DISCORD_PATRON_ROLE_IDS (comma-separated) without a
+// rebuild.
+const DISCORD_PATRON_ROLE_IDS = (process.env.SF_DISCORD_PATRON_ROLE_IDS ||
+  '1505982660026306631')
+  .split(',').map(function(s) { return s.trim(); }).filter(Boolean);
 
 // Shared Cloudflare Worker. The /discord-token endpoint exchanges an
 // authorization code for access / refresh tokens, injecting the
@@ -289,16 +290,11 @@ async function verifyMembership(accessToken) {
   // turned them into numbers).
   roleIds = roleIds.map(function(r) { return String(r); });
 
-  var tier3Id = String(DISCORD_ROLE_IDS.tier3);
-  var tier2Id = String(DISCORD_ROLE_IDS.tier2);
-  var hasTier3 = roleIds.indexOf(tier3Id) !== -1;
-  var hasTier2 = roleIds.indexOf(tier2Id) !== -1;
-
-  var tier = hasTier3 ? 'tier3' : hasTier2 ? 'tier2' : 'none';
-  var entitled = hasTier2 || hasTier3;
-  var reason;
-  if (entitled) reason = 'entitled';
-  else reason = 'no_role';
+  var entitled = roleIds.some(function(r) {
+    return DISCORD_PATRON_ROLE_IDS.indexOf(r) !== -1;
+  });
+  var tier = entitled ? 'patron' : 'none';
+  var reason = entitled ? 'entitled' : 'no_role';
 
   if (entitled) {
     console.log('[discord-auth] verify: user ' + userId + ' (@' + userName + ') granted ' + tier + ' via Discord role');

@@ -21,7 +21,7 @@
 //
 // All of this is EA-gated from main.js — the module itself doesn't check
 // entitlement, but main.js only wires up the IPC handlers when the user
-// is an active Tier 2/3 supporter.
+// is an active Patron.
 
 'use strict';
 

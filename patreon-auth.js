@@ -2,8 +2,7 @@
 //
 // This module is NOT a gate. The app boots normally for everyone; signing in
 // with Patreon is optional and only unlocks Early Access (EA) features for
-// users with an active membership on Tier 2 or Tier 3 of the StreamFusion
-// campaign.
+// users with an active membership on the StreamFusion Patreon.
 //
 // Responsibilities:
 //   1. Start the OAuth flow when the renderer asks (onboarding or settings).
@@ -13,25 +12,25 @@
 //      Worker (patreon-proxy.worker.js) so the client secret is never in
 //      the app binary.
 //   3. Verify membership against the configured campaign, and check that
-//      the user is currently entitled to Tier 2 or Tier 3. Persist the
-//      result (encrypted at rest via Electron safeStorage / DPAPI).
+//      the user is an active patron. Persist the result (encrypted at
+//      rest via Electron safeStorage / DPAPI).
 //   4. Re-check periodically (hourly while the app runs, and on every
 //      launch). Cancellations propagate to EA-lock within ~1 hour.
 //   5. Emit a `patreon-entitlement-changed` IPC message to the main window
 //      whenever the entitlement state changes, so the renderer can show or
 //      hide EA features live without a restart.
 //
-// Entitlement model:
+// Entitlement model (single Patreon tier — "Patron"):
 //   signedIn     bool   — user has a token cached
-//   entitled     bool   — signedIn AND active_patron AND tier ∈ {tier2, tier3}
-//   tier         string — 'tier3' | 'tier2' | 'tier1' | 'follower' | 'none'
+//   entitled     bool   — signedIn AND an active paying patron of the campaign
+//   tier         string — 'patron' | 'follower' | 'none'
 //   patronStatus string — raw patron_status from Patreon, or null
 //   reason       string — short code for UI messaging
 //   userName     string — full_name from Patreon, for "Connected as ..."
 //
 // The renderer should treat `entitled === true` as the sole gate for EA
-// features; `signedIn && !entitled` means "connected, but not at a high
-// enough tier yet" and warrants an upsell message.
+// features; `signedIn && !entitled` means "connected, but not an active
+// patron yet" and warrants an upsell message.
 
 'use strict';
 
@@ -48,25 +47,18 @@ const path = require('path');
 //
 // PATREON_CLIENT_ID     — public; safe to ship in the binary
 // PATREON_CAMPAIGN_ID   — public; safe to ship
-// PATREON_TIER_IDS      — tier IDs for Tier 2 and Tier 3 on your campaign.
-//                         Find them via the Patreon API:
-//                         GET /api/oauth2/v2/campaigns/{campaign_id}?include=tiers
-//                         See SETUP-PATREON.md for the full walkthrough.
 // TOKEN_PROXY_URL       — your deployed Cloudflare Worker endpoint
 //
 // REDIRECT URIs you must register on your Patreon OAuth client page:
 //   http://127.0.0.1:17823/callback
 //   http://127.0.0.1:17824/callback
 //   http://127.0.0.1:17825/callback
-// Public values — safe to commit. Verified against Patreon /campaigns API.
-//   Tier 2 │ Early Access  → tier id 28147937 ($6)
-//   Tier 3 │ Contributor   → tier id 28147942 ($10)
+//
+// Single-tier model: the campaign has one paid tier ("Patron"). Anyone with
+// an active pledge to it is entitled — there are no tier IDs to track, so a
+// price change or tier rename on Patreon needs no app update.
 const PATREON_CLIENT_ID   = process.env.SF_PATREON_CLIENT_ID   || 'tPN89A6Yz_NEpvQIQ2hDXcfCpyrrYha6YsgZ-aUcQP2y8Lcnaxm7-xSY8W3Zn4QO';
 const PATREON_CAMPAIGN_ID = process.env.SF_PATREON_CAMPAIGN_ID || '3410750';
-const PATREON_TIER_IDS = {
-  tier2: process.env.SF_PATREON_TIER2_ID || '28147937',
-  tier3: process.env.SF_PATREON_TIER3_ID || '28147942'
-};
 // Cloudflare Worker that proxies Patreon's token endpoint and adds the
 // client_secret server-side. Source: patreon-proxy.worker.js in this repo.
 const TOKEN_PROXY_URL     = process.env.SF_TOKEN_PROXY_URL     || 'https://streamfusion-patreon-proxy.bisherclay.workers.dev/';
@@ -76,7 +68,7 @@ const SCOPES = ['identity', 'identity.memberships'];
 
 // Owner accounts — always entitled regardless of Patreon membership
 // state. Primary use: the creator (who can't pledge to their own
-// Patreon) needs full access to test EA / Tier 3 features. Bypass
+// Patreon) needs full access to test EA features. Bypass
 // fires inside verifyMembership() after Patreon returns the user's
 // email, so it ONLY kicks in when the user has actually signed in
 // with a matching Patreon account — i.e. it's not a "skip sign-in"
@@ -115,7 +107,9 @@ const RUNTIME_CHECK_MS     =           60 * 60 * 1000;  // periodic reverify whi
 //                    declined_patron / former_patron. Fixes false
 //                    negatives for brand-new pledges (null status) and
 //                    Apple-relay email signups. See verifyMembership.
-const STATE_SCHEMA_V = 2;
+//   v3 (≥ 1.8.0)   — single-tier collapse: any active pledge to the
+//                    campaign is entitled (was Tier 2 / Tier 3 only).
+const STATE_SCHEMA_V = 3;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let authResolver = null;         // { resolve, reject } for the in-flight auth flow
@@ -262,11 +256,10 @@ async function refreshTokens(refreshToken) {
 // ── Core verification ────────────────────────────────────────────────────────
 // Given an access token, figure out the user's current relationship to our
 // campaign. Returns a rich object — the renderer uses this to decide between
-// "unlocked", "upgrade to Tier 2+", "re-pledge your expired membership", etc.
+// "unlocked", "become a Patron", "re-pledge your expired membership", etc.
 //
-// The tier ranking (tier3 > tier2 > tier1 > follower > none) is used for a
-// single purpose: if the user pledges to multiple tiers on our campaign (which
-// happens rarely but is possible), we report the highest one they're entitled to.
+// Single-tier model: the campaign has one paid tier. Any active pledge to it
+// counts — entitled is simply "a paying patron, not declined / former".
 async function verifyMembership(accessToken) {
   var url = 'https://www.patreon.com/api/oauth2/v2/identity' +
     '?include=memberships,memberships.currently_entitled_tiers' +
@@ -279,13 +272,12 @@ async function verifyMembership(accessToken) {
   var userName = (data && data.data && data.data.attributes && data.data.attributes.full_name) || '';
   var userEmail = (data && data.data && data.data.attributes && data.data.attributes.email) || '';
 
-  // Owner bypass — always grant full Tier 3 access. Applies on BOTH
-  // stable and beta installs (the beta Tier 3 gate sees entitled +
-  // tier: 'tier3' and hides itself). Logged so presence / absence of
-  // the bypass is visible in logs when debugging access issues.
+  // Owner bypass — always grant entitled access. The creator can't pledge
+  // to their own Patreon but needs full access to test EA features. Logged
+  // so presence / absence of the bypass is visible when debugging access.
   if (userEmail && OWNER_EMAILS.indexOf(userEmail.toLowerCase()) !== -1) {
-    console.log('[patreon-auth] owner bypass: ' + userEmail + ' → synthetic tier3 (entitled)');
-    return { active: true, entitled: true, tier: 'tier3', patronStatus: 'active_patron', reason: 'entitled', userName: userName };
+    console.log('[patreon-auth] owner bypass: ' + userEmail + ' → synthetic patron (entitled)');
+    return { active: true, entitled: true, tier: 'patron', patronStatus: 'active_patron', reason: 'entitled', userName: userName };
   }
 
   if (!data || !data.included) {
@@ -327,39 +319,15 @@ async function verifyMembership(accessToken) {
                           myMembership.relationships.currently_entitled_tiers.data) || [])
                         .map(function(t) { return String(t.id); });
 
-  // Canonical check — tier IDs as they appear in the Patreon campaign
-  // config. Fast-path: this hits for anyone whose currently_entitled_tiers
-  // array comes back fully populated with the expected IDs.
-  var tier2Id = String(PATREON_TIER_IDS.tier2);
-  var tier3Id = String(PATREON_TIER_IDS.tier3);
-  var hasTier3 = entitledTierIds.indexOf(tier3Id) !== -1;
-  var hasTier2 = entitledTierIds.indexOf(tier2Id) !== -1;
-
-  // Amount-cents fallback. Protects against three known failure modes:
-  //   1. Tier IDs on the campaign change (tier recreated / renamed)
-  //      without a corresponding app update — thresholds stay true.
-  //   2. Patreon's API occasionally returns an empty / partial
-  //      `currently_entitled_tiers` array for recently-pledged users
-  //      whose tier association hasn't fully synced. amount_cents is
-  //      set to the pledge value as soon as the charge succeeds.
-  //   3. Edge-case response shapes where the tier relationship is
-  //      missing but the summary attribute is present.
-  // Thresholds match the public campaign (verified 2026-04-21):
-  //   Tier 2 "Early Access"  → $6   → >= 600 cents
-  //   Tier 3 "Contributor"   → $10  → >= 1000 cents
-  if (!hasTier3 && amountCents >= 1000) {
-    console.log('[patreon-auth] verify: tier3 granted via amount_cents fallback (' + amountCents + 'c, tier-id list was ' + JSON.stringify(entitledTierIds) + ')');
-    hasTier3 = true;
-  }
-  if (!hasTier2 && amountCents >= 600) {
-    console.log('[patreon-auth] verify: tier2 granted via amount_cents fallback (' + amountCents + 'c, tier-id list was ' + JSON.stringify(entitledTierIds) + ')');
-    hasTier2 = true;
-  }
-
-  var tier = hasTier3 ? 'tier3'
-           : hasTier2 ? 'tier2'
-           : (entitledTierIds.length > 0 || amountCents > 0) ? 'tier1'
-           : 'follower';
+  // Single-tier model: the campaign has exactly one paid tier, so any
+  // active pledge counts. We treat the user as a paying patron when
+  // Patreon reports either a positive entitled amount OR at least one
+  // entitled tier on our campaign. Reading both signals covers the API's
+  // occasional partial responses for freshly-pledged users (the tier
+  // association can lag, but currently_entitled_amount_cents is set as
+  // soon as the charge succeeds). No tier IDs to track — robust to a
+  // price change or tier rename on Patreon.
+  var hasPledge = amountCents > 0 || entitledTierIds.length > 0;
 
   // Patreon's patron_status lifecycle:
   //   - active_patron       : last charge succeeded, currently paying
@@ -378,15 +346,16 @@ async function verifyMembership(accessToken) {
   // membership on our campaign) but the strict status gate rejected
   // them. Reported by itstojuo + wtnjb7nqfq among others.
   //
-  // 1.5.0.2 BEHAVIOR: trust currently_entitled_amount_cents as the
-  // payment signal — if Patreon reports amount >= 600c, the user IS
-  // paying $6+ right now. Explicitly BLOCK only declined_patron /
-  // former_patron (states where Patreon definitively says "payment
-  // failed" or "pledge ended" — amount_cents will typically already
-  // be 0 in those cases, but the status is extra assurance).
+  // SINGLE-TIER BEHAVIOR: trust the pledge signal — if Patreon reports any
+  // active pledge to the campaign, the user IS a paying patron right now.
+  // Explicitly BLOCK only declined_patron / former_patron (states where
+  // Patreon definitively says "payment failed" or "pledge ended" —
+  // amount_cents is typically already 0 there, but the status is extra
+  // assurance).
   var explicitlyInactive = patronStatus === 'declined_patron' ||
                            patronStatus === 'former_patron';
-  var entitled = (hasTier2 || hasTier3) && !explicitlyInactive;
+  var entitled = hasPledge && !explicitlyInactive;
+  var tier = entitled ? 'patron' : 'follower';
   // `active` kept in the public state for renderer-side UI decisions
   // (e.g. "Connected but inactive"). Entitlement no longer depends on it.
   var active = patronStatus === 'active_patron' || entitled;
@@ -403,8 +372,7 @@ async function verifyMembership(accessToken) {
                  'email=' + (userEmail || 'unknown') + ' ' +
                  'patron_status=' + patronStatus + ' ' +
                  'amount_cents=' + amountCents + ' ' +
-                 'tier_ids=' + JSON.stringify(entitledTierIds) + ' ' +
-                 '(expected tier2=' + tier2Id + ' tier3=' + tier3Id + ')');
+                 'tier_ids=' + JSON.stringify(entitledTierIds));
     try {
       var dump = JSON.stringify(data, null, 2);
       if (dump.length > 6144) dump = dump.slice(0, 6144) + '\n… [truncated]';
@@ -415,8 +383,7 @@ async function verifyMembership(accessToken) {
   var reason;
   if (entitled) reason = 'entitled';
   else if (explicitlyInactive) reason = patronStatus;       // declined_patron / former_patron
-  else if (amountCents === 0 && entitledTierIds.length === 0) reason = 'follower';
-  else reason = 'insufficient_tier';                         // has some pledge but below Tier 2 ($6)
+  else reason = 'follower';                                 // signed in, but no active pledge
 
   return { active: active, entitled: entitled, tier: tier, patronStatus: patronStatus, reason: reason, userName: userName };
 }
@@ -614,7 +581,7 @@ function _checkBetaOwnerBypass() {
       return {
         signedIn: true,
         entitled: true,
-        tier: 'tier3',
+        tier: 'patron',
         patronStatus: 'active_patron',
         reason: 'owner_bypass',
         userName: 'Owner',
