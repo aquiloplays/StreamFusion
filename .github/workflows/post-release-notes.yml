@@ -47,9 +47,10 @@ name: Post release notes to Discord
 #
 #   SF_RELEASE_CHANNEL_ID     (optional, default below)
 #     Override for the target Discord channel. Defaults to
-#     1494765819891159202 (the community #releases channel). Set on
-#     the beta repo if you want beta posts in a Tier-3-only channel
-#     instead of the same community channel.
+#     1504877541985357864 (the dedicated StreamFusion releases
+#     channel, rotated from the old community #releases channel
+#     1494765819891159202 in 2026-05 per Clay). Set on the beta
+#     repo if you want beta posts in a Tier-3-only channel instead.
 #
 # The built-in GITHUB_TOKEN is used for the GitHub release fetch. On
 # private repos it's scoped to THIS repo, which is fine since the

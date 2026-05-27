@@ -18,7 +18,11 @@
 //   SF_RELEASE_POST_SECRET     Shared secret matching RELEASE_POST_SECRET on
 //                              Railway. Set the SAME value on BOTH repos.
 //   SF_RELEASE_CHANNEL_ID      Target Discord channel id (default:
-//                              1494765819891159202 — community #releases)
+//                              1504877541985357864 — the dedicated
+//                              StreamFusion releases channel that
+//                              replaced the old community #releases
+//                              channel 1494765819891159202 in
+//                              2026-05 per Clay's channel rotation).
 //
 // Optional env vars (per-repo via Actions secrets):
 //   SF_RELEASE_REPO            owner/repo to pull the release from. Defaults
@@ -58,7 +62,7 @@ const https = require('https');
 // you're running your own deployment.
 const BOT_BASE = (process.env.SF_BOT_SERVICE_URL || 'https://sf-release.aquiloplays.workers.dev').replace(/\/$/, '');
 const SECRET   = process.env.SF_RELEASE_POST_SECRET || '';
-const CHANNEL  = process.env.SF_RELEASE_CHANNEL_ID  || '1494765819891159202';
+const CHANNEL  = process.env.SF_RELEASE_CHANNEL_ID  || '1504877541985357864';
 const GH_PAT   = process.env.SF_GITHUB_PAT          || '';
 const REPO     = process.env.SF_RELEASE_REPO || process.env.GITHUB_REPOSITORY || 'aquiloplays/StreamFusion';
 const PING     = (process.env.SF_RELEASE_PING_ROLE_ID || '').trim();
