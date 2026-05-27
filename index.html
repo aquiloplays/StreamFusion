@@ -16,7 +16,16 @@
   --tw:#9147ff;--tw-d:#9147ff22;
   --accent:#7c5cff;--accent-d:#7c5cff22;--accent-bright:#9a82ff;
   --brand-green:#5bff95;
+  --brand-pink:#ff6ab5;
+  --brand-amber:#ffb454;
   --brand-grad:linear-gradient(135deg,#9a82ff 0%,#5bff95 100%);
+  /* Signature aquilo aurora: violet → pink → green. Matches the
+     `_gradients.auroraStops` array in assets/palette.json. */
+  --brand-aurora:linear-gradient(135deg,#9a82ff 0%,#ff6ab5 50%,#5bff95 100%);
+  /* Semantic aliases — match palette.json's mapping where danger=pink. */
+  --sem-success:#5bff95;
+  --sem-warning:#ffb454;
+  --sem-danger:#ff6ab5;
   --yt:#ff0000;--yt-d:#ff000022;
   --tt:#00f2ea;--tt-d:#00f2ea22;
   --kk:#53fc18;--kk-d:#53fc1822;
@@ -2248,6 +2257,17 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <button class="tbtn" id="popoutVisHotkeyBtn" onclick="capturePopVisHotkey()" style="font-size:12px;font-weight:700;min-width:180px">Ctrl + Shift + H</button>
             </div>
             <div id="popoutVisHotkeyHint" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Temporarily hide the pop-out window (chat/events disappear from your screen) &mdash; press the hotkey again to restore it to the exact same position. Same binding rules as above.</div>
+
+            <!-- 1.7.x: optional global hotkey that fires the pop-out's Send-to-chat
+                 button. Works even when the pop-out window is the focused window
+                 on stream — main process registers a globalShortcut. Empty
+                 (None) by default; user opts in. -->
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt);margin-top:14px">
+              <span style="flex:1">Send chat from pop-out hotkey <span style="color:var(--mut);font-weight:400">(fires the Send button)</span></span>
+              <button class="tbtn" id="popoutChatSendHotkeyBtn" onclick="capturePopChatSendHotkey()" style="font-size:12px;font-weight:700;min-width:180px">None</button>
+              <button class="tbtn" id="popoutChatSendHotkeyClearBtn" onclick="clearPopChatSendHotkey()" style="font-size:11px;font-weight:600;padding:5px 10px" title="Remove the binding">Clear</button>
+            </div>
+            <div id="popoutChatSendHotkeyHint" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Fires whatever&rsquo;s typed in the pop-out&rsquo;s chat input as a chat message &mdash; same as clicking <strong>Send</strong>. Useful while playing fullscreen so you can reply without alt-tabbing. Bind a combo (modifier + key, any F-key, or mouse buttons 4/5). Examples: <code>Ctrl+Shift+Enter</code>, <code>Alt+S</code>, <code>F9</code>. Press <code>Esc</code> to cancel, or use <strong>Clear</strong> to unbind.</div>
           </div>
         </div>
 
@@ -2713,30 +2733,17 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               </div>
             </div>
 
-            <!-- Section 3: Shared StreamFusion bot — one bot, invited by
-                 supporters to their own servers. No dev-portal registration
-                 needed on the supporter's end. -->
-            <div class="sec">
-              <div class="sec-hd">Discord Bot (Community Join Events)</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Invite the <strong style="color:var(--txt)">StreamFusion bot</strong> to your Discord server and paste your server ID below. Member joins, voice-channel joins, and (optionally) messages from a specific channel will show up in StreamFusion's Events panel so you can thank people without alt-tabbing.</div>
-              <div style="display:flex;gap:6px;margin-bottom:8px">
-                <button class="cbtn tw" onclick="inviteSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px"><svg class="ic"><use href="#i-bolt"/></svg> Invite StreamFusion bot</button>
-              </div>
-              <input class="minput" id="dcBotGuildInput" type="text" placeholder="Discord server ID (a long number)" title="To find your server ID: (1) In Discord, open User Settings → Advanced → turn on Developer Mode. (2) Right-click your server name in the server list. (3) Click 'Copy Server ID'. Paste it here." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:6px" oninput="dcBotGuildId=this.value.trim();saveDiscordSettings()" onchange="dcBotGuildId=this.value.trim();saveDiscordSettings()">
-              <input class="minput" id="dcBotChannelInput" type="text" placeholder="Text channel ID (optional \u2014 for message events)" style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-bottom:8px" oninput="dcBotChannelId=this.value.trim();saveDiscordSettings()" onchange="dcBotChannelId=this.value.trim();saveDiscordSettings()">
-              <label class="frow" style="font-size:11px"><span>New members joining your Discord server</span><input type="checkbox" id="dcBotEvtMember" checked onchange="saveDiscordSettings()"></label>
-              <label class="frow" style="font-size:11px;color:var(--mut)" title="Post a note in your SF event feed every time someone joins a voice channel in your server. Leave off unless you really want this — active servers will fill your feed fast."><span>Voice channel joins <span style="font-weight:400">(noisy)</span></span><input type="checkbox" id="dcBotEvtVoice" onchange="saveDiscordSettings()"></label>
-              <label class="frow" style="font-size:11px;color:var(--mut)"><span>Messages in configured channel <span style="font-weight:400">(very noisy)</span></span><input type="checkbox" id="dcBotEvtMessage" onchange="saveDiscordSettings()"></label>
-              <div style="margin-top:8px;display:flex;gap:6px">
-                <button id="dcBotConnectBtn" class="cbtn tw" onclick="toggleSharedBot()" style="flex:1;font-size:11px;height:28px;padding:0 10px">Connect</button>
-              </div>
-              <div id="dcBotStatus" style="font-size:11px;color:var(--mut);margin-top:6px;line-height:1.5">Not connected.</div>
-              <details style="margin-top:10px">
-                <summary style="cursor:pointer;font-size:11px;color:var(--mut)">Advanced: use your own bot instead</summary>
-                <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:6px" title="For developers: you can run your own Discord application instead of the shared StreamFusion bot.">Have your own Discord bot? Paste its token here and SF will use that instead of the shared StreamFusion bot. You'll need to enable the <em>Server Members</em> intent on your bot's page at discord.com/developers.</div>
-                <input class="minput" id="dcBotTokenInput" type="password" placeholder="Custom bot token..." style="font-size:11px;padding:5px 8px;background:var(--surf2);width:100%;margin-top:6px" oninput="dcBotToken=this.value.trim();saveDiscordSettings()" onchange="dcBotToken=this.value.trim();saveDiscordSettings()">
-              </details>
-            </div>
+            <!-- Section 3: Standalone StreamFusion Discord bot — RETIRED in
+                 1.7.x as part of the bot-consolidation pass. The unified
+                 Loadout bot now handles every Discord-side integration
+                 (member joins, voice events, channel posts) for all
+                 aquilo.gg products. The "Invite StreamFusion bot" UI +
+                 inviteSharedBot/toggleSharedBot/etc. handlers were
+                 stripped from the renderer; the main-process IPC plumbing
+                 in main.js + discord-bot.js + bot-service/ is left in
+                 place so it can be revived if a SF-only path is ever
+                 wanted again, but it is currently unreachable from the
+                 UI. -->
 
             <!-- Section 3b: Community recap sharing — opt-in repost of the
                  streamer's recap to the aquilo.gg community Discord. The
@@ -11018,6 +11025,12 @@ var _popVisHotkey = localStorage.getItem('sf_overlay_vis_hotkey') || 'CommandOrC
 var _capturingPopVisHotkey = false;
 var _soHotkey = localStorage.getItem('sf_so_hotkey') || 'CommandOrControl+Shift+S';
 var _capturingSOHotkey = false;
+// 1.7.x: pop-out chat-send hotkey. Empty = unbound. The main process is
+// the source of truth (persisted to popout-send-hotkey.json there); we
+// fetch the current value on boot via popoutGetSendHotkey to make sure
+// the UI matches.
+var _popChatSendHotkey = '';
+var _capturingPopChatSendHotkey = false;
 function _formatAccel(a) {
   if (!a) return 'None';
   return a.replace(/CommandOrControl/gi,'Ctrl').replace(/CmdOrCtrl/gi,'Ctrl').replace(/Control/gi,'Ctrl').replace(/\+/g,' + ');
@@ -11057,29 +11070,73 @@ function _renderSOHotkeyBtn() {
   if (!btn) return;
   btn.textContent = _capturingSOHotkey ? 'Press combo… (Esc to cancel)' : _formatAccel(_soHotkey);
 }
-function captureSOHotkey() {
-  _capturingSOHotkey = true;
+function _renderPopChatSendHotkeyBtn() {
+  var btn = document.getElementById('popoutChatSendHotkeyBtn');
+  if (!btn) return;
+  btn.textContent = _capturingPopChatSendHotkey ? 'Press combo… (Esc to cancel)' : (_popChatSendHotkey ? _formatAccel(_popChatSendHotkey) : 'None');
+}
+function _resetAllCaptureFlags() {
   _capturingOverlayHotkey = false;
   _capturingPopVisHotkey = false;
+  _capturingSOHotkey = false;
+  _capturingPopChatSendHotkey = false;
+}
+function captureSOHotkey() {
+  _resetAllCaptureFlags();
+  _capturingSOHotkey = true;
   _renderSOHotkeyBtn();
   _renderOverlayHotkeyBtn();
   _renderPopVisHotkeyBtn();
+  _renderPopChatSendHotkeyBtn();
 }
 function captureOverlayHotkey() {
+  _resetAllCaptureFlags();
   _capturingOverlayHotkey = true;
-  _capturingPopVisHotkey = false;
-  _capturingSOHotkey = false;
+  _renderOverlayHotkeyBtn();
+  _renderPopVisHotkeyBtn();
+  _renderSOHotkeyBtn();
+  _renderPopChatSendHotkeyBtn();
+}
+function capturePopVisHotkey() {
+  _resetAllCaptureFlags();
+  _capturingPopVisHotkey = true;
+  _renderPopVisHotkeyBtn();
+  _renderOverlayHotkeyBtn();
+  _renderSOHotkeyBtn();
+  _renderPopChatSendHotkeyBtn();
+}
+function capturePopChatSendHotkey() {
+  _resetAllCaptureFlags();
+  _capturingPopChatSendHotkey = true;
+  _renderPopChatSendHotkeyBtn();
   _renderOverlayHotkeyBtn();
   _renderPopVisHotkeyBtn();
   _renderSOHotkeyBtn();
 }
-function capturePopVisHotkey() {
-  _capturingPopVisHotkey = true;
-  _capturingOverlayHotkey = false;
-  _capturingSOHotkey = false;
-  _renderPopVisHotkeyBtn();
-  _renderOverlayHotkeyBtn();
-  _renderSOHotkeyBtn();
+function _pushPopChatSendHotkey(accel) {
+  if (!window.electronAPI || !window.electronAPI.popoutSetSendHotkey) return;
+  window.electronAPI.popoutSetSendHotkey(accel).then(function(res) {
+    var hint = document.getElementById('popoutChatSendHotkeyHint');
+    if (!hint) return;
+    if (res && res.ok) {
+      _popChatSendHotkey = res.accel || '';
+      _renderPopChatSendHotkeyBtn();
+      if (res.accel) {
+        hint.innerHTML = '<span style="color:var(--grn);display:inline-flex;align-items:center;gap:4px"><svg class="ic"><use href="#i-check"/></svg>Hotkey set: ' + esc(_formatAccel(res.accel)) + ' &mdash; press it from anywhere to fire the pop-out Send button.</span>';
+      } else {
+        hint.innerHTML = '<span style="color:var(--mut);display:inline-flex;align-items:center;gap:4px">Hotkey cleared. The pop-out Send button still works as usual.</span>';
+      }
+    } else {
+      _renderPopChatSendHotkeyBtn();
+      hint.innerHTML = '<span style="color:var(--red);display:inline-flex;align-items:center;gap:4px"><svg class="ic"><use href="#i-warn"/></svg>' + esc(res && res.reason ? res.reason : 'Failed to register hotkey. Pick a different combo.') + '</span>';
+    }
+  }).catch(function() {});
+}
+function clearPopChatSendHotkey() {
+  _resetAllCaptureFlags();
+  _popChatSendHotkey = '';
+  _renderPopChatSendHotkeyBtn();
+  _pushPopChatSendHotkey('');
 }
 function _accelFromKeyEvent(e) {
   var parts = [];
@@ -11113,14 +11170,13 @@ function _matchAccel(e, accel) {
   return ek === key;
 }
 window.addEventListener('keydown', function(e) {
-  if (!_capturingOverlayHotkey && !_capturingPopVisHotkey && !_capturingSOHotkey) return;
+  if (!_capturingOverlayHotkey && !_capturingPopVisHotkey && !_capturingSOHotkey && !_capturingPopChatSendHotkey) return;
   if (e.key === 'Escape') {
-    _capturingOverlayHotkey = false;
-    _capturingPopVisHotkey = false;
-    _capturingSOHotkey = false;
+    _resetAllCaptureFlags();
     _renderOverlayHotkeyBtn();
     _renderPopVisHotkeyBtn();
     _renderSOHotkeyBtn();
+    _renderPopChatSendHotkeyBtn();
     e.preventDefault();
     return;
   }
@@ -11139,6 +11195,10 @@ window.addEventListener('keydown', function(e) {
     _capturingPopVisHotkey = false;
     _renderPopVisHotkeyBtn();
     _pushPopVisHotkey(accel);
+  } else if (_capturingPopChatSendHotkey) {
+    _capturingPopChatSendHotkey = false;
+    _renderPopChatSendHotkeyBtn();
+    _pushPopChatSendHotkey(accel);
   } else {
     _overlayHotkey = accel;
     localStorage.setItem('sf_overlay_hotkey', accel);
@@ -11154,7 +11214,7 @@ window.addEventListener('keydown', function(e) {
 // process polls them via GetAsyncKeyState and forwards through the same
 // onOverlayToggleInteract channel that the keyboard hotkey uses.
 window.addEventListener('mousedown', function(e) {
-  if (!_capturingOverlayHotkey && !_capturingPopVisHotkey) return;
+  if (!_capturingOverlayHotkey && !_capturingPopVisHotkey && !_capturingPopChatSendHotkey) return;
   // 3 = middle, 4 = X1, 5 = X2 (button index from MouseEvent.button)
   if (e.button !== 3 && e.button !== 4) return;
   var accel = (e.button === 3) ? 'Mouse4' : 'Mouse5';
@@ -11164,6 +11224,13 @@ window.addEventListener('mousedown', function(e) {
     _capturingPopVisHotkey = false;
     _renderPopVisHotkeyBtn();
     _pushPopVisHotkey(accel);
+  } else if (_capturingPopChatSendHotkey) {
+    _capturingPopChatSendHotkey = false;
+    _renderPopChatSendHotkeyBtn();
+    // Mouse4/Mouse5 go through the PowerShell poller path which currently
+    // only fans out to overlay-toggle / hotbar slots. Mark unsupported.
+    var hint = document.getElementById('popoutChatSendHotkeyHint');
+    if (hint) hint.innerHTML = '<span style="color:var(--red);display:inline-flex;align-items:center;gap:4px"><svg class="ic"><use href="#i-warn"/></svg>Mouse4 / Mouse5 aren&rsquo;t supported for the chat-send hotkey yet &mdash; they route through a separate poller. Use a keyboard combo instead.</span>';
   } else {
     _overlayHotkey = accel;
     localStorage.setItem('sf_overlay_hotkey', accel);
@@ -11180,8 +11247,18 @@ setTimeout(function() {
   _renderOverlayHotkeyBtn();
   _renderPopVisHotkeyBtn();
   _renderSOHotkeyBtn();
+  _renderPopChatSendHotkeyBtn();
   _pushOverlayHotkey(_overlayHotkey);
   _pushPopVisHotkey(_popVisHotkey);
+  // Hydrate the pop-out chat-send hotkey from the main process (source
+  // of truth, persisted to popout-send-hotkey.json). Don't push it back
+  // since main already loaded it on startup.
+  if (window.electronAPI && window.electronAPI.popoutGetSendHotkey) {
+    window.electronAPI.popoutGetSendHotkey().then(function(accel) {
+      _popChatSendHotkey = accel || '';
+      _renderPopChatSendHotkeyBtn();
+    }).catch(function() {});
+  }
 }, 800);
 
 // ── Pop-out preset sizes (Tall/Wide/Compact/Square/Default) ──
@@ -11675,20 +11752,17 @@ function sendObsAlert(obj) {
 
 var dcEventWebhook   = '';
 var dcRecordsWebhook = '';
-var dcBotToken       = '';
-var dcBotGuildId     = '';
-var dcBotChannelId   = '';
+// dcBotToken / dcBotGuildId / dcBotChannelId / dcBot — RETIRED in 1.7.x
+// when the standalone StreamFusion Discord bot was rolled into the unified
+// Loadout bot. The renderer no longer reads or writes these.
 var dcPost = { follow: false, sub: true, cheer: true, kick: true, gift: true, hype: true, ttgift: true };
 // Big-TikTok-gift threshold in coins. Streaks below this value don't
 // trigger a Discord post. Default 500 ≈ $5 which is roughly the median
 // "this is actually a big deal" TT gift.
 var dcTtGiftThreshold = 500;
 var dcSb   = { patreon: true, fourthwall: true, kofi: true, se: true };
-// Voice + message event forwarding defaults OFF so the Events panel
-// stays focused on the one Discord moment that actually matters during
-// a stream: a brand-new member just joined the server. Streamers who
-// want the noisier events can flip them on manually.
-var dcBot  = { enabled: false, evtMember: true, evtVoice: false, evtMessage: false };
+// dcBot — retired with the standalone StreamFusion bot in 1.7.x. See note
+// above near dcBotToken.
 var dcGiftThreshold = 5;
 var dcRecordsAuto = true;
 // Opt-in: repost stream recap to the aquilo.gg community Discord via the
@@ -11696,12 +11770,8 @@ var dcRecordsAuto = true;
 // lives on the Worker; SF never sees it.
 var dcCommunityRecap = false;
 var COMMUNITY_RECAP_URL = 'https://streamfusion-patreon-proxy.bisherclay.workers.dev/community-recap';
-// Shared StreamFusion bot service (hosted on Railway). One bot for all
-// EA supporters — they invite it to their server, paste the guild ID
-// here, and SF opens an SSE stream so Discord events flow back in.
-// Override in dev by setting window.__SF_BOT_SERVICE_URL before this
-// file runs.
-var BOT_SERVICE_URL = (window.__SF_BOT_SERVICE_URL || 'https://streamfusion-production-0bdd.up.railway.app').replace(/\/$/, '');
+// BOT_SERVICE_URL — retired in 1.7.x. The standalone Railway-hosted
+// StreamFusion bot has been folded into the unified Loadout bot.
 // All-time cumulative records. Persisted separately so they survive
 // installs + reset-stats actions. Each entry: { user, amount, ts }.
 var dcRecords = {
@@ -11720,12 +11790,11 @@ function loadDiscordSettings() {
     var d = JSON.parse(raw);
     if (d.eventWebhook != null)   dcEventWebhook   = d.eventWebhook;
     if (d.recordsWebhook != null) dcRecordsWebhook = d.recordsWebhook;
-    if (d.botToken != null)       dcBotToken       = d.botToken;
-    if (d.botGuildId != null)     dcBotGuildId     = d.botGuildId;
-    if (d.botChannelId != null)   dcBotChannelId   = d.botChannelId;
+    // d.botToken / d.botGuildId / d.botChannelId / d.bot — 1.7.x retired
+    // the standalone StreamFusion Discord bot; these legacy keys are no
+    // longer read. Old saved settings simply ignore them.
     if (d.post) Object.assign(dcPost, d.post);
     if (d.sb)   Object.assign(dcSb,   d.sb);
-    if (d.bot)  Object.assign(dcBot,  d.bot);
     if (d.giftThreshold) dcGiftThreshold = d.giftThreshold;
     if (d.ttGiftThreshold) dcTtGiftThreshold = d.ttGiftThreshold;
     if (d.recordsAuto != null) dcRecordsAuto = d.recordsAuto;
@@ -11754,14 +11823,11 @@ function saveDiscordSettings() {
   if (get('dcSbFourthwall')) dcSb.fourthwall = get('dcSbFourthwall').checked;
   if (get('dcSbKofi'))       dcSb.kofi       = get('dcSbKofi').checked;
   if (get('dcSbSE'))         dcSb.se         = get('dcSbSE').checked;
-  if (get('dcBotEvtMember'))  dcBot.evtMember  = get('dcBotEvtMember').checked;
-  if (get('dcBotEvtVoice'))   dcBot.evtVoice   = get('dcBotEvtVoice').checked;
-  if (get('dcBotEvtMessage')) dcBot.evtMessage = get('dcBotEvtMessage').checked;
+  // dcBotEvtMember/Voice/Message — retired with the standalone bot.
   try {
     localStorage.setItem('sf_discord_ea', JSON.stringify({
       eventWebhook: dcEventWebhook, recordsWebhook: dcRecordsWebhook,
-      botToken: dcBotToken, botGuildId: dcBotGuildId, botChannelId: dcBotChannelId,
-      post: dcPost, sb: dcSb, bot: dcBot,
+      post: dcPost, sb: dcSb,
       giftThreshold: dcGiftThreshold, ttGiftThreshold: dcTtGiftThreshold, recordsAuto: dcRecordsAuto,
       records: dcRecords, recordsMessageId: dcRecordsMessageId,
       communityRecap: dcCommunityRecap
@@ -12220,106 +12286,17 @@ function testRecordsWebhook() {
   });
 }
 
-// ── Discord Bot Gateway wiring ────────────────────────────────────────────
-// Two paths:
-//   1. Shared bot  (default) — SSE to BOT_SERVICE_URL/events, auth via
-//      the user's Patreon access token. One hosted bot in many servers.
-//   2. Custom bot  (fallback) — a bot token the user provides. Runs
-//      through the main-process Gateway WS in discord-bot.js.
-// If dcBotToken is set we assume the user wants custom; otherwise shared.
+// Standalone StreamFusion Discord bot — RETIRED in 1.7.x.
+// The renderer-side helpers (inviteSharedBot, toggleSharedBot,
+// connectSharedBot, disconnectSharedBot, toggleDiscordBot,
+// renderDiscordBotStatus) were stripped when the bot was rolled into
+// the unified Loadout bot. The main-process IPC handlers in main.js +
+// discord-bot.js are intact but no longer reachable from the UI.
 
-var _sharedBotSource = null;   // EventSource instance for the SSE stream
-
-function inviteSharedBot() {
-  // Fetch the current invite URL from the bot service so the invite always
-  // reflects the permissions the bot was built with. Falls back to a
-  // sensible Discord URL pattern if the service is unreachable.
-  fetch(BOT_SERVICE_URL + '/bot-invite')
-    .then(function(r) { return r.json(); })
-    .then(function(j) {
-      if (j && j.url) { window.open(j.url, '_blank'); return; }
-      addEvHistory('StreamFusion', 'Bot invite URL not configured on the service yet.', 'tw', false);
-    })
-    .catch(function() {
-      addEvHistory('StreamFusion', 'Could not reach StreamFusion bot service.', 'tw', false);
-    });
-}
-
-function toggleSharedBot() {
-  if (dcBot.enabled) { disconnectSharedBot(); return; }
-  if (dcBotToken) {
-    // Custom-bot mode — delegate to the main-process Gateway WS.
-    window.electronAPI.discordBotConnect({
-      token:     dcBotToken,
-      guildId:   dcBotGuildId || null,
-      channelId: dcBotChannelId || null
-    }).then(function(res) {
-      if (res && res.ok) { dcBot.enabled = true; saveDiscordSettings(); renderDiscordBotStatus(); }
-    });
-    return;
-  }
-  connectSharedBot();
-}
-
-function connectSharedBot() {
-  if (_sharedBotSource) { try { _sharedBotSource.close(); } catch (e) {} _sharedBotSource = null; }
-  var pt = S.patreon && S.patreon.accessToken;   // Not directly exposed; see note below
-  // NOTE: the renderer only has the public entitlement shape (no raw
-  // Patreon token). The bot service accepts the token in a URL query
-  // param, but we don't want to expose that token to the renderer. So
-  // we route the connection through an IPC handler in the main process
-  // which has access to the cached Patreon auth state.
-  if (!window.electronAPI || !window.electronAPI.sharedBotConnect) {
-    addEvHistory('StreamFusion', 'Shared bot connection not available in this build.', 'tw', false);
-    return;
-  }
-  window.electronAPI.sharedBotConnect({
-    botServiceUrl: BOT_SERVICE_URL,
-    guildId:       dcBotGuildId || null
-  }).then(function(res) {
-    if (res && res.ok) {
-      dcBot.enabled = true;
-      saveDiscordSettings();
-      renderDiscordBotStatus();
-    } else {
-      addEvHistory('StreamFusion', 'Could not connect to StreamFusion bot: ' + (res && res.reason || 'unknown'), 'tw', false);
-    }
-  });
-}
-
-function disconnectSharedBot() {
-  if (dcBotToken && window.electronAPI && window.electronAPI.discordBotDisconnect) {
-    window.electronAPI.discordBotDisconnect().then(function() {
-      dcBot.enabled = false;
-      saveDiscordSettings();
-      renderDiscordBotStatus();
-    });
-    return;
-  }
-  if (window.electronAPI && window.electronAPI.sharedBotDisconnect) {
-    window.electronAPI.sharedBotDisconnect().then(function() {
-      dcBot.enabled = false;
-      saveDiscordSettings();
-      renderDiscordBotStatus();
-    });
-  }
-}
-
-// Old function name still used in some legacy paths — alias to the new one.
-function toggleDiscordBot() { toggleSharedBot(); }
-
-function renderDiscordBotStatus() {
-  var btn = document.getElementById('dcBotConnectBtn');
-  var st  = document.getElementById('dcBotStatus');
-  if (btn) btn.textContent = dcBot.enabled ? 'Disconnect bot' : 'Connect bot';
-  if (!window.electronAPI || !window.electronAPI.discordBotStatus) return;
-  window.electronAPI.discordBotStatus().then(function(s) {
-    if (!st) return;
-    if (s && s.connected) st.innerHTML = '<span style="color:var(--ok,#22c55e)">&#9679; Connected</span> \u2014 watching for events.';
-    else if (dcBot.enabled) st.innerHTML = '<span style="color:#f0b429">&#9679; Connecting\u2026</span>';
-    else st.innerHTML = 'Not connected.';
-  });
-}
+// Stubs left so legacy callers no-op cleanly instead of throwing if
+// anything outside this file ever called them.
+function toggleDiscordBot() {}
+function renderDiscordBotStatus() {}
 
 // ── Rotation Relay (free, universal) ──────────────────────────────────────
 // Subscribes to song events from the streamer's Rotation widget and surfaces
@@ -12645,9 +12622,8 @@ function renderDiscordTab() {
   var get = function(id) { return document.getElementById(id); };
   if (get('dcEventWebhookInput'))   get('dcEventWebhookInput').value   = dcEventWebhook;
   if (get('dcRecordsWebhookInput')) get('dcRecordsWebhookInput').value = dcRecordsWebhook;
-  if (get('dcBotTokenInput'))       get('dcBotTokenInput').value       = dcBotToken;
-  if (get('dcBotGuildInput'))       get('dcBotGuildInput').value       = dcBotGuildId;
-  if (get('dcBotChannelInput'))     get('dcBotChannelInput').value     = dcBotChannelId;
+  // dcBotTokenInput / dcBotGuildInput / dcBotChannelInput — retired with
+  // the standalone bot UI in 1.7.x; the elements no longer exist.
   if (get('dcGiftThreshold'))       get('dcGiftThreshold').value       = dcGiftThreshold;
   if (get('dcTtGiftThreshold'))     get('dcTtGiftThreshold').value     = dcTtGiftThreshold;
   ['Follow','Sub','Cheer','Kick','Gift','Hype'].forEach(function(k) {
@@ -12662,9 +12638,7 @@ function renderDiscordTab() {
   if (get('dcSbFourthwall')) get('dcSbFourthwall').checked = !!dcSb.fourthwall;
   if (get('dcSbKofi'))       get('dcSbKofi').checked       = !!dcSb.kofi;
   if (get('dcSbSE'))         get('dcSbSE').checked         = !!dcSb.se;
-  if (get('dcBotEvtMember'))  get('dcBotEvtMember').checked  = !!dcBot.evtMember;
-  if (get('dcBotEvtVoice'))   get('dcBotEvtVoice').checked   = !!dcBot.evtVoice;
-  if (get('dcBotEvtMessage')) get('dcBotEvtMessage').checked = !!dcBot.evtMessage;
+  // dcBotEvt* — retired with the standalone bot UI in 1.7.x.
   // Records summary
   var summary = get('dcRecordsSummary');
   if (summary) {

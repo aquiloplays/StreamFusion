@@ -174,6 +174,50 @@ function _rebuildTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate(items));
 }
 let overlayHotkeyAccel = 'CommandOrControl+Shift+L';
+// 1.7.x: global hotkey that fires the overlay's Send-to-chat action. Empty
+// string means "no binding" — the feature is opt-in so we never grab a
+// combo silently at startup. Persisted via popout-send-hotkey.json so it
+// survives restarts. Set / read from the renderer via the
+// popout-set-send-hotkey / popout-get-send-hotkey IPC channels.
+let popoutSendHotkeyAccel = '';
+function getPopoutSendHotkeyPath() { return path.join(app.getPath('userData'), 'popout-send-hotkey.json'); }
+function loadPopoutSendHotkey() {
+  try {
+    var d = JSON.parse(fs.readFileSync(getPopoutSendHotkeyPath(), 'utf8'));
+    if (d && typeof d.accel === 'string') popoutSendHotkeyAccel = d.accel;
+  } catch (e) {}
+}
+function savePopoutSendHotkey() {
+  try { fs.writeFileSync(getPopoutSendHotkeyPath(), JSON.stringify({ accel: popoutSendHotkeyAccel })); } catch (e) {}
+}
+// Reject combos that conflict with hard OS-level shortcuts the user is
+// unlikely to actually want to override (and that some of which are
+// impossible to register anyway — listing them explicitly gives a clean
+// error message instead of a silent "register returned false"). Lone
+// modifier-less single keys are also rejected since they would intercept
+// every keystroke of normal typing.
+function _isReservedPopoutAccel(accel) {
+  if (!accel) return null;
+  var a = String(accel).trim();
+  var lower = a.toLowerCase();
+  // System-reserved on Windows
+  if (lower === 'alt+f4')                return 'Alt+F4 is a system close shortcut and cannot be reassigned.';
+  if (lower === 'ctrl+alt+delete')       return 'Ctrl+Alt+Delete is reserved by the operating system.';
+  if (lower.indexOf('super') === 0)      return 'The Windows / Super key cannot be remapped from inside the app.';
+  if (lower === 'f1')                    return 'F1 opens Windows Help — pick a different key.';
+  // Pure modifier (or empty key part) — Electron rejects these but we
+  // give a friendlier message.
+  var parts = a.split('+');
+  var key = parts[parts.length - 1];
+  if (!key) return 'No final key — combo must end with a real key.';
+  var KEYWORDS = ['Control', 'Ctrl', 'CommandOrControl', 'CmdOrCtrl', 'Cmd', 'Command', 'Shift', 'Alt', 'Option', 'Meta', 'Super'];
+  if (KEYWORDS.indexOf(key) !== -1) return 'Combo must include a non-modifier key (letter, digit, or F-key).';
+  // Plain letters/digits without any modifier would swallow normal typing.
+  if (parts.length === 1 && /^[a-z0-9]$/i.test(key)) {
+    return 'Plain keys without a modifier would intercept normal typing. Pair with Ctrl / Alt / Shift, or pick an F-key.';
+  }
+  return null;
+}
 // Mouse4/Mouse5 cannot be registered via Electron globalShortcut. When the
 // user picks one of those, we record it here and the PowerShell input poller
 // (further down) watches the corresponding XButton state and emits the
@@ -200,6 +244,7 @@ function loadMouseBindings() {
   } catch (e) {}
 }
 loadMouseBindings();
+loadPopoutSendHotkey();
 // Separate hotkey for toggling overlay visibility (hide/show). Lets the
 // streamer quickly hide the pop-out from their own screen without losing
 // its position / state. Defaults to Ctrl+Shift+H.
@@ -271,6 +316,17 @@ function registerAllOverlayHotkeys() {
     try {
       globalShortcut.register(overlayVisHotkeyAccel, toggleOverlayVisibility);
     } catch (e) { console.error('[overlay] failed to register vis hotkey', overlayVisHotkeyAccel, e); }
+  }
+  // Pop-out chat-send hotkey. Fires whatever the overlay's Send button
+  // does — see overlay.html's doSend(). Empty accel means "unbound".
+  if (popoutSendHotkeyAccel) {
+    try {
+      globalShortcut.register(popoutSendHotkeyAccel, () => {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send('overlay-fire-chat-send');
+        }
+      });
+    } catch (e) { console.error('[overlay] failed to register chat-send hotkey', popoutSendHotkeyAccel, e); }
   }
 }
 
@@ -1483,6 +1539,36 @@ ipcMain.handle('overlay-set-hotkey', (event, accel) => {
 });
 ipcMain.handle('overlay-get-hotkey', () => overlayHotkeyAccel);
 
+// Pop-out chat-send hotkey. Returns:
+//   { ok, accel, reason? } — ok=false carries `reason` for the UI hint.
+// Pass '' (empty) or null to clear the binding.
+ipcMain.handle('popout-set-send-hotkey', (event, accel) => {
+  var clean = (accel == null) ? '' : String(accel).trim();
+  if (clean === '') {
+    popoutSendHotkeyAccel = '';
+    savePopoutSendHotkey();
+    registerAllOverlayHotkeys();
+    return { ok: true, accel: '', reason: 'cleared' };
+  }
+  var bad = _isReservedPopoutAccel(clean);
+  if (bad) return { ok: false, accel: popoutSendHotkeyAccel, reason: bad };
+  // Don't allow stomping the overlay's existing hotkeys — they all share
+  // the same globalShortcut registry and the second register() silently
+  // fails. Surface the conflict instead of leaving the user with a binding
+  // that doesn't fire.
+  if (clean === overlayHotkeyAccel)    return { ok: false, accel: popoutSendHotkeyAccel, reason: 'Already bound to the pop-out interact toggle.' };
+  if (clean === overlayVisHotkeyAccel) return { ok: false, accel: popoutSendHotkeyAccel, reason: 'Already bound to the pop-out hide/show toggle.' };
+  popoutSendHotkeyAccel = clean;
+  savePopoutSendHotkey();
+  registerAllOverlayHotkeys();
+  var registered = true;
+  try { registered = globalShortcut.isRegistered(clean); } catch (e) {}
+  return registered
+    ? { ok: true, accel: popoutSendHotkeyAccel }
+    : { ok: false, accel: popoutSendHotkeyAccel, reason: 'Combo is already in use by another app or the OS. Pick a different one.' };
+});
+ipcMain.handle('popout-get-send-hotkey', () => popoutSendHotkeyAccel);
+
 // 1.5.1: mouse side-button → hotbar-slot bindings. Each call replaces
 // the binding for a single button. Payload shape:
 //   { button: 'Mouse4' | 'Mouse5', slot: number | null }
@@ -1555,7 +1641,7 @@ ipcMain.handle('hotbar-sync-hotkeys', (event, payload) => {
     // Electron silently fails the second register. Surface that to the
     // renderer so the user knows their binding clashes with the
     // overlay-toggle / overlay-vis hotkeys.
-    if (accel === overlayHotkeyAccel || accel === overlayVisHotkeyAccel) {
+    if (accel === overlayHotkeyAccel || accel === overlayVisHotkeyAccel || accel === popoutSendHotkeyAccel) {
       conflicted.push(accel);
       return;
     }
