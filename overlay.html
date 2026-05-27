@@ -1048,6 +1048,13 @@ document.getElementById('ovLockBtn').addEventListener('click', function() {
     }
   });
   btn.addEventListener('click', doSend);
+  // 1.7.x: global hotkey path. The main process registers a globalShortcut
+  // for the user-chosen accel (see popout-set-send-hotkey) and forwards
+  // each press to us. We fire the exact same doSend() the button does so
+  // the keybind and the button stay in lockstep.
+  if (api.onOverlayFireChatSend) {
+    api.onOverlayFireChatSend(function() { try { doSend(); } catch (e) {} });
+  }
 })();
 
 // ── Helpers ──────────────────────────────────────────────────

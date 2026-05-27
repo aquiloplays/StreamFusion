@@ -1,0 +1,56 @@
+{
+  "_doc": "Canonical aquilo.gg brand palette — pulled from src/app/globals.css :root tokens. Every brand generator (.py, .html, .svg) reads from this file so a future palette tweak only needs one edit + re-render. Tagline unchanged: 'Nightly Chaos & Streaming Tools for Creators'.",
+  "_version": "2.0",
+  "_dated": "2026-05-26",
+
+  "bg":              "#0a0b12",
+  "surface":         "#11131c",
+  "surfaceElevated": "#161929",
+  "border":          "#1f2233",
+  "borderStrong":    "#2a2f44",
+
+  "foreground":      "#ffffff",
+  "text":            "#ffffff",
+  "muted":           "#94a3b8",
+  "mutedStrong":     "#cbd5e1",
+  "subtle":          "#64748b",
+
+  "primary":         "#7c5cff",
+  "primaryBright":   "#9a82ff",
+  "accentIndigo":    "#a8b0ff",
+  "brandPink":       "#ff6ab5",
+  "brandGreen":      "#5bff95",
+  "brandAmber":      "#ffb454",
+  "brandSpotify":    "#1db954",
+
+  "success":         "#5bff95",
+  "warning":         "#ffb454",
+  "danger":          "#ff6ab5",
+
+  "_gradients": {
+    "_doc": "The signature aquilo.gg aurora — violet → pink → green. Used in `.gradient-text`, the hero blobs, and gradient bars in the banners.",
+    "auroraStops": ["#9a82ff", "#ff6ab5", "#5bff95", "#9a82ff"],
+    "primarySoft": ["#7c5cff", "#9a82ff"],
+    "violetPink":  ["#7c5cff", "#ff6ab5"],
+    "pinkGreen":   ["#ff6ab5", "#5bff95"]
+  },
+
+  "_legacyMap": {
+    "_doc": "Old v1 palette → new v2 mapping. Helps generators that previously hardcoded literals find their replacement.",
+    "#3A86FF": "primary",
+    "#2AD4B9": "brandGreen",
+    "#f0b429": "brandAmber",
+    "#0e0e10": "bg",
+    "#18181b": "surface",
+    "#1f1f23": "surfaceElevated",
+    "#26262c": "borderStrong",
+    "#efeff1": "foreground",
+    "#adadb8": "muted",
+    "#7d7f83": "subtle",
+    "#2a2a30": "border",
+    "#3fb950": "success",
+    "#f0883e": "warning",
+    "#f85149": "danger",
+    "#ff63a4": "brandPink"
+  }
+}

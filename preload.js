@@ -23,6 +23,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   overlayClickThrough:(v)     => ipcRenderer.send('overlay-click-through', v),
   overlaySetHotkey: (accel)   => ipcRenderer.invoke('overlay-set-hotkey', accel),
   overlayGetHotkey: ()        => ipcRenderer.invoke('overlay-get-hotkey'),
+  // 1.7.x: optional global hotkey that fires the pop-out's Send-to-chat
+  // button. Same plumbing as the overlay toggle — registered via
+  // globalShortcut in the main process so it works even when the pop-out
+  // window (not the main app) has focus on stream.
+  popoutSetSendHotkey: (accel) => ipcRenderer.invoke('popout-set-send-hotkey', accel),
+  popoutGetSendHotkey: ()      => ipcRenderer.invoke('popout-get-send-hotkey'),
+  // Overlay listens for chat-send fire-from-hotkey events.
+  onOverlayFireChatSend: (fn)  => ipcRenderer.on('overlay-fire-chat-send', fn),
   // Visibility toggle hotkey (hide/show the pop-out; position preserved)
   overlaySetVisHotkey:(accel) => ipcRenderer.invoke('overlay-set-vis-hotkey', accel),
   overlayGetVisHotkey:()      => ipcRenderer.invoke('overlay-get-vis-hotkey'),
