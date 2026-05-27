@@ -51,7 +51,11 @@
       "!scripts/sbae-decoded.json",
       "!scripts/sf-rf-import-new.txt",
       "!scripts/release-notes-*.md",
-      "!scripts/HANDOFF.md"
+      "!scripts/HANDOFF.md",
+      "!.claude/**",
+      "!.github/**",
+      "!marketing/**",
+      "!wrangler.toml"
     ],
     "asarUnpack": [],
     "publish": [
