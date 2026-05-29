@@ -8,7 +8,7 @@ account_id = "fa3738ee91624ee17c9ef4401ee8a493"
 #   wrangler kv namespace create FAVORITES
 [[kv_namespaces]]
 binding = "FAVORITES"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "1a88d2072b16478f8c7366b778a5491a"
 
 # Custom domain — matches the auth.aquilo.gg / release.aquilo.gg convention so
 # the client URL isn't tied to a personal *.workers.dev account.
