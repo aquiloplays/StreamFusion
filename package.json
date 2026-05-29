@@ -50,6 +50,7 @@
       "!dist-beta/**",
       "!scripts/sbae-decoded.json",
       "!scripts/sf-rf-import-new.txt",
+      "!scripts/sf-si-import.txt",
       "!scripts/release-notes-*.md",
       "!scripts/HANDOFF.md",
       "!.claude/**",
