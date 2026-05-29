@@ -1246,6 +1246,100 @@ ipcMain.handle('shared-bot-connect', async function(event, cfg) {
 ipcMain.handle('shared-bot-disconnect', function() {
   return discordBot.sharedBotDisconnect();
 });
+
+// ── Stream Info favorites (cloud sync) ──────────────────────────────────────
+// Cross-machine sync for the Stream Info → Favorites presets. Backed by the
+// aquilo-favorites Cloudflare Worker (KV). Auth mirrors shared-bot-connect:
+// the main process attaches the user's Patreon access token; the renderer
+// never sees it. A local JSON cache in userData gives instant load + offline
+// support, and is the only store for users entitled via Discord-only (no
+// Patreon token to authenticate the cloud call).
+const FAVORITES_WORKER_URL = (process.env.SF_FAVORITES_URL || 'https://favorites.aquilo.gg').replace(/\/+$/, '');
+function favoritesCachePath() { return path.join(app.getPath('userData'), 'stream-info-favorites.json'); }
+function favoritesReadCache(twitchId) {
+  try {
+    const all = JSON.parse(fs.readFileSync(favoritesCachePath(), 'utf8'));
+    const scope = (all.scopes && all.scopes[twitchId || 'default']) || null;
+    return scope ? { favorites: scope.favorites || [], updatedAt: scope.updatedAt || 0 } : { favorites: [], updatedAt: 0 };
+  } catch (e) { return { favorites: [], updatedAt: 0 }; }
+}
+function favoritesWriteCache(twitchId, favorites, updatedAt) {
+  try {
+    let all = {};
+    try { all = JSON.parse(fs.readFileSync(favoritesCachePath(), 'utf8')); } catch (e) {}
+    if (!all.scopes) all.scopes = {};
+    all.scopes[twitchId || 'default'] = { favorites: favorites || [], updatedAt: updatedAt || 0 };
+    fs.writeFileSync(favoritesCachePath(), JSON.stringify(all));
+  } catch (e) { console.warn('[favorites] cache write failed:', e && e.message); }
+}
+// Small promisified JSON request over https (GET/PUT) with a Bearer token.
+function favoritesHttp(method, urlStr, token, bodyObj) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(urlStr); } catch (e) { resolve({ ok: false, error: 'bad_url' }); return; }
+    const payload = bodyObj ? JSON.stringify(bodyObj) : null;
+    const req = https.request({
+      method, hostname: u.hostname, path: u.pathname + u.search,
+      headers: Object.assign(
+        { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json', 'User-Agent': 'StreamFusion' },
+        payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}
+      )
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { resolve({ ok: false, error: 'bad_response', status: res.statusCode }); }
+      });
+    });
+    req.on('error', (e) => resolve({ ok: false, error: 'network', detail: String(e && e.message) }));
+    req.setTimeout(12000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+async function favoritesToken() {
+  try { return await patreonAuth.getRawAccessTokenAsync(); }
+  catch (e) { try { return patreonAuth.getRawAccessToken(); } catch (e2) { return null; } }
+}
+// ── Feature-flag manifest ───────────────────────────────────────────────────
+// Reads features.json (the early-access manifest). The dedicated SF Patreon-
+// gated EA flag system will own this later; for now the renderer pulls it via
+// get-features and gates with isFeatureEnabled(). Loaded once at module init;
+// returns null if absent (renderer then assumes EA-gated, fail-safe closed).
+let _featuresManifest = null;
+try { _featuresManifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'features.json'), 'utf8')); }
+catch (e) { console.warn('[features] manifest load failed:', e && e.message); }
+ipcMain.handle('get-features', function() { return _featuresManifest; });
+
+ipcMain.handle('favorites-get', async function(event, twitchId) {
+  twitchId = String(twitchId || 'default');
+  const local = favoritesReadCache(twitchId);
+  const token = await favoritesToken();
+  if (!token) return { ok: true, favorites: local.favorites, updatedAt: local.updatedAt, localOnly: true };
+  const cloud = await favoritesHttp('GET', FAVORITES_WORKER_URL + '/favorites?twitchId=' + encodeURIComponent(twitchId), token, null);
+  if (!cloud || !cloud.ok) return { ok: true, favorites: local.favorites, updatedAt: local.updatedAt, offline: true, syncError: (cloud && cloud.error) || 'unreachable' };
+  // Last-write-wins reconciliation between cloud and the local cache.
+  if ((local.updatedAt || 0) > (cloud.updatedAt || 0)) {
+    // Local is newer (edited offline) — push it up and keep local.
+    await favoritesHttp('PUT', FAVORITES_WORKER_URL + '/favorites?twitchId=' + encodeURIComponent(twitchId), token, { favorites: local.favorites, updatedAt: local.updatedAt });
+    return { ok: true, favorites: local.favorites, updatedAt: local.updatedAt, cloudSynced: true };
+  }
+  favoritesWriteCache(twitchId, cloud.favorites, cloud.updatedAt);
+  return { ok: true, favorites: cloud.favorites || [], updatedAt: cloud.updatedAt || 0, cloudSynced: true };
+});
+ipcMain.handle('favorites-put', async function(event, arg) {
+  arg = arg || {};
+  const twitchId = String(arg.twitchId || 'default');
+  const favorites = Array.isArray(arg.favorites) ? arg.favorites : [];
+  const updatedAt = Number(arg.updatedAt) || Date.now();
+  favoritesWriteCache(twitchId, favorites, updatedAt);   // always persist locally first
+  const token = await favoritesToken();
+  if (!token) return { ok: true, localOnly: true, updatedAt };
+  const cloud = await favoritesHttp('PUT', FAVORITES_WORKER_URL + '/favorites?twitchId=' + encodeURIComponent(twitchId), token, { favorites, updatedAt });
+  if (!cloud || !cloud.ok) return { ok: true, offline: true, updatedAt, syncError: (cloud && cloud.error) || 'unreachable' };
+  return { ok: true, cloudSynced: true, updatedAt: cloud.updatedAt || updatedAt };
+});
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();
@@ -1658,6 +1752,42 @@ ipcMain.handle('hotbar-sync-hotkeys', (event, payload) => {
   });
   saveMouseBindings();
   return { ok: true, registered: registered, failed: failed, conflicted: conflicted };
+});
+
+// ── Stream Info quick-swap hotkeys ──────────────────────────────────────────
+// Open the Stream Info panel + apply pinned favorites #1-5. The renderer owns
+// persistence (localStorage) and pushes the full map here on startup / change;
+// we re-register atomically. open -> 'open-stream-info'; favN -> 'si-apply-pinned-fav'.
+let _siRegistered = new Set();
+ipcMain.handle('stream-info-sync-hotkeys', (event, payload) => {
+  payload = (payload && typeof payload === 'object') ? payload : {};
+  _siRegistered.forEach(a => { try { globalShortcut.unregister(a); } catch (e) {} });
+  _siRegistered.clear();
+  const registered = [], failed = [], conflicted = [];
+  function bind(accel, fn) {
+    accel = String(accel || '').trim();
+    if (!accel) return;
+    // Don't clash with overlay/hotbar/already-bound SI accels.
+    if (accel === overlayHotkeyAccel || accel === overlayVisHotkeyAccel || accel === popoutSendHotkeyAccel
+        || _hotbarRegistered.has(accel) || _siRegistered.has(accel)) { conflicted.push(accel); return; }
+    let ok = false;
+    try { ok = globalShortcut.register(accel, fn); } catch (e) { console.warn('[si-hotkey] register threw', accel, e && e.message); }
+    if (ok) { _siRegistered.add(accel); registered.push(accel); } else failed.push(accel);
+  }
+  bind(payload.open, () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try { mainWindow.show(); mainWindow.focus(); } catch (e) {}
+      mainWindow.webContents.send('open-stream-info');
+    }
+  });
+  for (let i = 1; i <= 5; i++) {
+    (function(n) {
+      bind(payload['fav' + n], () => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('si-apply-pinned-fav', n);
+      });
+    })(i);
+  }
+  return { ok: true, registered, failed, conflicted };
 });
 
 // Visibility toggle hotkey — separate from interact hotkey. Hides/shows the

@@ -244,6 +244,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sharedBotConnect:     (cfg)         => ipcRenderer.invoke('shared-bot-connect',    cfg || {}),
   sharedBotDisconnect:  ()            => ipcRenderer.invoke('shared-bot-disconnect'),
 
+  // ── Stream Info favorites (cloud sync, EA) ──────────────────────────────
+  // Cross-machine sync for Stream Info presets. The main process attaches the
+  // user's Patreon access token (renderer never sees it) and falls back to a
+  // local userData cache when offline / not Patreon-linked. Returns:
+  //   { ok, favorites:[], updatedAt, cloudSynced?|offline?|localOnly?, syncError? }
+  // Early-access feature manifest (features.json). Returns the parsed object or
+  // null. The renderer's isFeatureEnabled() gates EA features off this.
+  getFeatures:  ()                               => ipcRenderer.invoke('get-features'),
+
+  favoritesGet: (twitchId)                       => ipcRenderer.invoke('favorites-get', twitchId),
+  favoritesPut: (twitchId, favorites, updatedAt) => ipcRenderer.invoke('favorites-put', { twitchId: twitchId, favorites: favorites, updatedAt: updatedAt }),
+
+  // Stream Info quick-swap global hotkeys. Map: { open, fav1..fav5 }. Returns
+  // { ok, registered, failed, conflicted }. Main fires open-stream-info /
+  // si-apply-pinned-fav back to the renderer.
+  streamInfoSyncHotkeys: (map) => ipcRenderer.invoke('stream-info-sync-hotkeys', map || {}),
+  onOpenStreamInfo:      (fn)  => ipcRenderer.on('open-stream-info', fn),
+  onApplyPinnedFav:      (fn)  => ipcRenderer.on('si-apply-pinned-fav', (e, n) => fn(n)),
+
   // ── Rotation Relay (free for all users) ─────────────────────────────────
   // Subscribes to the streamer's Rotation widget over the cloud relay so
   // song events show up in the events tab + chat overlay. Streamer pastes

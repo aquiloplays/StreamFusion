@@ -528,6 +528,114 @@ body.has-sf-notice { padding-top: 42px !important; }
 .modal{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:22px;width:400px;max-width:96vw;max-height:90vh;overflow-y:auto}
 .modal::-webkit-scrollbar{width:4px}
 .modal::-webkit-scrollbar-thumb{background:var(--bdr)}
+/* ── Stream Info panel ─────────────────────────────────────────────── */
+.modal:has(.si-modal-wide){width:660px}
+.si-modal-wide{display:none}
+.si-live-pulse{margin-left:9px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:#e0245e;padding:2px 7px;border-radius:10px;vertical-align:2px;animation:siPulse 1.6s ease-in-out infinite}
+@keyframes siPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,36,94,.55)}50%{box-shadow:0 0 0 6px rgba(224,36,94,0)}}
+.si-subtabs{display:flex;gap:6px;margin:10px 0 14px;border-bottom:1px solid var(--bdr)}
+.si-subtab{background:none;border:none;border-bottom:2px solid transparent;color:var(--mut);font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px}
+.si-subtab .ic{width:14px;height:14px}
+.si-subtab:hover{color:var(--txt)}
+.si-subtab.on{color:var(--txt);border-bottom-color:var(--accent)}
+.si-label{display:block;font-size:11px;font-weight:600;color:var(--mut);margin:12px 0 5px}
+.si-charcount{float:right;font-weight:500;color:var(--mut)}
+.si-charcount.warn{color:#f59e0b}
+.si-charcount.over{color:var(--err,#ef4444)}
+.si-muted{color:var(--mut);font-weight:500}
+.si-input{width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:7px;padding:9px 11px;font-size:13px;box-sizing:border-box}
+.si-input:focus{outline:none;border-color:var(--accent)}
+.si-status{display:flex;align-items:center;gap:7px;font-size:11.5px;padding:7px 11px;border-radius:7px;margin-bottom:4px}
+.si-status .ic{width:13px;height:13px}
+.si-status .si-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.si-status.live{background:rgba(34,197,94,.10);color:var(--ok,#22c55e)}
+.si-status.live .si-dot{background:var(--ok,#22c55e)}
+.si-status.dirty{background:rgba(245,158,11,.12);color:#f59e0b}
+.si-status.dirty .si-dot{background:#f59e0b;animation:siPulse 1.6s ease-in-out infinite}
+.si-status.wait{background:var(--surf2);color:var(--mut)}
+.si-cat-current{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;padding:6px 8px}
+.si-cat-current img,.si-box-ph{width:34px;height:46px;border-radius:4px;object-fit:cover;background:var(--surf3);flex-shrink:0}
+.si-cat-name{flex:1;font-size:13px;font-weight:600;color:var(--txt)}
+.si-cat-clear{background:none;border:none;color:var(--mut);cursor:pointer;padding:4px;border-radius:5px}
+.si-cat-clear:hover{background:var(--surf3);color:var(--txt)}
+.si-cat-clear .ic{width:14px;height:14px}
+.si-cat-empty{font-size:12px;color:var(--mut);background:var(--surf2);border:1px dashed var(--bdr);border-radius:7px;padding:9px 11px}
+.si-cat-search-wrap{position:relative;margin-top:6px}
+.si-cat-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.45);max-height:264px;overflow-y:auto;z-index:30;display:none;animation:siDdIn .14s ease}
+@keyframes siDdIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.si-dd-head{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);padding:8px 11px 4px}
+.si-dd-item{display:flex;align-items:center;gap:10px;padding:6px 11px;cursor:pointer;font-size:13px;color:var(--txt)}
+.si-dd-item:hover{background:var(--surf2)}
+.si-dd-item img,.si-dd-item .si-box-ph{width:30px;height:40px}
+.si-dd-empty{padding:12px;font-size:12px;color:var(--mut);text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
+.si-dd-empty .ic{width:13px;height:13px}
+.si-tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;padding:7px 8px;min-height:20px}
+.si-tag{display:inline-flex;align-items:center;gap:4px;background:var(--surf3);border-radius:5px;padding:3px 4px 3px 8px;font-size:11.5px;color:var(--txt)}
+.si-tag-x{background:none;border:none;color:var(--mut);cursor:pointer;font-size:14px;line-height:1;padding:0 3px}
+.si-tag-x:hover{color:var(--err,#ef4444)}
+.si-tag-input{flex:1;min-width:90px;background:none;border:none;color:var(--txt);font-size:12px;padding:3px}
+.si-tag-input:focus{outline:none}
+.si-diff{margin-top:12px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px}
+.si-diff-hd{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin-bottom:7px}
+.si-diff-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;flex-wrap:wrap}
+.si-diff-k{font-weight:700;color:var(--mut);min-width:62px}
+.si-diff-old{color:var(--mut);text-decoration:line-through;opacity:.8}
+.si-diff-arrow{color:var(--accent);font-weight:700}
+.si-diff-new{color:var(--txt);font-weight:600}
+.si-diff-tags{display:flex;gap:5px;flex-wrap:wrap}
+.si-tag-add{color:var(--ok,#22c55e);font-weight:600}
+.si-tag-rem{color:var(--err,#ef4444);font-weight:600}
+.si-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.si-actions .btn-tw:disabled{opacity:.45;cursor:not-allowed}
+/* Favorites grid */
+.si-fav-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.si-fav-toolbar .si-input{flex:1}
+.si-fav-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-height:48vh;overflow-y:auto;padding:2px}
+.si-fav-card{position:relative;display:flex;gap:10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:9px;padding:10px;cursor:grab}
+.si-fav-card.dragging{opacity:.4}
+.si-fav-card.drag-over{border-color:var(--accent)}
+.si-fav-card.pinned{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.06)}
+.si-fav-box{width:42px;height:56px;border-radius:5px;object-fit:cover;background:var(--surf3);flex-shrink:0}
+.si-fav-main{flex:1;min-width:0}
+.si-fav-name{font-size:13px;font-weight:700;color:var(--txt);display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.si-fav-pinmark{color:#f59e0b}
+.si-fav-pinmark .ic{width:12px;height:12px}
+.si-fav-title{font-size:11.5px;color:var(--txt);opacity:.85;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.si-fav-game{font-size:10.5px;color:var(--mut);margin-top:3px}
+.si-fav-actions{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.si-fav-actions button{background:var(--surf3);border:none;color:var(--mut);border-radius:5px;padding:4px 7px;font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.si-fav-actions button:hover{color:var(--txt)}
+.si-fav-actions button.apply{background:var(--accent);color:#fff}
+.si-fav-actions button .ic{width:12px;height:12px}
+.si-fav-grip{position:absolute;top:8px;right:9px;color:var(--mut);font-size:13px;cursor:grab;opacity:.5}
+.si-fav-empty{grid-column:1/-1;text-align:center;color:var(--mut);font-size:12px;padding:26px 10px;line-height:1.6}
+.si-fav-sync{font-size:10.5px;color:var(--mut);display:flex;align-items:center;gap:5px;margin-bottom:8px}
+.si-fav-sync .ic{width:12px;height:12px}
+.si-fav-sync.err{color:var(--err,#ef4444)}
+/* EA gate */
+.si-ea-gate{text-align:center;padding:28px 18px}
+.si-ea-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;color:#fff;background:linear-gradient(90deg,var(--accent),#22c55e);padding:4px 12px;border-radius:12px;margin-bottom:14px}
+.si-ea-gate h3{font-size:16px;margin:0 0 8px}
+.si-ea-gate p{font-size:12.5px;color:var(--mut);line-height:1.6;max-width:420px;margin:0 auto 18px}
+/* Listing-card preview */
+.si-preview-card{display:flex;gap:11px;background:var(--surf2);border:1px solid var(--bdr);border-radius:9px;padding:10px;margin:8px 0 4px}
+.si-preview-card img{width:48px;height:64px;border-radius:5px;object-fit:cover;background:var(--surf3);flex-shrink:0}
+.si-preview-main{flex:1;min-width:0}
+.si-preview-top{display:flex;gap:7px;align-items:center;margin-bottom:3px;min-height:14px}
+.si-preview-live{font-size:9px;font-weight:800;letter-spacing:.05em;color:#fff;background:#e0245e;padding:1px 6px;border-radius:3px}
+.si-preview-vc{font-size:10.5px;color:var(--mut)}
+.si-preview-title{font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-preview-chan{font-size:11px;color:var(--mut)}
+.si-preview-game{font-size:11px;color:var(--accent);margin-top:2px}
+.si-preview-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.si-preview-tags span{font-size:9.5px;color:var(--mut);background:var(--surf3);border-radius:9px;padding:1px 7px}
+/* Hotkeys tab */
+.si-hk-help{font-size:11.5px;color:var(--mut);line-height:1.6;margin-bottom:12px}
+.si-hk-list{display:flex;flex-direction:column;gap:8px}
+.si-hk-row{display:flex;align-items:center;gap:8px}
+.si-hk-label{flex:1;font-size:12px;color:var(--txt)}
+.si-hk-input{width:200px;flex-shrink:0;font-family:ui-monospace,monospace;font-size:11px}
+#si-hk-status{margin-top:12px}
 .mh{font-size:16px;font-weight:700;margin-bottom:6px}
 .mp{font-size:12px;color:var(--mut);line-height:1.6;margin-bottom:12px}
 .mlbl{font-size:11px;color:var(--mut);display:block;margin:8px 0 3px}
@@ -1755,6 +1863,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="ttsPauseBtn" onclick="toggleTTSPause()" style="display:none"><svg class="ic"><use href="#i-pause"/></svg>Pause TTS</button>
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
+  <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info \u2014 edit your title, category &amp; tags (Early Access)"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
   <!-- Loadout dashboard \u2014 shows when the Aquilo Loadout SB kit is
        detected. Hidden until detection so the toolbar isn't crowded
@@ -3224,6 +3333,35 @@ function renderEaSettings() {
   }
 })();
 
+// ── Feature flags (early-access manifest) ─────────────────────────────────────
+// Mirrors features.json — the canonical manifest the dedicated SF Patreon-gated
+// EA flag system will own once that chip lands. Loaded from main at startup.
+// Until it arrives we assume EA-gated (fail-safe closed) so a flagged feature
+// never leaks open by default.
+S._features = null;
+(function initFeatureFlags() {
+  if (!window.electronAPI || !window.electronAPI.getFeatures) return;
+  window.electronAPI.getFeatures().then(function(f) { S._features = f || null; }).catch(function() {});
+})();
+function _featureDef(key) {
+  return (S._features && S._features.features && S._features.features[key]) || null;
+}
+// True when the feature is flagged early-access (default true if manifest absent).
+function isFeatureEarlyAccess(key) {
+  var d = _featureDef(key);
+  return d ? !!d.earlyAccess : true;
+}
+// Unlock = any Patreon link (free linking, any tier — per the EA policy) OR the
+// standard cross-feature EA entitlement (paid Patreon / Discord Patron role).
+function _siFeatureUnlocked() {
+  return !!(S.patreon && S.patreon.signedIn) || !!S.hasEarlyAccess;
+}
+// True when the feature is usable: not EA-gated, or the user has unlocked EA.
+function isFeatureEnabled(key) {
+  if (!isFeatureEarlyAccess(key)) return true;
+  return _siFeatureUnlocked();
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 var S = {
   sbWS: null, tfWS: null,
@@ -3314,6 +3452,24 @@ var S = {
     // { login, displayName, fireAt (unix-ms), timer (timeout id, NOT persisted) }.
     // Persisted across reloads via fireAt; on load we re-arm or discard if past.
     scheduled: null
+  },
+  // Stream Info editor (Early Access) — read/update title+category+tags via the
+  // SB Stream Info actions, plus the cloud-synced favorites presets. Actions
+  // are re-queried from SB each time the panel opens (like raidFinder).
+  streamInfo: {
+    actions: { get: null, set: null, search: null },
+    // Last known LIVE values (from the Get action / a successful Apply).
+    live: { title: '', gameId: '', gameName: '', boxArtUrl: '', tags: [] },
+    // Working DRAFT in the editor. null until first load merges live → draft.
+    draft: null,
+    loading: false, applying: false,
+    lastGetReqId: null, lastSetReqId: null, lastSearchReqId: null,
+    searchResults: null, searchQuery: '', searchOpen: false,
+    recentSearches: [],                 // [{id,name,boxArtUrl}] most-recent-first
+    view: 'editor',                     // 'editor' | 'favorites'
+    favorites: [],                      // [{id,name,title,gameId,gameName,tags,pinned,sortOrder,...}]
+    favFilter: '', favLoaded: false, favSyncing: false, favSyncError: null,
+    pendingApplyFavId: null             // favorite being applied (for status UI)
   },
   // Smart Shoutout Queue (Tier 2 EA) — auto-detects when a fellow streamer
   // chats and queues a `/shoutout` candidate. State is per-stream-session
@@ -5077,6 +5233,924 @@ var SF_RF_RAID_NAME = 'StreamFusion Raid Finder \u2014 Start Raid';
 // UUIDs bumped again so re-import creates fresh actions.
 var SF_RF_FIND_UUID = 'a33f0c26-a7dd-49e8-a707-63aaf23fb4e2';
 var SF_RF_RAID_UUID = '7fafc95d-4e7a-4111-ad7c-b5f7713d2e7f';
+
+// ── Stream Info (Early Access) ────────────────────────────────────────────────
+// Read + update the channel's title / category / tags from inside SF. Same
+// architecture as the Raid Finder: three inline-C# Streamer.bot actions driven
+// over the existing SB WebSocket using SB's own Twitch login — no separate
+// Twitch OAuth in SF. The actions broadcast their results back tagged
+// source="sf_stream_info", routed in handleSBEvent → _siHandleResponse.
+//
+// Updating title/category needs the channel:manage:broadcast scope on the SB
+// Twitch login; a 401 from the PATCH surfaces a re-auth hint to the user.
+//
+// IMPORT REFERENCES — keep in sync with scripts/build-si-sbae.py.
+// UUIDs are read FROM here by the build script, so a re-import overwrites the
+// existing actions in place instead of leaving stale duplicates.
+var SF_SI_GET_NAME    = 'StreamFusion Stream Info — Get Channel Info';
+var SF_SI_SET_NAME    = 'StreamFusion Stream Info — Update Channel Info';
+var SF_SI_SEARCH_NAME = 'StreamFusion Stream Info — Search Categories';
+var SF_SI_GET_UUID    = 'b1e7c4a0-5f21-4d8e-9a3c-1f0b2c3d4e5a';
+var SF_SI_SET_UUID    = 'c2f8d5b1-6a32-4e9f-8b4d-2a1c3d4e5f6b';
+var SF_SI_SEARCH_UUID = 'd3a9e6c2-7b43-4f10-9c5e-3b2d4e5f6a7c';
+var SF_SI_IMPORT      = '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';
+
+// Twitch hard-caps the stream title at 140 chars.
+var SF_SI_TITLE_MAX = 140;
+// Twitch tag rules: ≤10 tags, each ≤25 chars, letters/numbers only (no spaces).
+var SF_SI_TAG_MAX   = 10;
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+function openStreamInfo() {
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
+    sysMsg('tw', 'Connect to Streamer.bot to use Stream Info.');
+    showToast({ title: 'Streamer.bot not connected', message: 'Stream Info reads & writes your channel through Streamer.bot.', kind: 'warn' });
+    return;
+  }
+  // Early-access gate: rendered by _siRenderGate() when the flag is on and the
+  // user isn't Patreon-linked. _siOpenGated() is the post-gate continuation.
+  if (typeof _siRenderGate === 'function' && _siRenderGate()) return;
+  _siOpenGated();
+}
+
+// Continuation once the EA gate (if any) has passed.
+function _siOpenGated() {
+  _siCheckActions(function(haveAll) {
+    if (!haveAll) { _siShowInstall(); return; }
+    _siRenderPanel();
+    _siGetInfo();
+  });
+}
+
+// ── Early-access gate ─────────────────────────────────────────────────────────
+// Returns true when it rendered the gate (caller should stop); false to proceed.
+function _siRenderGate() {
+  if (isFeatureEnabled('stream-info-editor')) return false;   // unlocked or flag off
+  _siShowGate();
+  return true;
+}
+function _siShowGate() {
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  m.innerHTML = ''
+    + '<div class="mh"><svg class="ic"><use href="#i-pencil"/></svg> Stream Info</div>'
+    + '<div class="si-ea-gate">'
+    +   '<div class="si-ea-badge">EARLY ACCESS</div>'
+    +   '<h3>Link your Patreon to unlock</h3>'
+    +   '<p>Edit your Twitch title, category &amp; tags right from StreamFusion — and save favorite presets that sync across your machines. This feature is in early access; linking your Patreon (any tier, free included) unlocks it.</p>'
+    +   '<div class="mbtns" style="justify-content:center">'
+    +     '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
+    +     '<button class="btn-tw" id="si-ea-link" onclick="_siGateLinkPatreon()"><svg class="ic"><use href="#i-heart"/></svg> Link Patreon</button>'
+    +   '</div>'
+    +   '<p style="margin-top:14px;font-size:11px">Already a patron connected through Discord? <a onclick="_siGateConnectDiscord();return false" style="color:var(--accent);cursor:pointer;text-decoration:underline">Connect Discord</a> instead.</p>'
+    + '</div>';
+}
+function _siGateLinkPatreon() {
+  var b = document.getElementById('si-ea-link');
+  if (!window.electronAPI || !window.electronAPI.patreonBeginAuth) { showToast({ message: 'Patreon linking is unavailable here.', kind: 'err' }); return; }
+  if (b) { b.disabled = true; b.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Opening Patreon…'; }
+  window.electronAPI.patreonBeginAuth().then(function(state) {
+    if (state) { if (typeof applyPatreonState === 'function') applyPatreonState(state); else { S.patreon = state; } }
+    if (_siFeatureUnlocked()) { showToast({ title: 'Unlocked', message: 'Stream Info is now available.', kind: 'ok' }); _siOpenGated(); }
+    else { if (b) { b.disabled = false; b.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg> Link Patreon'; } showToast({ title: 'Patreon linked', message: 'We couldn’t confirm the link yet — try opening Stream Info again in a moment.', kind: 'warn' }); }
+  }).catch(function() {
+    if (b) { b.disabled = false; b.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg> Link Patreon'; }
+    showToast({ message: 'Patreon linking failed or was cancelled.', kind: 'err' });
+  });
+}
+function _siGateConnectDiscord() {
+  if (!window.electronAPI || !window.electronAPI.discordBeginAuth) { showToast({ message: 'Discord connect is unavailable here.', kind: 'err' }); return; }
+  window.electronAPI.discordBeginAuth().then(function(state) {
+    if (state) { if (typeof applyDiscordState === 'function') applyDiscordState(state); else { S.discord = state; } }
+    if (_siFeatureUnlocked()) { showToast({ title: 'Unlocked', message: 'Stream Info is now available.', kind: 'ok' }); _siOpenGated(); }
+    else { showToast({ title: 'Discord connected', message: 'No Patron role found in the aquilo.gg server.', kind: 'warn' }); }
+  }).catch(function() { showToast({ message: 'Discord connect failed or was cancelled.', kind: 'err' }); });
+}
+
+// ── SB action detection ───────────────────────────────────────────────────────
+// Mirror of _rfCheckActions: prefer UUID match (survives renames), fall back to
+// name match (covers users who recreated the action from source).
+function _siCheckActions(done) {
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) { done(false); return; }
+  var reqId = 'sf-si-chk-' + Date.now();
+  sbPending[reqId] = function(resp) {
+    var actions = resp.actions || [];
+    S._sbActionsCache = actions;
+    function match(uuid, name) {
+      var byId = null, byName = null;
+      for (var i = 0; i < actions.length; i++) {
+        if (actions[i].id === uuid) byId = { id: actions[i].id, name: actions[i].name };
+        if (actions[i].name === name) byName = { id: actions[i].id, name: actions[i].name };
+      }
+      return byId || byName;
+    }
+    var si = S.streamInfo.actions;
+    si.get    = match(SF_SI_GET_UUID,    SF_SI_GET_NAME);
+    si.set    = match(SF_SI_SET_UUID,    SF_SI_SET_NAME);
+    si.search = match(SF_SI_SEARCH_UUID, SF_SI_SEARCH_NAME);
+    console.log('[SF si] GetActions ' + actions.length + ' total; get=' + (si.get && si.get.id) + ' set=' + (si.set && si.set.id) + ' search=' + (si.search && si.search.id));
+    done(!!(si.get && si.set && si.search));
+  };
+  S.sbWS.send(JSON.stringify({ request: 'GetActions', id: reqId }));
+  setTimeout(function() { if (sbPending[reqId]) { delete sbPending[reqId]; done(!!(S.streamInfo.actions.get && S.streamInfo.actions.set && S.streamInfo.actions.search)); } }, 8000);
+}
+
+function _siShowInstall() {
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  m.innerHTML = '<div class="mh"><svg class="ic"><use href="#i-pencil"/></svg> Stream Info &mdash; Install Actions</div>'
+    + '<p class="mp">Stream Info edits your Twitch title, category and tags through Streamer.bot &mdash; your existing SB Twitch login is used, no extra tokens. Import these three small actions once.</p>'
+    + '<div style="background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.35);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;line-height:1.5;color:var(--txt)">'
+    +   '<strong>Heads up:</strong> updating your title / category needs the <code>channel:manage:broadcast</code> scope on the Twitch account you connected in Streamer.bot. If Apply fails with an auth error, re-authorize Twitch inside Streamer.bot (it requests this scope by default for broadcasters).'
+    + '</div>'
+    + '<div style="margin-bottom:10px">'
+    + '<textarea id="siImportStr" readonly onclick="this.select()" style="width:100%;height:60px;font-size:10px;font-family:monospace;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:8px;resize:none">' + SF_SI_IMPORT + '</textarea>'
+    + '</div>'
+    + '<button class="btn-tw" style="margin-bottom:10px;font-size:12px" onclick="_siCopyImport()"><svg class="ic"><use href="#i-doc"/></svg> Copy to clipboard</button>'
+    + '<ol style="font-size:12px;color:var(--mut);margin:0 0 12px 16px;padding:0;line-height:1.8">'
+    + '<li>In Streamer.bot, click <strong style="color:var(--txt)">Import</strong> (top menu)</li>'
+    + '<li>Paste the string above and click <strong style="color:var(--txt)">Import</strong></li>'
+    + '<li>Come back here and click <em>I\'ve imported the actions</em></li>'
+    + '</ol>'
+    + '<div id="siInstallStatus" style="font-size:11px;color:var(--mut);min-height:18px;margin-bottom:8px"></div>'
+    + '<div class="mbtns">'
+    + '<button class="btn-x" onclick="closeModal()">Cancel</button>'
+    + '<button class="btn-tw" onclick="_siVerifyInstall()">I\'ve imported the actions</button>'
+    + '</div>';
+}
+function _siCopyImport() {
+  try {
+    var ta = document.getElementById('siImportStr');
+    if (ta) { ta.select(); }
+    navigator.clipboard.writeText(SF_SI_IMPORT).then(function() {
+      var s = document.getElementById('siInstallStatus'); if (s) s.innerHTML = '<span style="color:var(--grn)">Copied. Now paste it into Streamer.bot &rarr; Import.</span>';
+    });
+  } catch (e) {}
+}
+function _siVerifyInstall() {
+  var s = document.getElementById('siInstallStatus');
+  if (s) s.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Checking Streamer.bot for the actions…';
+  _siCheckActions(function(haveAll) {
+    if (haveAll) { _siRenderPanel(); _siGetInfo(); }
+    else if (s) s.innerHTML = '<span style="color:var(--err,#ef4444)">Still not detecting all three actions. Make sure the import succeeded in Streamer.bot, then try again.</span>';
+  });
+}
+
+// ── Read / write plumbing ─────────────────────────────────────────────────────
+function _siBroadcasterId() { return S.twUserId ? String(S.twUserId) : ''; }
+
+function _siGetInfo() {
+  var si = S.streamInfo;
+  if (!si.actions.get || !S.sbConnected) return;
+  var reqId = 'sf-si-get-' + Date.now();
+  si.lastGetReqId = reqId;
+  si.loading = true;
+  _siRenderStatus();
+  S.sbWS.send(JSON.stringify({
+    request: 'DoAction', id: reqId, action: si.actions.get,
+    args: { sfReqId: reqId, broadcasterId: _siBroadcasterId() }
+  }));
+  setTimeout(function() {
+    if (si.loading && si.lastGetReqId === reqId) { si.loading = false; _siRenderStatus(); }
+  }, 12000);
+}
+
+// Debounced category autocomplete.
+function _siSearchGames(query) {
+  var si = S.streamInfo;
+  si.searchQuery = query;
+  clearTimeout(si._searchTimer);
+  if (!query || query.length < 2) { si.searchResults = null; _siRenderDropdown(); return; }
+  si._searchTimer = setTimeout(function() {
+    if (!si.actions.search || !S.sbConnected) return;
+    var reqId = 'sf-si-search-' + Date.now();
+    si.lastSearchReqId = reqId;
+    S.sbWS.send(JSON.stringify({
+      request: 'DoAction', id: reqId, action: si.actions.search,
+      args: { sfReqId: reqId, query: query }
+    }));
+  }, 250);
+}
+
+function _siApply() {
+  var si = S.streamInfo;
+  if (!si.draft) return;
+  _siSyncDraftFromInputs();
+  if (!_siIsDirty()) { showToast({ message: 'Nothing to apply — draft matches your live stream.', kind: 'info' }); return; }
+  _siApplyCore();
+}
+// Sends the Update action from the current draft. Shared by the Apply button and
+// by headless favorite/hotkey applies (which need no editor inputs). Returns
+// true when a request was sent.
+function _siApplyCore() {
+  var si = S.streamInfo;
+  if (!si.draft) return false;
+  if (!si.actions.set || !S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) { showToast({ message: 'Streamer.bot not connected.', kind: 'err' }); return false; }
+  var title = si.draft.title || '';
+  if (title.length > SF_SI_TITLE_MAX) { showToast({ message: 'Title is over the ' + SF_SI_TITLE_MAX + '-char Twitch limit.', kind: 'err' }); return false; }
+  var reqId = 'sf-si-set-' + Date.now();
+  si.lastSetReqId = reqId;
+  si.applying = true;
+  _siRenderStatus();
+  var applyBtn = document.getElementById('si-apply');
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Applying…'; }
+  var args = {
+    sfReqId: reqId, broadcasterId: _siBroadcasterId(),
+    title: title, gameId: si.draft.gameId || ''
+  };
+  // Tags are pipe-delimited on the wire (Twitch tags never contain pipes).
+  args.tags = (si.draft.tags || []).join('|');
+  S.sbWS.send(JSON.stringify({ request: 'DoAction', id: reqId, action: si.actions.set, args: args }));
+  setTimeout(function() {
+    if (si.applying && si.lastSetReqId === reqId) {
+      si.applying = false;
+      _siRenderStatus(); _siResetApplyBtn();
+      showToast({ title: 'Apply timed out', message: 'Streamer.bot didn’t confirm the change. Check SB is running and Twitch is connected.', kind: 'err' });
+    }
+  }, 15000);
+  return true;
+}
+function _siResetApplyBtn() {
+  var b = document.getElementById('si-apply');
+  if (b) { b.disabled = !_siIsDirty(); b.innerHTML = '<svg class="ic"><use href="#i-check"/></svg> Apply Changes'; }
+}
+
+// Routed from handleSBEvent on source === 'sf_stream_info'.
+function _siHandleResponse(data) {
+  var si = S.streamInfo;
+  if (!data || !data.kind) return;
+  if (data.kind === 'info') {
+    if (data.reqId && data.reqId !== si.lastGetReqId) return;
+    si.loading = false;
+    si.live = {
+      title:     data.title    || '',
+      gameId:    data.gameId   || '',
+      gameName:  data.gameName || '',
+      boxArtUrl: data.boxArtUrl || '',
+      tags:      Array.isArray(data.tags) ? data.tags.slice() : []
+    };
+    // First load (or a reload with no local edits) seeds the draft from live.
+    if (!si.draft || !_siIsDirty()) si.draft = _siCloneState(si.live);
+    if (data.broadcasterId && !S.twUserId) S.twUserId = String(data.broadcasterId);
+    _siRenderEditor();
+    return;
+  }
+  if (data.kind === 'games') {
+    if (data.reqId && data.reqId !== si.lastSearchReqId) return;
+    si.searchResults = Array.isArray(data.games) ? data.games : [];
+    _siRenderDropdown();
+    return;
+  }
+  if (data.kind === 'updated') {
+    if (data.reqId && data.reqId !== si.lastSetReqId) return;
+    si.applying = false;
+    // Commit the draft to live, then settle the UI.
+    si.live = _siCloneState(si.draft);
+    si.pendingApplyFavId = null;
+    _siRenderStatus(); _siResetApplyBtn();
+    showToast({ title: 'Stream updated', message: 'Your title' + (si.draft.gameName ? ' & category' : '') + ' are now live on Twitch.', kind: 'ok', duration: 3500 });
+    // Refresh the canonical values (and box art) from Twitch.
+    setTimeout(_siGetInfo, 800);
+    return;
+  }
+  if (data.kind === 'error') {
+    var op = data.op || '';
+    if (op === 'get')    { si.loading = false; _siRenderStatus(); }
+    if (op === 'update') { si.applying = false; _siRenderStatus(); _siResetApplyBtn(); }
+    var code = data.code || 'unknown';
+    var msg, title = 'Stream Info error';
+    if (code === 'twitch_not_connected') { title = 'Twitch not connected in SB'; msg = 'Sign in to Twitch inside Streamer.bot, then try again.'; }
+    else if (code === 'missing_broadcaster') { msg = 'Couldn’t determine your Twitch channel. Make sure Twitch is connected in Streamer.bot.'; }
+    else if (code === 'helix_401') { title = 'Re-authorize Twitch in Streamer.bot'; msg = 'Your Streamer.bot Twitch login is missing the channel:manage:broadcast scope. Re-connect Twitch (broadcaster) in SB to grant it.'; }
+    else if (code.indexOf('helix_') === 0) { msg = 'Twitch returned ' + code.replace('helix_', 'HTTP ') + (data.detail ? (' — ' + data.detail) : '') + '.'; }
+    else { msg = 'Error: ' + code; }
+    showToast({ title: title, message: msg, kind: 'err', duration: 6000 });
+    return;
+  }
+}
+
+// ── State helpers ─────────────────────────────────────────────────────────────
+function _siCloneState(s) {
+  s = s || {};
+  return { title: s.title || '', gameId: s.gameId || '', gameName: s.gameName || '', boxArtUrl: s.boxArtUrl || '', tags: Array.isArray(s.tags) ? s.tags.slice() : [] };
+}
+function _siSyncDraftFromInputs() {
+  var si = S.streamInfo;
+  if (!si.draft) si.draft = _siCloneState(si.live);
+  var t = document.getElementById('si-title');
+  if (t) si.draft.title = t.value;
+}
+function _siIsDirty() {
+  var si = S.streamInfo;
+  if (!si.draft) return false;
+  var a = si.draft, b = si.live;
+  if ((a.title || '') !== (b.title || '')) return true;
+  if ((a.gameId || '') !== (b.gameId || '')) return true;
+  var at = (a.tags || []).slice().sort().join('');
+  var bt = (b.tags || []).slice().sort().join('');
+  return at !== bt;
+}
+// Twitch box-art templates contain {width}x{height}; fill them in.
+function _siBoxArt(url, w, h) {
+  if (!url) return '';
+  return url.replace('{width}', w).replace('{height}', h).replace('%7Bwidth%7D', w).replace('%7Bheight%7D', h);
+}
+
+// ── Panel rendering ───────────────────────────────────────────────────────────
+function _siRenderPanel() {
+  var si = S.streamInfo;
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  m.innerHTML = ''
+    + '<div class="si-modal-wide"></div>'           // :has() marker → wider modal
+    + '<div class="mh"><svg class="ic"><use href="#i-pencil"/></svg> Stream Info'
+    +   '<span id="si-live-pulse" class="si-live-pulse" style="display:none">LIVE</span>'
+    + '</div>'
+    + '<div class="si-subtabs">'
+    +   '<button class="si-subtab' + (si.view === 'editor' ? ' on' : '') + '" onclick="_siSwitchView(\'editor\')"><svg class="ic"><use href="#i-pencil"/></svg> Editor</button>'
+    +   '<button class="si-subtab' + (si.view === 'favorites' ? ' on' : '') + '" onclick="_siSwitchView(\'favorites\')"><svg class="ic"><use href="#i-heart"/></svg> Favorites</button>'
+    +   '<button class="si-subtab' + (si.view === 'hotkeys' ? ' on' : '') + '" onclick="_siSwitchView(\'hotkeys\')">⌨ Hotkeys</button>'
+    + '</div>'
+    + '<div id="si-body"></div>';
+  if (si.view === 'favorites') _siRenderFavorites();
+  else if (si.view === 'hotkeys') _siRenderHotkeys();
+  else _siRenderEditor();
+  _siUpdateLivePulse();
+}
+function _siSwitchView(v) {
+  var si = S.streamInfo;
+  _siSyncDraftFromInputs();
+  si.view = v;
+  _siRenderPanel();
+}
+
+function _siRenderEditor() {
+  var si = S.streamInfo;
+  var body = document.getElementById('si-body'); if (!body) return;
+  if (!si.draft) si.draft = _siCloneState(si.live);
+  var d = si.draft;
+  var catHtml = d.gameName
+    ? '<div class="si-cat-current">'
+        + (d.boxArtUrl ? '<img src="' + esc(_siBoxArt(d.boxArtUrl, 40, 56)) + '" alt="">' : '<div class="si-box-ph"></div>')
+        + '<span class="si-cat-name">' + esc(d.gameName) + '</span>'
+        + '<button class="si-cat-clear" title="Clear category" onclick="_siClearGame()"><svg class="ic"><use href="#i-x"/></svg></button>'
+      + '</div>'
+    : '<div class="si-cat-empty">No category set</div>';
+  body.innerHTML = ''
+    + '<div id="si-status" class="si-status"></div>'
+    + '<div id="si-preview"></div>'
+    + '<label class="si-label">Title <span id="si-charcount" class="si-charcount"></span></label>'
+    + '<input id="si-title" class="si-input" maxlength="' + SF_SI_TITLE_MAX + '" value="' + esc(d.title || '') + '" placeholder="What are you streaming?" oninput="_siOnTitleInput(this.value)">'
+    + '<label class="si-label">Category</label>'
+    + catHtml
+    + '<div class="si-cat-search-wrap">'
+    +   '<input id="si-cat-search" class="si-input" placeholder="🔍 Search Twitch categories…" autocomplete="off" value="' + esc(si.searchQuery || '') + '" oninput="_siSearchGames(this.value)" onfocus="S.streamInfo.searchOpen=true;_siRenderDropdown()" onblur="setTimeout(function(){S.streamInfo.searchOpen=false;_siRenderDropdown();},180)">'
+    +   '<div id="si-cat-dropdown" class="si-cat-dropdown"></div>'
+    + '</div>'
+    + '<label class="si-label">Tags <span id="si-tagcount" class="si-muted"></span></label>'
+    + '<div id="si-tags" class="si-tags"></div>'
+    + '<div id="si-diff" class="si-diff"></div>'
+    + '<div class="si-actions">'
+    +   '<button class="btn-x" onclick="_siRefreshFromTwitch()" title="Reload current values from Twitch"><svg class="ic"><use href="#i-refresh"/></svg> Refresh</button>'
+    +   '<button class="btn-x" onclick="_siSaveFavoritePrompt()"><svg class="ic"><use href="#i-heart"/></svg> Save as favorite</button>'
+    +   '<button id="si-apply" class="btn-tw" onclick="_siApply()"><svg class="ic"><use href="#i-check"/></svg> Apply Changes</button>'
+    + '</div>';
+  _siRenderTags();
+  _siRenderStatus();
+  _siRenderCharcount();
+  _siRenderDiff();
+  _siRenderPreview();
+  _siResetApplyBtn();
+  _siRenderDropdown();
+}
+
+// Twitch-style directory listing preview so the streamer can see how their card
+// will read before applying.
+function _siRenderPreview() {
+  var el = document.getElementById('si-preview'); if (!el) return;
+  var d = S.streamInfo.draft || S.streamInfo.live;
+  var live = _siIsLive();
+  var box = d.boxArtUrl ? '<img src="' + esc(_siBoxArt(d.boxArtUrl, 60, 80)) + '" alt="">' : '<div class="si-box-ph" style="width:48px;height:64px"></div>';
+  el.innerHTML = '<div class="si-preview-card">'
+    + box
+    + '<div class="si-preview-main">'
+    +   '<div class="si-preview-top">' + (live ? '<span class="si-preview-live">LIVE</span>' : '') + (S.twViewersFetched && S.viewers && S.viewers.tw != null ? '<span class="si-preview-vc">' + esc(String(S.viewers.tw)) + ' viewers</span>' : '') + '</div>'
+    +   '<div class="si-preview-title">' + (d.title ? esc(d.title) : '<span style="opacity:.5">Your stream title…</span>') + '</div>'
+    +   '<div class="si-preview-chan">' + esc(S.twLogin || 'your_channel') + '</div>'
+    +   '<div class="si-preview-game">' + (d.gameName ? esc(d.gameName) : 'No category') + '</div>'
+    +   ((d.tags && d.tags.length) ? '<div class="si-preview-tags">' + d.tags.slice(0, 6).map(function(t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' : '')
+    + '</div></div>';
+}
+
+function _siOnTitleInput(v) {
+  S.streamInfo.draft.title = v;
+  _siRenderCharcount(); _siRenderStatus(); _siRenderDiff(); _siRenderPreview(); _siResetApplyBtn();
+}
+
+function _siRenderCharcount() {
+  var el = document.getElementById('si-charcount'); if (!el) return;
+  var n = (S.streamInfo.draft.title || '').length;
+  el.textContent = n + '/' + SF_SI_TITLE_MAX;
+  el.classList.toggle('warn', n >= SF_SI_TITLE_MAX - 15 && n < SF_SI_TITLE_MAX);
+  el.classList.toggle('over', n >= SF_SI_TITLE_MAX);
+}
+
+function _siRenderStatus() {
+  var el = document.getElementById('si-status'); if (!el) return;
+  var si = S.streamInfo;
+  if (si.loading)  { el.className = 'si-status wait'; el.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Loading current stream info…'; return; }
+  if (si.applying) { el.className = 'si-status wait'; el.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Applying to Twitch…'; return; }
+  if (_siIsDirty()) { el.className = 'si-status dirty'; el.innerHTML = '<span class="si-dot"></span> Drafted changes — not yet applied'; }
+  else             { el.className = 'si-status live';  el.innerHTML = '<span class="si-dot"></span> Matches your live stream'; }
+}
+
+function _siRenderDiff() {
+  var el = document.getElementById('si-diff'); if (!el) return;
+  var si = S.streamInfo;
+  if (!_siIsDirty()) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  var rows = '';
+  var a = si.draft, b = si.live;
+  if ((a.title || '') !== (b.title || '')) {
+    rows += '<div class="si-diff-row"><span class="si-diff-k">Title</span>'
+         + '<span class="si-diff-old">' + (b.title ? esc(b.title) : '<em>empty</em>') + '</span>'
+         + '<span class="si-diff-arrow">→</span>'
+         + '<span class="si-diff-new">' + (a.title ? esc(a.title) : '<em>empty</em>') + '</span></div>';
+  }
+  if ((a.gameId || '') !== (b.gameId || '')) {
+    rows += '<div class="si-diff-row"><span class="si-diff-k">Category</span>'
+         + '<span class="si-diff-old">' + (b.gameName ? esc(b.gameName) : '<em>none</em>') + '</span>'
+         + '<span class="si-diff-arrow">→</span>'
+         + '<span class="si-diff-new">' + (a.gameName ? esc(a.gameName) : '<em>none</em>') + '</span></div>';
+  }
+  var added   = (a.tags || []).filter(function(t) { return (b.tags || []).indexOf(t) === -1; });
+  var removed = (b.tags || []).filter(function(t) { return (a.tags || []).indexOf(t) === -1; });
+  if (added.length || removed.length) {
+    rows += '<div class="si-diff-row"><span class="si-diff-k">Tags</span><span class="si-diff-tags">'
+         + added.map(function(t) { return '<span class="si-tag-add">+' + esc(t) + '</span>'; }).join('')
+         + removed.map(function(t) { return '<span class="si-tag-rem">−' + esc(t) + '</span>'; }).join('')
+         + '</span></div>';
+  }
+  el.innerHTML = '<div class="si-diff-hd">What will change</div>' + rows;
+}
+
+// ── Category search dropdown ───────────────────────────────────────────────────
+function _siRenderDropdown() {
+  var el = document.getElementById('si-cat-dropdown'); if (!el) return;
+  var si = S.streamInfo;
+  if (!si.searchOpen) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var items, isRecent = false;
+  if (si.searchQuery && si.searchQuery.length >= 2) {
+    items = si.searchResults;
+    if (items === null) { el.style.display = ''; el.innerHTML = '<div class="si-dd-empty"><svg class="ic spin"><use href="#i-refresh"/></svg> Searching…</div>'; return; }
+  } else {
+    items = si.recentSearches; isRecent = true;
+  }
+  if (!items || !items.length) {
+    if (isRecent) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = ''; el.innerHTML = '<div class="si-dd-empty">No categories match “' + esc(si.searchQuery) + '”.</div>';
+    return;
+  }
+  el.style.display = '';
+  var head = isRecent ? '<div class="si-dd-head">Recent</div>' : '';
+  el.innerHTML = head + items.map(function(g, i) {
+    var fn = isRecent ? '_siSelectRecentIdx(' + i + ')' : '_siSelectGameIdx(' + i + ')';
+    return '<div class="si-dd-item" onmousedown="' + fn + '">'
+      + (g.boxArtUrl ? '<img src="' + esc(_siBoxArt(g.boxArtUrl, 40, 56)) + '" alt="">' : '<div class="si-box-ph"></div>')
+      + '<span>' + esc(g.name) + '</span></div>';
+  }).join('');
+}
+function _siSelectGameIdx(i) { var g = S.streamInfo.searchResults && S.streamInfo.searchResults[i]; if (g) _siApplyGameSelection(g); }
+function _siSelectRecentIdx(i) { var g = S.streamInfo.recentSearches && S.streamInfo.recentSearches[i]; if (g) _siApplyGameSelection(g); }
+function _siApplyGameSelection(g) {
+  var si = S.streamInfo;
+  _siSyncDraftFromInputs();
+  si.draft.gameId = String(g.id || '');
+  si.draft.gameName = g.name || '';
+  si.draft.boxArtUrl = g.boxArtUrl || '';
+  // Most-recent-first, dedupe by id, cap 8.
+  si.recentSearches = [{ id: g.id, name: g.name, boxArtUrl: g.boxArtUrl }]
+    .concat((si.recentSearches || []).filter(function(r) { return String(r.id) !== String(g.id); }))
+    .slice(0, 8);
+  si.searchQuery = ''; si.searchResults = null; si.searchOpen = false;
+  _siRenderEditor();
+}
+function _siClearGame() {
+  var si = S.streamInfo;
+  _siSyncDraftFromInputs();
+  si.draft.gameId = ''; si.draft.gameName = ''; si.draft.boxArtUrl = '';
+  _siRenderEditor();
+}
+
+// ── Tags ──────────────────────────────────────────────────────────────────────
+function _siRenderTags() {
+  var el = document.getElementById('si-tags'); if (!el) return;
+  var d = S.streamInfo.draft; var tags = d.tags || [];
+  el.innerHTML = tags.map(function(t, i) {
+    return '<span class="si-tag">' + esc(t) + '<button class="si-tag-x" onclick="_siRemoveTag(' + i + ')" title="Remove tag">×</button></span>';
+  }).join('')
+    + '<input id="si-tag-input" class="si-tag-input" placeholder="' + (tags.length ? 'add tag…' : 'Add a tag, press Enter…') + '" autocomplete="off" onkeydown="_siOnTagKey(event)">';
+  var cnt = document.getElementById('si-tagcount');
+  if (cnt) cnt.textContent = '(' + tags.length + '/' + SF_SI_TAG_MAX + ')';
+}
+function _siOnTagKey(e) {
+  var inp = document.getElementById('si-tag-input'); if (!inp) return;
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    _siAddTag(inp.value); inp.value = '';
+    var fresh = document.getElementById('si-tag-input'); if (fresh) fresh.focus();
+  } else if (e.key === 'Backspace' && !inp.value) {
+    var d = S.streamInfo.draft;
+    if (d.tags.length) { _siRemoveTag(d.tags.length - 1); var f2 = document.getElementById('si-tag-input'); if (f2) f2.focus(); }
+  }
+}
+function _siAddTag(raw) {
+  var si = S.streamInfo; if (!si.draft) return;
+  var t = String(raw || '').trim().replace(/[^A-Za-z0-9]/g, '');   // Twitch tags: alphanumeric only
+  if (!t) return;
+  if (t.length > 25) t = t.slice(0, 25);
+  if (si.draft.tags.length >= SF_SI_TAG_MAX) { showToast({ message: 'Twitch allows up to ' + SF_SI_TAG_MAX + ' tags.', kind: 'warn' }); return; }
+  if (si.draft.tags.some(function(x) { return x.toLowerCase() === t.toLowerCase(); })) return;
+  si.draft.tags.push(t);
+  _siRenderTags(); _siRenderStatus(); _siRenderDiff(); _siRenderPreview(); _siResetApplyBtn();
+}
+function _siRemoveTag(i) {
+  var d = S.streamInfo.draft;
+  d.tags.splice(i, 1);
+  _siRenderTags(); _siRenderStatus(); _siRenderDiff(); _siRenderPreview(); _siResetApplyBtn();
+}
+
+function _siRefreshFromTwitch() { _siGetInfo(); }
+
+// ── Live indicator ────────────────────────────────────────────────────────────
+function _siIsLive() { return !!(S.twViewersFetched && S.viewers && S.viewers.tw != null); }
+function _siUpdateLivePulse() {
+  var el = document.getElementById('si-live-pulse'); if (!el) return;
+  el.style.display = _siIsLive() ? '' : 'none';
+}
+
+// ── Favorites bridge ──────────────────────────────────────────────────────────
+// "Save as favorite" from the Editor: capture the draft, switch to the
+// Favorites view, and open the new-favorite form (which lives in that view).
+function _siSaveFavoritePrompt() {
+  _siSyncDraftFromInputs();
+  S.streamInfo.view = 'favorites';
+  _siRenderPanel();
+  _favEnsureLoaded(function() { _favRender(); _favNewFromCurrent(); });
+}
+function _siRenderFavorites() {
+  if (typeof _favRender === 'function') { _favRender(); return; }
+  var body = document.getElementById('si-body'); if (body) body.innerHTML = '<div class="si-dd-empty">Favorites load here.</div>';
+}
+
+// ── Favorites (cloud-synced presets) ──────────────────────────────────────────
+function _favId() { return 'fav_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function _favTwitchId() { return S.twUserId ? String(S.twUserId) : 'default'; }
+function _favById(id) { return (S.streamInfo.favorites || []).filter(function(f) { return f.id === id; })[0] || null; }
+function _favSorted() {
+  return (S.streamInfo.favorites || []).slice().sort(function(a, b) {
+    if (!!b.pinned !== !!a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+    return (a.sortOrder || 0) - (b.sortOrder || 0);
+  });
+}
+
+function _favLoad(force) {
+  var si = S.streamInfo;
+  if (si.favLoaded && !force) return;
+  _favEnsureLoaded(function() { if (si.view === 'favorites') _favRender(); else _favRenderSyncLine(); }, force);
+}
+// Loads favorites from main (cloud/local) once, then runs cb. Used by the view
+// and by the headless hotkey/favorite apply path.
+function _favEnsureLoaded(cb, force) {
+  var si = S.streamInfo;
+  if (si.favLoaded && !force) { if (cb) cb(); return; }
+  si.favSyncing = true; si.favSyncError = null;
+  if (!window.electronAPI || !window.electronAPI.favoritesGet) { si.favLoaded = true; si.favSyncing = false; if (cb) cb(); return; }
+  window.electronAPI.favoritesGet(_favTwitchId()).then(function(res) {
+    si.favSyncing = false; si.favLoaded = true;
+    if (res && res.ok) {
+      si.favorites = Array.isArray(res.favorites) ? res.favorites : [];
+      si._favUpdatedAt = res.updatedAt || 0;
+      si.favSyncState = res.cloudSynced ? 'cloud' : (res.localOnly ? 'local' : 'offline');
+      si.favSyncError = res.syncError || null;
+    } else { si.favSyncError = 'load_failed'; }
+    if (cb) cb();
+  }).catch(function() { si.favSyncing = false; si.favLoaded = true; si.favSyncError = 'load_failed'; if (cb) cb(); });
+}
+
+function _favPersist() {
+  var si = S.streamInfo;
+  var now = Date.now();
+  si._favUpdatedAt = now;
+  if (!window.electronAPI || !window.electronAPI.favoritesPut) return;
+  si.favSyncing = true; _favRenderSyncLine();
+  window.electronAPI.favoritesPut(_favTwitchId(), si.favorites, now).then(function(res) {
+    si.favSyncing = false;
+    si.favSyncState = (res && res.cloudSynced) ? 'cloud' : ((res && res.localOnly) ? 'local' : 'offline');
+    si.favSyncError = (res && res.syncError) || null;
+    _favRenderSyncLine();
+  }).catch(function() { si.favSyncing = false; si.favSyncError = 'save_failed'; _favRenderSyncLine(); });
+}
+
+function _favRender() {
+  var si = S.streamInfo;
+  var body = document.getElementById('si-body'); if (!body) return;
+  if (!si.favLoaded) {
+    body.innerHTML = '<div class="si-dd-empty"><svg class="ic spin"><use href="#i-refresh"/></svg> Loading favorites…</div>';
+    _favLoad();
+    return;
+  }
+  body.innerHTML = ''
+    + '<div id="si-fav-sync" class="si-fav-sync"></div>'
+    + '<div class="si-fav-toolbar">'
+    +   '<input class="si-input" id="si-fav-filter" placeholder="🔍 Filter favorites…" autocomplete="off" value="' + esc(si.favFilter || '') + '" oninput="_favFilter(this.value)">'
+    +   '<button class="btn-tw" onclick="_favNewFromCurrent()"><svg class="ic"><use href="#i-plus"/></svg> New from current</button>'
+    + '</div>'
+    + '<div id="si-fav-editor"></div>'
+    + '<div id="si-fav-grid" class="si-fav-grid"></div>';
+  _favRenderSyncLine();
+  _favRenderGrid();
+}
+
+function _favRenderSyncLine() {
+  var el = document.getElementById('si-fav-sync'); if (!el) return;
+  var si = S.streamInfo;
+  el.className = 'si-fav-sync';
+  if (si.favSyncing) { el.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Syncing…'; return; }
+  if (si.favSyncState === 'cloud')  { el.innerHTML = '<svg class="ic"><use href="#i-check"/></svg> Synced across your machines'; return; }
+  if (si.favSyncState === 'local')  { el.innerHTML = '<svg class="ic"><use href="#i-pin"/></svg> Saved on this machine — link Patreon to sync everywhere'; return; }
+  if (si.favSyncState === 'offline' || si.favSyncError) { el.className = 'si-fav-sync err'; el.innerHTML = '<svg class="ic"><use href="#i-warn"/></svg> Offline — changes saved locally, will sync when reconnected'; return; }
+  el.innerHTML = '';
+}
+
+function _favRenderGrid() {
+  var el = document.getElementById('si-fav-grid'); if (!el) return;
+  var si = S.streamInfo;
+  var q = (si.favFilter || '').toLowerCase();
+  var list = _favSorted().filter(function(f) {
+    if (!q) return true;
+    return (f.name || '').toLowerCase().indexOf(q) !== -1
+        || (f.title || '').toLowerCase().indexOf(q) !== -1
+        || (f.gameName || '').toLowerCase().indexOf(q) !== -1;
+  });
+  if (!list.length) {
+    el.innerHTML = '<div class="si-fav-empty">'
+      + (si.favorites.length ? 'No favorites match “' + esc(si.favFilter) + '”.' : 'No favorites yet.<br>Set up your title &amp; category in the Editor, then click <strong>New from current</strong>.')
+      + '</div>';
+    return;
+  }
+  el.innerHTML = list.map(_favCard).join('');
+}
+
+function _favCard(f) {
+  var box = f.boxArtUrl ? '<img class="si-fav-box" src="' + esc(_siBoxArt(f.boxArtUrl, 42, 56)) + '" alt="">' : '<div class="si-fav-box"></div>';
+  var tagNote = (f.tags && f.tags.length) ? ' · ' + f.tags.length + ' tag' + (f.tags.length > 1 ? 's' : '') : '';
+  return '<div class="si-fav-card' + (f.pinned ? ' pinned' : '') + '" draggable="true" data-favid="' + escA(f.id) + '"'
+    + ' ondragstart="_favDragStart(event,\'' + escA(f.id) + '\')" ondragover="_favDragOver(event,\'' + escA(f.id) + '\')" ondrop="_favDrop(event,\'' + escA(f.id) + '\')" ondragend="_favDragEnd(event)">'
+    + '<span class="si-fav-grip" title="Drag to reorder">⠿</span>'
+    + box
+    + '<div class="si-fav-main">'
+    +   '<div class="si-fav-name">' + (f.pinned ? '<span class="si-fav-pinmark"><svg class="ic"><use href="#i-pin"/></svg></span>' : '') + esc(f.name || 'Untitled') + '</div>'
+    +   '<div class="si-fav-title">' + (f.title ? esc(f.title) : '<em style="opacity:.6">no title</em>') + '</div>'
+    +   '<div class="si-fav-game">' + (f.gameName ? esc(f.gameName) : 'No category') + tagNote + '</div>'
+    +   '<div class="si-fav-actions">'
+    +     '<button class="apply" onclick="_favApply(\'' + escA(f.id) + '\')" title="Apply this preset to your live stream"><svg class="ic"><use href="#i-check"/></svg> Apply</button>'
+    +     '<button onclick="_favEdit(\'' + escA(f.id) + '\')">Edit</button>'
+    +     '<button onclick="_favTogglePin(\'' + escA(f.id) + '\')">' + (f.pinned ? 'Unpin' : 'Pin') + '</button>'
+    +     '<button onclick="_favDelete(\'' + escA(f.id) + '\')" title="Delete favorite"><svg class="ic"><use href="#i-trash"/></svg></button>'
+    +   '</div>'
+    + '</div></div>';
+}
+
+function _favFilter(v) { S.streamInfo.favFilter = v; _favRenderGrid(); }
+
+// New favorite captured from the current editor draft.
+function _favNewFromCurrent() {
+  _siSyncDraftFromInputs();
+  var d = S.streamInfo.draft || S.streamInfo.live;
+  S.streamInfo._favForm = {
+    id: null, name: '',
+    title: d.title || '', gameId: d.gameId || '', gameName: d.gameName || '', boxArtUrl: d.boxArtUrl || '',
+    tags: (d.tags || []).slice()
+  };
+  _favRenderForm();
+}
+function _favEdit(id) {
+  var f = _favById(id); if (!f) return;
+  S.streamInfo._favForm = {
+    id: f.id, name: f.name || '',
+    title: f.title || '', gameId: f.gameId || '', gameName: f.gameName || '', boxArtUrl: f.boxArtUrl || '',
+    tags: (f.tags || []).slice()
+  };
+  _favRenderForm();
+}
+function _favRenderForm() {
+  var host = document.getElementById('si-fav-editor'); if (!host) return;
+  var fm = S.streamInfo._favForm; if (!fm) { host.innerHTML = ''; return; }
+  var d = S.streamInfo.draft || {};
+  var catLine = fm.gameName ? esc(fm.gameName) : '<em style="opacity:.6">none</em>';
+  var useCurrent = (d.gameId && d.gameId !== fm.gameId)
+    ? '<button class="btn-x" style="font-size:10.5px" onclick="_favFormUseCurrentCat()">Use editor category: ' + esc(d.gameName || 'none') + '</button>' : '';
+  host.innerHTML = '<div class="si-diff" style="margin:0 0 12px">'
+    + '<div class="si-diff-hd">' + (fm.id ? 'Edit favorite' : 'New favorite') + '</div>'
+    + '<label class="si-label" style="margin-top:2px">Name</label>'
+    + '<input id="si-fav-name" class="si-input" maxlength="60" value="' + esc(fm.name) + '" placeholder="e.g. Variety night" oninput="S.streamInfo._favForm.name=this.value">'
+    + '<label class="si-label">Title</label>'
+    + '<input id="si-fav-title" class="si-input" maxlength="' + SF_SI_TITLE_MAX + '" value="' + esc(fm.title) + '" oninput="S.streamInfo._favForm.title=this.value">'
+    + '<label class="si-label">Category</label>'
+    + '<div class="si-cat-current">'
+    +   (fm.boxArtUrl ? '<img src="' + esc(_siBoxArt(fm.boxArtUrl, 40, 56)) + '" alt="">' : '<div class="si-box-ph"></div>')
+    +   '<span class="si-cat-name">' + catLine + '</span></div>'
+    + (useCurrent ? '<div style="margin-top:6px">' + useCurrent + '</div>' : '')
+    + '<label class="si-label">Tags</label>'
+    + '<div id="si-fav-form-tags" class="si-tags"></div>'
+    + '<div class="si-actions" style="margin-top:12px">'
+    +   '<button class="btn-x" onclick="_favFormCancel()">Cancel</button>'
+    +   '<button class="btn-tw" onclick="_favFormSave()"><svg class="ic"><use href="#i-check"/></svg> ' + (fm.id ? 'Save' : 'Create favorite') + '</button>'
+    + '</div></div>';
+  _favFormRenderTags();
+  var n = document.getElementById('si-fav-name'); if (n) n.focus();
+}
+function _favFormUseCurrentCat() {
+  var fm = S.streamInfo._favForm, d = S.streamInfo.draft || {};
+  fm.gameId = d.gameId || ''; fm.gameName = d.gameName || ''; fm.boxArtUrl = d.boxArtUrl || '';
+  _favRenderForm();
+}
+function _favFormRenderTags() {
+  var el = document.getElementById('si-fav-form-tags'); if (!el) return;
+  var fm = S.streamInfo._favForm;
+  el.innerHTML = (fm.tags || []).map(function(t, i) {
+    return '<span class="si-tag">' + esc(t) + '<button class="si-tag-x" onclick="_favFormRemoveTag(' + i + ')">×</button></span>';
+  }).join('') + '<input id="si-fav-form-tag-input" class="si-tag-input" placeholder="add tag…" autocomplete="off" onkeydown="_favFormTagKey(event)">';
+}
+function _favFormTagKey(e) {
+  var inp = document.getElementById('si-fav-form-tag-input'); if (!inp) return;
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var fm = S.streamInfo._favForm;
+    var t = String(inp.value || '').trim().replace(/[^A-Za-z0-9]/g, '');
+    if (t && fm.tags.length < SF_SI_TAG_MAX && !fm.tags.some(function(x) { return x.toLowerCase() === t.toLowerCase(); })) fm.tags.push(t.slice(0, 25));
+    inp.value = ''; _favFormRenderTags();
+    var f2 = document.getElementById('si-fav-form-tag-input'); if (f2) f2.focus();
+  } else if (e.key === 'Backspace' && !inp.value) {
+    var fm2 = S.streamInfo._favForm;
+    if (fm2.tags.length) { fm2.tags.pop(); _favFormRenderTags(); var f3 = document.getElementById('si-fav-form-tag-input'); if (f3) f3.focus(); }
+  }
+}
+function _favFormRemoveTag(i) { S.streamInfo._favForm.tags.splice(i, 1); _favFormRenderTags(); }
+function _favFormCancel() { S.streamInfo._favForm = null; var h = document.getElementById('si-fav-editor'); if (h) h.innerHTML = ''; }
+function _favFormSave() {
+  var si = S.streamInfo, fm = si._favForm; if (!fm) return;
+  var nameInp = document.getElementById('si-fav-name'); if (nameInp) fm.name = nameInp.value;
+  var titleInp = document.getElementById('si-fav-title'); if (titleInp) fm.title = titleInp.value;
+  if (!fm.name.trim()) { showToast({ message: 'Give the favorite a name.', kind: 'warn' }); if (nameInp) nameInp.focus(); return; }
+  var now = Date.now();
+  if (fm.id) {
+    var f = _favById(fm.id);
+    if (f) { f.name = fm.name.trim(); f.title = fm.title; f.gameId = fm.gameId; f.gameName = fm.gameName; f.boxArtUrl = fm.boxArtUrl; f.tags = fm.tags.slice(); f.updatedAt = now; }
+  } else {
+    var maxOrder = (si.favorites || []).reduce(function(m, x) { return Math.max(m, x.sortOrder || 0); }, 0);
+    si.favorites.push({
+      id: _favId(), name: fm.name.trim(), title: fm.title,
+      gameId: fm.gameId, gameName: fm.gameName, boxArtUrl: fm.boxArtUrl,
+      tags: fm.tags.slice(), pinned: false, sortOrder: maxOrder + 1,
+      createdAt: now, updatedAt: now
+    });
+  }
+  si._favForm = null;
+  _favPersist();
+  _favRender();
+  showToast({ message: 'Favorite ' + (fm.id ? 'saved' : 'created') + '.', kind: 'ok', duration: 2500 });
+}
+
+function _favApply(id) {
+  var si = S.streamInfo, f = _favById(id); if (!f) return;
+  si.draft = { title: f.title || '', gameId: f.gameId || '', gameName: f.gameName || '', boxArtUrl: f.boxArtUrl || '', tags: (f.tags || []).slice() };
+  si.pendingApplyFavId = id;
+  si.view = 'editor';
+  _siRenderPanel();
+  _siApply();
+}
+function _favTogglePin(id) {
+  var f = _favById(id); if (!f) return;
+  f.pinned = !f.pinned; f.updatedAt = Date.now();
+  _favPersist(); _favRenderGrid();
+}
+function _favDelete(id) {
+  var f = _favById(id); if (!f) return;
+  if (!confirm('Delete favorite “' + (f.name || 'Untitled') + '”?')) return;
+  S.streamInfo.favorites = S.streamInfo.favorites.filter(function(x) { return x.id !== id; });
+  _favPersist(); _favRenderGrid();
+  showToast({ message: 'Deleted “' + (f.name || 'Untitled') + '”.', kind: 'info', duration: 2500 });
+}
+
+// ── Drag-to-reorder ───────────────────────────────────────────────────────────
+function _favDragStart(e, id) {
+  S.streamInfo._favDrag = id;
+  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); } catch (x) {}
+  var card = e.currentTarget; if (card) card.classList.add('dragging');
+}
+function _favDragOver(e, id) {
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch (x) {}
+  var grid = document.getElementById('si-fav-grid');
+  if (grid) grid.querySelectorAll('.si-fav-card').forEach(function(c) { c.classList.toggle('drag-over', c.getAttribute('data-favid') === id); });
+}
+function _favDrop(e, targetId) {
+  e.preventDefault();
+  var si = S.streamInfo;
+  var dragId = si._favDrag; if (!dragId || dragId === targetId) return;
+  var ordered = _favSorted();
+  var from = ordered.findIndex(function(f) { return f.id === dragId; });
+  var to = ordered.findIndex(function(f) { return f.id === targetId; });
+  if (from === -1 || to === -1) return;
+  var moved = ordered.splice(from, 1)[0];
+  ordered.splice(to, 0, moved);
+  // Reassign sortOrder to match the new visual order.
+  ordered.forEach(function(f, i) { f.sortOrder = i; });
+  _favPersist(); _favRenderGrid();
+}
+function _favDragEnd() {
+  S.streamInfo._favDrag = null;
+  var grid = document.getElementById('si-fav-grid');
+  if (grid) grid.querySelectorAll('.si-fav-card').forEach(function(c) { c.classList.remove('dragging', 'drag-over'); });
+}
+
+// ── Quick-swap hotkeys ────────────────────────────────────────────────────────
+// Global shortcuts (registered in main): open the panel + instantly apply
+// pinned favorites #1–5. Persisted in localStorage; pushed to main on startup
+// and on every change. Map shape: { open, fav1, fav2, fav3, fav4, fav5 }.
+function _siLoadHotkeys() { try { return JSON.parse(localStorage.getItem('sf_si_hotkeys') || '{}') || {}; } catch (e) { return {}; } }
+function _siSaveHotkeys(h) { try { localStorage.setItem('sf_si_hotkeys', JSON.stringify(h || {})); } catch (e) {} }
+function _siSyncHotkeysToMain(cb) {
+  if (!window.electronAPI || !window.electronAPI.streamInfoSyncHotkeys) { if (cb) cb(null); return; }
+  window.electronAPI.streamInfoSyncHotkeys(_siLoadHotkeys()).then(function(r) { S.streamInfo._hkResult = r; if (cb) cb(r); }).catch(function() { if (cb) cb(null); });
+}
+function _siSetHotkey(key, val) {
+  var h = _siLoadHotkeys();
+  h[key] = String(val || '').trim();
+  _siSaveHotkeys(h);
+  _siSyncHotkeysToMain(function() { _siRenderHkStatus(); });
+}
+function _siRenderHotkeys() {
+  var body = document.getElementById('si-body'); if (!body) return;
+  var h = _siLoadHotkeys();
+  var pinned = _favSorted().filter(function(f) { return f.pinned; });
+  function row(label, key, sub) {
+    return '<div class="si-hk-row">'
+      + '<div class="si-hk-label">' + label + (sub ? '<span class="si-muted"> ' + sub + '</span>' : '') + '</div>'
+      + '<input class="si-input si-hk-input" value="' + esc(h[key] || '') + '" placeholder="Ctrl+Shift+1, Alt+G, F13…" autocomplete="off" onchange="_siSetHotkey(\'' + key + '\',this.value)">'
+      + '<button class="btn-x" onclick="_siSetHotkey(\'' + key + '\',\'\');_siRenderHotkeys()" title="Clear">Clear</button>'
+      + '</div>';
+  }
+  var rows = row('Open Stream Info', 'open', '');
+  for (var i = 1; i <= 5; i++) {
+    var f = pinned[i - 1];
+    rows += row('Apply pinned favorite #' + i, 'fav' + i, f ? ('→ ' + esc(f.name)) : '(no pinned favorite yet)');
+  }
+  body.innerHTML = '<div class="si-hk-help">Global shortcuts — they work even when StreamFusion isn’t focused. Use Electron accelerators like <code>Ctrl+Shift+1</code>, <code>Alt+G</code>, or <code>F13</code>–<code>F24</code>. The favorite slots map to your pinned favorites in order — pin &amp; reorder them in the Favorites tab.</div>'
+    + '<div class="si-hk-list">' + rows + '</div>'
+    + '<div id="si-hk-status" class="si-fav-sync"></div>';
+  _siRenderHkStatus();
+}
+function _siRenderHkStatus() {
+  var el = document.getElementById('si-hk-status'); if (!el) return;
+  var r = S.streamInfo._hkResult;
+  if (!r) { el.className = 'si-fav-sync'; el.innerHTML = ''; return; }
+  if (r.failed && r.failed.length) { el.className = 'si-fav-sync err'; el.innerHTML = '<svg class="ic"><use href="#i-warn"/></svg> Couldn’t bind: ' + r.failed.map(esc).join(', ') + ' — already used by another app or shortcut.'; }
+  else if (r.conflicted && r.conflicted.length) { el.className = 'si-fav-sync err'; el.innerHTML = '<svg class="ic"><use href="#i-warn"/></svg> Conflicts with another SF hotkey: ' + r.conflicted.map(esc).join(', '); }
+  else { el.className = 'si-fav-sync'; el.innerHTML = '<svg class="ic"><use href="#i-check"/></svg> Shortcuts active.'; }
+}
+
+// Apply the n-th (1-based) pinned favorite instantly — headless, no panel needed.
+function _favApplyPinned(n) {
+  if (!isFeatureEnabled('stream-info-editor')) { showToast({ title: 'Early Access', message: 'Link your Patreon to use Stream Info.', kind: 'warn' }); return; }
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) { showToast({ message: 'Connect Streamer.bot to apply favorites.', kind: 'warn' }); return; }
+  _favEnsureLoaded(function() {
+    var pinned = _favSorted().filter(function(f) { return f.pinned; });
+    var f = pinned[n - 1];
+    if (!f) { showToast({ message: 'No pinned favorite in slot #' + n + '.', kind: 'info' }); return; }
+    _siCheckActions(function(haveAll) {
+      if (!haveAll) { showToast({ title: 'Stream Info not set up', message: 'Open Stream Info once to install the Streamer.bot actions.', kind: 'warn' }); return; }
+      _favApplyHeadless(f);
+    });
+  });
+}
+function _favApplyHeadless(f) {
+  var si = S.streamInfo;
+  si.draft = { title: f.title || '', gameId: f.gameId || '', gameName: f.gameName || '', boxArtUrl: f.boxArtUrl || '', tags: (f.tags || []).slice() };
+  si.pendingApplyFavId = f.id;
+  if (_siApplyCore()) showToast({ title: 'Applying favorite', message: '“' + (f.name || 'preset') + '” → your stream', kind: 'info', duration: 2500 });
+}
+
+// Wire global-hotkey events from main + push the saved bindings on startup.
+(function initSiHotkeys() {
+  if (!window.electronAPI) return;
+  if (window.electronAPI.onOpenStreamInfo) window.electronAPI.onOpenStreamInfo(function() { openStreamInfo(); });
+  if (window.electronAPI.onApplyPinnedFav) window.electronAPI.onApplyPinnedFav(function(n) { _favApplyPinned(n); });
+  // Defer so the SB connection + electronAPI are settled before we register.
+  setTimeout(function() { _siSyncHotkeysToMain(); }, 1800);
+})();
 
 function openRaidFinder() {
   if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
@@ -7432,6 +8506,10 @@ function handleSBEvent(event, data) {
   }
   else if (key === 'General.Custom' && data && data.source === 'sf_raid_finder') {
     _handleRaidFinderResponse(data);
+    return;
+  }
+  else if (key === 'General.Custom' && data && data.source === 'sf_stream_info') {
+    _siHandleResponse(data);
     return;
   }
   else if (key === 'General.Custom' && data && data.source === 'aquilo_loadout_manifest') {

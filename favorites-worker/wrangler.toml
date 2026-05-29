@@ -1,0 +1,17 @@
+name = "aquilo-favorites"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+account_id = "fa3738ee91624ee17c9ef4401ee8a493"
+
+# KV namespace for the per-user favorites blobs + the token→patreon-id cache.
+# Create it once, then paste the returned id below:
+#   wrangler kv namespace create FAVORITES
+[[kv_namespaces]]
+binding = "FAVORITES"
+id = "1a88d2072b16478f8c7366b778a5491a"
+
+# Custom domain — matches the auth.aquilo.gg / release.aquilo.gg convention so
+# the client URL isn't tied to a personal *.workers.dev account.
+[[routes]]
+pattern = "favorites.aquilo.gg"
+custom_domain = true
