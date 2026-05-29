@@ -1754,6 +1754,42 @@ ipcMain.handle('hotbar-sync-hotkeys', (event, payload) => {
   return { ok: true, registered: registered, failed: failed, conflicted: conflicted };
 });
 
+// ── Stream Info quick-swap hotkeys ──────────────────────────────────────────
+// Open the Stream Info panel + apply pinned favorites #1-5. The renderer owns
+// persistence (localStorage) and pushes the full map here on startup / change;
+// we re-register atomically. open -> 'open-stream-info'; favN -> 'si-apply-pinned-fav'.
+let _siRegistered = new Set();
+ipcMain.handle('stream-info-sync-hotkeys', (event, payload) => {
+  payload = (payload && typeof payload === 'object') ? payload : {};
+  _siRegistered.forEach(a => { try { globalShortcut.unregister(a); } catch (e) {} });
+  _siRegistered.clear();
+  const registered = [], failed = [], conflicted = [];
+  function bind(accel, fn) {
+    accel = String(accel || '').trim();
+    if (!accel) return;
+    // Don't clash with overlay/hotbar/already-bound SI accels.
+    if (accel === overlayHotkeyAccel || accel === overlayVisHotkeyAccel || accel === popoutSendHotkeyAccel
+        || _hotbarRegistered.has(accel) || _siRegistered.has(accel)) { conflicted.push(accel); return; }
+    let ok = false;
+    try { ok = globalShortcut.register(accel, fn); } catch (e) { console.warn('[si-hotkey] register threw', accel, e && e.message); }
+    if (ok) { _siRegistered.add(accel); registered.push(accel); } else failed.push(accel);
+  }
+  bind(payload.open, () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try { mainWindow.show(); mainWindow.focus(); } catch (e) {}
+      mainWindow.webContents.send('open-stream-info');
+    }
+  });
+  for (let i = 1; i <= 5; i++) {
+    (function(n) {
+      bind(payload['fav' + n], () => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('si-apply-pinned-fav', n);
+      });
+    })(i);
+  }
+  return { ok: true, registered, failed, conflicted };
+});
+
 // Visibility toggle hotkey — separate from interact hotkey. Hides/shows the
 // overlay window without losing state or position.
 ipcMain.handle('overlay-set-vis-hotkey', (event, accel) => {

@@ -256,6 +256,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   favoritesGet: (twitchId)                       => ipcRenderer.invoke('favorites-get', twitchId),
   favoritesPut: (twitchId, favorites, updatedAt) => ipcRenderer.invoke('favorites-put', { twitchId: twitchId, favorites: favorites, updatedAt: updatedAt }),
 
+  // Stream Info quick-swap global hotkeys. Map: { open, fav1..fav5 }. Returns
+  // { ok, registered, failed, conflicted }. Main fires open-stream-info /
+  // si-apply-pinned-fav back to the renderer.
+  streamInfoSyncHotkeys: (map) => ipcRenderer.invoke('stream-info-sync-hotkeys', map || {}),
+  onOpenStreamInfo:      (fn)  => ipcRenderer.on('open-stream-info', fn),
+  onApplyPinnedFav:      (fn)  => ipcRenderer.on('si-apply-pinned-fav', (e, n) => fn(n)),
+
   // ── Rotation Relay (free for all users) ─────────────────────────────────
   // Subscribes to the streamer's Rotation widget over the cloud relay so
   // song events show up in the events tab + chat overlay. Streamer pastes

@@ -2,6 +2,7 @@
   "name": "aquilo-favorites-worker",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Cloudflare Worker: cross-machine cloud sync for StreamFusion Stream Info favorites (KV-backed, Patreon-authed).",
   "scripts": {
     "dev": "wrangler dev",

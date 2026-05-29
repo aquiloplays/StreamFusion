@@ -617,6 +617,25 @@ body.has-sf-notice { padding-top: 42px !important; }
 .si-ea-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;color:#fff;background:linear-gradient(90deg,var(--accent),#22c55e);padding:4px 12px;border-radius:12px;margin-bottom:14px}
 .si-ea-gate h3{font-size:16px;margin:0 0 8px}
 .si-ea-gate p{font-size:12.5px;color:var(--mut);line-height:1.6;max-width:420px;margin:0 auto 18px}
+/* Listing-card preview */
+.si-preview-card{display:flex;gap:11px;background:var(--surf2);border:1px solid var(--bdr);border-radius:9px;padding:10px;margin:8px 0 4px}
+.si-preview-card img{width:48px;height:64px;border-radius:5px;object-fit:cover;background:var(--surf3);flex-shrink:0}
+.si-preview-main{flex:1;min-width:0}
+.si-preview-top{display:flex;gap:7px;align-items:center;margin-bottom:3px;min-height:14px}
+.si-preview-live{font-size:9px;font-weight:800;letter-spacing:.05em;color:#fff;background:#e0245e;padding:1px 6px;border-radius:3px}
+.si-preview-vc{font-size:10.5px;color:var(--mut)}
+.si-preview-title{font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-preview-chan{font-size:11px;color:var(--mut)}
+.si-preview-game{font-size:11px;color:var(--accent);margin-top:2px}
+.si-preview-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.si-preview-tags span{font-size:9.5px;color:var(--mut);background:var(--surf3);border-radius:9px;padding:1px 7px}
+/* Hotkeys tab */
+.si-hk-help{font-size:11.5px;color:var(--mut);line-height:1.6;margin-bottom:12px}
+.si-hk-list{display:flex;flex-direction:column;gap:8px}
+.si-hk-row{display:flex;align-items:center;gap:8px}
+.si-hk-label{flex:1;font-size:12px;color:var(--txt)}
+.si-hk-input{width:200px;flex-shrink:0;font-family:ui-monospace,monospace;font-size:11px}
+#si-hk-status{margin-top:12px}
 .mh{font-size:16px;font-weight:700;margin-bottom:6px}
 .mp{font-size:12px;color:var(--mut);line-height:1.6;margin-bottom:12px}
 .mlbl{font-size:11px;color:var(--mut);display:block;margin:8px 0 3px}
@@ -5416,11 +5435,19 @@ function _siSearchGames(query) {
 function _siApply() {
   var si = S.streamInfo;
   if (!si.draft) return;
-  if (!si.actions.set || !S.sbConnected) { showToast({ message: 'Streamer.bot not connected.', kind: 'err' }); return; }
   _siSyncDraftFromInputs();
   if (!_siIsDirty()) { showToast({ message: 'Nothing to apply — draft matches your live stream.', kind: 'info' }); return; }
+  _siApplyCore();
+}
+// Sends the Update action from the current draft. Shared by the Apply button and
+// by headless favorite/hotkey applies (which need no editor inputs). Returns
+// true when a request was sent.
+function _siApplyCore() {
+  var si = S.streamInfo;
+  if (!si.draft) return false;
+  if (!si.actions.set || !S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) { showToast({ message: 'Streamer.bot not connected.', kind: 'err' }); return false; }
   var title = si.draft.title || '';
-  if (title.length > SF_SI_TITLE_MAX) { showToast({ message: 'Title is over the ' + SF_SI_TITLE_MAX + '-char Twitch limit.', kind: 'err' }); return; }
+  if (title.length > SF_SI_TITLE_MAX) { showToast({ message: 'Title is over the ' + SF_SI_TITLE_MAX + '-char Twitch limit.', kind: 'err' }); return false; }
   var reqId = 'sf-si-set-' + Date.now();
   si.lastSetReqId = reqId;
   si.applying = true;
@@ -5441,6 +5468,7 @@ function _siApply() {
       showToast({ title: 'Apply timed out', message: 'Streamer.bot didn’t confirm the change. Check SB is running and Twitch is connected.', kind: 'err' });
     }
   }, 15000);
+  return true;
 }
 function _siResetApplyBtn() {
   var b = document.getElementById('si-apply');
@@ -5541,9 +5569,12 @@ function _siRenderPanel() {
     + '<div class="si-subtabs">'
     +   '<button class="si-subtab' + (si.view === 'editor' ? ' on' : '') + '" onclick="_siSwitchView(\'editor\')"><svg class="ic"><use href="#i-pencil"/></svg> Editor</button>'
     +   '<button class="si-subtab' + (si.view === 'favorites' ? ' on' : '') + '" onclick="_siSwitchView(\'favorites\')"><svg class="ic"><use href="#i-heart"/></svg> Favorites</button>'
+    +   '<button class="si-subtab' + (si.view === 'hotkeys' ? ' on' : '') + '" onclick="_siSwitchView(\'hotkeys\')">⌨ Hotkeys</button>'
     + '</div>'
     + '<div id="si-body"></div>';
-  if (si.view === 'favorites') _siRenderFavorites(); else _siRenderEditor();
+  if (si.view === 'favorites') _siRenderFavorites();
+  else if (si.view === 'hotkeys') _siRenderHotkeys();
+  else _siRenderEditor();
   _siUpdateLivePulse();
 }
 function _siSwitchView(v) {
@@ -5567,6 +5598,7 @@ function _siRenderEditor() {
     : '<div class="si-cat-empty">No category set</div>';
   body.innerHTML = ''
     + '<div id="si-status" class="si-status"></div>'
+    + '<div id="si-preview"></div>'
     + '<label class="si-label">Title <span id="si-charcount" class="si-charcount"></span></label>'
     + '<input id="si-title" class="si-input" maxlength="' + SF_SI_TITLE_MAX + '" value="' + esc(d.title || '') + '" placeholder="What are you streaming?" oninput="_siOnTitleInput(this.value)">'
     + '<label class="si-label">Category</label>'
@@ -5587,13 +5619,32 @@ function _siRenderEditor() {
   _siRenderStatus();
   _siRenderCharcount();
   _siRenderDiff();
+  _siRenderPreview();
   _siResetApplyBtn();
   _siRenderDropdown();
 }
 
+// Twitch-style directory listing preview so the streamer can see how their card
+// will read before applying.
+function _siRenderPreview() {
+  var el = document.getElementById('si-preview'); if (!el) return;
+  var d = S.streamInfo.draft || S.streamInfo.live;
+  var live = _siIsLive();
+  var box = d.boxArtUrl ? '<img src="' + esc(_siBoxArt(d.boxArtUrl, 60, 80)) + '" alt="">' : '<div class="si-box-ph" style="width:48px;height:64px"></div>';
+  el.innerHTML = '<div class="si-preview-card">'
+    + box
+    + '<div class="si-preview-main">'
+    +   '<div class="si-preview-top">' + (live ? '<span class="si-preview-live">LIVE</span>' : '') + (S.twViewersFetched && S.viewers && S.viewers.tw != null ? '<span class="si-preview-vc">' + esc(String(S.viewers.tw)) + ' viewers</span>' : '') + '</div>'
+    +   '<div class="si-preview-title">' + (d.title ? esc(d.title) : '<span style="opacity:.5">Your stream title…</span>') + '</div>'
+    +   '<div class="si-preview-chan">' + esc(S.twLogin || 'your_channel') + '</div>'
+    +   '<div class="si-preview-game">' + (d.gameName ? esc(d.gameName) : 'No category') + '</div>'
+    +   ((d.tags && d.tags.length) ? '<div class="si-preview-tags">' + d.tags.slice(0, 6).map(function(t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' : '')
+    + '</div></div>';
+}
+
 function _siOnTitleInput(v) {
   S.streamInfo.draft.title = v;
-  _siRenderCharcount(); _siRenderStatus(); _siRenderDiff(); _siResetApplyBtn();
+  _siRenderCharcount(); _siRenderStatus(); _siRenderDiff(); _siRenderPreview(); _siResetApplyBtn();
 }
 
 function _siRenderCharcount() {
@@ -5721,12 +5772,12 @@ function _siAddTag(raw) {
   if (si.draft.tags.length >= SF_SI_TAG_MAX) { showToast({ message: 'Twitch allows up to ' + SF_SI_TAG_MAX + ' tags.', kind: 'warn' }); return; }
   if (si.draft.tags.some(function(x) { return x.toLowerCase() === t.toLowerCase(); })) return;
   si.draft.tags.push(t);
-  _siRenderTags(); _siRenderStatus(); _siRenderDiff(); _siResetApplyBtn();
+  _siRenderTags(); _siRenderStatus(); _siRenderDiff(); _siRenderPreview(); _siResetApplyBtn();
 }
 function _siRemoveTag(i) {
   var d = S.streamInfo.draft;
   d.tags.splice(i, 1);
-  _siRenderTags(); _siRenderStatus(); _siRenderDiff(); _siResetApplyBtn();
+  _siRenderTags(); _siRenderStatus(); _siRenderDiff(); _siRenderPreview(); _siResetApplyBtn();
 }
 
 function _siRefreshFromTwitch() { _siGetInfo(); }
@@ -5738,8 +5789,15 @@ function _siUpdateLivePulse() {
   el.style.display = _siIsLive() ? '' : 'none';
 }
 
-// ── Favorites (full implementation added in the favorites step) ────────────────
-function _siSaveFavoritePrompt() { if (typeof _favSavePrompt === 'function') _favSavePrompt(); }
+// ── Favorites bridge ──────────────────────────────────────────────────────────
+// "Save as favorite" from the Editor: capture the draft, switch to the
+// Favorites view, and open the new-favorite form (which lives in that view).
+function _siSaveFavoritePrompt() {
+  _siSyncDraftFromInputs();
+  S.streamInfo.view = 'favorites';
+  _siRenderPanel();
+  _favEnsureLoaded(function() { _favRender(); _favNewFromCurrent(); });
+}
 function _siRenderFavorites() {
   if (typeof _favRender === 'function') { _favRender(); return; }
   var body = document.getElementById('si-body'); if (body) body.innerHTML = '<div class="si-dd-empty">Favorites load here.</div>';
@@ -5759,8 +5817,15 @@ function _favSorted() {
 function _favLoad(force) {
   var si = S.streamInfo;
   if (si.favLoaded && !force) return;
+  _favEnsureLoaded(function() { if (si.view === 'favorites') _favRender(); else _favRenderSyncLine(); }, force);
+}
+// Loads favorites from main (cloud/local) once, then runs cb. Used by the view
+// and by the headless hotkey/favorite apply path.
+function _favEnsureLoaded(cb, force) {
+  var si = S.streamInfo;
+  if (si.favLoaded && !force) { if (cb) cb(); return; }
   si.favSyncing = true; si.favSyncError = null;
-  if (!window.electronAPI || !window.electronAPI.favoritesGet) { si.favLoaded = true; si.favSyncing = false; _favRender(); return; }
+  if (!window.electronAPI || !window.electronAPI.favoritesGet) { si.favLoaded = true; si.favSyncing = false; if (cb) cb(); return; }
   window.electronAPI.favoritesGet(_favTwitchId()).then(function(res) {
     si.favSyncing = false; si.favLoaded = true;
     if (res && res.ok) {
@@ -5769,8 +5834,8 @@ function _favLoad(force) {
       si.favSyncState = res.cloudSynced ? 'cloud' : (res.localOnly ? 'local' : 'offline');
       si.favSyncError = res.syncError || null;
     } else { si.favSyncError = 'load_failed'; }
-    if (si.view === 'favorites') _favRender(); else _favRenderSyncLine();
-  }).catch(function() { si.favSyncing = false; si.favLoaded = true; si.favSyncError = 'load_failed'; if (si.view === 'favorites') _favRender(); });
+    if (cb) cb();
+  }).catch(function() { si.favSyncing = false; si.favLoaded = true; si.favSyncError = 'load_failed'; if (cb) cb(); });
 }
 
 function _favPersist() {
@@ -6010,6 +6075,82 @@ function _favDragEnd() {
   var grid = document.getElementById('si-fav-grid');
   if (grid) grid.querySelectorAll('.si-fav-card').forEach(function(c) { c.classList.remove('dragging', 'drag-over'); });
 }
+
+// ── Quick-swap hotkeys ────────────────────────────────────────────────────────
+// Global shortcuts (registered in main): open the panel + instantly apply
+// pinned favorites #1–5. Persisted in localStorage; pushed to main on startup
+// and on every change. Map shape: { open, fav1, fav2, fav3, fav4, fav5 }.
+function _siLoadHotkeys() { try { return JSON.parse(localStorage.getItem('sf_si_hotkeys') || '{}') || {}; } catch (e) { return {}; } }
+function _siSaveHotkeys(h) { try { localStorage.setItem('sf_si_hotkeys', JSON.stringify(h || {})); } catch (e) {} }
+function _siSyncHotkeysToMain(cb) {
+  if (!window.electronAPI || !window.electronAPI.streamInfoSyncHotkeys) { if (cb) cb(null); return; }
+  window.electronAPI.streamInfoSyncHotkeys(_siLoadHotkeys()).then(function(r) { S.streamInfo._hkResult = r; if (cb) cb(r); }).catch(function() { if (cb) cb(null); });
+}
+function _siSetHotkey(key, val) {
+  var h = _siLoadHotkeys();
+  h[key] = String(val || '').trim();
+  _siSaveHotkeys(h);
+  _siSyncHotkeysToMain(function() { _siRenderHkStatus(); });
+}
+function _siRenderHotkeys() {
+  var body = document.getElementById('si-body'); if (!body) return;
+  var h = _siLoadHotkeys();
+  var pinned = _favSorted().filter(function(f) { return f.pinned; });
+  function row(label, key, sub) {
+    return '<div class="si-hk-row">'
+      + '<div class="si-hk-label">' + label + (sub ? '<span class="si-muted"> ' + sub + '</span>' : '') + '</div>'
+      + '<input class="si-input si-hk-input" value="' + esc(h[key] || '') + '" placeholder="Ctrl+Shift+1, Alt+G, F13…" autocomplete="off" onchange="_siSetHotkey(\'' + key + '\',this.value)">'
+      + '<button class="btn-x" onclick="_siSetHotkey(\'' + key + '\',\'\');_siRenderHotkeys()" title="Clear">Clear</button>'
+      + '</div>';
+  }
+  var rows = row('Open Stream Info', 'open', '');
+  for (var i = 1; i <= 5; i++) {
+    var f = pinned[i - 1];
+    rows += row('Apply pinned favorite #' + i, 'fav' + i, f ? ('→ ' + esc(f.name)) : '(no pinned favorite yet)');
+  }
+  body.innerHTML = '<div class="si-hk-help">Global shortcuts — they work even when StreamFusion isn’t focused. Use Electron accelerators like <code>Ctrl+Shift+1</code>, <code>Alt+G</code>, or <code>F13</code>–<code>F24</code>. The favorite slots map to your pinned favorites in order — pin &amp; reorder them in the Favorites tab.</div>'
+    + '<div class="si-hk-list">' + rows + '</div>'
+    + '<div id="si-hk-status" class="si-fav-sync"></div>';
+  _siRenderHkStatus();
+}
+function _siRenderHkStatus() {
+  var el = document.getElementById('si-hk-status'); if (!el) return;
+  var r = S.streamInfo._hkResult;
+  if (!r) { el.className = 'si-fav-sync'; el.innerHTML = ''; return; }
+  if (r.failed && r.failed.length) { el.className = 'si-fav-sync err'; el.innerHTML = '<svg class="ic"><use href="#i-warn"/></svg> Couldn’t bind: ' + r.failed.map(esc).join(', ') + ' — already used by another app or shortcut.'; }
+  else if (r.conflicted && r.conflicted.length) { el.className = 'si-fav-sync err'; el.innerHTML = '<svg class="ic"><use href="#i-warn"/></svg> Conflicts with another SF hotkey: ' + r.conflicted.map(esc).join(', '); }
+  else { el.className = 'si-fav-sync'; el.innerHTML = '<svg class="ic"><use href="#i-check"/></svg> Shortcuts active.'; }
+}
+
+// Apply the n-th (1-based) pinned favorite instantly — headless, no panel needed.
+function _favApplyPinned(n) {
+  if (!isFeatureEnabled('stream-info-editor')) { showToast({ title: 'Early Access', message: 'Link your Patreon to use Stream Info.', kind: 'warn' }); return; }
+  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) { showToast({ message: 'Connect Streamer.bot to apply favorites.', kind: 'warn' }); return; }
+  _favEnsureLoaded(function() {
+    var pinned = _favSorted().filter(function(f) { return f.pinned; });
+    var f = pinned[n - 1];
+    if (!f) { showToast({ message: 'No pinned favorite in slot #' + n + '.', kind: 'info' }); return; }
+    _siCheckActions(function(haveAll) {
+      if (!haveAll) { showToast({ title: 'Stream Info not set up', message: 'Open Stream Info once to install the Streamer.bot actions.', kind: 'warn' }); return; }
+      _favApplyHeadless(f);
+    });
+  });
+}
+function _favApplyHeadless(f) {
+  var si = S.streamInfo;
+  si.draft = { title: f.title || '', gameId: f.gameId || '', gameName: f.gameName || '', boxArtUrl: f.boxArtUrl || '', tags: (f.tags || []).slice() };
+  si.pendingApplyFavId = f.id;
+  if (_siApplyCore()) showToast({ title: 'Applying favorite', message: '“' + (f.name || 'preset') + '” → your stream', kind: 'info', duration: 2500 });
+}
+
+// Wire global-hotkey events from main + push the saved bindings on startup.
+(function initSiHotkeys() {
+  if (!window.electronAPI) return;
+  if (window.electronAPI.onOpenStreamInfo) window.electronAPI.onOpenStreamInfo(function() { openStreamInfo(); });
+  if (window.electronAPI.onApplyPinnedFav) window.electronAPI.onApplyPinnedFav(function(n) { _favApplyPinned(n); });
+  // Defer so the SB connection + electronAPI are settled before we register.
+  setTimeout(function() { _siSyncHotkeysToMain(); }, 1800);
+})();
 
 function openRaidFinder() {
   if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
