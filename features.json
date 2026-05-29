@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "_comment": "StreamFusion early-access feature manifest. The dedicated SF Patreon-gated EA flag system (separate chip) will eventually own this file; until it ships, main.js loads it (get-features IPC) and the renderer gates features with isFeatureEnabled(). earlyAccess:true means the feature is hidden behind the EA gate (linking Patreon — any tier, free included — or the standard EA entitlement unlocks it). Set earlyAccess:false to ship a feature to everyone.",
+  "features": {
+    "stream-info-editor": {
+      "name": "Stream Info Editor",
+      "description": "Edit your Twitch title, category and tags from inside StreamFusion, with cloud-synced favorite presets and quick-swap hotkeys.",
+      "earlyAccess": true,
+      "unlock": "patreon-link-any-tier"
+    }
+  }
+}

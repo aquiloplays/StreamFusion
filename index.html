@@ -3314,6 +3314,35 @@ function renderEaSettings() {
   }
 })();
 
+// ── Feature flags (early-access manifest) ─────────────────────────────────────
+// Mirrors features.json — the canonical manifest the dedicated SF Patreon-gated
+// EA flag system will own once that chip lands. Loaded from main at startup.
+// Until it arrives we assume EA-gated (fail-safe closed) so a flagged feature
+// never leaks open by default.
+S._features = null;
+(function initFeatureFlags() {
+  if (!window.electronAPI || !window.electronAPI.getFeatures) return;
+  window.electronAPI.getFeatures().then(function(f) { S._features = f || null; }).catch(function() {});
+})();
+function _featureDef(key) {
+  return (S._features && S._features.features && S._features.features[key]) || null;
+}
+// True when the feature is flagged early-access (default true if manifest absent).
+function isFeatureEarlyAccess(key) {
+  var d = _featureDef(key);
+  return d ? !!d.earlyAccess : true;
+}
+// Unlock = any Patreon link (free linking, any tier — per the EA policy) OR the
+// standard cross-feature EA entitlement (paid Patreon / Discord Patron role).
+function _siFeatureUnlocked() {
+  return !!(S.patreon && S.patreon.signedIn) || !!S.hasEarlyAccess;
+}
+// True when the feature is usable: not EA-gated, or the user has unlocked EA.
+function isFeatureEnabled(key) {
+  if (!isFeatureEarlyAccess(key)) return true;
+  return _siFeatureUnlocked();
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 var S = {
   sbWS: null, tfWS: null,
@@ -5232,6 +5261,51 @@ function _siOpenGated() {
     _siRenderPanel();
     _siGetInfo();
   });
+}
+
+// ── Early-access gate ─────────────────────────────────────────────────────────
+// Returns true when it rendered the gate (caller should stop); false to proceed.
+function _siRenderGate() {
+  if (isFeatureEnabled('stream-info-editor')) return false;   // unlocked or flag off
+  _siShowGate();
+  return true;
+}
+function _siShowGate() {
+  var m = document.getElementById('modal');
+  document.getElementById('overlay').classList.add('show');
+  m.innerHTML = ''
+    + '<div class="mh"><svg class="ic"><use href="#i-pencil"/></svg> Stream Info</div>'
+    + '<div class="si-ea-gate">'
+    +   '<div class="si-ea-badge">EARLY ACCESS</div>'
+    +   '<h3>Link your Patreon to unlock</h3>'
+    +   '<p>Edit your Twitch title, category &amp; tags right from StreamFusion — and save favorite presets that sync across your machines. This feature is in early access; linking your Patreon (any tier, free included) unlocks it.</p>'
+    +   '<div class="mbtns" style="justify-content:center">'
+    +     '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
+    +     '<button class="btn-tw" id="si-ea-link" onclick="_siGateLinkPatreon()"><svg class="ic"><use href="#i-heart"/></svg> Link Patreon</button>'
+    +   '</div>'
+    +   '<p style="margin-top:14px;font-size:11px">Already a patron connected through Discord? <a onclick="_siGateConnectDiscord();return false" style="color:var(--accent);cursor:pointer;text-decoration:underline">Connect Discord</a> instead.</p>'
+    + '</div>';
+}
+function _siGateLinkPatreon() {
+  var b = document.getElementById('si-ea-link');
+  if (!window.electronAPI || !window.electronAPI.patreonBeginAuth) { showToast({ message: 'Patreon linking is unavailable here.', kind: 'err' }); return; }
+  if (b) { b.disabled = true; b.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Opening Patreon…'; }
+  window.electronAPI.patreonBeginAuth().then(function(state) {
+    if (state) { if (typeof applyPatreonState === 'function') applyPatreonState(state); else { S.patreon = state; } }
+    if (_siFeatureUnlocked()) { showToast({ title: 'Unlocked', message: 'Stream Info is now available.', kind: 'ok' }); _siOpenGated(); }
+    else { if (b) { b.disabled = false; b.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg> Link Patreon'; } showToast({ title: 'Patreon linked', message: 'We couldn’t confirm the link yet — try opening Stream Info again in a moment.', kind: 'warn' }); }
+  }).catch(function() {
+    if (b) { b.disabled = false; b.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg> Link Patreon'; }
+    showToast({ message: 'Patreon linking failed or was cancelled.', kind: 'err' });
+  });
+}
+function _siGateConnectDiscord() {
+  if (!window.electronAPI || !window.electronAPI.discordBeginAuth) { showToast({ message: 'Discord connect is unavailable here.', kind: 'err' }); return; }
+  window.electronAPI.discordBeginAuth().then(function(state) {
+    if (state) { if (typeof applyDiscordState === 'function') applyDiscordState(state); else { S.discord = state; } }
+    if (_siFeatureUnlocked()) { showToast({ title: 'Unlocked', message: 'Stream Info is now available.', kind: 'ok' }); _siOpenGated(); }
+    else { showToast({ title: 'Discord connected', message: 'No Patron role found in the aquilo.gg server.', kind: 'warn' }); }
+  }).catch(function() { showToast({ message: 'Discord connect failed or was cancelled.', kind: 'err' }); });
 }
 
 // ── SB action detection ───────────────────────────────────────────────────────

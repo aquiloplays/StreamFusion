@@ -249,6 +249,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // user's Patreon access token (renderer never sees it) and falls back to a
   // local userData cache when offline / not Patreon-linked. Returns:
   //   { ok, favorites:[], updatedAt, cloudSynced?|offline?|localOnly?, syncError? }
+  // Early-access feature manifest (features.json). Returns the parsed object or
+  // null. The renderer's isFeatureEnabled() gates EA features off this.
+  getFeatures:  ()                               => ipcRenderer.invoke('get-features'),
+
   favoritesGet: (twitchId)                       => ipcRenderer.invoke('favorites-get', twitchId),
   favoritesPut: (twitchId, favorites, updatedAt) => ipcRenderer.invoke('favorites-put', { twitchId: twitchId, favorites: favorites, updatedAt: updatedAt }),
 

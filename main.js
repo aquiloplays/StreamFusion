@@ -1302,6 +1302,16 @@ async function favoritesToken() {
   try { return await patreonAuth.getRawAccessTokenAsync(); }
   catch (e) { try { return patreonAuth.getRawAccessToken(); } catch (e2) { return null; } }
 }
+// ── Feature-flag manifest ───────────────────────────────────────────────────
+// Reads features.json (the early-access manifest). The dedicated SF Patreon-
+// gated EA flag system will own this later; for now the renderer pulls it via
+// get-features and gates with isFeatureEnabled(). Loaded once at module init;
+// returns null if absent (renderer then assumes EA-gated, fail-safe closed).
+let _featuresManifest = null;
+try { _featuresManifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'features.json'), 'utf8')); }
+catch (e) { console.warn('[features] manifest load failed:', e && e.message); }
+ipcMain.handle('get-features', function() { return _featuresManifest; });
+
 ipcMain.handle('favorites-get', async function(event, twitchId) {
   twitchId = String(twitchId || 'default');
   const local = favoritesReadCache(twitchId);
