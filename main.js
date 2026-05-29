@@ -1246,6 +1246,90 @@ ipcMain.handle('shared-bot-connect', async function(event, cfg) {
 ipcMain.handle('shared-bot-disconnect', function() {
   return discordBot.sharedBotDisconnect();
 });
+
+// ── Stream Info favorites (cloud sync) ──────────────────────────────────────
+// Cross-machine sync for the Stream Info → Favorites presets. Backed by the
+// aquilo-favorites Cloudflare Worker (KV). Auth mirrors shared-bot-connect:
+// the main process attaches the user's Patreon access token; the renderer
+// never sees it. A local JSON cache in userData gives instant load + offline
+// support, and is the only store for users entitled via Discord-only (no
+// Patreon token to authenticate the cloud call).
+const FAVORITES_WORKER_URL = (process.env.SF_FAVORITES_URL || 'https://favorites.aquilo.gg').replace(/\/+$/, '');
+function favoritesCachePath() { return path.join(app.getPath('userData'), 'stream-info-favorites.json'); }
+function favoritesReadCache(twitchId) {
+  try {
+    const all = JSON.parse(fs.readFileSync(favoritesCachePath(), 'utf8'));
+    const scope = (all.scopes && all.scopes[twitchId || 'default']) || null;
+    return scope ? { favorites: scope.favorites || [], updatedAt: scope.updatedAt || 0 } : { favorites: [], updatedAt: 0 };
+  } catch (e) { return { favorites: [], updatedAt: 0 }; }
+}
+function favoritesWriteCache(twitchId, favorites, updatedAt) {
+  try {
+    let all = {};
+    try { all = JSON.parse(fs.readFileSync(favoritesCachePath(), 'utf8')); } catch (e) {}
+    if (!all.scopes) all.scopes = {};
+    all.scopes[twitchId || 'default'] = { favorites: favorites || [], updatedAt: updatedAt || 0 };
+    fs.writeFileSync(favoritesCachePath(), JSON.stringify(all));
+  } catch (e) { console.warn('[favorites] cache write failed:', e && e.message); }
+}
+// Small promisified JSON request over https (GET/PUT) with a Bearer token.
+function favoritesHttp(method, urlStr, token, bodyObj) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(urlStr); } catch (e) { resolve({ ok: false, error: 'bad_url' }); return; }
+    const payload = bodyObj ? JSON.stringify(bodyObj) : null;
+    const req = https.request({
+      method, hostname: u.hostname, path: u.pathname + u.search,
+      headers: Object.assign(
+        { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json', 'User-Agent': 'StreamFusion' },
+        payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}
+      )
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { resolve({ ok: false, error: 'bad_response', status: res.statusCode }); }
+      });
+    });
+    req.on('error', (e) => resolve({ ok: false, error: 'network', detail: String(e && e.message) }));
+    req.setTimeout(12000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+async function favoritesToken() {
+  try { return await patreonAuth.getRawAccessTokenAsync(); }
+  catch (e) { try { return patreonAuth.getRawAccessToken(); } catch (e2) { return null; } }
+}
+ipcMain.handle('favorites-get', async function(event, twitchId) {
+  twitchId = String(twitchId || 'default');
+  const local = favoritesReadCache(twitchId);
+  const token = await favoritesToken();
+  if (!token) return { ok: true, favorites: local.favorites, updatedAt: local.updatedAt, localOnly: true };
+  const cloud = await favoritesHttp('GET', FAVORITES_WORKER_URL + '/favorites?twitchId=' + encodeURIComponent(twitchId), token, null);
+  if (!cloud || !cloud.ok) return { ok: true, favorites: local.favorites, updatedAt: local.updatedAt, offline: true, syncError: (cloud && cloud.error) || 'unreachable' };
+  // Last-write-wins reconciliation between cloud and the local cache.
+  if ((local.updatedAt || 0) > (cloud.updatedAt || 0)) {
+    // Local is newer (edited offline) — push it up and keep local.
+    await favoritesHttp('PUT', FAVORITES_WORKER_URL + '/favorites?twitchId=' + encodeURIComponent(twitchId), token, { favorites: local.favorites, updatedAt: local.updatedAt });
+    return { ok: true, favorites: local.favorites, updatedAt: local.updatedAt, cloudSynced: true };
+  }
+  favoritesWriteCache(twitchId, cloud.favorites, cloud.updatedAt);
+  return { ok: true, favorites: cloud.favorites || [], updatedAt: cloud.updatedAt || 0, cloudSynced: true };
+});
+ipcMain.handle('favorites-put', async function(event, arg) {
+  arg = arg || {};
+  const twitchId = String(arg.twitchId || 'default');
+  const favorites = Array.isArray(arg.favorites) ? arg.favorites : [];
+  const updatedAt = Number(arg.updatedAt) || Date.now();
+  favoritesWriteCache(twitchId, favorites, updatedAt);   // always persist locally first
+  const token = await favoritesToken();
+  if (!token) return { ok: true, localOnly: true, updatedAt };
+  const cloud = await favoritesHttp('PUT', FAVORITES_WORKER_URL + '/favorites?twitchId=' + encodeURIComponent(twitchId), token, { favorites, updatedAt });
+  if (!cloud || !cloud.ok) return { ok: true, offline: true, updatedAt, syncError: (cloud && cloud.error) || 'unreachable' };
+  return { ok: true, cloudSynced: true, updatedAt: cloud.updatedAt || updatedAt };
+});
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();

@@ -47,6 +47,7 @@
       "!preview-icon.js",
       "!icon-preview.png",
       "!release-worker/**",
+      "!favorites-worker/**",
       "!dist-beta/**",
       "!scripts/sbae-decoded.json",
       "!scripts/sf-rf-import-new.txt",

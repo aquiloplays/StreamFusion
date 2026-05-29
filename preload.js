@@ -244,6 +244,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sharedBotConnect:     (cfg)         => ipcRenderer.invoke('shared-bot-connect',    cfg || {}),
   sharedBotDisconnect:  ()            => ipcRenderer.invoke('shared-bot-disconnect'),
 
+  // ── Stream Info favorites (cloud sync, EA) ──────────────────────────────
+  // Cross-machine sync for Stream Info presets. The main process attaches the
+  // user's Patreon access token (renderer never sees it) and falls back to a
+  // local userData cache when offline / not Patreon-linked. Returns:
+  //   { ok, favorites:[], updatedAt, cloudSynced?|offline?|localOnly?, syncError? }
+  favoritesGet: (twitchId)                       => ipcRenderer.invoke('favorites-get', twitchId),
+  favoritesPut: (twitchId, favorites, updatedAt) => ipcRenderer.invoke('favorites-put', { twitchId: twitchId, favorites: favorites, updatedAt: updatedAt }),
+
   // ── Rotation Relay (free for all users) ─────────────────────────────────
   // Subscribes to the streamer's Rotation widget over the cloud relay so
   // song events show up in the events tab + chat overlay. Streamer pastes

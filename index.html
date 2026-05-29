@@ -5671,6 +5671,272 @@ function _siRenderFavorites() {
   var body = document.getElementById('si-body'); if (body) body.innerHTML = '<div class="si-dd-empty">Favorites load here.</div>';
 }
 
+// ── Favorites (cloud-synced presets) ──────────────────────────────────────────
+function _favId() { return 'fav_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function _favTwitchId() { return S.twUserId ? String(S.twUserId) : 'default'; }
+function _favById(id) { return (S.streamInfo.favorites || []).filter(function(f) { return f.id === id; })[0] || null; }
+function _favSorted() {
+  return (S.streamInfo.favorites || []).slice().sort(function(a, b) {
+    if (!!b.pinned !== !!a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+    return (a.sortOrder || 0) - (b.sortOrder || 0);
+  });
+}
+
+function _favLoad(force) {
+  var si = S.streamInfo;
+  if (si.favLoaded && !force) return;
+  si.favSyncing = true; si.favSyncError = null;
+  if (!window.electronAPI || !window.electronAPI.favoritesGet) { si.favLoaded = true; si.favSyncing = false; _favRender(); return; }
+  window.electronAPI.favoritesGet(_favTwitchId()).then(function(res) {
+    si.favSyncing = false; si.favLoaded = true;
+    if (res && res.ok) {
+      si.favorites = Array.isArray(res.favorites) ? res.favorites : [];
+      si._favUpdatedAt = res.updatedAt || 0;
+      si.favSyncState = res.cloudSynced ? 'cloud' : (res.localOnly ? 'local' : 'offline');
+      si.favSyncError = res.syncError || null;
+    } else { si.favSyncError = 'load_failed'; }
+    if (si.view === 'favorites') _favRender(); else _favRenderSyncLine();
+  }).catch(function() { si.favSyncing = false; si.favLoaded = true; si.favSyncError = 'load_failed'; if (si.view === 'favorites') _favRender(); });
+}
+
+function _favPersist() {
+  var si = S.streamInfo;
+  var now = Date.now();
+  si._favUpdatedAt = now;
+  if (!window.electronAPI || !window.electronAPI.favoritesPut) return;
+  si.favSyncing = true; _favRenderSyncLine();
+  window.electronAPI.favoritesPut(_favTwitchId(), si.favorites, now).then(function(res) {
+    si.favSyncing = false;
+    si.favSyncState = (res && res.cloudSynced) ? 'cloud' : ((res && res.localOnly) ? 'local' : 'offline');
+    si.favSyncError = (res && res.syncError) || null;
+    _favRenderSyncLine();
+  }).catch(function() { si.favSyncing = false; si.favSyncError = 'save_failed'; _favRenderSyncLine(); });
+}
+
+function _favRender() {
+  var si = S.streamInfo;
+  var body = document.getElementById('si-body'); if (!body) return;
+  if (!si.favLoaded) {
+    body.innerHTML = '<div class="si-dd-empty"><svg class="ic spin"><use href="#i-refresh"/></svg> Loading favorites…</div>';
+    _favLoad();
+    return;
+  }
+  body.innerHTML = ''
+    + '<div id="si-fav-sync" class="si-fav-sync"></div>'
+    + '<div class="si-fav-toolbar">'
+    +   '<input class="si-input" id="si-fav-filter" placeholder="🔍 Filter favorites…" autocomplete="off" value="' + esc(si.favFilter || '') + '" oninput="_favFilter(this.value)">'
+    +   '<button class="btn-tw" onclick="_favNewFromCurrent()"><svg class="ic"><use href="#i-plus"/></svg> New from current</button>'
+    + '</div>'
+    + '<div id="si-fav-editor"></div>'
+    + '<div id="si-fav-grid" class="si-fav-grid"></div>';
+  _favRenderSyncLine();
+  _favRenderGrid();
+}
+
+function _favRenderSyncLine() {
+  var el = document.getElementById('si-fav-sync'); if (!el) return;
+  var si = S.streamInfo;
+  el.className = 'si-fav-sync';
+  if (si.favSyncing) { el.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Syncing…'; return; }
+  if (si.favSyncState === 'cloud')  { el.innerHTML = '<svg class="ic"><use href="#i-check"/></svg> Synced across your machines'; return; }
+  if (si.favSyncState === 'local')  { el.innerHTML = '<svg class="ic"><use href="#i-pin"/></svg> Saved on this machine — link Patreon to sync everywhere'; return; }
+  if (si.favSyncState === 'offline' || si.favSyncError) { el.className = 'si-fav-sync err'; el.innerHTML = '<svg class="ic"><use href="#i-warn"/></svg> Offline — changes saved locally, will sync when reconnected'; return; }
+  el.innerHTML = '';
+}
+
+function _favRenderGrid() {
+  var el = document.getElementById('si-fav-grid'); if (!el) return;
+  var si = S.streamInfo;
+  var q = (si.favFilter || '').toLowerCase();
+  var list = _favSorted().filter(function(f) {
+    if (!q) return true;
+    return (f.name || '').toLowerCase().indexOf(q) !== -1
+        || (f.title || '').toLowerCase().indexOf(q) !== -1
+        || (f.gameName || '').toLowerCase().indexOf(q) !== -1;
+  });
+  if (!list.length) {
+    el.innerHTML = '<div class="si-fav-empty">'
+      + (si.favorites.length ? 'No favorites match “' + esc(si.favFilter) + '”.' : 'No favorites yet.<br>Set up your title &amp; category in the Editor, then click <strong>New from current</strong>.')
+      + '</div>';
+    return;
+  }
+  el.innerHTML = list.map(_favCard).join('');
+}
+
+function _favCard(f) {
+  var box = f.boxArtUrl ? '<img class="si-fav-box" src="' + esc(_siBoxArt(f.boxArtUrl, 42, 56)) + '" alt="">' : '<div class="si-fav-box"></div>';
+  var tagNote = (f.tags && f.tags.length) ? ' · ' + f.tags.length + ' tag' + (f.tags.length > 1 ? 's' : '') : '';
+  return '<div class="si-fav-card' + (f.pinned ? ' pinned' : '') + '" draggable="true" data-favid="' + escA(f.id) + '"'
+    + ' ondragstart="_favDragStart(event,\'' + escA(f.id) + '\')" ondragover="_favDragOver(event,\'' + escA(f.id) + '\')" ondrop="_favDrop(event,\'' + escA(f.id) + '\')" ondragend="_favDragEnd(event)">'
+    + '<span class="si-fav-grip" title="Drag to reorder">⠿</span>'
+    + box
+    + '<div class="si-fav-main">'
+    +   '<div class="si-fav-name">' + (f.pinned ? '<span class="si-fav-pinmark"><svg class="ic"><use href="#i-pin"/></svg></span>' : '') + esc(f.name || 'Untitled') + '</div>'
+    +   '<div class="si-fav-title">' + (f.title ? esc(f.title) : '<em style="opacity:.6">no title</em>') + '</div>'
+    +   '<div class="si-fav-game">' + (f.gameName ? esc(f.gameName) : 'No category') + tagNote + '</div>'
+    +   '<div class="si-fav-actions">'
+    +     '<button class="apply" onclick="_favApply(\'' + escA(f.id) + '\')" title="Apply this preset to your live stream"><svg class="ic"><use href="#i-check"/></svg> Apply</button>'
+    +     '<button onclick="_favEdit(\'' + escA(f.id) + '\')">Edit</button>'
+    +     '<button onclick="_favTogglePin(\'' + escA(f.id) + '\')">' + (f.pinned ? 'Unpin' : 'Pin') + '</button>'
+    +     '<button onclick="_favDelete(\'' + escA(f.id) + '\')" title="Delete favorite"><svg class="ic"><use href="#i-trash"/></svg></button>'
+    +   '</div>'
+    + '</div></div>';
+}
+
+function _favFilter(v) { S.streamInfo.favFilter = v; _favRenderGrid(); }
+
+// New favorite captured from the current editor draft.
+function _favNewFromCurrent() {
+  _siSyncDraftFromInputs();
+  var d = S.streamInfo.draft || S.streamInfo.live;
+  S.streamInfo._favForm = {
+    id: null, name: '',
+    title: d.title || '', gameId: d.gameId || '', gameName: d.gameName || '', boxArtUrl: d.boxArtUrl || '',
+    tags: (d.tags || []).slice()
+  };
+  _favRenderForm();
+}
+function _favEdit(id) {
+  var f = _favById(id); if (!f) return;
+  S.streamInfo._favForm = {
+    id: f.id, name: f.name || '',
+    title: f.title || '', gameId: f.gameId || '', gameName: f.gameName || '', boxArtUrl: f.boxArtUrl || '',
+    tags: (f.tags || []).slice()
+  };
+  _favRenderForm();
+}
+function _favRenderForm() {
+  var host = document.getElementById('si-fav-editor'); if (!host) return;
+  var fm = S.streamInfo._favForm; if (!fm) { host.innerHTML = ''; return; }
+  var d = S.streamInfo.draft || {};
+  var catLine = fm.gameName ? esc(fm.gameName) : '<em style="opacity:.6">none</em>';
+  var useCurrent = (d.gameId && d.gameId !== fm.gameId)
+    ? '<button class="btn-x" style="font-size:10.5px" onclick="_favFormUseCurrentCat()">Use editor category: ' + esc(d.gameName || 'none') + '</button>' : '';
+  host.innerHTML = '<div class="si-diff" style="margin:0 0 12px">'
+    + '<div class="si-diff-hd">' + (fm.id ? 'Edit favorite' : 'New favorite') + '</div>'
+    + '<label class="si-label" style="margin-top:2px">Name</label>'
+    + '<input id="si-fav-name" class="si-input" maxlength="60" value="' + esc(fm.name) + '" placeholder="e.g. Variety night" oninput="S.streamInfo._favForm.name=this.value">'
+    + '<label class="si-label">Title</label>'
+    + '<input id="si-fav-title" class="si-input" maxlength="' + SF_SI_TITLE_MAX + '" value="' + esc(fm.title) + '" oninput="S.streamInfo._favForm.title=this.value">'
+    + '<label class="si-label">Category</label>'
+    + '<div class="si-cat-current">'
+    +   (fm.boxArtUrl ? '<img src="' + esc(_siBoxArt(fm.boxArtUrl, 40, 56)) + '" alt="">' : '<div class="si-box-ph"></div>')
+    +   '<span class="si-cat-name">' + catLine + '</span></div>'
+    + (useCurrent ? '<div style="margin-top:6px">' + useCurrent + '</div>' : '')
+    + '<label class="si-label">Tags</label>'
+    + '<div id="si-fav-form-tags" class="si-tags"></div>'
+    + '<div class="si-actions" style="margin-top:12px">'
+    +   '<button class="btn-x" onclick="_favFormCancel()">Cancel</button>'
+    +   '<button class="btn-tw" onclick="_favFormSave()"><svg class="ic"><use href="#i-check"/></svg> ' + (fm.id ? 'Save' : 'Create favorite') + '</button>'
+    + '</div></div>';
+  _favFormRenderTags();
+  var n = document.getElementById('si-fav-name'); if (n) n.focus();
+}
+function _favFormUseCurrentCat() {
+  var fm = S.streamInfo._favForm, d = S.streamInfo.draft || {};
+  fm.gameId = d.gameId || ''; fm.gameName = d.gameName || ''; fm.boxArtUrl = d.boxArtUrl || '';
+  _favRenderForm();
+}
+function _favFormRenderTags() {
+  var el = document.getElementById('si-fav-form-tags'); if (!el) return;
+  var fm = S.streamInfo._favForm;
+  el.innerHTML = (fm.tags || []).map(function(t, i) {
+    return '<span class="si-tag">' + esc(t) + '<button class="si-tag-x" onclick="_favFormRemoveTag(' + i + ')">×</button></span>';
+  }).join('') + '<input id="si-fav-form-tag-input" class="si-tag-input" placeholder="add tag…" autocomplete="off" onkeydown="_favFormTagKey(event)">';
+}
+function _favFormTagKey(e) {
+  var inp = document.getElementById('si-fav-form-tag-input'); if (!inp) return;
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var fm = S.streamInfo._favForm;
+    var t = String(inp.value || '').trim().replace(/[^A-Za-z0-9]/g, '');
+    if (t && fm.tags.length < SF_SI_TAG_MAX && !fm.tags.some(function(x) { return x.toLowerCase() === t.toLowerCase(); })) fm.tags.push(t.slice(0, 25));
+    inp.value = ''; _favFormRenderTags();
+    var f2 = document.getElementById('si-fav-form-tag-input'); if (f2) f2.focus();
+  } else if (e.key === 'Backspace' && !inp.value) {
+    var fm2 = S.streamInfo._favForm;
+    if (fm2.tags.length) { fm2.tags.pop(); _favFormRenderTags(); var f3 = document.getElementById('si-fav-form-tag-input'); if (f3) f3.focus(); }
+  }
+}
+function _favFormRemoveTag(i) { S.streamInfo._favForm.tags.splice(i, 1); _favFormRenderTags(); }
+function _favFormCancel() { S.streamInfo._favForm = null; var h = document.getElementById('si-fav-editor'); if (h) h.innerHTML = ''; }
+function _favFormSave() {
+  var si = S.streamInfo, fm = si._favForm; if (!fm) return;
+  var nameInp = document.getElementById('si-fav-name'); if (nameInp) fm.name = nameInp.value;
+  var titleInp = document.getElementById('si-fav-title'); if (titleInp) fm.title = titleInp.value;
+  if (!fm.name.trim()) { showToast({ message: 'Give the favorite a name.', kind: 'warn' }); if (nameInp) nameInp.focus(); return; }
+  var now = Date.now();
+  if (fm.id) {
+    var f = _favById(fm.id);
+    if (f) { f.name = fm.name.trim(); f.title = fm.title; f.gameId = fm.gameId; f.gameName = fm.gameName; f.boxArtUrl = fm.boxArtUrl; f.tags = fm.tags.slice(); f.updatedAt = now; }
+  } else {
+    var maxOrder = (si.favorites || []).reduce(function(m, x) { return Math.max(m, x.sortOrder || 0); }, 0);
+    si.favorites.push({
+      id: _favId(), name: fm.name.trim(), title: fm.title,
+      gameId: fm.gameId, gameName: fm.gameName, boxArtUrl: fm.boxArtUrl,
+      tags: fm.tags.slice(), pinned: false, sortOrder: maxOrder + 1,
+      createdAt: now, updatedAt: now
+    });
+  }
+  si._favForm = null;
+  _favPersist();
+  _favRender();
+  showToast({ message: 'Favorite ' + (fm.id ? 'saved' : 'created') + '.', kind: 'ok', duration: 2500 });
+}
+
+function _favApply(id) {
+  var si = S.streamInfo, f = _favById(id); if (!f) return;
+  si.draft = { title: f.title || '', gameId: f.gameId || '', gameName: f.gameName || '', boxArtUrl: f.boxArtUrl || '', tags: (f.tags || []).slice() };
+  si.pendingApplyFavId = id;
+  si.view = 'editor';
+  _siRenderPanel();
+  _siApply();
+}
+function _favTogglePin(id) {
+  var f = _favById(id); if (!f) return;
+  f.pinned = !f.pinned; f.updatedAt = Date.now();
+  _favPersist(); _favRenderGrid();
+}
+function _favDelete(id) {
+  var f = _favById(id); if (!f) return;
+  if (!confirm('Delete favorite “' + (f.name || 'Untitled') + '”?')) return;
+  S.streamInfo.favorites = S.streamInfo.favorites.filter(function(x) { return x.id !== id; });
+  _favPersist(); _favRenderGrid();
+  showToast({ message: 'Deleted “' + (f.name || 'Untitled') + '”.', kind: 'info', duration: 2500 });
+}
+
+// ── Drag-to-reorder ───────────────────────────────────────────────────────────
+function _favDragStart(e, id) {
+  S.streamInfo._favDrag = id;
+  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); } catch (x) {}
+  var card = e.currentTarget; if (card) card.classList.add('dragging');
+}
+function _favDragOver(e, id) {
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch (x) {}
+  var grid = document.getElementById('si-fav-grid');
+  if (grid) grid.querySelectorAll('.si-fav-card').forEach(function(c) { c.classList.toggle('drag-over', c.getAttribute('data-favid') === id); });
+}
+function _favDrop(e, targetId) {
+  e.preventDefault();
+  var si = S.streamInfo;
+  var dragId = si._favDrag; if (!dragId || dragId === targetId) return;
+  var ordered = _favSorted();
+  var from = ordered.findIndex(function(f) { return f.id === dragId; });
+  var to = ordered.findIndex(function(f) { return f.id === targetId; });
+  if (from === -1 || to === -1) return;
+  var moved = ordered.splice(from, 1)[0];
+  ordered.splice(to, 0, moved);
+  // Reassign sortOrder to match the new visual order.
+  ordered.forEach(function(f, i) { f.sortOrder = i; });
+  _favPersist(); _favRenderGrid();
+}
+function _favDragEnd() {
+  S.streamInfo._favDrag = null;
+  var grid = document.getElementById('si-fav-grid');
+  if (grid) grid.querySelectorAll('.si-fav-card').forEach(function(c) { c.classList.remove('dragging', 'drag-over'); });
+}
+
 function openRaidFinder() {
   if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
     sysMsg('tw', 'Connect to Streamer.bot to use the Raid Finder.');
