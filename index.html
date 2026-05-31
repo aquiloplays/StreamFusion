@@ -3338,7 +3338,7 @@ function renderEaSettings() {
 // EA flag system will own once that chip lands. Loaded from main at startup.
 // Until it arrives we assume EA-gated (fail-safe closed) so a flagged feature
 // never leaks open by default.
-S._features = null;
+// NOTE: S._features is initialized in the S = {} object literal below.
 (function initFeatureFlags() {
   if (!window.electronAPI || !window.electronAPI.getFeatures) return;
   window.electronAPI.getFeatures().then(function(f) { S._features = f || null; }).catch(function() {});
@@ -3364,6 +3364,7 @@ function isFeatureEnabled(key) {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 var S = {
+  _features: null,
   sbWS: null, tfWS: null,
   sbConnected: false, tfConnected: false,
   sbHost: '127.0.0.1', sbPort: 8080, sbPass: '',
