@@ -2566,7 +2566,18 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                      to find the one they want. -->
                 <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
 
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Look</div>
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Presets</div>
+                  <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:6px">Pick a starter look, then tweak anything below. Applying a preset overwrites the style options (it leaves your platform / event / gift choices alone).</div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px" id="obsChatPresetRow">
+                    <button class="tbtn chat-preset-btn" data-preset="aurora"   onclick="applyChatPreset('aurora')"   style="font-size:11px;font-weight:700;padding:6px 12px">Aurora</button>
+                    <button class="tbtn chat-preset-btn" data-preset="minimal"  onclick="applyChatPreset('minimal')"  style="font-size:11px;font-weight:700;padding:6px 12px">Minimal</button>
+                    <button class="tbtn chat-preset-btn" data-preset="glassy"   onclick="applyChatPreset('glassy')"   style="font-size:11px;font-weight:700;padding:6px 12px">Glassy</button>
+                    <button class="tbtn chat-preset-btn" data-preset="neon"     onclick="applyChatPreset('neon')"     style="font-size:11px;font-weight:700;padding:6px 12px">Neon</button>
+                    <button class="tbtn chat-preset-btn" data-preset="twitch"   onclick="applyChatPreset('twitch')"   style="font-size:11px;font-weight:700;padding:6px 12px">Classic Twitch</button>
+                    <button class="tbtn chat-preset-btn" data-preset="console"  onclick="applyChatPreset('console')"  style="font-size:11px;font-weight:700;padding:6px 12px">Vintage Console</button>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Look</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
                     <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Box (gradient) = single container around the whole feed, painted with the StreamFusion blue/teal gradient. Box (grey) = same container, but a plain grey panel with no gradient — for streamers who want the framed look without the stylized accent. Box (no background) = the same auto-sizing transcript style with NO frame, for streamers who layer chat over a custom OBS background."><span>Style</span>
                       <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
@@ -2632,6 +2643,71 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                         <option value="bm">Bottom-middle</option>
                       </select>
                     </label>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Style &amp; color</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px" title="Drives the gradient, left accents, and the optional glow."><span>Accent color</span><input type="color" id="obsChatAccentColor" value="#7c5cff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
+                    <label class="frow" style="font-size:11px" title="Color of the message text."><span>Text color</span><input type="color" id="obsChatTextColor" value="#ffffff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
+                    <label class="frow" style="font-size:11px"><span>Font</span>
+                      <select id="obsChatFontFamily" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="geist">Geist (default)</option>
+                        <option value="inter">Inter</option>
+                        <option value="system">System UI</option>
+                        <option value="rounded">Rounded (Nunito)</option>
+                        <option value="condensed">Condensed (Oswald)</option>
+                        <option value="mono">Monospace</option>
+                        <option value="serif">Serif</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px"><span>Font weight</span>
+                      <select id="obsChatFontWeight" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="400">Regular</option>
+                        <option value="500">Medium</option>
+                        <option value="600">Semibold</option>
+                        <option value="700">Bold</option>
+                        <option value="800">Extra bold</option>
+                        <option value="900">Black</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px" title="How the username is colored. Chatter = each viewer's own Twitch color (falls back to platform). Platform = the source's brand color. Accent = your accent color. Solid = one fixed color you pick."><span>Username color</span>
+                      <select id="obsChatUsernameColorMode" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="chatter">Chatter's own color</option>
+                        <option value="platform">Platform color</option>
+                        <option value="accent">Accent color</option>
+                        <option value="solid">Solid (pick)</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px" title="Used only when Username color is set to Solid."><span>Solid username color</span><input type="color" id="obsChatUsernameColor" value="#ffffff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
+                    <label class="frow" style="font-size:11px" title="Corner roundness in pixels. Leave blank to use the style's built-in default."><span>Corner radius (px)</span><input type="number" id="obsChatCornerRadius" min="0" max="32" placeholder="auto" onchange="updateObsConfig('chat')" style="width:56px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px" title="Vertical gap between messages in pixels. Leave blank for the default."><span>Message spacing (px)</span><input type="number" id="obsChatMessageGap" min="0" max="24" placeholder="auto" onchange="updateObsConfig('chat')" style="width:56px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Animation &amp; legibility</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px" title="How new messages enter."><span>Message animation</span>
+                      <select id="obsChatAnimIn" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
+                        <option value="slide-up">Slide up (default)</option>
+                        <option value="fade">Fade</option>
+                        <option value="slide-left">Slide in from right</option>
+                        <option value="scale">Pop / scale</option>
+                        <option value="none">None (instant)</option>
+                      </select>
+                    </label>
+                    <label class="frow" style="font-size:11px" title="Auto-remove each message this many seconds after it arrives. 0 keeps messages until they scroll off by count."><span>Fade out after (s)</span><input type="number" id="obsChatFadeOut" min="0" max="120" value="0" onchange="updateObsConfig('chat')" style="width:56px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                    <label class="frow" style="font-size:11px" title="Soft accent-colored halo around messages / the box frame."><span>Outer glow</span><input type="checkbox" id="obsChatOuterGlow" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Glow color. Leave at the accent for a coherent look, or pick a separate hue."><span>Glow color</span><input type="color" id="obsChatGlowColor" value="#7c5cff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
+                    <label class="frow" style="font-size:11px" title="Drop shadow behind text so it stays readable on bright or busy scenes."><span>Text shadow</span><input type="checkbox" id="obsChatTextShadow" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="The 1px frame line around the box styles. Turn off for a frameless panel."><span>Box border line</span><input type="checkbox" id="obsChatOuterBorder" checked onchange="updateObsConfig('chat')"></label>
+                  </div>
+
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Filtering &amp; extras</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <label class="frow" style="font-size:11px" title="Hide messages from common chat bots (Nightbot, StreamElements, Streamlabs, Moobot, and similar)."><span>Hide bot messages</span><input type="checkbox" id="obsChatHideBots" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Show each chatter's pronouns from pronouns.alejo.io as a small chip before their name."><span>Show pronouns</span><input type="checkbox" id="obsChatShowPronouns" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Italicize and tint /me action messages to match the chatter."><span>Style /me actions</span><input type="checkbox" id="obsChatMeStyle" checked onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Give first-time chatters and highlighted messages a gold accent."><span>Highlight first-time chatters</span><input type="checkbox" id="obsChatHighlightFirstTime" onchange="updateObsConfig('chat')"></label>
+                    <label class="frow" style="font-size:11px" title="Show a small HH:MM timestamp at the start of each message."><span>Timestamps</span><input type="checkbox" id="obsChatShowTimestamps" onchange="updateObsConfig('chat')"></label>
                   </div>
 
                 </div>
@@ -3478,7 +3554,17 @@ var S = {
       showPlatformIcon: false,
       eventPlacement: 'inline',      // 'inline' | 'above' | 'below' | 'off'
       eventSize: 13,
-      ttGiftCorner: 'br'             // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
+      ttGiftCorner: 'br',            // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off'
+      // 1.10 customization knobs — defaults preserve the historical look.
+      accentColor: '#7c5cff', textColor: '#ffffff', glowColor: '',
+      fontFamily: 'geist', fontWeight: 400,
+      usernameColorMode: 'chatter', usernameColor: '#ffffff',
+      cornerRadius: null, messageGap: null,
+      animIn: 'slide-up', fadeOutSec: 0,
+      meStyle: true, hideBots: false, showPronouns: false,
+      showTimestamps: false, highlightFirstTime: false,
+      outerGlow: false, textShadow: false, outerBorder: true,
+      preset: 'aurora'
     },
     alerts:   { enabled: { follow: true, sub: true, resub: true, gift: true, cheer: true, raid: true, host: true, tip: true }, duration: 6000, showEmotes: true },
     shoutout: { duration: 8000, thankMessage: 'Thanks so much for supporting the stream!', showRecentEvent: true },
@@ -9824,26 +9910,7 @@ function renderObsOverlaysTab() {
   // Hydrate config inputs from S.obsCfg.
   var c = S.obsCfg || {};
   var get = function(id) { return document.getElementById(id); };
-  if (c.chat) {
-    // 1.4.9 removed the 'hud' theme. 1.5.3 added 'nobg'. Migrate
-    // unknown values to 'card' so legacy settings don't break the picker.
-    if (get('obsChatTheme'))                get('obsChatTheme').value = (c.chat.theme === 'box' || c.chat.theme === 'box-grey' || c.chat.theme === 'nobg') ? c.chat.theme : 'card';
-    if (get('obsChatFontSize'))             get('obsChatFontSize').value = c.chat.fontSize || 18;
-    if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = c.chat.maxMessages || 20;
-    if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((c.chat.bgOpacity || 0) * 100);
-    if (get('obsChatBoxOpacity'))           get('obsChatBoxOpacity').value = Math.round((c.chat.boxOpacity != null ? c.chat.boxOpacity : 0.8) * 100);
-    if (get('obsChatShowProfilePics'))      get('obsChatShowProfilePics').checked = !!c.chat.showProfilePics;
-    if (get('obsChatShowPlatformIcon'))     get('obsChatShowPlatformIcon').checked = !!c.chat.showPlatformIcon;
-    if (get('obsChatShowPlatformBadge'))    get('obsChatShowPlatformBadge').checked = !!c.chat.showPlatformBadge;
-    if (get('obsChatShowUserBadges'))       get('obsChatShowUserBadges').checked = c.chat.showUserBadges !== false;
-    if (get('obsChatShowEmotes'))           get('obsChatShowEmotes').checked = c.chat.showEmotes !== false;
-    if (get('obsChatShowEvents'))           get('obsChatShowEvents').checked = !!c.chat.showEvents;
-    if (get('obsChatEventPlacement'))       get('obsChatEventPlacement').value = c.chat.eventPlacement || 'inline';
-    if (get('obsChatEventSize'))            get('obsChatEventSize').value = c.chat.eventSize || 13;
-    if (get('obsChatShowGiftAnimations'))   get('obsChatShowGiftAnimations').checked = !!c.chat.showGiftAnimations;
-    if (get('obsChatTtGiftCorner'))         get('obsChatTtGiftCorner').value = c.chat.ttGiftCorner || 'br';
-    if (get('obsChatTtGiftSide'))           get('obsChatTtGiftSide').value = c.chat.ttGiftSide || 'top';
-  }
+  if (c.chat) _hydrateChatInputs();
   if (c.alerts) {
     var en = c.alerts.enabled || {};
     if (get('obsAlertsFollow')) get('obsAlertsFollow').checked = en.follow !== false;
@@ -10465,6 +10532,145 @@ function onFilterProfanityToggle(checked) {
   if (typeof saveSettings === 'function') saveSettings();
 }
 
+// ── Chat overlay presets ────────────────────────────────────────────────
+// Each preset is a partial chat config: the style-related fields only. Applying
+// one leaves platform / event / gift choices untouched (those are merged back
+// in by applyChatPreset). 'aurora' is the Aquilo default — cosmic dark base
+// with violet / teal accents.
+var CHAT_PRESETS = {
+  aurora: {
+    theme: 'box', boxOpacity: 0.82, bgOpacity: 0.85,
+    accentColor: '#7c5cff', textColor: '#ffffff', glowColor: '#7c5cff',
+    fontFamily: 'geist', fontWeight: 600, usernameColorMode: 'chatter',
+    cornerRadius: 14, messageGap: 5, animIn: 'slide-up',
+    fadeOutSec: 0, meStyle: true, outerGlow: true, textShadow: false,
+    outerBorder: true, showTimestamps: false, highlightFirstTime: true
+  },
+  minimal: {
+    theme: 'nobg', bgOpacity: 0,
+    accentColor: '#ffffff', textColor: '#ffffff', glowColor: '',
+    fontFamily: 'inter', fontWeight: 500, usernameColorMode: 'solid', usernameColor: '#ffffff',
+    cornerRadius: null, messageGap: 4, animIn: 'fade',
+    fadeOutSec: 0, meStyle: true, outerGlow: false, textShadow: true,
+    outerBorder: false, showProfilePics: false, showPlatformIcon: false,
+    showUserBadges: false, highlightFirstTime: false
+  },
+  glassy: {
+    theme: 'box-grey', boxOpacity: 0.42,
+    accentColor: '#9bd1ff', textColor: '#f4f9ff', glowColor: '#9bd1ff',
+    fontFamily: 'system', fontWeight: 500, usernameColorMode: 'chatter',
+    cornerRadius: 18, messageGap: 5, animIn: 'scale',
+    fadeOutSec: 0, meStyle: true, outerGlow: true, textShadow: false,
+    outerBorder: true, highlightFirstTime: false
+  },
+  neon: {
+    theme: 'card', bgOpacity: 0.55,
+    accentColor: '#00ffd5', textColor: '#eafff9', glowColor: '#00ffd5',
+    fontFamily: 'condensed', fontWeight: 700, usernameColorMode: 'accent',
+    cornerRadius: 6, messageGap: 6, animIn: 'slide-left',
+    fadeOutSec: 0, meStyle: true, outerGlow: true, textShadow: true,
+    outerBorder: true, highlightFirstTime: true
+  },
+  twitch: {
+    theme: 'nobg', bgOpacity: 0,
+    accentColor: '#9147ff', textColor: '#efeff1', glowColor: '',
+    fontFamily: 'inter', fontWeight: 600, usernameColorMode: 'chatter',
+    cornerRadius: null, messageGap: 3, animIn: 'fade',
+    fadeOutSec: 0, meStyle: true, outerGlow: false, textShadow: false,
+    outerBorder: false, showProfilePics: false, showPlatformIcon: false,
+    showUserBadges: true, highlightFirstTime: false
+  },
+  console: {
+    theme: 'box-grey', boxOpacity: 0.85,
+    accentColor: '#33ff66', textColor: '#33ff66', glowColor: '#33ff66',
+    fontFamily: 'mono', fontWeight: 500, usernameColorMode: 'solid', usernameColor: '#7CFC00',
+    cornerRadius: 0, messageGap: 4, animIn: 'none',
+    fadeOutSec: 0, meStyle: true, outerGlow: false, textShadow: false,
+    outerBorder: true, highlightFirstTime: false
+  }
+};
+
+// Push a preset onto the chat config, re-hydrate the inputs, then run the
+// normal update path so the overlay refreshes live and settings persist.
+function applyChatPreset(name) {
+  var p = CHAT_PRESETS[name];
+  if (!p) return;
+  S.obsCfg = S.obsCfg || {};
+  var base = S.obsCfg.chat || {};
+  var merged = {};
+  Object.keys(base).forEach(function(k) { merged[k] = base[k]; });
+  Object.keys(p).forEach(function(k) { merged[k] = p[k]; });
+  merged.preset = name;
+  S.obsCfg.chat = merged;
+  _hydrateChatInputs();
+  _markChatPreset(name);
+  updateObsConfig('chat');
+}
+
+function _markChatPreset(name) {
+  var row = document.getElementById('obsChatPresetRow');
+  if (!row) return;
+  row.querySelectorAll('.chat-preset-btn').forEach(function(b) {
+    b.classList.toggle('on', b.getAttribute('data-preset') === name);
+  });
+}
+
+// Single source of truth for pushing S.obsCfg.chat values into the DOM
+// controls. Called on tab render and after a preset is applied.
+function _hydrateChatInputs() {
+  var c = S.obsCfg || {};
+  if (!c.chat) return;
+  var get = function(id) { return document.getElementById(id); };
+  var cc = c.chat;
+  // 1.4.9 removed the 'hud' theme. 1.5.3 added 'nobg'. Migrate
+  // unknown values to 'card' so legacy settings don't break the picker.
+  if (get('obsChatTheme'))                get('obsChatTheme').value = (cc.theme === 'box' || cc.theme === 'box-grey' || cc.theme === 'nobg') ? cc.theme : 'card';
+  if (get('obsChatFontSize'))             get('obsChatFontSize').value = cc.fontSize || 18;
+  if (get('obsChatMaxMessages'))          get('obsChatMaxMessages').value = cc.maxMessages || 20;
+  if (get('obsChatBgOpacity'))            get('obsChatBgOpacity').value = Math.round((cc.bgOpacity || 0) * 100);
+  if (get('obsChatBoxOpacity'))           get('obsChatBoxOpacity').value = Math.round((cc.boxOpacity != null ? cc.boxOpacity : 0.8) * 100);
+  if (get('obsChatShowProfilePics'))      get('obsChatShowProfilePics').checked = !!cc.showProfilePics;
+  if (get('obsChatShowPlatformIcon'))     get('obsChatShowPlatformIcon').checked = !!cc.showPlatformIcon;
+  if (get('obsChatShowPlatformBadge'))    get('obsChatShowPlatformBadge').checked = !!cc.showPlatformBadge;
+  if (get('obsChatShowUserBadges'))       get('obsChatShowUserBadges').checked = cc.showUserBadges !== false;
+  if (get('obsChatShowEmotes'))           get('obsChatShowEmotes').checked = cc.showEmotes !== false;
+  if (get('obsChatShowEvents'))           get('obsChatShowEvents').checked = !!cc.showEvents;
+  if (get('obsChatEventPlacement'))       get('obsChatEventPlacement').value = cc.eventPlacement || 'inline';
+  if (get('obsChatEventSize'))            get('obsChatEventSize').value = cc.eventSize || 13;
+  if (get('obsChatShowGiftAnimations'))   get('obsChatShowGiftAnimations').checked = !!cc.showGiftAnimations;
+  if (get('obsChatTtGiftCorner'))         get('obsChatTtGiftCorner').value = cc.ttGiftCorner || 'br';
+  if (get('obsChatTtGiftSide'))           get('obsChatTtGiftSide').value = cc.ttGiftSide || 'top';
+  // 1.10 customization knobs
+  if (get('obsChatAccentColor'))          get('obsChatAccentColor').value = cc.accentColor || '#7c5cff';
+  if (get('obsChatTextColor'))            get('obsChatTextColor').value = cc.textColor || '#ffffff';
+  if (get('obsChatGlowColor'))            get('obsChatGlowColor').value = cc.glowColor || cc.accentColor || '#7c5cff';
+  if (get('obsChatFontFamily'))           get('obsChatFontFamily').value = cc.fontFamily || 'geist';
+  if (get('obsChatFontWeight'))           get('obsChatFontWeight').value = String(cc.fontWeight || 400);
+  if (get('obsChatUsernameColorMode'))    get('obsChatUsernameColorMode').value = cc.usernameColorMode || 'chatter';
+  if (get('obsChatUsernameColor'))        get('obsChatUsernameColor').value = cc.usernameColor || '#ffffff';
+  if (get('obsChatCornerRadius'))         get('obsChatCornerRadius').value = (cc.cornerRadius == null ? '' : cc.cornerRadius);
+  if (get('obsChatMessageGap'))           get('obsChatMessageGap').value = (cc.messageGap == null ? '' : cc.messageGap);
+  if (get('obsChatAnimIn'))               get('obsChatAnimIn').value = cc.animIn || 'slide-up';
+  if (get('obsChatFadeOut'))              get('obsChatFadeOut').value = cc.fadeOutSec || 0;
+  if (get('obsChatMeStyle'))              get('obsChatMeStyle').checked = cc.meStyle !== false;
+  if (get('obsChatHideBots'))             get('obsChatHideBots').checked = !!cc.hideBots;
+  if (get('obsChatShowPronouns'))         get('obsChatShowPronouns').checked = !!cc.showPronouns;
+  if (get('obsChatShowTimestamps'))       get('obsChatShowTimestamps').checked = !!cc.showTimestamps;
+  if (get('obsChatHighlightFirstTime'))   get('obsChatHighlightFirstTime').checked = !!cc.highlightFirstTime;
+  if (get('obsChatOuterGlow'))            get('obsChatOuterGlow').checked = !!cc.outerGlow;
+  if (get('obsChatTextShadow'))           get('obsChatTextShadow').checked = !!cc.textShadow;
+  if (get('obsChatOuterBorder'))          get('obsChatOuterBorder').checked = cc.outerBorder !== false;
+  _markChatPreset(cc.preset || 'custom');
+}
+
+// Reads a number input, returning null when it's left blank so the overlay
+// keeps its built-in per-theme default instead of forcing a value.
+function _numOrNull(el) {
+  if (!el || el.value === '' || el.value == null) return null;
+  var n = parseInt(el.value, 10);
+  return isNaN(n) ? null : n;
+}
+
 function updateObsConfig(which) {
   if (!window.electronAPI || !window.electronAPI.obsSetConfig) return;
   var get = function(id) { return document.getElementById(id); };
@@ -10487,6 +10693,27 @@ function updateObsConfig(which) {
       showGiftAnimations:   !!(get('obsChatShowGiftAnimations') && get('obsChatShowGiftAnimations').checked),
       ttGiftCorner:         ((get('obsChatTtGiftCorner') || {}).value) || 'br',
       ttGiftSide:           ((get('obsChatTtGiftSide') || {}).value) || 'top',
+      // 1.10 customization knobs
+      accentColor:          ((get('obsChatAccentColor') || {}).value) || '#7c5cff',
+      textColor:            ((get('obsChatTextColor') || {}).value) || '#ffffff',
+      glowColor:            ((get('obsChatGlowColor') || {}).value) || '',
+      fontFamily:           ((get('obsChatFontFamily') || {}).value) || 'geist',
+      fontWeight:           parseInt((get('obsChatFontWeight') || {}).value, 10) || 400,
+      usernameColorMode:    ((get('obsChatUsernameColorMode') || {}).value) || 'chatter',
+      usernameColor:        ((get('obsChatUsernameColor') || {}).value) || '#ffffff',
+      cornerRadius:         _numOrNull(get('obsChatCornerRadius')),
+      messageGap:           _numOrNull(get('obsChatMessageGap')),
+      animIn:               ((get('obsChatAnimIn') || {}).value) || 'slide-up',
+      fadeOutSec:           parseInt((get('obsChatFadeOut') || {}).value, 10) || 0,
+      meStyle:              !!(get('obsChatMeStyle') && get('obsChatMeStyle').checked),
+      hideBots:             !!(get('obsChatHideBots') && get('obsChatHideBots').checked),
+      showPronouns:         !!(get('obsChatShowPronouns') && get('obsChatShowPronouns').checked),
+      showTimestamps:       !!(get('obsChatShowTimestamps') && get('obsChatShowTimestamps').checked),
+      highlightFirstTime:   !!(get('obsChatHighlightFirstTime') && get('obsChatHighlightFirstTime').checked),
+      outerGlow:            !!(get('obsChatOuterGlow') && get('obsChatOuterGlow').checked),
+      textShadow:           !!(get('obsChatTextShadow') && get('obsChatTextShadow').checked),
+      outerBorder:          !(get('obsChatOuterBorder')) || get('obsChatOuterBorder').checked,
+      preset:               (S.obsCfg && S.obsCfg.chat && S.obsCfg.chat.preset) || 'custom',
       showPlatforms:        S.show || { tw: true, yt: true, tt: true, kk: true }
     };
     S.obsCfg.chat = cfg;
@@ -10555,6 +10782,32 @@ function updateObsConfig(which) {
   window.electronAPI.obsSetConfig(which, cfg);
   if (typeof saveSettings === 'function') saveSettings();
 }
+
+// On boot the obs-server's in-memory config starts empty, so connected
+// browser sources fall back to their built-in defaults until the streamer
+// touches a setting. Push the saved S.obsCfg for every overlay type once the
+// server is up so a restart restores the exact look the streamer last had,
+// without making them re-open Settings. Retries a few times while the server
+// finishes binding its port.
+var _obsSyncTries = 0;
+function _syncSavedObsConfigs() {
+  if (!window.electronAPI || !window.electronAPI.obsSetConfig || !window.electronAPI.obsGetStatus) return;
+  window.electronAPI.obsGetStatus().then(function(s) {
+    if (!s || !s.running) {
+      if (_obsSyncTries++ < 10) setTimeout(_syncSavedObsConfigs, 1000);
+      return;
+    }
+    var cfgs = S.obsCfg || {};
+    ['chat', 'alerts', 'shoutout', 'vertical', 'ticker'].forEach(function(type) {
+      if (cfgs[type]) {
+        try { window.electronAPI.obsSetConfig(type, cfgs[type]); } catch (e) {}
+      }
+    });
+  }).catch(function() {
+    if (_obsSyncTries++ < 10) setTimeout(_syncSavedObsConfigs, 1000);
+  });
+}
+setTimeout(_syncSavedObsConfigs, 1500);
 
 // Fake shoutout for UI testing — fires the overlay with placeholder data
 // so the streamer can see the card render without waiting for a real
