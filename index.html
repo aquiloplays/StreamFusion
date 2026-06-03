@@ -282,6 +282,14 @@ body.has-sf-notice { padding-top: 42px !important; }
 .tog.on::after{left:16px}
 .frow{display:flex;align-items:center;justify-content:space-between;padding:4px 7px;font-size:12px;color:var(--mut);border-radius:6px;margin-bottom:2px}
 .frow input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;cursor:pointer}
+/* Hotkeys page rows — label block on the left, capture + reset on the right. */
+.hk-row{display:flex;align-items:center;gap:12px;padding:2px 0}
+.hk-label{flex:1;min-width:0}
+.hk-name{font-size:12px;font-weight:700;color:var(--txt)}
+.hk-desc{font-size:10px;color:var(--mut);line-height:1.45;margin-top:2px}
+.hk-controls{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.hk-reset{font-size:11px;font-weight:600;padding:5px 10px}
+.hk-row.capturing .tbtn:not(.hk-reset){border-color:var(--accent);color:var(--accent)}
 .ev-group{margin-bottom:2px}
 .ev-group-hd{font-size:10px;font-weight:700;color:var(--mut);padding:5px 7px 2px;text-transform:uppercase;letter-spacing:.5px}
 .ev-group-hd.tw{color:var(--tw)}.ev-group-hd.yt{color:var(--yt)}.ev-group-hd.tt{color:var(--tt)}.ev-group-hd.kk{color:var(--kk)}
@@ -1968,6 +1976,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="goals" onclick="switchSettingsTab('goals')">Goals</div>
         <div class="settings-tab" data-tab="appearance" onclick="switchSettingsTab('appearance')">Appearance</div>
         <div class="settings-tab" data-tab="popout" onclick="switchSettingsTab('popout')">Pop Out</div>
+        <div class="settings-tab" data-tab="hotkeys" onclick="switchSettingsTab('hotkeys')">Hotkeys</div>
         <div class="settings-tab" data-tab="demo" onclick="switchSettingsTab('demo')">Demo</div>
         <div class="settings-tab" data-tab="blocklist" onclick="switchSettingsTab('blocklist')">Blocklist</div>
         <div class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">About</div>
@@ -2307,11 +2316,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
           <div class="sec">
             <div class="sec-hd">Keyboard Shortcuts</div>
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt)">
-              <span style="flex:1">Quick Shoutout picker</span>
-              <button class="tbtn" id="soHotkeyBtn" onclick="captureSOHotkey()" style="font-size:12px;font-weight:700;min-width:180px">Ctrl + Shift + S</button>
-            </div>
-            <div id="soHotkeyHint" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Opens a searchable list of current chatters for quick shoutouts. Bind any modifier + key combo or F-key. Press <code>Esc</code> to cancel.</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6">Every StreamFusion shortcut, including the Quick Shoutout picker, is now editable on the dedicated <button class="tbtn" onclick="switchSettingsTab('hotkeys')" style="font-size:11px;font-weight:700;padding:3px 10px">Hotkeys</button> page.</div>
           </div>
         </div>
 
@@ -2355,28 +2360,82 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             </div>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">HOTKEY</div>
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt)">
-              <span style="flex:1">Press-to-toggle hotkey (optional backup)</span>
-              <button class="tbtn" id="popoutHotkeyBtn" onclick="captureOverlayHotkey()" style="font-size:12px;font-weight:700;min-width:180px">Ctrl + Shift + L</button>
-            </div>
-            <div id="popoutHotkeyHint" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Bind a key combo (modifier + key, any F-key, or mouse buttons 4/5). Examples: <code>Ctrl+Shift+L</code>, <code>Alt+Q</code>, <code>F8</code>, <code>Mouse4</code>. Press <code>Esc</code> to cancel.</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6">Pop-out interact, hide / show, and send-chat hotkeys now live on the dedicated <button class="tbtn" onclick="switchSettingsTab('hotkeys')" style="font-size:11px;font-weight:700;padding:3px 10px">Hotkeys</button> page, alongside every other StreamFusion shortcut.</div>
+          </div>
+        </div>
 
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt);margin-top:10px">
-              <span style="flex:1">Hide / show pop-out hotkey <span style="color:var(--mut);font-weight:400">(resumes last position)</span></span>
-              <button class="tbtn" id="popoutVisHotkeyBtn" onclick="capturePopVisHotkey()" style="font-size:12px;font-weight:700;min-width:180px">Ctrl + Shift + H</button>
+        <!-- ═══ HOTKEYS TAB ═══ -->
+        <!-- Consolidated home for every global StreamFusion shortcut. Each row
+             shares one capture-and-bind widget: click the button, press a combo
+             (or mouse button 4/5), and it registers at runtime. Conflicts with
+             another StreamFusion hotkey are caught before saving; Reset restores
+             the factory default. The capture / render / push plumbing lives in
+             the hotkey rebinder block further down (search _commitHotkey). -->
+        <div class="settings-pane" id="pane-hotkeys">
+          <div class="sec">
+            <div class="sec-hd">Hotkeys</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:12px">
+              Bind any modifier + key combo (<code>Ctrl+Shift+L</code>), a lone F-key (<code>F8</code>), or a mouse side button (<code>Mouse4</code> / <code>Mouse5</code>). Click a binding, press your combo, and it takes effect immediately. Press <code>Esc</code> to cancel. If a combo is already used by another StreamFusion hotkey you will be warned before it saves.
             </div>
-            <div id="popoutVisHotkeyHint" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Temporarily hide the pop-out window (chat/events disappear from your screen) &mdash; press the hotkey again to restore it to the exact same position. Same binding rules as above.</div>
 
-            <!-- 1.7.x: optional global hotkey that fires the pop-out's Send-to-chat
-                 button. Works even when the pop-out window is the focused window
-                 on stream — main process registers a globalShortcut. Empty
-                 (None) by default; user opts in. -->
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt);margin-top:14px">
-              <span style="flex:1">Send chat from pop-out hotkey <span style="color:var(--mut);font-weight:400">(fires the Send button)</span></span>
-              <button class="tbtn" id="popoutChatSendHotkeyBtn" onclick="capturePopChatSendHotkey()" style="font-size:12px;font-weight:700;min-width:180px">None</button>
-              <button class="tbtn" id="popoutChatSendHotkeyClearBtn" onclick="clearPopChatSendHotkey()" style="font-size:11px;font-weight:600;padding:5px 10px" title="Remove the binding">Clear</button>
+            <!-- Pop-out interact toggle -->
+            <div class="hk-row">
+              <div class="hk-label">
+                <div class="hk-name">Pop-out interact toggle</div>
+                <div class="hk-desc">Flips the pop-out overlay between click-through and interactive, even from inside a fullscreen game.</div>
+              </div>
+              <div class="hk-controls">
+                <button class="tbtn" id="popoutHotkeyBtn" onclick="captureOverlayHotkey()" style="font-size:12px;font-weight:700;min-width:170px">Ctrl + Shift + L</button>
+                <button class="tbtn hk-reset" onclick="resetHotkey('interact')" title="Reset to default (Ctrl + Shift + L)">Reset</button>
+              </div>
             </div>
-            <div id="popoutChatSendHotkeyHint" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.5">Fires whatever&rsquo;s typed in the pop-out&rsquo;s chat input as a chat message &mdash; same as clicking <strong>Send</strong>. Useful while playing fullscreen so you can reply without alt-tabbing. Bind a combo (modifier + key, any F-key, or mouse buttons 4/5). Examples: <code>Ctrl+Shift+Enter</code>, <code>Alt+S</code>, <code>F9</code>. Press <code>Esc</code> to cancel, or use <strong>Clear</strong> to unbind.</div>
+            <div id="popoutHotkeyHint" style="font-size:10px;color:var(--mut);margin:4px 0 14px;line-height:1.5"></div>
+
+            <!-- Pop-out hide / show -->
+            <div class="hk-row">
+              <div class="hk-label">
+                <div class="hk-name">Pop-out hide / show</div>
+                <div class="hk-desc">Temporarily hides the pop-out window from your own screen, then restores it to the exact same position.</div>
+              </div>
+              <div class="hk-controls">
+                <button class="tbtn" id="popoutVisHotkeyBtn" onclick="capturePopVisHotkey()" style="font-size:12px;font-weight:700;min-width:170px">Ctrl + Shift + H</button>
+                <button class="tbtn hk-reset" onclick="resetHotkey('vis')" title="Reset to default (Ctrl + Shift + H)">Reset</button>
+              </div>
+            </div>
+            <div id="popoutVisHotkeyHint" style="font-size:10px;color:var(--mut);margin:4px 0 14px;line-height:1.5"></div>
+
+            <!-- Send chat from pop-out -->
+            <div class="hk-row">
+              <div class="hk-label">
+                <div class="hk-name">Send chat from pop-out</div>
+                <div class="hk-desc">Fires the pop-out Send button so you can reply without alt-tabbing. Optional, unbound by default. Keyboard combos only.</div>
+              </div>
+              <div class="hk-controls">
+                <button class="tbtn" id="popoutChatSendHotkeyBtn" onclick="capturePopChatSendHotkey()" style="font-size:12px;font-weight:700;min-width:170px">None</button>
+                <button class="tbtn hk-reset" onclick="clearPopChatSendHotkey()" title="Unbind">Clear</button>
+              </div>
+            </div>
+            <div id="popoutChatSendHotkeyHint" style="font-size:10px;color:var(--mut);margin:4px 0 14px;line-height:1.5"></div>
+
+            <!-- Quick shoutout picker -->
+            <div class="hk-row">
+              <div class="hk-label">
+                <div class="hk-name">Quick shoutout picker</div>
+                <div class="hk-desc">Opens a searchable list of current chatters for a fast shoutout.</div>
+              </div>
+              <div class="hk-controls">
+                <button class="tbtn" id="soHotkeyBtn" onclick="captureSOHotkey()" style="font-size:12px;font-weight:700;min-width:170px">Ctrl + Shift + S</button>
+                <button class="tbtn hk-reset" onclick="resetHotkey('so')" title="Reset to default (Ctrl + Shift + S)">Reset</button>
+              </div>
+            </div>
+            <div id="soHotkeyHint" style="font-size:10px;color:var(--mut);margin:4px 0 4px;line-height:1.5"></div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-hd">Per-feature shortcuts</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6">
+              Quick-action hotbar slots and Stream Info quick-swap bindings are set where you build them, since each one points at a specific slot or favorite. Find hotbar slot keys on the hotbar editor, and Stream Info quick-swap keys under Stream Info &rarr; Hotkeys.
+            </div>
           </div>
         </div>
 
@@ -12236,6 +12295,72 @@ function clearPopChatSendHotkey() {
   _renderPopChatSendHotkeyBtn();
   _pushPopChatSendHotkey('');
 }
+// ── Conflict detection + reset (consolidated Hotkeys page) ──────────────────
+// Factory defaults for the four global StreamFusion hotkeys. 'send' is opt-in
+// so its default is unbound.
+var _hotkeyDefaults = {
+  interact: 'CommandOrControl+Shift+L',
+  vis:      'CommandOrControl+Shift+H',
+  so:       'CommandOrControl+Shift+S',
+  send:     ''
+};
+var _hotkeyNames = {
+  interact: 'Pop-out interact toggle',
+  vis:      'Pop-out hide / show',
+  so:       'Quick shoutout picker',
+  send:     'Send chat from pop-out'
+};
+function _currentHotkeys() {
+  return { interact: _overlayHotkey, vis: _popVisHotkey, so: _soHotkey, send: _popChatSendHotkey };
+}
+// Returns the friendly name of an existing StreamFusion binding that already
+// owns `accel`, ignoring the row being edited (`exclude`). Empty accel and the
+// unbound 'None' value never collide. This is what lets us warn the user
+// BEFORE a save instead of silently letting Electron's globalShortcut drop the
+// second registration on the floor.
+function _findHotkeyConflict(accel, exclude) {
+  if (!accel) return null;
+  var cur = _currentHotkeys();
+  var keys = Object.keys(cur);
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i] === exclude) continue;
+    if (cur[keys[i]] && cur[keys[i]] === accel) return _hotkeyNames[keys[i]];
+  }
+  return null;
+}
+function _warnHotkeyConflict(hintId, accel, ownerName) {
+  var hint = document.getElementById(hintId);
+  if (!hint) return;
+  hint.innerHTML = '<span style="color:var(--red);display:inline-flex;align-items:center;gap:4px">'
+    + '<svg class="ic"><use href="#i-warn"/></svg>'
+    + esc(_formatAccel(accel)) + ' is already bound to <strong>' + esc(ownerName) + '</strong>. '
+    + 'Pick a different combo, or reset that one first.</span>';
+}
+// Per-hotkey "Reset to default". Refuses to apply a default that would collide
+// with another customized binding, surfacing the same warning a manual capture
+// would, so reset can never silently create a dead shortcut.
+function resetHotkey(which) {
+  _resetAllCaptureFlags();
+  _renderOverlayHotkeyBtn(); _renderPopVisHotkeyBtn(); _renderSOHotkeyBtn(); _renderPopChatSendHotkeyBtn();
+  if (which === 'send') { clearPopChatSendHotkey(); return; }
+  var def = _hotkeyDefaults[which];
+  var conflict = _findHotkeyConflict(def, which);
+  if (which === 'interact') {
+    if (conflict) { _warnHotkeyConflict('popoutHotkeyHint', def, conflict); return; }
+    _overlayHotkey = def; localStorage.setItem('sf_overlay_hotkey', def);
+    _renderOverlayHotkeyBtn(); _pushOverlayHotkey(def);
+  } else if (which === 'vis') {
+    if (conflict) { _warnHotkeyConflict('popoutVisHotkeyHint', def, conflict); return; }
+    _popVisHotkey = def; localStorage.setItem('sf_overlay_vis_hotkey', def);
+    _renderPopVisHotkeyBtn(); _pushPopVisHotkey(def);
+  } else if (which === 'so') {
+    if (conflict) { _warnHotkeyConflict('soHotkeyHint', def, conflict); return; }
+    _soHotkey = def; localStorage.setItem('sf_so_hotkey', def);
+    _renderSOHotkeyBtn();
+    var hint = document.getElementById('soHotkeyHint');
+    if (hint) hint.innerHTML = '<span style="color:var(--mut)">Reset to default: ' + esc(_formatAccel(def)) + '</span>';
+  }
+}
 function _accelFromKeyEvent(e) {
   var parts = [];
   if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl');
@@ -12281,28 +12406,45 @@ window.addEventListener('keydown', function(e) {
   var accel = _accelFromKeyEvent(e);
   if (!accel) return;
   if (_capturingSOHotkey) {
-    _soHotkey = accel;
-    localStorage.setItem('sf_so_hotkey', accel);
     _capturingSOHotkey = false;
     _renderSOHotkeyBtn();
-    var hint = document.getElementById('soHotkeyHint');
-    if (hint) hint.innerHTML = '<span style="color:var(--grn);display:inline-flex;align-items:center;gap:4px"><svg class="ic"><use href="#i-check"/></svg>Hotkey set: ' + esc(_formatAccel(accel)) + '</span>';
+    var conflict = _findHotkeyConflict(accel, 'so');
+    if (conflict) { _warnHotkeyConflict('soHotkeyHint', accel, conflict); }
+    else {
+      _soHotkey = accel;
+      localStorage.setItem('sf_so_hotkey', accel);
+      _renderSOHotkeyBtn();
+      var hint = document.getElementById('soHotkeyHint');
+      if (hint) hint.innerHTML = '<span style="color:var(--grn);display:inline-flex;align-items:center;gap:4px"><svg class="ic"><use href="#i-check"/></svg>Hotkey set: ' + esc(_formatAccel(accel)) + '</span>';
+    }
   } else if (_capturingPopVisHotkey) {
-    _popVisHotkey = accel;
-    localStorage.setItem('sf_overlay_vis_hotkey', accel);
     _capturingPopVisHotkey = false;
     _renderPopVisHotkeyBtn();
-    _pushPopVisHotkey(accel);
+    var conflictV = _findHotkeyConflict(accel, 'vis');
+    if (conflictV) { _warnHotkeyConflict('popoutVisHotkeyHint', accel, conflictV); }
+    else {
+      _popVisHotkey = accel;
+      localStorage.setItem('sf_overlay_vis_hotkey', accel);
+      _renderPopVisHotkeyBtn();
+      _pushPopVisHotkey(accel);
+    }
   } else if (_capturingPopChatSendHotkey) {
     _capturingPopChatSendHotkey = false;
     _renderPopChatSendHotkeyBtn();
-    _pushPopChatSendHotkey(accel);
+    var conflictS = _findHotkeyConflict(accel, 'send');
+    if (conflictS) { _warnHotkeyConflict('popoutChatSendHotkeyHint', accel, conflictS); }
+    else { _pushPopChatSendHotkey(accel); }
   } else {
-    _overlayHotkey = accel;
-    localStorage.setItem('sf_overlay_hotkey', accel);
     _capturingOverlayHotkey = false;
     _renderOverlayHotkeyBtn();
-    _pushOverlayHotkey(accel);
+    var conflictI = _findHotkeyConflict(accel, 'interact');
+    if (conflictI) { _warnHotkeyConflict('popoutHotkeyHint', accel, conflictI); }
+    else {
+      _overlayHotkey = accel;
+      localStorage.setItem('sf_overlay_hotkey', accel);
+      _renderOverlayHotkeyBtn();
+      _pushOverlayHotkey(accel);
+    }
   }
   e.preventDefault();
   e.stopPropagation();
@@ -12317,11 +12459,16 @@ window.addEventListener('mousedown', function(e) {
   if (e.button !== 3 && e.button !== 4) return;
   var accel = (e.button === 3) ? 'Mouse4' : 'Mouse5';
   if (_capturingPopVisHotkey) {
-    _popVisHotkey = accel;
-    localStorage.setItem('sf_overlay_vis_hotkey', accel);
     _capturingPopVisHotkey = false;
     _renderPopVisHotkeyBtn();
-    _pushPopVisHotkey(accel);
+    var conflictV = _findHotkeyConflict(accel, 'vis');
+    if (conflictV) { _warnHotkeyConflict('popoutVisHotkeyHint', accel, conflictV); }
+    else {
+      _popVisHotkey = accel;
+      localStorage.setItem('sf_overlay_vis_hotkey', accel);
+      _renderPopVisHotkeyBtn();
+      _pushPopVisHotkey(accel);
+    }
   } else if (_capturingPopChatSendHotkey) {
     _capturingPopChatSendHotkey = false;
     _renderPopChatSendHotkeyBtn();
@@ -12330,11 +12477,16 @@ window.addEventListener('mousedown', function(e) {
     var hint = document.getElementById('popoutChatSendHotkeyHint');
     if (hint) hint.innerHTML = '<span style="color:var(--red);display:inline-flex;align-items:center;gap:4px"><svg class="ic"><use href="#i-warn"/></svg>Mouse4 / Mouse5 aren&rsquo;t supported for the chat-send hotkey yet &mdash; they route through a separate poller. Use a keyboard combo instead.</span>';
   } else {
-    _overlayHotkey = accel;
-    localStorage.setItem('sf_overlay_hotkey', accel);
     _capturingOverlayHotkey = false;
     _renderOverlayHotkeyBtn();
-    _pushOverlayHotkey(accel);
+    var conflictI = _findHotkeyConflict(accel, 'interact');
+    if (conflictI) { _warnHotkeyConflict('popoutHotkeyHint', accel, conflictI); }
+    else {
+      _overlayHotkey = accel;
+      localStorage.setItem('sf_overlay_hotkey', accel);
+      _renderOverlayHotkeyBtn();
+      _pushOverlayHotkey(accel);
+    }
   }
   e.preventDefault();
   e.stopPropagation();
