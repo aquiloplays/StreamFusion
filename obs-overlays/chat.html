@@ -3,8 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>StreamFusion — Chat Overlay</title>
+<title>StreamFusion Chat Overlay</title>
 <style>
+  /* Optional web fonts for the font-family customization knob. OBS browser
+     sources have network access, so these load on demand; if a streamer's
+     machine blocks them the stack falls back to a local system font. Geist
+     (the default) ships with the look and isn't on Google Fonts, so it stays
+     in the fallback stack rather than being imported here. */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap');
   /* ───────────────────────────────────────────────────────────────────────
      StreamFusion OBS chat overlay — transparent-background browser source.
      Connects to /events?type=chat via SSE.
@@ -39,6 +45,12 @@
     --yt: #ff4545;
     --tt: #fe2c55;
     --kk: #53fc18;
+    /* Customization knobs (1.10) — each one is left UNSET by default so the
+       overlay keeps its historical look unless the streamer (or a preset)
+       opts in. applyConfig() only writes these when a value is supplied. */
+    --font-family: 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --msg-weight: 400;        /* message body font weight */
+    --glow: rgba(124, 92, 255, 0.45);  /* outer-glow color, defaults to accent */
     /* Side-zone widths — used when TikTok gifts or events are pinned to
        the left/right of the chat box instead of stacked over it. The
        chat box automatically shrinks horizontally to leave room. */
@@ -52,7 +64,7 @@
     width: 100vw; height: 100vh;
     background: transparent;
     overflow: hidden;
-    font-family: 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-family, 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
     -webkit-font-smoothing: antialiased;
     color: var(--text);
   }
@@ -97,10 +109,16 @@
         rgba(91, 255, 149, 0.10) 55%,
         rgba(124, 92, 255, 0.06)),
       rgba(var(--box-color), var(--box-op));
-    border-radius: 12px;
+    border-radius: var(--radius, 12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
   }
+  /* Outer glow on the box frame (both gradient and grey variants). */
+  body.glow.theme-box #feed,
+  body.glow.theme-box-grey #feed { box-shadow: 0 6px 22px rgba(0,0,0,.30), 0 0 26px var(--glow); }
+  /* Border toggle — lets a preset drop the 1px frame line. */
+  body.no-outer-border.theme-box #feed,
+  body.no-outer-border.theme-box-grey #feed { border-color: transparent; }
 
   /* Plain grey box — same fill-the-source behaviour as theme-box but
      without the blue/teal gradient. For streamers who want the
@@ -112,7 +130,7 @@
     max-height: none;
     padding: 14px 16px 12px;
     background: rgba(var(--box-color), var(--box-op));
-    border-radius: 12px;
+    border-radius: var(--radius, 12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 6px 22px rgba(0, 0, 0, 0.30);
   }
@@ -141,8 +159,8 @@
     align-items: flex-start;
     gap: 10px;
     padding: 7px 12px 8px 14px;
-    margin-top: 5px;
-    border-radius: 9px;
+    margin-top: var(--msg-gap, 5px);
+    border-radius: var(--radius, 9px);
     background: rgba(14, 14, 16, var(--msg-bg-op));
     border-left: 3px solid var(--accent);
     font-size: var(--font-size);
@@ -151,6 +169,49 @@
     opacity: 0;
     transform: translateY(6px);
     animation: msgIn .28s cubic-bezier(.22,.9,.32,1) forwards;
+  }
+  /* Animation-style switch (1.10). Default is the slide-up "msgIn". Each body
+     class swaps the keyframe; anim-none disables entry animation entirely
+     (best for very high-traffic chats). The leaving animation is shared. */
+  body.anim-fade       .msg { animation-name: msgFade; }
+  body.anim-slide-left .msg { animation-name: msgSlideLeft; }
+  body.anim-scale      .msg { animation-name: msgScale; }
+  body.anim-none       .msg { animation: none; opacity: 1; transform: none; }
+  @keyframes msgFade       { from { opacity: 0; transform: none; } to { opacity: 1; transform: none; } }
+  @keyframes msgSlideLeft  { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+  @keyframes msgScale      { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
+  /* Outer glow — soft accent-tinted halo around cards / the box frame. */
+  body.glow .msg { box-shadow: 0 0 14px var(--glow); }
+  /* Text shadow for legibility on busy/bright backgrounds. */
+  body.text-shadow .m,
+  body.text-shadow .u { text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.6); }
+  /* /me action messages — italic, tinted. The username color is applied
+     inline by the renderer so it matches the chatter. */
+  .msg.action .m { font-style: italic; }
+  /* First-message / highlighted chatter accent. */
+  .msg.hl { background: rgba(240,180,41,.16); border-left-color: #f0b429; }
+  body.theme-nobg .msg.hl { background: rgba(240,180,41,.10); }
+  /* Pronoun chip (pronouns.alejo.io). Small neutral pill before the name. */
+  .pron {
+    display: inline-flex;
+    align-items: center;
+    height: calc(var(--font-size) + 2px);
+    padding: 0 5px;
+    font-size: calc(var(--font-size) - 6px);
+    font-weight: 800;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.14);
+    color: var(--mut);
+    letter-spacing: .2px;
+    text-transform: lowercase;
+  }
+  /* Inline timestamp prefix on the message line. */
+  .ts {
+    font-size: calc(var(--font-size) - 4px);
+    color: var(--mut);
+    opacity: .65;
+    margin-right: 5px;
+    font-variant-numeric: tabular-nums;
   }
   /* 1.4.9: only messages from the last 400ms animate — a burst of
      back-to-back messages shouldn't all replay the in animation,
@@ -296,6 +357,7 @@
   .m {
     color: var(--text);
     font-size: var(--font-size);
+    font-weight: var(--msg-weight, 400);
     line-height: 1.4;
   }
   .m img.emote {
@@ -718,7 +780,7 @@
 <div id="gifts"></div>
 <div id="combo" data-anchor="off"></div>
 <div id="gated">Patreon Early Access required<br><span style="font-size:11px;color:#94a3b8;letter-spacing:.04em;text-transform:none;font-weight:600">Connect in StreamFusion → Settings → Early Access</span></div>
-<div id="hint">StreamFusion chat overlay — waiting for messages…</div>
+<div id="hint">StreamFusion chat overlay. Waiting for messages…</div>
 
 <script>
 (function() {
@@ -742,8 +804,67 @@
     showGiftAnimations: false,
     ttGiftCorner:     'off',           // 'tl'|'tr'|'bl'|'br'|'tm'|'bm'|'off' — combo-counter anchor
     ttGiftSide:       'top',           // 'top'|'right'|'left'|'off' — floating gift zone
-    ttGiftComboHoldMs: 3000
+    ttGiftComboHoldMs: 3000,
+    // ── 1.10 customization knobs ──────────────────────────────────────────
+    // All default to the historical look; presets / settings opt in.
+    accentColor:      '',              // '' = keep CSS default (#7c5cff)
+    textColor:        '',              // '' = keep CSS default (#ffffff)
+    glowColor:        '',              // '' = derive from accent
+    fontFamily:       'geist',         // geist|inter|system|rounded|condensed|mono|serif
+    fontWeight:       400,             // message body weight
+    usernameColorMode:'chatter',       // chatter|platform|solid|accent
+    usernameColor:    '#ffffff',       // used when mode === 'solid'
+    cornerRadius:     null,            // px; null = keep per-theme CSS default
+    messageGap:       null,            // px between messages; null = CSS default
+    animIn:           'slide-up',      // slide-up|fade|slide-left|scale|none
+    fadeOutSec:       0,               // auto-remove a message N s after arrival (0 = off)
+    meStyle:          true,            // italicize + tint /me action messages
+    hideBots:         false,           // drop messages from known chat bots
+    botList:          null,            // optional override list (lowercased names)
+    showPronouns:     false,           // fetch + show pronouns.alejo.io chips
+    showTimestamps:   false,           // inline HH:MM prefix on each message
+    highlightFirstTime:false,          // accent first-time chatters / highlighted msgs
+    outerGlow:        false,           // accent halo around cards / box
+    textShadow:       false,           // drop shadow on text for legibility
+    outerBorder:      true             // 1px frame line on box themes
   };
+
+  // Known chat bots filtered when CFG.hideBots is on. Lowercased logins.
+  var DEFAULT_BOTS = ['nightbot','streamelements','streamlabs','moobot','wizebot',
+    'fossabot','sery_bot','soundalerts','botisimo','phantombot','commanderroot',
+    'streamfusion','stay_hydrated_bot','pretzelrocks','deepbot','ankhbot'];
+
+  // Maps the fontFamily enum to a real CSS stack. Optional families are
+  // pulled from the @import at the top of <style>; everything ends in a
+  // safe system fallback.
+  function _fontStack(name) {
+    switch (name) {
+      case 'inter':     return "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      case 'system':    return "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+      case 'rounded':   return "'Nunito', 'Quicksand', 'Segoe UI', sans-serif";
+      case 'condensed': return "'Oswald', 'Bebas Neue', 'Arial Narrow', sans-serif";
+      case 'mono':      return "'JetBrains Mono', 'Consolas', 'SF Mono', monospace";
+      case 'serif':     return "'Georgia', 'Times New Roman', serif";
+      case 'geist':
+      default:          return "'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    }
+  }
+
+  // Turns a glow color into a semi-transparent rgba so the halo reads as a
+  // soft bloom rather than a hard ring. Accepts #rgb / #rrggbb; anything else
+  // is passed through unchanged.
+  function _glowColor(c) {
+    var s = String(c || '').trim();
+    var hex = s.replace('#', '');
+    if (/^[0-9a-f]{3}$/i.test(hex)) hex = hex.replace(/(.)/g, '$1$1');
+    if (/^[0-9a-f]{6}$/i.test(hex)) {
+      var r = parseInt(hex.slice(0, 2), 16),
+          g = parseInt(hex.slice(2, 4), 16),
+          b = parseInt(hex.slice(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',0.5)';
+    }
+    return s;
+  }
 
   var feed      = document.getElementById('feed');
   var evAbove   = document.getElementById('events-above');
@@ -780,6 +901,68 @@
     return String(s || '').replace(/[&<>"']/g, function(c) {
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
     });
+  }
+
+  function isBot(name) {
+    if (!CFG.hideBots) return false;
+    var list = (CFG.botList && CFG.botList.length) ? CFG.botList : DEFAULT_BOTS;
+    return list.indexOf(String(name || '').toLowerCase()) !== -1;
+  }
+
+  // ── Pronoun support (pronouns.alejo.io) ─────────────────────────────────
+  // Best-effort, fully async and cached so chat throughput is never blocked.
+  // We fetch the id->display map once, then look up each chatter by lowercased
+  // login. Results (including "no pronoun set") are cached so each user hits
+  // the network at most once. When a lookup resolves we inject a chip into the
+  // already-rendered message head; if it never resolves, nothing shows.
+  var _pronDisplay = null;       // { pronoun_id: 'they/them', ... } or null until loaded
+  var _pronDisplayPromise = null;
+  var _pronUserCache = Object.create(null);  // login -> 'they/them' | '' (negative)
+  function _loadPronDisplay() {
+    if (_pronDisplay) return Promise.resolve(_pronDisplay);
+    if (_pronDisplayPromise) return _pronDisplayPromise;
+    _pronDisplayPromise = fetch('https://pronouns.alejo.io/api/pronouns')
+      .then(function(r) { return r.json(); })
+      .then(function(arr) {
+        var map = Object.create(null);
+        (arr || []).forEach(function(p) { if (p && p.name) map[p.name] = p.display || p.name; });
+        _pronDisplay = map;
+        return map;
+      })
+      .catch(function() { _pronDisplay = {}; return _pronDisplay; });
+    return _pronDisplayPromise;
+  }
+  function attachPronoun(node, login) {
+    if (!CFG.showPronouns || !login || !node) return;
+    var key = String(login).toLowerCase();
+    var inject = function(text) {
+      if (!text) return;
+      var head = node.querySelector('.msg-head');
+      var nameEl = node.querySelector('.u');
+      if (!head || !nameEl) return;
+      var chip = document.createElement('span');
+      chip.className = 'pron';
+      chip.textContent = text;
+      head.insertBefore(chip, nameEl);
+    };
+    if (key in _pronUserCache) { inject(_pronUserCache[key]); return; }
+    _loadPronDisplay().then(function(disp) {
+      return fetch('https://pronouns.alejo.io/api/users/' + encodeURIComponent(key))
+        .then(function(r) { return r.json(); })
+        .then(function(rows) {
+          var row = rows && rows[0];
+          var text = (row && disp && disp[row.pronoun_id]) ? disp[row.pronoun_id] : '';
+          _pronUserCache[key] = text;
+          inject(text);
+        });
+    }).catch(function() { _pronUserCache[key] = ''; });
+  }
+
+  // Two-digit local HH:MM for the optional timestamp prefix.
+  function _nowHHMM() {
+    var d = new Date();
+    var h = d.getHours(), m = d.getMinutes();
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
   }
 
   function renderMessage(text, emotes) {
@@ -835,13 +1018,36 @@
     if (!m) return;
     var plat = (m.platform || '').toLowerCase();
     if (!CFG.showPlatforms[plat] && plat) return;
+    if (isBot(m.user)) return;
     if (hint) hint.classList.remove('show');
+
+    // Strip the Twitch IRC /me wrapper so control chars never reach the DOM,
+    // regardless of whether action styling is enabled.
+    var text = String(m.message || '');
+    var isAction = !!m.action || /^\x01ACTION /.test(text);
+    if (/^\x01ACTION /.test(text)) text = text.replace(/^\x01ACTION /, '').replace(/\x01$/, '');
 
     noteMsgTime();
     var div = document.createElement('div');
     div.className = 'msg ' + plat;
+    if (isAction && CFG.meStyle) div.className += ' action';
+    if (CFG.highlightFirstTime && (m.firstMsg || m.firstMessage || m.highlight)) div.className += ' hl';
 
-    var userColor = m.userColor ? ('color:' + m.userColor + ';') : '';
+    // Username color resolution by mode. Empty string means "fall back to the
+    // platform-tinted class color" (the historical default for chatter mode
+    // when a platform didn't supply a per-user color).
+    var uColor = '';
+    switch (CFG.usernameColorMode) {
+      case 'platform': uColor = ''; break;
+      case 'solid':    uColor = CFG.usernameColor || ''; break;
+      case 'accent':   uColor = 'var(--accent)'; break;
+      case 'chatter':
+      default:         uColor = m.userColor || ''; break;
+    }
+    var uStyle = uColor ? ('color:' + uColor + ';') : '';
+    // Action messages tint the body to match the chatter when styling is on.
+    var mStyle = (isAction && CFG.meStyle && uColor) ? (' style="color:' + uColor + ';"') : '';
+    var ts = CFG.showTimestamps ? ('<span class="ts">' + _nowHHMM() + '</span>') : '';
 
     div.innerHTML =
       renderPfp(m) +
@@ -849,14 +1055,25 @@
         '<div class="msg-head">' +
           renderPlatIcon(plat) +
           renderBadges(m.badges) +
-          '<span class="u ' + plat + '" style="' + userColor + '">' + escapeHtml(m.user || 'anon') + '</span>' +
+          '<span class="u ' + plat + '" style="' + uStyle + '">' + escapeHtml(m.user || 'anon') + '</span>' +
         '</div>' +
-        '<div class="m">' + renderMessage(m.message || '', m.emotes) + '</div>' +
+        '<div class="m"' + mStyle + '>' + ts + renderMessage(text, m.emotes) + '</div>' +
       '</div>';
 
     feed.appendChild(div);
     messageCount++;
     trimFeed();
+    attachPronoun(div, m.login || m.user);
+
+    // Optional time-based fade-out (independent of the count-based trim).
+    if (CFG.fadeOutSec && CFG.fadeOutSec > 0) {
+      setTimeout(function() {
+        if (div.parentNode && !div.classList.contains('leaving')) {
+          div.classList.add('leaving');
+          setTimeout(function() { if (div.parentNode) div.parentNode.removeChild(div); }, 240);
+        }
+      }, CFG.fadeOutSec * 1000);
+    }
   }
 
   function trimFeed() {
@@ -1116,6 +1333,27 @@
     root.style.setProperty('--box-op', String(CFG.boxOpacity != null ? CFG.boxOpacity : 0.8));
     root.style.setProperty('--font-size', (CFG.fontSize || 16) + 'px');
     root.style.setProperty('--event-size', (CFG.eventSize || 13) + 'px');
+
+    // ── 1.10 customization knobs ──────────────────────────────────────────
+    root.style.setProperty('--font-family', _fontStack(CFG.fontFamily || 'geist'));
+    root.style.setProperty('--msg-weight', String(CFG.fontWeight || 400));
+    if (CFG.accentColor) root.style.setProperty('--accent', CFG.accentColor);
+    if (CFG.textColor)   root.style.setProperty('--text', CFG.textColor);
+    // Outer-glow color falls back to the accent so a single accent pick lights
+    // the whole overlay coherently.
+    root.style.setProperty('--glow', _glowColor(CFG.glowColor || CFG.accentColor || '#7c5cff'));
+    // Corner radius / message gap only override when explicitly set, so the
+    // per-theme CSS defaults survive for streamers who never touch them.
+    if (CFG.cornerRadius != null) root.style.setProperty('--radius', CFG.cornerRadius + 'px');
+    else root.style.removeProperty('--radius');
+    if (CFG.messageGap != null) root.style.setProperty('--msg-gap', CFG.messageGap + 'px');
+    else root.style.removeProperty('--msg-gap');
+
+    document.body.classList.remove('anim-slide-up', 'anim-fade', 'anim-slide-left', 'anim-scale', 'anim-none');
+    document.body.classList.add('anim-' + (CFG.animIn || 'slide-up'));
+    document.body.classList.toggle('glow', !!CFG.outerGlow);
+    document.body.classList.toggle('text-shadow', !!CFG.textShadow);
+    document.body.classList.toggle('no-outer-border', CFG.outerBorder === false);
     // Theme is now a 3-way enum: 'card' (default per-message bubbles),
     // 'box' (single gradient container), 'nobg' (transparent transcript).
     // Pre-1.5.3 settings only know 'card'/'box', so unknown values fall
