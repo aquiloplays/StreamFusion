@@ -191,7 +191,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Renderer-side fan-out: anything the main app learns (chat msg, event,
   // shoutout click) goes to the OBS overlay server, which forwards to
   // every connected browser source via SSE. All three functions take a
-  // payload object; see obs-overlays/*.html for the data contracts.
+  // payload object; data contracts live in the hosted overlay sources
+  // at aquilo-site/public/sf/overlay/*/index.html (the bundled
+  // obs-overlays/ copies were migrated to aquilo.gg on 2026-06-09).
   obsBroadcastChat:     (data)        => ipcRenderer.send('obs-broadcast-chat',     data || {}),
   obsBroadcastAlert:    (data)        => ipcRenderer.send('obs-broadcast-alert',    data || {}),
   obsBroadcastShoutout: (data)        => ipcRenderer.send('obs-broadcast-shoutout', data || {}),

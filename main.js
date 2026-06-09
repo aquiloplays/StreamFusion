@@ -976,7 +976,11 @@ app.whenReady().then(() => {
   // OBS overlay server comes up alongside the main window. It always
   // listens (so the streamer can bookmark the URLs without worrying about
   // whether SF is "ready"), but it returns the gated page if the user
-  // isn't an active Patron.
+  // isn't an active Patron. Tell it where to persist the per-overlay
+  // customization cfg the aquilo.gg/sf/customize/ page writes , userData
+  // is the only path that's reliably writable both in dev and inside the
+  // packaged asar.
+  try { obsServer.setConfigDir(app.getPath('userData')); } catch (e) {}
   obsServer.startServer().then(function(ok) {
     if (!ok) logToFile('OBS-SERVER', 'failed to start on default port');
     // Auto-refresh any OBS browser sources that point at SF's loopback

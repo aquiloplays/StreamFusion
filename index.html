@@ -2543,339 +2543,90 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
              alerts banner, shoutout card, vertical bar, horizontal ticker. -->
         <div class="settings-pane" id="pane-obsoverlays">
           <div id="obsContent">
+
+            <!-- ─── Customization moved ─── -->
+            <!-- As of 2026-06-09, every overlay knob lives at
+                 aquilo.gg/sf/customize/. SF still serves chat + events
+                 over SSE; the customizer page is what writes the cfg
+                 (via POST /api/config/<overlay>). Keeping the URL list
+                 here so the streamer doesn't have to leave SF just to
+                 paste a browser source URL into OBS. -->
+            <div class="sec">
+              <div class="sec-hd"><svg class="ic"><use href="#i-bolt"/></svg> Customize on aquilo.gg</div>
+              <div style="background:linear-gradient(135deg,rgba(124,92,255,0.18),rgba(154,130,255,0.06));border:1px solid rgba(124,92,255,0.45);border-radius:10px;padding:14px;margin-bottom:14px">
+                <div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:4px">Overlay customization moved to the web</div>
+                <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:10px">
+                  Every knob ,  theme, font, colors, animations, presets, TikTok gift placement, all of it ,  now lives at <strong style="color:var(--txt)">aquilo.gg/sf/customize</strong>. Changes save to this StreamFusion install automatically and persist across restarts. The page even shows a live preview of your overlay while you tweak.
+                </div>
+                <button onclick="window.open('https://aquilo.gg/sf/customize/','_blank')" style="background:#7c5cff;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:0.02em;cursor:pointer">
+                  Open customizer &rarr;
+                </button>
+              </div>
+            </div>
+
+            <!-- ─── Browser source URLs ─── -->
             <div class="sec">
               <div class="sec-hd">Browser Source URLs</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
-                Paste these URLs into OBS &rarr; Sources &rarr; <strong style="color:var(--txt)">+ Browser Source</strong>. Overlays render live from StreamFusion &mdash; no files, no refreshes. They update instantly when you change settings below.
+                Paste these into OBS &rarr; Sources &rarr; <strong style="color:var(--txt)">+ Browser Source</strong>. They load from aquilo.gg and connect back to this StreamFusion process for chat + events.
               </div>
-              <!-- Chat overlay row -->
-              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Chat Feed</span>
-                  <span style="font-size:10px;color:var(--mut)">Transparent background, recent messages, fade-in</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px" title="Recommended OBS browser source dimensions for a 1920x1080 canvas">Recommended: 380 &times; 550</span>
+              <div id="obsUrlList" style="display:flex;flex-direction:column;gap:8px">
+                <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:800;color:var(--txt)">Chat Feed</span>
+                    <span style="font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px;margin-left:auto">Recommended: 380 &times; 550</span>
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input id="obsUrlChat" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                    <button class="cbtn tw" onclick="copyObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  </div>
                 </div>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <input id="obsUrlChat" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
-                  <button class="cbtn tw" onclick="copyObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
-                  <button class="cbtn" onclick="previewObsUrl('chat')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
+                <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:800;color:var(--txt)">Alerts Banner</span>
+                    <span style="font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px;margin-left:auto">Recommended: 700 &times; 200</span>
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input id="obsUrlAlerts" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                    <button class="cbtn tw" onclick="copyObsUrl('alerts')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
+                  </div>
                 </div>
-                <!-- Per-overlay config: chat. 1.4.9 regrouped the controls
-                     into Look / Who-and-what / Events / TikTok gifts so
-                     streamers don't have to scan 15 checkboxes in one grid
-                     to find the one they want. -->
-                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Presets</div>
-                  <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:6px">Pick a starter look, then tweak anything below. Applying a preset overwrites the style options (it leaves your platform / event / gift choices alone).</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px" id="obsChatPresetRow">
-                    <button class="tbtn chat-preset-btn" data-preset="aurora"   onclick="applyChatPreset('aurora')"   style="font-size:11px;font-weight:700;padding:6px 12px">Aurora</button>
-                    <button class="tbtn chat-preset-btn" data-preset="minimal"  onclick="applyChatPreset('minimal')"  style="font-size:11px;font-weight:700;padding:6px 12px">Minimal</button>
-                    <button class="tbtn chat-preset-btn" data-preset="glassy"   onclick="applyChatPreset('glassy')"   style="font-size:11px;font-weight:700;padding:6px 12px">Glassy</button>
-                    <button class="tbtn chat-preset-btn" data-preset="neon"     onclick="applyChatPreset('neon')"     style="font-size:11px;font-weight:700;padding:6px 12px">Neon</button>
-                    <button class="tbtn chat-preset-btn" data-preset="twitch"   onclick="applyChatPreset('twitch')"   style="font-size:11px;font-weight:700;padding:6px 12px">Classic Twitch</button>
-                    <button class="tbtn chat-preset-btn" data-preset="console"  onclick="applyChatPreset('console')"  style="font-size:11px;font-weight:700;padding:6px 12px">Vintage Console</button>
+                <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:800;color:var(--txt)">Shoutout Card</span>
+                    <span style="font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px;margin-left:auto">Recommended: 720 &times; 200</span>
                   </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Look</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Card = one rounded card per message (default). Box (gradient) = single container around the whole feed, painted with the StreamFusion blue/teal gradient. Box (grey) = same container, but a plain grey panel with no gradient — for streamers who want the framed look without the stylized accent. Box (no background) = the same auto-sizing transcript style with NO frame, for streamers who layer chat over a custom OBS background."><span>Style</span>
-                      <select id="obsChatTheme" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="box">Box (gradient)</option>
-                        <option value="box-grey">Box (grey)</option>
-                        <option value="card">Card</option>
-                        <option value="nobg">Box (no background)</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsChatFontSize" min="10" max="32" value="16" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px" title="Per-message background opacity for the Card style. 0 = fully transparent text."><span>Card opacity</span><input type="range" id="obsChatBgOpacity" min="0" max="100" value="85" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                    <label class="frow" style="font-size:11px" title="Only affects the Grey-box message style. How see-through the grey background box is. 0% = invisible, 100% = solid."><span>Grey-box see-through</span><input type="range" id="obsChatBoxOpacity" min="0" max="100" value="80" onchange="updateObsConfig('chat')" style="width:80px"></label>
-                    <label class="frow" style="font-size:11px" title="How many messages stay visible in the overlay before old ones drop off. For Box / Box (no background) styles, this also controls the height of the overlay — the box only grows tall enough for this many messages, never the full browser-source height."><span>Max messages on screen</span><input type="number" id="obsChatMaxMessages" min="3" max="80" value="30" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input id="obsUrlShoutout" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                    <button class="cbtn tw" onclick="copyObsUrl('shoutout')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
                   </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Who &amp; what shows</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Round avatar at the start of each message."><span>Profile pictures</span><input type="checkbox" id="obsChatShowProfilePics" checked onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Small TW/YT/TT/KK colored chip next to the username so you can tell the source at a glance."><span>Platform icon</span><input type="checkbox" id="obsChatShowPlatformIcon" checked onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Sub / mod / VIP / broadcaster letter chips next to the username."><span>User badges</span><input type="checkbox" id="obsChatShowUserBadges" checked onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Render Twitch / Kick / YouTube / BTTV / 7TV emotes as inline images."><span>Emotes</span><input type="checkbox" id="obsChatShowEmotes" checked onchange="updateObsConfig('chat')"></label>
-                    <!-- 'Legacy platform bar' was the old pre-1.4.9 left-border colored strip. The new
-                         Card style already has a platform-tinted left border, so this is off by default
-                         and mainly kept for the Grey box style which doesn't show any accent otherwise. -->
-                    <label class="frow" style="font-size:11px" title="The OLD pre-1.4.9 thick colored bar on the left of each message. Mostly useful with the Grey-box style (which otherwise has no platform accent). The new Card style already has a thin tinted left edge so this is usually off."><span>Thick colored side bar (old style)</span><input type="checkbox" id="obsChatShowPlatformBadge" onchange="updateObsConfig('chat')"></label>
+                </div>
+                <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:800;color:var(--txt)">Vertical Bar</span>
+                    <span style="font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px;margin-left:auto">Recommended: 380 &times; 720</span>
                   </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Sub / gift / cheer / raid events</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsChatShowEvents" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Where sub / gift / cheer / raid event notifications show up on your OBS overlay. 'Mixed in' blends them with chat messages so they scroll together. 'Separate bar' pins them above or below the chat feed. 'Side column' puts them outside the chat box on the left or right — chat shrinks to make room so events never overlap."><span>Event placement</span>
-                      <select id="obsChatEventPlacement" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="inline">Mixed in with chat</option>
-                        <option value="above">Separate bar, above chat</option>
-                        <option value="below">Separate bar, below chat</option>
-                        <option value="left">Side column, left of chat</option>
-                        <option value="right">Side column, right of chat</option>
-                        <option value="off">Don't show events</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px"><span>Event font size</span><input type="number" id="obsChatEventSize" min="10" max="22" value="13" onchange="updateObsConfig('chat')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input id="obsUrlVertical" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                    <button class="cbtn tw" onclick="copyObsUrl('vertical')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
                   </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">TikTok gifts</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Every incoming TikTok gift animates the real gift artwork floating across your overlay. Pair this with the placement option on the right to control whether they drift across the top or fall down a side column outside the chat box."><span>Animate gifts across screen</span><input type="checkbox" id="obsChatShowGiftAnimations" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Where the floating TikTok gift artwork plays. 'Top of overlay' is the legacy behaviour (gifts drift right→left across the upper half — fine for the card theme but can cover chat in the box theme). 'Right column' / 'Left column' move the gifts into a vertical strip outside the chat box; chat shrinks horizontally to make room so they never overlap."><span>Gift float position</span>
-                      <select id="obsChatTtGiftSide" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="top">Top of overlay (legacy)</option>
-                        <option value="right">Right column (outside chat)</option>
-                        <option value="left">Left column (outside chat)</option>
-                        <option value="off">Don't animate</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px" title="When someone sends many gifts in a row, a small counter chip appears showing the combo (×5, ×30, etc.). Pick which corner of your overlay it anchors to, or turn it off."><span>Gift combo counter corner</span>
-                      <select id="obsChatTtGiftCorner" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="off">Off</option>
-                        <option value="tl">Top-left</option>
-                        <option value="tr">Top-right</option>
-                        <option value="bl">Bottom-left</option>
-                        <option value="br">Bottom-right</option>
-                        <option value="tm">Top-middle</option>
-                        <option value="bm">Bottom-middle</option>
-                      </select>
-                    </label>
+                </div>
+                <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:800;color:var(--txt)">Horizontal Ticker</span>
+                    <span style="font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px;margin-left:auto">Recommended: 1920 &times; 80</span>
                   </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Style &amp; color</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Drives the gradient, left accents, and the optional glow."><span>Accent color</span><input type="color" id="obsChatAccentColor" value="#7c5cff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
-                    <label class="frow" style="font-size:11px" title="Color of the message text."><span>Text color</span><input type="color" id="obsChatTextColor" value="#ffffff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
-                    <label class="frow" style="font-size:11px"><span>Font</span>
-                      <select id="obsChatFontFamily" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="geist">Geist (default)</option>
-                        <option value="inter">Inter</option>
-                        <option value="system">System UI</option>
-                        <option value="rounded">Rounded (Nunito)</option>
-                        <option value="condensed">Condensed (Oswald)</option>
-                        <option value="mono">Monospace</option>
-                        <option value="serif">Serif</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px"><span>Font weight</span>
-                      <select id="obsChatFontWeight" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="400">Regular</option>
-                        <option value="500">Medium</option>
-                        <option value="600">Semibold</option>
-                        <option value="700">Bold</option>
-                        <option value="800">Extra bold</option>
-                        <option value="900">Black</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px" title="How the username is colored. Chatter = each viewer's own Twitch color (falls back to platform). Platform = the source's brand color. Accent = your accent color. Solid = one fixed color you pick."><span>Username color</span>
-                      <select id="obsChatUsernameColorMode" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="chatter">Chatter's own color</option>
-                        <option value="platform">Platform color</option>
-                        <option value="accent">Accent color</option>
-                        <option value="solid">Solid (pick)</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px" title="Used only when Username color is set to Solid."><span>Solid username color</span><input type="color" id="obsChatUsernameColor" value="#ffffff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
-                    <label class="frow" style="font-size:11px" title="Corner roundness in pixels. Leave blank to use the style's built-in default."><span>Corner radius (px)</span><input type="number" id="obsChatCornerRadius" min="0" max="32" placeholder="auto" onchange="updateObsConfig('chat')" style="width:56px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px" title="Vertical gap between messages in pixels. Leave blank for the default."><span>Message spacing (px)</span><input type="number" id="obsChatMessageGap" min="0" max="24" placeholder="auto" onchange="updateObsConfig('chat')" style="width:56px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input id="obsUrlTicker" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
+                    <button class="cbtn tw" onclick="copyObsUrl('ticker')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
                   </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Animation &amp; legibility</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="How new messages enter."><span>Message animation</span>
-                      <select id="obsChatAnimIn" onchange="updateObsConfig('chat')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="slide-up">Slide up (default)</option>
-                        <option value="fade">Fade</option>
-                        <option value="slide-left">Slide in from right</option>
-                        <option value="scale">Pop / scale</option>
-                        <option value="none">None (instant)</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px" title="Auto-remove each message this many seconds after it arrives. 0 keeps messages until they scroll off by count."><span>Fade out after (s)</span><input type="number" id="obsChatFadeOut" min="0" max="120" value="0" onchange="updateObsConfig('chat')" style="width:56px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px" title="Soft accent-colored halo around messages / the box frame."><span>Outer glow</span><input type="checkbox" id="obsChatOuterGlow" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Glow color. Leave at the accent for a coherent look, or pick a separate hue."><span>Glow color</span><input type="color" id="obsChatGlowColor" value="#7c5cff" onchange="updateObsConfig('chat')" style="width:40px;height:22px;padding:0;background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer"></label>
-                    <label class="frow" style="font-size:11px" title="Drop shadow behind text so it stays readable on bright or busy scenes."><span>Text shadow</span><input type="checkbox" id="obsChatTextShadow" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="The 1px frame line around the box styles. Turn off for a frameless panel."><span>Box border line</span><input type="checkbox" id="obsChatOuterBorder" checked onchange="updateObsConfig('chat')"></label>
-                  </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Filtering &amp; extras</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px" title="Hide messages from common chat bots (Nightbot, StreamElements, Streamlabs, Moobot, and similar)."><span>Hide bot messages</span><input type="checkbox" id="obsChatHideBots" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Show each chatter's pronouns from pronouns.alejo.io as a small chip before their name."><span>Show pronouns</span><input type="checkbox" id="obsChatShowPronouns" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Italicize and tint /me action messages to match the chatter."><span>Style /me actions</span><input type="checkbox" id="obsChatMeStyle" checked onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Give first-time chatters and highlighted messages a gold accent."><span>Highlight first-time chatters</span><input type="checkbox" id="obsChatHighlightFirstTime" onchange="updateObsConfig('chat')"></label>
-                    <label class="frow" style="font-size:11px" title="Show a small HH:MM timestamp at the start of each message."><span>Timestamps</span><input type="checkbox" id="obsChatShowTimestamps" onchange="updateObsConfig('chat')"></label>
-                  </div>
-
                 </div>
               </div>
-              <!-- Alerts overlay row -->
-              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Alerts Banner</span>
-                  <span style="font-size:10px;color:var(--mut)">Slide-in event alerts with confetti for big paid events</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px" title="Recommended OBS browser source dimensions">Recommended: 760 &times; 220</span>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <input id="obsUrlAlerts" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
-                  <button class="cbtn tw" onclick="copyObsUrl('alerts')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
-                  <button class="cbtn" onclick="previewObsUrl('alerts')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
-                </div>
-                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
-                  <div style="font-size:11px;color:var(--mut);margin-bottom:6px">Trigger on:</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
-                    <label class="frow" style="font-size:11px"><span>Follows</span><input type="checkbox" id="obsAlertsFollow" checked onchange="updateObsConfig('alerts')"></label>
-                    <label class="frow" style="font-size:11px"><span>Subs &amp; Resubs</span><input type="checkbox" id="obsAlertsSub" checked onchange="updateObsConfig('alerts')"></label>
-                    <label class="frow" style="font-size:11px"><span>Gift subs</span><input type="checkbox" id="obsAlertsGift" checked onchange="updateObsConfig('alerts')"></label>
-                    <label class="frow" style="font-size:11px"><span>Cheers / Bits</span><input type="checkbox" id="obsAlertsCheer" checked onchange="updateObsConfig('alerts')"></label>
-                    <label class="frow" style="font-size:11px"><span>Raids / Hosts</span><input type="checkbox" id="obsAlertsRaid" checked onchange="updateObsConfig('alerts')"></label>
-                    <label class="frow" style="font-size:11px"><span>Tips</span><input type="checkbox" id="obsAlertsTip" checked onchange="updateObsConfig('alerts')"></label>
-                  </div>
-                  <label class="frow" style="font-size:11px;margin-top:6px"><span>Display duration (seconds)</span><input type="number" id="obsAlertsDuration" min="2" max="30" value="6" onchange="updateObsConfig('alerts')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label class="frow" style="font-size:11px;margin-top:6px" title="Default is the big card with confetti and pulse ring. Minimal is a compact single-row chip — no confetti, no ambient glow, a slim platform accent on the left edge. Use minimal if you don't want alerts to steal attention from gameplay.">
-                    <span>Style</span>
-                    <select id="obsAlertsStyle" onchange="updateObsConfig('alerts')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                      <option value="default">Default (full card, confetti)</option>
-                      <option value="minimal">Minimal (subtle, no confetti)</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-              <!-- Vertical overlay row — for phone-portrait streams -->
-              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Vertical Chat Bar</span>
-                  <span style="font-size:10px;color:var(--mut)">One-line chat + event popups, built for vertical streams</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px" title="Recommended OBS browser source dimensions (portrait canvas)">Recommended: 720 &times; 1280</span>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <input id="obsUrlVertical" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
-                  <button class="cbtn tw" onclick="copyObsUrl('vertical')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
-                  <button class="cbtn" onclick="previewObsUrl('vertical')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
-                </div>
-                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:2px 0 6px">Chat bar (bottom)</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px"><span>Show chat messages</span><input type="checkbox" id="obsVerticalShowChat" checked onchange="updateObsConfig('vertical')"></label>
-                    <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsVerticalFontSize" min="12" max="40" value="20" onchange="updateObsConfig('vertical')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px"><span>Hold time (seconds)</span><input type="number" id="obsVerticalHold" min="1" max="15" value="4" onchange="updateObsConfig('vertical')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px"><span>Bar opacity</span><input type="range" id="obsVerticalBgOpacity" min="0" max="100" value="55" onchange="updateObsConfig('vertical')" style="width:80px"></label>
-                    <label class="frow" style="font-size:11px"><span>Profile pictures</span><input type="checkbox" id="obsVerticalShowProfilePics" onchange="updateObsConfig('vertical')"></label>
-                    <label class="frow" style="font-size:11px"><span>Platform icon</span><input type="checkbox" id="obsVerticalShowPlatformIcon" onchange="updateObsConfig('vertical')"></label>
-                    <label class="frow" style="font-size:11px"><span>User badges</span><input type="checkbox" id="obsVerticalShowUserBadges" checked onchange="updateObsConfig('vertical')"></label>
-                    <label class="frow" style="font-size:11px"><span>Emotes</span><input type="checkbox" id="obsVerticalShowEmotes" checked onchange="updateObsConfig('vertical')"></label>
-                  </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">Event popups (sub / follow / cheer / raid)</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px"><span>Show events</span><input type="checkbox" id="obsVerticalShowEvents" checked onchange="updateObsConfig('vertical')"></label>
-                    <label class="frow" style="font-size:11px" title="Where event cards stack on the canvas. Above = middle of screen pushing up. Below = just above the chat bar."><span>Placement</span>
-                      <select id="obsVerticalEventPlacement" onchange="updateObsConfig('vertical')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="above">Above chat bar</option>
-                        <option value="below">Just above chat</option>
-                        <option value="off">Off</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px"><span>Event font size</span><input type="number" id="obsVerticalEventSize" min="11" max="22" value="14" onchange="updateObsConfig('vertical')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px"><span>Hold (seconds)</span><input type="number" id="obsVerticalEventHold" min="2" max="20" value="8" onchange="updateObsConfig('vertical')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  </div>
-
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 6px">TikTok gifts</div>
-                  <label class="frow" style="font-size:11px" title="Floating gift artwork across the top half of the canvas. Never covers chat or events."><span>Floating gift animation</span><input type="checkbox" id="obsVerticalShowGiftAnimations" checked onchange="updateObsConfig('vertical')"></label>
-                  <div style="font-size:10px;color:var(--mut);margin-top:8px;line-height:1.5">Gifts animate in the top half of the canvas and never queue into the chat bar. Long chat messages auto-marquee so the whole line is readable.</div>
-
-                </div>
-              </div>
-              <!-- Horizontal ticker overlay row -->
-              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Horizontal Ticker</span>
-                  <span style="font-size:10px;color:var(--mut)">Right-to-left scrolling chat strip — drop on top or bottom of your scene</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px" title="Recommended OBS browser source dimensions (full-width strip)">Recommended: 1920 &times; 60</span>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <input id="obsUrlTicker" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
-                  <button class="cbtn tw" onclick="copyObsUrl('ticker')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
-                  <button class="cbtn" onclick="previewObsUrl('ticker')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
-                </div>
-                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <label class="frow" style="font-size:11px"><span>Font size</span><input type="number" id="obsTickerFontSize" min="12" max="40" value="18" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px"><span>Bar height (px)</span><input type="number" id="obsTickerBarHeight" min="32" max="120" value="56" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px" title="Higher = slower scroll. 22s is roughly 'reading speed' for a one-line message on a 1080p source."><span>Scroll duration (s)</span><input type="number" id="obsTickerScrollDur" min="8" max="60" value="22" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px"><span>Bar opacity</span><input type="range" id="obsTickerBgOpacity" min="0" max="100" value="0" onchange="updateObsConfig('ticker')" style="width:80px"></label>
-                    <label class="frow" style="font-size:11px" title="Where the ticker strip anchors on the OBS source — bottom (default) or top."><span>Position</span>
-                      <select id="obsTickerPosition" onchange="updateObsConfig('ticker')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                        <option value="bottom">Bottom</option>
-                        <option value="top">Top</option>
-                      </select>
-                    </label>
-                    <label class="frow" style="font-size:11px" title="Hard cap on pending messages. Beyond this the OLDEST queued message gets dropped — better to lose stale msgs than starve newer ones during a sub-bomb."><span>Max queue depth</span><input type="number" id="obsTickerMaxQueue" min="10" max="200" value="50" onchange="updateObsConfig('ticker')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                    <label class="frow" style="font-size:11px"><span>Profile pictures</span><input type="checkbox" id="obsTickerShowAvatars" checked onchange="updateObsConfig('ticker')"></label>
-                    <label class="frow" style="font-size:11px"><span>Platform icon</span><input type="checkbox" id="obsTickerShowPlatformIcon" checked onchange="updateObsConfig('ticker')"></label>
-                    <label class="frow" style="font-size:11px"><span>Emotes</span><input type="checkbox" id="obsTickerShowEmotes" checked onchange="updateObsConfig('ticker')"></label>
-                  </div>
-                  <div style="font-size:10px;color:var(--mut);margin-top:8px;line-height:1.5">Each chat message slides in from the right edge of the strip and exits on the left. Faster scroll = tighter spawn cadence. The strip is full-width on the OBS source — pick recommended 1920&times;<em>barHeight</em> for a 1080p stream and drop it as a top or bottom band over your scene.</div>
-                </div>
-              </div>
-              <!-- Shoutout overlay row -->
-              <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                  <span style="font-size:12px;font-weight:800;color:var(--txt)">Shoutout Card</span>
-                  <span style="font-size:10px;color:var(--mut)">Pops in when you click Shoutout on an event</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--accent);font-weight:700;background:rgba(124,92,255,0.1);padding:2px 8px;border-radius:4px" title="Recommended OBS browser source dimensions">Recommended: 760 &times; 300</span>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <input id="obsUrlShoutout" class="minput" readonly style="font-family:Consolas,monospace;font-size:11px;padding:6px 10px;flex:1;background:var(--surf3);color:var(--accent)" value="">
-                  <button class="cbtn tw" onclick="copyObsUrl('shoutout')" style="font-size:11px;height:28px;padding:0 10px">Copy</button>
-                  <button class="cbtn" onclick="previewObsUrl('shoutout')" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt)">Preview</button>
-                </div>
-                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:6px">
-                  <label class="frow" style="font-size:11px"><span>Auto-detect recent event</span><input type="checkbox" id="obsShoutoutShowRecentEvent" checked onchange="updateObsConfig('shoutout')"></label>
-                  <label class="frow" style="font-size:11px"><span>Display duration (seconds)</span><input type="number" id="obsShoutoutDuration" min="3" max="30" value="8" onchange="updateObsConfig('shoutout')" style="width:52px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px"></label>
-                  <label style="font-size:11px;color:var(--mut);display:block">Thank-you message:<br>
-                    <input type="text" id="obsShoutoutThankMessage" value="Thanks so much for supporting the stream!" onchange="updateObsConfig('shoutout')" style="width:100%;margin-top:4px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:6px 8px;border-radius:4px;font-size:11px">
-                  </label>
-                </div>
-                <div style="margin-top:8px">
-                  <button class="cbtn" onclick="testShoutout()" style="font-size:11px;height:26px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);width:100%">Test shoutout</button>
-                </div>
+              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr)">
+                Local <code style="background:var(--surf3);padding:1px 4px;border-radius:3px;font-family:Consolas,monospace">127.0.0.1:8787/&lt;name&gt;</code> URLs still work too ,  they 302-redirect to the aquilo.gg versions, so existing OBS scenes don't need to be touched.
               </div>
             </div>
-            <div class="sec">
-              <div class="sec-hd">Server Status</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.5" id="obsServerStatus">
-                Checking&hellip;
-              </div>
-            </div>
-            <div class="sec">
-              <div class="sec-hd">Chat overlay filter</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Replace common curse words with asterisks (same length) on chat messages going to your OBS overlays and pop-out — your main chat panel keeps the raw text so you + your mods still see what was said. Useful for family-friendly streams or platforms with stricter content rules. Word-boundary matching; covers ~40 common stems.</div>
-              <label class="frow" style="font-size:11px"><span>Filter curse words from chat overlays</span><input type="checkbox" id="settings-filter-profanity" onchange="onFilterProfanityToggle(this.checked)"></label>
-            </div>
-            <div class="sec">
-              <div class="sec-hd">Auto-refresh OBS browser sources</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When SF starts (or auto-updates and re-launches), browser sources in OBS that point at SF overlay URLs may be stuck on a "this site can't be reached" error from when SF was off. Browser sources don't auto-retry, so they sit blank until you manually refresh each one. Enable this to have SF connect to the OBS WebSocket plugin on launch and refresh those sources for you.</div>
-              <label class="frow" style="font-size:11px;margin-bottom:6px"><span>Auto-refresh on SF launch</span><input type="checkbox" id="obsAutoRefresh" checked onchange="onObsRefreshCfgChange()"></label>
-              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-                <label style="flex:0 0 auto;font-size:11px;color:var(--mut)">OBS WebSocket port</label>
-                <input id="obsRefreshPort" type="number" min="1" max="65535" value="4455" onchange="onObsRefreshCfgChange()" style="width:74px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 6px;border-radius:4px;font-size:11px">
-                <span style="font-size:10px;color:var(--mut)">(default 4455)</span>
-              </div>
-              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-                <label style="flex:0 0 auto;font-size:11px;color:var(--mut);min-width:155px">OBS WebSocket password</label>
-                <input id="obsRefreshPassword" type="password" placeholder="leave blank if auth is off" onchange="onObsRefreshCfgChange()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:3px 8px;border-radius:4px;font-size:11px;font-family:ui-monospace,monospace">
-              </div>
-              <div id="obsRefreshPwHint" style="font-size:10px;color:var(--mut);margin-bottom:8px;line-height:1.5">Find this in OBS &rarr; Tools &rarr; WebSocket Server Settings &rarr; Show Connect Info. Stored locally on your machine; never leaves SF.</div>
-              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                <button class="cbtn tw" style="font-size:11px;height:28px;padding:0 12px" onclick="onObsRefreshNow()">Refresh OBS sources now</button>
-                <div id="obsRefreshStatus" style="font-size:10.5px;color:var(--mut);line-height:1.5;flex:1;min-width:160px"></div>
-              </div>
-            </div>
+
           </div>
         </div>
 

@@ -32,6 +32,50 @@ let heartbeatTimer = null;
 // live event. Covers the "streamer reloads OBS scene" case gracefully.
 let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {} };
 
+// Config persistence. As of 2026-06-09 the per-overlay cfg comes from the
+// aquilo.gg/sf/customize/ page (POST /api/config/<overlay>), not SF's own
+// settings UI. We write it to disk so a SF restart restores the look
+// without the streamer reopening the customizer. Path is set by main.js
+// via setConfigDir(); falls back to a sibling file next to this module
+// if running outside Electron (CI smoke tests).
+const VALID_OVERLAYS = ['chat', 'alerts', 'shoutout', 'vertical', 'ticker'];
+let configDir = __dirname;            // overridden by setConfigDir(app.getPath('userData'))
+let configWriteTimer = null;          // debounce , dragging a slider must not hammer disk
+
+function _configPath() { return path.join(configDir, 'obs-config.json'); }
+
+function setConfigDir(dir) {
+  if (typeof dir !== 'string' || !dir) return;
+  configDir = dir;
+}
+
+function _loadConfigFromDisk() {
+  try {
+    var raw = fs.readFileSync(_configPath(), 'utf8');
+    var parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      VALID_OVERLAYS.forEach(function(k) {
+        if (parsed[k] && typeof parsed[k] === 'object') lastConfig[k] = parsed[k];
+      });
+    }
+  } catch (e) {
+    // ENOENT on first boot is expected , no log
+    if (e && e.code !== 'ENOENT') console.warn('[obs-server] config load failed:', e.message);
+  }
+}
+
+function _persistConfigSoon() {
+  if (configWriteTimer) clearTimeout(configWriteTimer);
+  configWriteTimer = setTimeout(function() {
+    configWriteTimer = null;
+    try {
+      fs.writeFileSync(_configPath(), JSON.stringify(lastConfig, null, 2), 'utf8');
+    } catch (e) {
+      console.warn('[obs-server] config save failed:', e.message);
+    }
+  }, 250);
+}
+
 // ── Aquilo product integration registry ────────────────────────────────────
 // Companion products (Aquilo Spotify widget, Aquilo Streamer.Bot kit, future
 // products) POST to /api/integrations/register on startup. Their entry stays
@@ -109,38 +153,64 @@ function pushControl(clientId, command, args) {
   }
 }
 
-// Read an overlay file from disk each request. File reads are cheap and
-// reading fresh means dev-mode hot-editing of the HTML works without an
-// app restart (electron-builder bundles the files into the asar for prod;
-// fs can still read out of asar via Node's patched fs).
-function readOverlayFile(name) {
-  try {
-    return fs.readFileSync(path.join(__dirname, 'obs-overlays', name), 'utf8');
-  } catch (e) {
-    return '<!doctype html><html><body style="font-family:Geist,system-ui,sans-serif;color:#f87171;background:#0a0b12;padding:24px">' +
-           '<h2>StreamFusion overlay missing</h2><p>File not found: ' + name + '</p></body></html>';
-  }
-}
+// As of 2026-06-09 the five OBS overlay HTML files are hosted canonically
+// at https://aquilo.gg/sf/overlay/<name>/ , see Aquilo/aquilo-site/public/
+// sf/overlay/. The local routes below now 302-redirect there. Editing
+// the overlays no longer requires a new StreamFusion release; an
+// aquilo-site deploy ships the change to every active streamer the next
+// time their OBS browser source reloads. The hosted page reaches back
+// into THIS server's /events stream via SSE (sf-bridge.js does the
+// port discovery), and CORS:* on /events lets the cross-origin call
+// through.
+//
+// Local fs.readFileSync of obs-overlays/*.html is gone. The folder
+// itself was emptied in the same change; a MIGRATED.md remains for
+// anyone landing in that dir from a stale clone.
+var HOSTED_OVERLAY_BASE = 'https://aquilo.gg/sf/overlay/';
+var OVERLAY_ROUTE_MAP = {
+  '/chat':     'chat',
+  '/alerts':   'alerts',
+  '/shoutout': 'shoutout',
+  '/vertical': 'vertical',
+  '/ticker':   'ticker'
+};
 
-// Very small landing page listing the three overlay URLs, for when the
-// streamer hits http://127.0.0.1:8787/ in a browser to check the server
-// is alive. OBS never loads this — it's purely for humans.
+// Very small landing page for when the streamer hits
+// http://127.0.0.1:8787/ in a browser to check the server is alive.
+// Recommends the aquilo.gg URLs (canonical) but also shows the legacy
+// 127.0.0.1 paths, both as a "yes the server is up" sanity check and
+// because existing OBS browser sources still use the local form. OBS
+// itself never loads this , it's purely for humans poking at the URL.
 function landingPage() {
   var urls = getUrls();
+  var rows = [
+    { name: 'Chat feed',          hosted: HOSTED_OVERLAY_BASE + 'chat/',     legacy: urls.chat },
+    { name: 'Alerts banner',      hosted: HOSTED_OVERLAY_BASE + 'alerts/',   legacy: urls.alerts },
+    { name: 'Shoutout card',      hosted: HOSTED_OVERLAY_BASE + 'shoutout/', legacy: urls.shoutout },
+    { name: 'Vertical bar',       hosted: HOSTED_OVERLAY_BASE + 'vertical/', legacy: urls.vertical },
+    { name: 'Horizontal ticker',  hosted: HOSTED_OVERLAY_BASE + 'ticker/',   legacy: urls.ticker }
+  ];
+  var listHtml = rows.map(function(r) {
+    return '<li><div class="lbl">' + r.name + '</div>' +
+           '<code>' + r.hosted + '</code>' +
+           '<div class="legacy">Legacy (still works via redirect): <code class="muted">' + r.legacy + '</code></div></li>';
+  }).join('');
   return '<!doctype html><html><head><meta charset="utf-8"><title>StreamFusion — OBS Overlays</title>' +
-         '<style>body{font-family:Geist,"Geist Sans",-apple-system,Segoe UI,sans-serif;background:#0a0b12;color:#ffffff;padding:32px;max-width:640px;margin:0 auto}' +
-         'h1{font-size:20px;font-weight:800;letter-spacing:-0.01em;margin:0 0 4px} .sub{color:#94a3b8;margin:0 0 24px;font-size:13px}' +
+         '<style>body{font-family:Geist,"Geist Sans",-apple-system,Segoe UI,sans-serif;background:#0a0b12;color:#ffffff;padding:32px;max-width:680px;margin:0 auto}' +
+         'h1{font-size:20px;font-weight:800;letter-spacing:-0.01em;margin:0 0 4px} .sub{color:#94a3b8;margin:0 0 22px;font-size:13px;line-height:1.55}' +
+         '.sub a{color:#9a82ff;text-decoration:none} .sub a:hover{text-decoration:underline}' +
          'ul{list-style:none;padding:0;margin:0} li{background:#11131c;border:1px solid #1f2233;border-radius:10px;padding:14px 16px;margin-bottom:10px}' +
-         '.lbl{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}' +
+         '.lbl{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}' +
          'code{font-family:SFMono-Regular,Consolas,monospace;font-size:12px;color:#9a82ff;user-select:all}' +
+         'code.muted{color:#64748b}' +
+         '.legacy{font-size:10px;color:#64748b;margin-top:6px}' +
          'p.hint{font-size:11px;color:#94a3b8;margin-top:18px;line-height:1.6}</style></head>' +
-         '<body><h1>StreamFusion — OBS Browser Source Overlays</h1><p class="sub">Paste these URLs into OBS → Sources → + → Browser Source.</p><ul>' +
-         '<li><div class="lbl">Chat feed</div><code>' + urls.chat + '</code></li>' +
-         '<li><div class="lbl">Alerts banner</div><code>' + urls.alerts + '</code></li>' +
-         '<li><div class="lbl">Shoutout card</div><code>' + urls.shoutout + '</code></li>' +
-         '<li><div class="lbl">Vertical bar</div><code>' + urls.vertical + '</code></li>' +
-         '<li><div class="lbl">Horizontal ticker</div><code>' + urls.ticker + '</code></li>' +
-         '</ul><p class="hint">These URLs work only while StreamFusion is running. Set the browser source width/height in OBS as needed — overlays are transparent-backed.</p></body></html>';
+         '<body><h1>StreamFusion , OBS Browser Source Overlays</h1>' +
+         '<p class="sub">The overlay HTML is hosted at <a href="' + HOSTED_OVERLAY_BASE + '" target="_blank">aquilo.gg/sf/overlay</a> ' +
+         'so design changes ship without a new StreamFusion release. Paste the aquilo.gg URL into OBS → Sources → + → Browser Source. ' +
+         'StreamFusion (this app) still drives the chat + events; the hosted page just renders them.</p>' +
+         '<ul>' + listHtml + '</ul>' +
+         '<p class="hint">Both forms need StreamFusion running. Set the browser source width/height in OBS as needed , overlays are transparent-backed.</p></body></html>';
 }
 
 function serveHtml(res, body, status) {
@@ -190,19 +260,100 @@ function handleRequest(req, res) {
     return;
   }
 
-  // Overlays serve to everyone — no entitlement check.
-  if (p === '/chat' || p === '/alerts' || p === '/shoutout' || p === '/vertical' || p === '/ticker') {
-    var file = (p === '/chat')      ? 'chat.html'
-             : (p === '/alerts')    ? 'alerts.html'
-             : (p === '/shoutout')  ? 'shoutout.html'
-             : (p === '/vertical')  ? 'vertical.html'
-             : 'ticker.html';
-    serveHtml(res, readOverlayFile(file));
+  // Overlays serve to everyone , no entitlement check. The HTML lives on
+  // aquilo.gg now; we 302-redirect so existing OBS browser sources
+  // pointing at http://127.0.0.1:8787/chat keep working without the
+  // streamer having to re-paste a new URL into OBS. The aquilo.gg page
+  // then opens an EventSource straight back to this server's /events
+  // stream (sf-bridge.js discovers the active port).
+  if (OVERLAY_ROUTE_MAP[p]) {
+    res.writeHead(302, {
+      'Location':                    HOSTED_OVERLAY_BASE + OVERLAY_ROUTE_MAP[p] + '/',
+      'Cache-Control':               'no-store',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end();
     return;
   }
 
   if (p === '/' || p === '/index.html') {
     serveHtml(res, landingPage());
+    return;
+  }
+
+  // ── /api/config/<overlay> ────────────────────────────────────────────────
+  // The canonical surface that aquilo.gg/sf/customize/ uses to drive the
+  // overlays. GET returns the current persisted cfg (so the page can
+  // hydrate its inputs on open); POST replaces it wholesale and broadcasts
+  // to every connected overlay of that type. Loopback-only by virtue of
+  // BIND_HOST='127.0.0.1', so no auth needed beyond that.
+  var configMatch = /^\/api\/config\/([a-z]+)\/?$/.exec(p);
+  if (configMatch) {
+    var which = configMatch[1];
+    if (VALID_OVERLAYS.indexOf(which) === -1) {
+      res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'unknown overlay; expected one of ' + VALID_OVERLAYS.join(', ') }));
+      return;
+    }
+    if (req.method === 'OPTIONS') {
+      // Answer the preflight inline rather than 405-ing , every POST from
+      // a cross-origin page (e.g. aquilo.gg/sf/customize/) sends one of
+      // these because of the Content-Type: application/json header.
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin':  '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
+      res.end();
+      return;
+    }
+    if (req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type':                'application/json',
+        'Cache-Control':               'no-store',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(JSON.stringify({ overlay: which, cfg: lastConfig[which] || {} }));
+      return;
+    }
+    if (req.method === 'POST') {
+      var cfgChunks = [];
+      var cfgTotal = 0;
+      req.on('data', function(d) {
+        cfgChunks.push(d);
+        cfgTotal += d.length;
+        if (cfgTotal > 32768) { req.destroy(); }   // generous; cfg objects are <2KB
+      });
+      req.on('end', function() {
+        var body = null;
+        try { body = JSON.parse(Buffer.concat(cfgChunks).toString('utf-8') || '{}'); } catch (e) {}
+        if (!body || typeof body !== 'object') {
+          res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ error: 'cfg must be a JSON object' }));
+          return;
+        }
+        // setConfig persists to disk + broadcasts to live overlays via SSE
+        setConfig(which, body);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: true, overlay: which }));
+      });
+      return;
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ error: 'method not allowed; use GET or POST' }));
+    return;
+  }
+
+  // GET /api/config , bulk hydrate. Returns the cfg for every overlay so
+  // the customizer page can populate all five tabs in one round-trip
+  // instead of pinging /api/config/<overlay> five times.
+  if (p === '/api/config' && req.method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type':                'application/json',
+      'Cache-Control':               'no-store',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({ cfg: lastConfig }));
     return;
   }
 
@@ -357,11 +508,13 @@ function handleRequest(req, res) {
     return;
   }
 
-  // CORS preflight for /api/integrations/* — companion products on a
-  // different origin (e.g. widgets.aquilo.gg) need this to fetch.
-  if (p.indexOf('/api/integrations') === 0 && req.method === 'OPTIONS') {
+  // CORS preflight for /api/integrations/* AND /api/config/* , companion
+  // products and the aquilo.gg/sf/customize/ page hit these from a
+  // different origin so the browser sends a preflight for any POST with
+  // Content-Type: application/json.
+  if ((p.indexOf('/api/integrations') === 0 || p.indexOf('/api/config') === 0) && req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin':  '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
@@ -399,6 +552,10 @@ function _attemptListen(port) {
 
 function startServer(port) {
   if (server) return Promise.resolve(true);
+  // Load persisted overlay cfg before binding , so the first SSE 'hello'
+  // a freshly-connecting OBS browser source receives carries the streamer's
+  // last-saved look, not the empty default.
+  _loadConfigFromDisk();
   var requested = (typeof port === 'number' && port > 0) ? port : DEFAULT_PORT;
   // First requested port + four fallbacks. Picked in a small fixed range
   // so the streamer's OBS browser-source URL is at most a few ports off
@@ -498,11 +655,14 @@ function broadcast(type, data, targetOverlay) {
 }
 
 // Persist the latest per-overlay config so replay works on reconnect.
-// Also broadcasts immediately to connected overlays of that type.
+// Also broadcasts immediately to connected overlays of that type, and
+// schedules a debounced disk write so a SF restart restores the look
+// without the streamer reopening the customizer page.
 function setConfig(overlayType, cfg) {
   if (!overlayType || !cfg) return;
   lastConfig[overlayType] = cfg;
   broadcast('config', cfg, overlayType);
+  _persistConfigSoon();
 }
 
 // Retained as a no-op so main.js's existing call site stays valid.
@@ -535,6 +695,7 @@ module.exports = {
   stopServer:       stopServer,
   broadcast:        broadcast,
   setConfig:        setConfig,
+  setConfigDir:     setConfigDir,  // main.js calls this before startServer
   setEntitled:      setEntitled,
   getUrls:          getUrls,
   isRunning:        isRunning,
