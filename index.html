@@ -9608,17 +9608,21 @@ function renderObsOverlaysTab() {
   var pane = document.getElementById('pane-obsoverlays');
   if (!pane) return;
 
-  // Populate URLs + status from the main process.
+  // Populate URLs + status from the main process. As of 1.10.x we show
+  // the canonical aquilo.gg URLs as the values so streamers pasting into
+  // OBS get the up-to-date hosted versions. The 127.0.0.1 form still
+  // works (it 302-redirects to the same place) for any OBS sources that
+  // were saved before this change; we don't surface them in the UI.
   if (window.electronAPI && window.electronAPI.obsGetStatus) {
     window.electronAPI.obsGetStatus().then(function(s) {
       if (!s) return;
-      var u = s.urls || {};
       var setVal = function(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
-      setVal('obsUrlChat',     u.chat);
-      setVal('obsUrlAlerts',   u.alerts);
-      setVal('obsUrlShoutout', u.shoutout);
-      setVal('obsUrlVertical', u.vertical);
-      setVal('obsUrlTicker',   u.ticker);
+      var BASE = 'https://aquilo.gg/sf/overlay/';
+      setVal('obsUrlChat',     BASE + 'chat/');
+      setVal('obsUrlAlerts',   BASE + 'alerts/');
+      setVal('obsUrlShoutout', BASE + 'shoutout/');
+      setVal('obsUrlVertical', BASE + 'vertical/');
+      setVal('obsUrlTicker',   BASE + 'ticker/');
       // Hydrate auto-refresh cfg now that the panel is mounted. Same
       // call site is fine because the panel renders once on EA unlock
       // and stays around — the underlying cfg comes from main process.
