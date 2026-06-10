@@ -77,6 +77,13 @@ function postWebhook(url, payload) {
     if (!url) return resolve({ ok: false, status: 0, body: null, error: 'no_url' });
     var u;
     try { u = new URL(url); } catch (e) { return resolve({ ok: false, status: 0, error: 'invalid_url' }); }
+    // Host allowlist: this posts to a caller-supplied URL server-side, so
+    // restrict it to Discord (over https) to prevent it being used to POST
+    // arbitrary bodies to internal or arbitrary hosts (SSRF).
+    var hn = (u.hostname || '').toLowerCase();
+    var hostOk = hn === 'discord.com' || hn === 'discordapp.com' ||
+                 hn.endsWith('.discord.com') || hn.endsWith('.discordapp.com');
+    if (u.protocol !== 'https:' || !hostOk) return resolve({ ok: false, status: 0, error: 'host_not_allowed' });
     // Add ?wait=true so the response includes the message body (including id)
     u.searchParams.set('wait', 'true');
     var body = JSON.stringify(payload || {});

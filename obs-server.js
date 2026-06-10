@@ -68,10 +68,18 @@ function _persistConfigSoon() {
   if (configWriteTimer) clearTimeout(configWriteTimer);
   configWriteTimer = setTimeout(function() {
     configWriteTimer = null;
+    // Atomic write: a crash mid-write must not truncate obs-config.json and
+    // silently wipe the streamer's saved overlay look (the load path falls
+    // back to defaults on a parse error). Write a temp file then rename over
+    // the target; rename is atomic on the same volume.
+    var target = _configPath();
+    var tmp = target + '.tmp';
     try {
-      fs.writeFileSync(_configPath(), JSON.stringify(lastConfig, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(lastConfig, null, 2), 'utf8');
+      fs.renameSync(tmp, target);
     } catch (e) {
       console.warn('[obs-server] config save failed:', e.message);
+      try { fs.unlinkSync(tmp); } catch (e2) {}
     }
   }, 250);
 }
@@ -222,9 +230,39 @@ function serveHtml(res, body, status) {
   res.end(body);
 }
 
+// ── Anti-drive-by / DNS-rebind protection ──────────────────────────────────
+// The server is loopback-only, but a webpage the streamer visits can still
+// reach 127.0.0.1 from their browser. Two guards:
+//   1. Host header must be loopback. A DNS-rebind attacker points their own
+//      hostname at 127.0.0.1, so the Host header gives them away.
+//   2. State-changing POSTs and the chat SSE only honor known-good Origins
+//      (the hosted overlays + customizer on aquilo.gg, plus localhost). The
+//      browser sets Origin and page JS cannot forge it, so a random site's
+//      drive-by POST is rejected and it cannot read the live-chat stream.
+var ALLOWED_ORIGIN_RE = /^https?:\/\/(aquilo\.gg|localhost|127\.0\.0\.1)(:\d+)?$/i;
+var HOSTED_OVERLAY_ORIGIN = 'https://aquilo.gg';
+function _originAllowed(origin) { return !origin || ALLOWED_ORIGIN_RE.test(origin); }
+function _acao(req) {
+  var o = req.headers['origin'];
+  // Reflect an allowed origin; otherwise return aquilo.gg so a disallowed
+  // cross-origin reader can't match it and is blocked from reading the body.
+  return (o && ALLOWED_ORIGIN_RE.test(o)) ? o : HOSTED_OVERLAY_ORIGIN;
+}
+function _hostOk(req) {
+  var host = String(req.headers['host'] || '').replace(/:\d+$/, '').toLowerCase();
+  return host === '' || host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1';
+}
+
 function handleRequest(req, res) {
   var u = new URL(req.url, 'http://127.0.0.1:' + serverPort);
   var p = u.pathname;
+
+  // Reject non-loopback Host headers (DNS-rebinding defense).
+  if (!_hostOk(req)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('forbidden');
+    return;
+  }
 
   // Health / ping endpoint — used by the settings panel to verify the
   // server is up without actually opening the overlay.
@@ -244,7 +282,10 @@ function handleRequest(req, res) {
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': '*'
+      // Restrict who can READ the live chat stream cross-origin. A random
+      // site the streamer visits gets aquilo.gg here, which won't match its
+      // own origin, so the browser blocks it from reading viewers' chat.
+      'Access-Control-Allow-Origin': _acao(req)
     });
     // Initial "hello" with the last-known config for this overlay type,
     // so a fresh OBS connection renders with the right settings without
@@ -300,7 +341,7 @@ function handleRequest(req, res) {
       // a cross-origin page (e.g. aquilo.gg/sf/customize/) sends one of
       // these because of the Content-Type: application/json header.
       res.writeHead(204, {
-        'Access-Control-Allow-Origin':  '*',
+        'Access-Control-Allow-Origin':  _acao(req),
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type'
       });
@@ -311,12 +352,20 @@ function handleRequest(req, res) {
       res.writeHead(200, {
         'Content-Type':                'application/json',
         'Cache-Control':               'no-store',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': _acao(req)
       });
       res.end(JSON.stringify({ overlay: which, cfg: lastConfig[which] || {} }));
       return;
     }
     if (req.method === 'POST') {
+      // State-changing: reject drive-by POSTs from pages whose origin isn't
+      // the hosted customizer/overlays (or localhost). The browser sets
+      // Origin and page JS can't forge it.
+      if (!_originAllowed(req.headers['origin'])) {
+        res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': _acao(req) });
+        res.end(JSON.stringify({ error: 'origin not allowed' }));
+        return;
+      }
       var cfgChunks = [];
       var cfgTotal = 0;
       req.on('data', function(d) {
@@ -424,7 +473,13 @@ function handleRequest(req, res) {
     // Cross-origin POST control endpoint. Mostly used by SF's own renderer
     // (via the obs-integration-control IPC) but exposed over HTTP too so
     // companion tooling on the same machine can drive a widget without
-    // shipping its own SB integration.
+    // shipping its own SB integration. Origin-gated so a random web page
+    // can't skip/pause the streamer's connected widgets.
+    if (!_originAllowed(req.headers['origin'])) {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': _acao(req) });
+      res.end(JSON.stringify({ error: 'origin not allowed' }));
+      return;
+    }
     var ctlChunks = [];
     req.on('data', function(d) {
       ctlChunks.push(d);
@@ -446,6 +501,11 @@ function handleRequest(req, res) {
   }
 
   if ((p === '/api/integrations/register' || p === '/api/integrations/heartbeat' || p === '/api/integrations/unregister') && req.method === 'POST') {
+    if (!_originAllowed(req.headers['origin'])) {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': _acao(req) });
+      res.end(JSON.stringify({ error: 'origin not allowed' }));
+      return;
+    }
     var chunks = [];
     req.on('data', function(d) {
       chunks.push(d);

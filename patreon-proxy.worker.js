@@ -230,6 +230,36 @@ async function handleDiscordTokenProxy(request, env) {
 // in the author field so the community channel tells viewers WHOSE recap
 // they're looking at, then forward to Discord. The webhook URL stays on
 // the Worker — a scraper pulling StreamFusion's public repo never sees it.
+// The /community-recap endpoint is unauthenticated (the SF renderer can't
+// hold a Patreon token to sign with), so rebuild the embed from a strict
+// whitelist before forwarding. An anonymous caller can then at most post a
+// constrained, attribution-stamped recap card, never arbitrary Discord
+// content, pings, or non-https media.
+function _httpsUrl(u) {
+  try { var x = new URL(String(u)); return x.protocol === 'https:' ? x.toString() : undefined; }
+  catch (e) { return undefined; }
+}
+function _sanitizeRecapEmbed(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  var out = {};
+  if (raw.title) out.title = String(raw.title).slice(0, 256);
+  if (raw.description) out.description = String(raw.description).slice(0, 2048);
+  if (raw.url) out.url = _httpsUrl(raw.url);
+  if (typeof raw.color === 'number' && isFinite(raw.color)) out.color = raw.color & 0xffffff;
+  if (raw.timestamp) { var t = new Date(raw.timestamp); if (!isNaN(t.getTime())) out.timestamp = t.toISOString(); }
+  if (raw.thumbnail && raw.thumbnail.url) { var tu = _httpsUrl(raw.thumbnail.url); if (tu) out.thumbnail = { url: tu }; }
+  if (raw.image && raw.image.url) { var iu = _httpsUrl(raw.image.url); if (iu) out.image = { url: iu }; }
+  if (Array.isArray(raw.fields)) {
+    out.fields = raw.fields.slice(0, 25).map(function(f) {
+      return (f && f.name != null) ? {
+        name: String(f.name).slice(0, 256),
+        value: String(f.value == null ? '' : f.value).slice(0, 1024),
+        inline: !!f.inline
+      } : null;
+    }).filter(Boolean);
+  }
+  return out;
+}
 async function handleCommunityRecap(request, env) {
   if (request.method !== 'POST') {
     return json({ error: 'method_not_allowed' }, 405);
@@ -242,9 +272,9 @@ async function handleCommunityRecap(request, env) {
   try { body = await request.json(); }
   catch (e) { return json({ error: 'invalid_json' }, 400); }
 
-  // Basic shape check — we expect { embed, streamerName? }.
-  var srcEmbed = body && body.embed;
-  if (!srcEmbed || typeof srcEmbed !== 'object') {
+  // Rebuild the embed from a strict whitelist (we expect { embed, streamerName? }).
+  var srcEmbed = _sanitizeRecapEmbed(body && body.embed);
+  if (!srcEmbed) {
     return json({ error: 'missing_embed' }, 400);
   }
 
@@ -473,10 +503,10 @@ function json(obj, status, extraHeaders) {
 //   { "patreonAccessToken": "...optional Patreon access token..." }
 //
 // Response (200):
-//   { ok: true, token: "ghp_...", email: "...", tier: "tier3", expiresHint: 86400000 }
+//   { ok: true, token: "ghp_...", email: "...", tier: "patron", expiresHint: 86400000 }
 //
 // Errors (403):
-//   { ok: false, error: "not_tier3" | "patreon_check_failed" | "no_token" }
+//   { ok: false, error: "not_a_patron" | "patreon_check_failed" | "no_token" }
 async function handleBetaUpdaterToken(request, env) {
   if (request.method === 'OPTIONS') return preflightCors();
   if (request.method !== 'POST') {
@@ -496,35 +526,41 @@ async function handleBetaUpdaterToken(request, env) {
 
   var verdict;
   try {
-    verdict = await _verifyTier3PatreonToken(accessToken, env);
+    verdict = await _verifyPatreonSupporter(accessToken, env);
   } catch (e) {
     return json({ ok: false, error: 'patreon_check_failed', detail: String(e && e.message || e) }, 502, corsHeaders());
   }
 
   if (!verdict.entitled) {
-    return json({ ok: false, error: 'not_tier3', tier: verdict.tier || 'none', email: verdict.email || null }, 403, corsHeaders());
+    return json({ ok: false, error: 'not_a_patron', tier: verdict.tier || 'none', email: verdict.email || null }, 403, corsHeaders());
   }
 
   return json({
     ok: true,
     token:       env.GITHUB_BETA_TOKEN,
     email:       verdict.email || null,
-    tier:        verdict.tier  || 'tier3',
+    tier:        verdict.tier  || 'patron',
     expiresHint: 86400000   // 24h cache hint to the client; not enforced server-side
   }, 200, corsHeaders());
 }
 
 // Calls Patreon's /identity endpoint with the user's access token, then
-// returns {entitled, tier, email, reason}. Mirrors the looser-but-safe
-// rules used in patreon-auth.js inside the SF app:
-//   - currently_entitled_amount_cents >= 1000 → tier3
-//   - currently_entitled_amount_cents >= 600  → tier2 (NOT entitled here)
+// returns {entitled, tier, email, reason}. Mirrors the single-tier,
+// campaign-scoped rules used in patreon-auth.js inside the SF app:
+//   - active pledge of >= 500 cents ($5 "Patron" tier) ON OUR CAMPAIGN → entitled
 //   - patron_status === 'declined_patron' or 'former_patron' → blocked
 //   - owner email always grants regardless of pledge
+// The campaign filter is the load-bearing fix: without it, a $5 pledge to
+// ANY unrelated creator's Patreon would unlock our private beta token.
 const PATREON_OWNER_EMAIL = 'bisherclay@gmail.com';
-async function _verifyTier3PatreonToken(accessToken, env) {
+// The Aquilo campaign. Keep in sync with patreon-auth.js's
+// PATREON_CAMPAIGN_ID. Overridable via env for self-hosters/testing.
+const PATREON_CAMPAIGN_ID = '3410750';
+const PATRON_MIN_CENTS = 500;
+async function _verifyPatreonSupporter(accessToken, env) {
+  var campaignId = String((env && env.PATREON_CAMPAIGN_ID) || PATREON_CAMPAIGN_ID);
   var url = 'https://www.patreon.com/api/oauth2/v2/identity'
-    + '?include=memberships'
+    + '?include=memberships,memberships.campaign'
     + '&fields%5Bmember%5D=patron_status,currently_entitled_amount_cents'
     + '&fields%5Buser%5D=email';
   var resp;
@@ -543,39 +579,50 @@ async function _verifyTier3PatreonToken(accessToken, env) {
   catch (e) { throw new Error('Patreon identity returned non-JSON'); }
 
   var email = (doc && doc.data && doc.data.attributes && doc.data.attributes.email) || null;
-  // Owner bypass — always tier3 regardless of pledge state. Matches
+  // Owner bypass: always entitled regardless of pledge state. Matches
   // patreon-auth.js's strengthen-owner-bypass logic.
   if (email && email.toLowerCase() === PATREON_OWNER_EMAIL.toLowerCase()) {
-    return { entitled: true, tier: 'tier3', email: email, reason: 'owner_bypass' };
+    return { entitled: true, tier: 'patron', email: email, reason: 'owner_bypass' };
   }
 
   var memberships = (doc && doc.data && doc.data.relationships && doc.data.relationships.memberships && doc.data.relationships.memberships.data) || [];
+  // Build member-id -> { attrs, campaignId } from the included resources.
+  // Member resources carry relationships.campaign.data.id, which lets us
+  // confirm the pledge is on OUR campaign and not some other creator's.
   var memberLookup = {};
   if (Array.isArray(doc.included)) {
     for (var i = 0; i < doc.included.length; i++) {
       var inc = doc.included[i];
-      if (inc && inc.type === 'member') memberLookup[inc.id] = inc.attributes || {};
+      if (inc && inc.type === 'member') {
+        var campRef = inc.relationships && inc.relationships.campaign &&
+                      inc.relationships.campaign.data && inc.relationships.campaign.data.id;
+        memberLookup[inc.id] = {
+          attrs: inc.attributes || {},
+          campaignId: campRef != null ? String(campRef) : null
+        };
+      }
     }
   }
-  var bestTier = 'none';
   var bestAmount = 0;
   for (var j = 0; j < memberships.length; j++) {
-    var attrs = memberLookup[memberships[j].id] || {};
-    var status = attrs.patron_status || null;
-    var amount = parseInt(attrs.currently_entitled_amount_cents, 10) || 0;
+    var rec = memberLookup[memberships[j].id];
+    if (!rec) continue;
+    // Only pledges to the Aquilo campaign count toward entitlement.
+    if (rec.campaignId !== campaignId) continue;
+    var status = rec.attrs.patron_status || null;
+    var amount = parseInt(rec.attrs.currently_entitled_amount_cents, 10) || 0;
     // Explicit declines/former patrons can't be entitled even if a stale
     // amount is reported.
     if (status === 'declined_patron' || status === 'former_patron') continue;
     if (amount > bestAmount) bestAmount = amount;
   }
-  if (bestAmount >= 1000)      bestTier = 'tier3';
-  else if (bestAmount >= 600)  bestTier = 'tier2';
-  else if (bestAmount > 0)     bestTier = 'tier1';
 
+  // Single paid tier: any active pledge of $5+ on our campaign is entitled.
+  var entitled = bestAmount >= PATRON_MIN_CENTS;
   return {
-    entitled: bestTier === 'tier3',
-    tier:     bestTier,
+    entitled: entitled,
+    tier:     entitled ? 'patron' : 'none',
     email:    email,
-    reason:   bestTier === 'tier3' ? 'patreon_tier3' : 'patreon_below_tier3'
+    reason:   entitled ? 'patreon_patron' : 'patreon_not_supporting'
   };
 }

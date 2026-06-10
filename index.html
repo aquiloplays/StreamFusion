@@ -3057,15 +3057,14 @@ function renderDiscordEaSettings() {
     title = 'Not connected';
     sub = 'Connect to check your Patron role in aquilo.gg\u2019s Discord.';
   } else if (st.entitled) {
-    var tierLabel = st.tier === 'tier3' ? 'Tier 3' : 'Tier 2';
-    title = 'Connected as @' + (st.userName || 'you') + ' \u2014 ' + tierLabel + ' Patron';
+    title = 'Connected as @' + (st.userName || 'you') + ' \u00b7 Patron';
     sub = 'You’ll get new features early, verified via your Discord role. Thanks for supporting!';
   } else if (st.reason === 'not_in_guild') {
     title = 'Connected as @' + (st.userName || 'you') + ' \u2014 not in server';
     sub = 'You\u2019re not a member of aquilo.gg\u2019s Discord yet. Join, then re-check.';
   } else if (st.reason === 'no_role') {
     title = 'Connected as @' + (st.userName || 'you') + ' \u2014 no Patron role';
-    sub = 'No Tier 2 or Tier 3 Patron role detected. Link Patreon in Discord settings and re-check.';
+    sub = 'No Patron role detected. Link Patreon in Discord settings and re-check.';
   } else if (st.reason === 'reverify_failed') {
     title = 'Connected \u2014 couldn\u2019t verify right now';
     sub = 'Discord was unreachable. We\u2019ll retry automatically.';
@@ -3109,8 +3108,7 @@ function applyPatreonState(state) {
   // Removing both classes first means transitions between tiers cascade
   // cleanly without leaving stale state.
   document.body.classList.remove('tier-2', 'tier-3');
-  if (state.tier === 'tier3') document.body.classList.add('tier-3');
-  else if (state.tier === 'tier2') document.body.classList.add('tier-2');
+  if (state.entitled || state.tier === 'patron') document.body.classList.add('tier-2');
 }
 
 // Discord entitlement update. Mirrors applyPatreonState and feeds the
@@ -3131,12 +3129,11 @@ function _eaMessages(state) {
     title = 'Not connected';
     sub = 'Connect Patreon to get early access to new features. Every current feature is already free.';
   } else if (state.entitled) {
-    var tierLabel = state.tier === 'tier3' ? 'Tier 3' : 'Tier 2';
-    title = 'Connected as ' + (state.userName || 'you') + ' — ' + tierLabel;
+    title = 'Connected as ' + (state.userName || 'you') + ' · Patron';
     sub = 'You’ll get new features early. Thanks for supporting StreamFusion!';
   } else if (state.reason === 'insufficient_tier') {
-    title = 'Connected as ' + (state.userName || 'you') + ' — below Tier 2';
-    sub = 'Tier 2 and Tier 3 patrons get new features early. Every current feature is free regardless.';
+    title = 'Connected as ' + (state.userName || 'you') + ' · not yet a patron';
+    sub = 'Patrons get new features early. Every current feature is free regardless.';
   } else if (state.reason === 'declined_patron') {
     title = 'Payment declined';
     sub = 'Your last Patreon payment didn’t go through. Update it on Patreon to keep getting new features early.';
@@ -4574,7 +4571,7 @@ function renderTextWithEmotes(text) {
   return text.split(' ').map(function(tok) {
     if (!tok) return ' ';
     var url = EMOTE_MAP.get(tok);
-    if (url) { var n = esc(tok); return '<img class="emote" src="' + url + '" alt="' + n + '" title="' + n + '" onerror="this.replaceWith(document.createTextNode(\' \'+this.alt+\' \'))"> '; }
+    if (url) { var n = esc(tok); return '<img class="emote" src="' + esc(url) + '" alt="' + n + '" title="' + n + '" onerror="this.replaceWith(document.createTextNode(\' \'+this.alt+\' \'))"> '; }
     return esc(tok) + ' ';
   }).join('').trimEnd();
 }
@@ -4744,6 +4741,10 @@ function connectSB(host, port, pass) {
   if (!S.useSB) return;
   S.sbHost = host; S.sbPort = port; S.sbPass = pass; saveSettings();
   clearTimeout(S.sbReconnectTimer);
+  // Kill any in-flight retry countdown / hello timer so a manual reconnect
+  // doesn't leave an old interval ticking that fires a SECOND connectSB.
+  if (S._sbCdTimer) { clearInterval(S._sbCdTimer); S._sbCdTimer = null; }
+  if (S._sbHelloTimer) { clearTimeout(S._sbHelloTimer); S._sbHelloTimer = null; }
   if (S.sbWS) { S.sbWS.onclose = null; S.sbWS.onerror = null; try { S.sbWS.close(); } catch(e) {} S.sbWS = null; }
   setDot('sb', 'wait'); setLbl('sb', 'Connecting...');
   var ws;
@@ -4848,6 +4849,11 @@ function buildSBAuthHash(pass, salt, challenge) {
 }
 
 function sbSubscribeAll(ws) {
+  // One Subscribe per socket. The Hello path and the GetInfo/sf-info fallback
+  // path can both reach here on the same connection; without this guard SB
+  // delivers every event twice (doubled chat + alerts).
+  if (ws._sbSubscribed) return;
+  ws._sbSubscribed = true;
   // Use wildcard '*' to subscribe to all events per platform — avoids missing events due to name mismatches
   var payload = { request: 'Subscribe', id: 'sf-sub', events: {
     Twitch: ['*'],
@@ -8758,8 +8764,9 @@ function pushMsg(m) {
   var icon = _platSvgs[m.plat] || '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
   el.className = 'msg ' + m.plat + (isHighlighted ? ' highlighted' : '') + (isFirstMsg ? ' first-msg' : '') + (isFirstWords ? ' first-words' : '');
   if (m.user) el.setAttribute('data-user', m.user.toLowerCase());
-  var bhtml = (m.badges || []).map(function(b) { return b.img ? '<img class="tw-badge" src="' + b.img + '" title="' + esc(b.lbl || '') + '">' : '<span class="badge ' + (b.cls||'') + '">' + esc(b.lbl) + '</span>'; }).join('');
-  var nStyle = m.color ? ' style="color:' + m.color + '"' : '';
+  var bhtml = (m.badges || []).map(function(b) { return b.img ? '<img class="tw-badge" src="' + esc(b.img) + '" title="' + esc(b.lbl || '') + '">' : '<span class="badge ' + esc(b.cls||'') + '">' + esc(b.lbl) + '</span>'; }).join('');
+  var _ncol = safeColor(m.color);
+  var nStyle = _ncol ? ' style="color:' + _ncol + '"' : '';
   var msgContent = m.html != null ? '<span class="mtext">' + m.html + '</span>' : '<div class="mtext">' + esc(m.text || '') + '</div>';
   var modHtml = '';
   if (m.plat === 'tw') {
@@ -9117,8 +9124,28 @@ function confirmDialog(opts) {
   });
 }
 
-function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escA(s) { return String(s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+// esc is used for BOTH HTML text and double-quoted attribute values, so it
+// must also escape quotes, otherwise a value containing " breaks out of an
+// attribute (a renderer XSS here reaches privileged IPC). escA produces a
+// value safe inside onclick="handler('...')" : it JS-escapes for the
+// single-quoted string AND HTML-escapes for the double-quoted attribute.
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function escA(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+// Whitelist a CSS color before putting it in a style attribute.
+function safeColor(c) {
+  c = String(c == null ? '' : c).trim();
+  if (!c) return '';
+  if (/^#[0-9a-fA-F]{3,8}$/.test(c)) return c;
+  if (/^rgba?\([0-9.,%\s/]+\)$/.test(c)) return c;
+  if (/^hsla?\([0-9.,%\s/deg]+\)$/.test(c)) return c;
+  if (/^[a-zA-Z]{3,20}$/.test(c)) return c;
+  return '';
+}
 
 // ── Viewers & stats ───────────────────────────────────────────────────────────
 function updateViewers() {

@@ -595,15 +595,24 @@ function createWindow() {
     if (input.key === 'F12') { mainWindow.webContents.toggleDevTools(); event.preventDefault(); }
   });
 
-  // Open external links in the default browser, not in Electron
+  // Open external links in the default browser, not in Electron. Only
+  // http/https/mailto are allowed: shell.openExternal on a file: or custom
+  // scheme can launch a local program or protocol handler, which is a real
+  // hazard when the URL is remote-controlled (e.g. a remote notice link).
+  const safeOpen = (url) => {
+    try {
+      const u = new URL(String(url || ''));
+      if (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'mailto:') shell.openExternal(url);
+    } catch (e) {}
+  };
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    safeOpen(url);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith('file://')) {
       e.preventDefault();
-      shell.openExternal(url);
+      safeOpen(url);
     }
   });
 }
@@ -1273,7 +1282,11 @@ function favoritesWriteCache(twitchId, favorites, updatedAt) {
     try { all = JSON.parse(fs.readFileSync(favoritesCachePath(), 'utf8')); } catch (e) {}
     if (!all.scopes) all.scopes = {};
     all.scopes[twitchId || 'default'] = { favorites: favorites || [], updatedAt: updatedAt || 0 };
-    fs.writeFileSync(favoritesCachePath(), JSON.stringify(all));
+    // Atomic write so a crash mid-write can't corrupt the cache.
+    const fp = favoritesCachePath();
+    const tmp = fp + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(all));
+    fs.renameSync(tmp, fp);
   } catch (e) { console.warn('[favorites] cache write failed:', e && e.message); }
 }
 // Small promisified JSON request over https (GET/PUT) with a Bearer token.
@@ -2156,7 +2169,19 @@ ipcMain.handle('import-settings', async () => {
   try { return fs.readFileSync(result.filePaths[0], 'utf8'); } catch (e) { return null; }
 });
 ipcMain.handle('write-export-file', async (event, filePath, data) => {
-  try { fs.writeFileSync(filePath, data, 'utf8'); return true; } catch (e) { return false; }
+  // Confine writes to the user's own export-friendly directories. Without
+  // this, a compromised renderer could write arbitrary content to any path
+  // the process can reach (e.g. a startup script).
+  try {
+    const p = path.resolve(String(filePath || ''));
+    const bases = ['downloads', 'documents', 'desktop', 'userData']
+      .map(n => { try { return path.resolve(app.getPath(n)); } catch (e) { return null; } })
+      .filter(Boolean);
+    const ok = bases.some(base => p === base || p.startsWith(base + path.sep));
+    if (!ok) { console.warn('[export] refused write outside allowed dirs:', p); return false; }
+    fs.writeFileSync(p, String(data == null ? '' : data), 'utf8');
+    return true;
+  } catch (e) { return false; }
 });
 
 ipcMain.on('open-log-folder', () => {
