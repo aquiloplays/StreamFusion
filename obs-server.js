@@ -239,7 +239,10 @@ function serveHtml(res, body, status) {
 //      (the hosted overlays + customizer on aquilo.gg, plus localhost). The
 //      browser sets Origin and page JS cannot forge it, so a random site's
 //      drive-by POST is rejected and it cannot read the live-chat stream.
-var ALLOWED_ORIGIN_RE = /^https?:\/\/(aquilo\.gg|localhost|127\.0\.0\.1)(:\d+)?$/i;
+// aquilo.gg and ALL its subdomains (widget.aquilo.gg hosts the Spotify/
+// rotation widget, which registers + heartbeats against this server), plus
+// loopback for local testing.
+var ALLOWED_ORIGIN_RE = /^https?:\/\/(([a-z0-9-]+\.)*aquilo\.gg|localhost|127\.0\.0\.1)(:\d+)?$/i;
 var HOSTED_OVERLAY_ORIGIN = 'https://aquilo.gg';
 function _originAllowed(origin) { return !origin || ALLOWED_ORIGIN_RE.test(origin); }
 function _acao(req) {

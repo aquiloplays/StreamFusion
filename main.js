@@ -2149,6 +2149,7 @@ ipcMain.handle('check-for-updates', async () => {
 });
 
 // ── Settings export / import ────────────────────────────────────────────────
+let _pendingExportPath = null;   // path the user just chose in the Save dialog
 ipcMain.handle('export-settings', async () => {
   if (!mainWindow || mainWindow.isDestroyed()) return null;
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -2156,7 +2157,9 @@ ipcMain.handle('export-settings', async () => {
     defaultPath: 'streamfusion-settings.json',
     filters: [{ name: 'JSON', extensions: ['json'] }]
   });
-  return result.canceled ? null : result.filePath;
+  if (result.canceled || !result.filePath) { _pendingExportPath = null; return null; }
+  _pendingExportPath = path.resolve(result.filePath);
+  return result.filePath;
 });
 ipcMain.handle('import-settings', async () => {
   if (!mainWindow || mainWindow.isDestroyed()) return null;
@@ -2169,19 +2172,20 @@ ipcMain.handle('import-settings', async () => {
   try { return fs.readFileSync(result.filePaths[0], 'utf8'); } catch (e) { return null; }
 });
 ipcMain.handle('write-export-file', async (event, filePath, data) => {
-  // Confine writes to the user's own export-friendly directories. Without
-  // this, a compromised renderer could write arbitrary content to any path
-  // the process can reach (e.g. a startup script).
+  // Only write to the exact path the user just picked in the native Save
+  // dialog (stashed by export-settings). This stops a compromised renderer
+  // from writing to an arbitrary path (e.g. a startup script) WITHOUT
+  // restricting where the user may legitimately save their export.
   try {
     const p = path.resolve(String(filePath || ''));
-    const bases = ['downloads', 'documents', 'desktop', 'userData']
-      .map(n => { try { return path.resolve(app.getPath(n)); } catch (e) { return null; } })
-      .filter(Boolean);
-    const ok = bases.some(base => p === base || p.startsWith(base + path.sep));
-    if (!ok) { console.warn('[export] refused write outside allowed dirs:', p); return false; }
+    if (!_pendingExportPath || p !== _pendingExportPath) {
+      console.warn('[export] refused write to a path the user did not choose:', p);
+      return false;
+    }
+    _pendingExportPath = null;   // one-shot: each write needs a fresh dialog
     fs.writeFileSync(p, String(data == null ? '' : data), 'utf8');
     return true;
-  } catch (e) { return false; }
+  } catch (e) { _pendingExportPath = null; return false; }
 });
 
 ipcMain.on('open-log-folder', () => {
