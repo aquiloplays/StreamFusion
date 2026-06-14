@@ -8188,6 +8188,12 @@ function handleSBEvent(event, data) {
     var _redeemMsg = _extractUserMessage(data);
     if (_streamSession.active && rcost > 0) _streamSession.chPoints += rcost;
     pushMsg({ plat: 'tw', isEv: true, evType: 'redeem', user: ren, text: ren + ' redeemed: ' + rtitle + (rcost ? ' (' + rcost.toLocaleString() + ' pts)' : ''), evMessage: _redeemMsg, avatar: _resolveEvAvatar('tw', data.user || data.redeemer, ren) });
+    // Forward to the OBS chat overlay's event feed. The text-regex detector in
+    // addEvHistory never matched "redeemed", so redemptions previously never
+    // reached the browser-source overlay over SSE. eventType 'channelPoints'
+    // carries the redeemer + reward title; the alerts banner ignores it (no
+    // EVENT_META entry) so this never floods the banner.
+    sendObsAlert({ eventType: 'channelPoints', platform: 'tw', user: ren, rewardName: (rtitle && rtitle !== '?') ? rtitle : '', message: _redeemMsg || '' });
   } else if (key === 'Twitch.UserBanned' || key === 'Twitch.Ban') {
     if (chk('ev-tw-mod')) return;
     var _bt = data.targetUser || data.target || {};
@@ -8348,6 +8354,7 @@ function handleSBEvent(event, data) {
     ) || 0;
     var _kredeemMsg = _extractUserMessage(data);
     pushMsg({ plat: 'kk', isEv: true, evType: 'redeem', user: kren, text: kren + ' redeemed: ' + krtitle + (krcost ? ' (' + krcost.toLocaleString() + ' pts)' : ''), evMessage: _kredeemMsg, avatar: _resolveEvAvatar('kk', data.user || data.redeemer, kren) });
+    sendObsAlert({ eventType: 'channelPoints', platform: 'kk', user: kren, rewardName: (krtitle && krtitle !== '?') ? krtitle : '', message: _kredeemMsg || '' });
   } else if (key === 'Kick.Kick' || key === 'Kick.Donation' || key === 'Kick.Tip') {
     var kkipUser = gu(data); var kkipAmt = Number(data.amount || data.value || 0);
     S.stats.kicks++; S.stats.kkSubRev += kkipAmt * 0.95; updateStreamStats();
@@ -8437,6 +8444,11 @@ function handleSBEvent(event, data) {
   } else if (key === 'Twitch.HypeTrainStart') {
     startHypeTrain(data);
     pushMsg({ plat: 'tw', isEv: true, evType: 'hype', big: true, user: 'Hype Train', text: 'Hype Train started! Level ' + (data.level||1) });
+    // Forward milestone to the OBS chat overlay (eventType 'hypeTrain'). Only
+    // start / level-up / end are forwarded, never the noisy progress ticks, so
+    // the feed sees the train without flooding. The alerts banner ignores this
+    // type (no EVENT_META entry).
+    sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: data.level || 1, phase: 'start' });
   } else if (key === 'Twitch.HypeTrainUpdate' || key === 'Twitch.HypeTrainProgress') {
     updateHypeTrainProgress(data);
     if ((data.total || 0) >= (data.goal || _htState.goal)) {
@@ -8446,6 +8458,11 @@ function handleSBEvent(event, data) {
       triggerHypeAnimation();
       triggerHypeLevelUpFanfare(_hlvl);
       sendOverlayHypeLevelUp(_hlvl);
+      // Level-up carries the most recent contributor's name when SB provides
+      // one, so the overlay can read "<name> boosted the Hype Train (Lvl N)".
+      var _hc = data.lastContribution || data.last_contribution || (data.topContributions && data.topContributions[0]) || null;
+      var _hcUser = (_hc && (_hc.userName || _hc.user_name || _hc.displayName || _hc.display_name || _hc.name || (_hc.user && (_hc.user.display_name || _hc.user.name)))) || '';
+      sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: _hcUser || 'Hype Train', level: _hlvl, phase: 'levelup' });
     }
   // ── Twitch Polls ──────────────────────────────────────────────────────────
   } else if (key === 'Twitch.PollCreated' || key === 'Twitch.Poll.Created') {
@@ -8537,6 +8554,7 @@ function handleSBEvent(event, data) {
     if (key !== 'Twitch.HypeTrainConductorUpdate') {
       endHypeTrain();
       pushMsg({ plat: 'tw', isEv: true, evType: 'hype', user: 'Hype Train', text: 'Hype Train ended! Level ' + _htState.level });
+      sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: _htState.level, phase: 'end' });
     } else { updateHypeTrainProgress(data); }
   } else if (src === 'Twitch' && /^Goal/i.test(type || '')) {
     // Silently consume Twitch channel Goal events (GoalBegin, GoalProgress,
