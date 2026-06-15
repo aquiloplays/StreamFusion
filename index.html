@@ -2799,6 +2799,18 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button onclick="if(window.electronAPI&&electronAPI.openLogFolder)electronAPI.openLogFolder()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;cursor:pointer">Open Log Folder</button>
             </div>
+            <div style="margin-top:12px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:11px;font-weight:700;color:var(--txt)">Event trail</span>
+                <span style="font-size:10px;color:var(--mut)">last 50 alert-class events, received vs shown vs forwarded to overlay</span>
+                <span style="margin-left:auto;display:flex;gap:6px">
+                  <button onclick="_renderEventTrail()" style="padding:4px 10px;border-radius:5px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:10px;cursor:pointer">Refresh</button>
+                  <button onclick="copyEventTrail()" style="padding:4px 10px;border-radius:5px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:10px;cursor:pointer">Copy</button>
+                </span>
+              </div>
+              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:6px">If a missing event is not listed here at all, Streamer.bot / Twitch never delivered it (look at the Streamer.bot Twitch connection). If it shows <code>received</code> but never <code>overlay</code>, a StreamFusion filter dropped it. If <code>overlay</code> fired but it never appeared on stream, the drop is downstream (overlay / SSE).</div>
+              <pre id="eventTrailDump" style="font-family:Consolas,monospace;font-size:10px;line-height:1.45;color:var(--txt);background:var(--surf3);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;max-height:240px;overflow:auto;white-space:pre;margin:0">(no events yet)</pre>
+            </div>
           </div>
           <div class="sec">
             <div class="sec-hd">Updates</div>
@@ -7974,6 +7986,61 @@ function _maybeSeedTwLogin(data) {
   // Kick off the decapi poll now that we have a login.
   if (typeof startTwViewerPoll === 'function') startTwViewerPoll();
 }
+// ── Forensic event trail ────────────────────────────────────────────────
+// Ring buffer of the last 50 inbound Streamer.bot events and what became of
+// each: 'received' (entered handleSBEvent), 'deduped' (dropped as a duplicate),
+// 'shown' (rendered in the in-app event feed), and 'overlay' (forwarded to the
+// OBS browser-source overlays). Purpose-built for incidents like a missed
+// cheer: if an event is NOT in this trail at all, Streamer.bot / Twitch never
+// delivered it to StreamFusion (look upstream at Streamer.bot's Twitch
+// connection / EventSub session); if it IS here as 'received' but never
+// 'overlay', the drop is a StreamFusion filter or handler; if 'overlay' fired
+// but it never appeared on stream, the drop is downstream (SSE fanout / the
+// overlay's own filters). Inspect via window.sfEventTrail() in DevTools or the
+// Diagnostics box in Settings -> About.
+var _sfTrail = [];
+var _SF_TRAIL_MAX = 50;
+function _trailBits(data) {
+  if (!data || typeof data !== 'object') return null;
+  var b = data.bits != null ? data.bits : (data.amount != null ? data.amount : null);
+  return (b == null || b === '') ? null : Number(b);
+}
+function trailLog(phase, info) {
+  try {
+    _sfTrail.push(Object.assign({ t: Date.now(), phase: phase }, info || {}));
+    while (_sfTrail.length > _SF_TRAIL_MAX) _sfTrail.shift();
+    if (typeof _renderEventTrail === 'function') _renderEventTrail();
+  } catch (e) {}
+}
+// Console helper: window.sfEventTrail() prints a table and returns the buffer.
+window.sfEventTrail = function() {
+  try {
+    console.table(_sfTrail.map(function(e) {
+      return { time: new Date(e.t).toLocaleTimeString(), phase: e.phase, key: e.key || e.type || '', user: e.user || '', bits: e.bits != null ? e.bits : '' };
+    }));
+  } catch (e) {}
+  return _sfTrail.slice();
+};
+function _eventTrailText() {
+  if (!_sfTrail.length) return '(no events yet)';
+  return _sfTrail.slice().reverse().map(function(e) {
+    var ts = new Date(e.t).toLocaleTimeString();
+    var label = (e.key || e.type || '').padEnd(22, ' ');
+    var phase = String(e.phase).padEnd(12, ' ');
+    var who = e.user ? (' ' + e.user) : '';
+    var bits = (e.bits != null) ? ('  ' + e.bits + ' bits') : '';
+    var why = e.reason ? ('  (' + e.reason + ')') : '';
+    return ts + '  ' + phase + label + who + bits + why;
+  }).join('\n');
+}
+function _renderEventTrail() {
+  var el = document.getElementById('eventTrailDump');
+  if (el) el.textContent = _eventTrailText();
+}
+function copyEventTrail() {
+  try { navigator.clipboard.writeText(_eventTrailText()); } catch (e) {}
+}
+
 function handleSBEvent(event, data) {
   var src = (event && event.source) || '', type = (event && event.type) || '';
   // Normalize source casing so 'youtube', 'Youtube', 'YouTube' all match
@@ -7982,6 +8049,15 @@ function handleSBEvent(event, data) {
   else if (srcL === 'twitch') src = 'Twitch';
   else if (srcL === 'kick') src = 'Kick';
   var key = src + '.' + type;
+  // Forensic trail: record every inbound event before any dedup / filter so a
+  // later "where did it go" investigation can prove receipt. Skip the
+  // high-frequency chat + viewer-count chatter so 50 slots stay useful for
+  // alert-class events (cheers, subs, raids, redeems, etc.).
+  if (key.indexOf('ChatMessage') === -1 && key.indexOf('Message') === -1
+      && key.indexOf('ViewerCount') === -1 && key.indexOf('PresentViewers') === -1
+      && key.indexOf('ViewCount') === -1 && key.indexOf('StreamUpdate') === -1) {
+    trailLog('received', { key: key, user: gu(data || {}), bits: _trailBits(data) });
+  }
   // Seed S.twLogin from any Twitch event so the decapi viewer poll can start
   // even when SB's GetBroadcaster response didn't provide broadcastUserName.
   if (src === 'Twitch') _maybeSeedTwLogin(data || {});
@@ -7990,7 +8066,7 @@ function handleSBEvent(event, data) {
     && key.indexOf('ViewerCount') === -1 && key.indexOf('PresentViewers') === -1
     && key.indexOf('StreamUpdate') === -1 && key.indexOf('ViewCount') === -1
     && key.indexOf('ChatMessage') === -1) {
-    if (_sbDedup(key, data || {})) return;
+    if (_sbDedup(key, data || {})) { trailLog('deduped', { key: key, user: gu(data || {}), bits: _trailBits(data) }); return; }
   }
   if (key === 'Twitch.ChatMessage') {
     var u = data.user || (data.message && data.message.user) || {};
@@ -8729,7 +8805,8 @@ function pushMsg(m) {
   }
   // Events go to the events panel only, not the chat feed
   if (m.isEv) {
-    if (S.paused) return;
+    if (S.paused) { trailLog('paused', { type: m.evType || 'event', user: m.user || '' }); return; }
+    trailLog('shown', { type: m.evType || 'event', user: m.user || '', bits: m.coinAmount != null ? m.coinAmount : null });
     S.evs++; updateStatBar(); removeEmpty();
     addEvHistory(m.user || 'System', m.text || '', m.plat, m.big, m.giftHtml || null, m.evMessage || '', m.avatar || '');
     ttsEventSpeak(m.plat, m.evType || '', m.user || '', m.text || '', m.coinAmount);
@@ -9645,6 +9722,7 @@ function switchSettingsTab(tab) {
   if (tab === 'theme') renderThemeTab();
   if (tab === 'discordea') renderDiscordTab();
   if (tab === 'integrations') renderDiscordStatus();
+  if (tab === 'about' && typeof _renderEventTrail === 'function') _renderEventTrail();
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
@@ -13032,13 +13110,14 @@ function sendObsAlert(obj) {
   // saves a no-op round-trip for disabled event types.
   var ev = obj.eventType;
   if (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.enabled) {
-    if (S.obsCfg.alerts.enabled[ev] === false) return;
+    if (S.obsCfg.alerts.enabled[ev] === false) { trailLog('overlay-skip', { type: ev, user: obj.user || '', reason: 'alert type disabled' }); return; }
   }
   // Alerts with a viewer message (sub/resub/cheer/tip/etc.) get emotes
   // extracted from the rendered HTML too, so the alerts banner can
   // render emote images in the "quoted" secondary line.
   var payload = Object.assign({ duration: (S.obsCfg && S.obsCfg.alerts && S.obsCfg.alerts.duration) || 6000 }, obj);
   if (!payload.emotes && payload.messageHtml) payload.emotes = _extractObsEmotes(payload.messageHtml);
+  trailLog('overlay', { type: ev, user: obj.user || '', bits: obj.amount != null ? obj.amount : null });
   window.electronAPI.obsBroadcastAlert(payload);
 }
 // ── Discord+ (EA-only): live events, records, bot ─────────────────────────
