@@ -8626,12 +8626,16 @@ function handleSBEvent(event, data) {
     S.stats.bits += extBits;
     trackContributor('tw', extUser, extBits * 0.01);
     updateStreamStats();
-  } else if (key === 'Twitch.HypeTrainEnd' || key === 'Twitch.HypeTrainExpire' || key === 'Twitch.HypeTrainConductorUpdate') {
-    if (key !== 'Twitch.HypeTrainConductorUpdate') {
-      endHypeTrain();
-      pushMsg({ plat: 'tw', isEv: true, evType: 'hype', user: 'Hype Train', text: 'Hype Train ended! Level ' + _htState.level });
-      sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: _htState.level, phase: 'end' });
-    } else { updateHypeTrainProgress(data); }
+  } else if (src === 'Twitch' && /^HypeTrain(End|Ended|Expir|Complete)/i.test(type || '')) {
+    // Broadened from the exact 'HypeTrainEnd' / 'HypeTrainExpire' match:
+    // Streamer.bot has shipped the end event under several names across
+    // versions, and a name we did not match was leaving the bar stuck.
+    // endHypeTrain clears the timers + safety backstop and hides the bar.
+    endHypeTrain();
+    pushMsg({ plat: 'tw', isEv: true, evType: 'hype', user: 'Hype Train', text: 'Hype Train ended! Level ' + _htState.level });
+    sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: _htState.level, phase: 'end' });
+  } else if (key === 'Twitch.HypeTrainConductorUpdate') {
+    updateHypeTrainProgress(data);
   } else if (src === 'Twitch' && /^Goal/i.test(type || '')) {
     // Silently consume Twitch channel Goal events (GoalBegin, GoalProgress,
     // GoalEnd, GoalUpdate). These fire on every follow/sub tick and aren't
@@ -11307,6 +11311,23 @@ function _playCoinDing(idx) {
 // ═══ HYPE TRAIN ════════════════════════════════════════════════════════════
 var _htState = { active: false, expiring: false, level: 1, total: 0, goal: 0, expires: 0, top: [] };
 var _htTimer = null;
+// Hard safety timeout. The hype bar is supposed to clear on the Streamer.bot
+// end event (or when its countdown hits zero), but tonight an end event was
+// missed and the bar lingered indefinitely. This wall-clock backstop force-
+// clears the bar 5 minutes after the most recent hype activity (start / level /
+// progress), so a dropped end event can never leave it stuck. Each new
+// activity re-arms it; endHypeTrain clears it.
+var _htSafetyTimer = null;
+var _HT_SAFETY_MS = 5 * 60 * 1000;
+function _armHypeSafety() {
+  if (_htSafetyTimer) clearTimeout(_htSafetyTimer);
+  _htSafetyTimer = setTimeout(function() {
+    if (_htState.active) {
+      try { console.warn('[SF hype] safety timeout fired - clearing a stuck hype bar (no end event in 5 min)'); } catch (e) {}
+      endHypeTrain();
+    }
+  }, _HT_SAFETY_MS);
+}
 function updateHypeTrain() {
   var el = document.getElementById('sfHypeTrain');
   if (!el) return;
@@ -11375,6 +11396,7 @@ function startHypeTrain(data) {
     if (!_htState.active) { clearInterval(_htTimer); return; }
     updateHypeTrain();
   }, 1000);
+  _armHypeSafety();
   showBanner('i-train', 'HYPE TRAIN!', 'Level ' + _htState.level + ' \u2022 ' + _htState.goal + ' goal', null, 'org');
 }
 function updateHypeTrainProgress(data) {
@@ -11394,6 +11416,9 @@ function updateHypeTrainProgress(data) {
   // so the bar can't render over 100% while we wait for the next
   // HypeTrainLevelUp to bump level + reset total.
   if (_htState.total > _htState.goal) _htState.total = _htState.goal;
+  // Re-arm the safety backstop on genuine activity so an active train extends
+  // its window, but a train that goes silent still clears within 5 minutes.
+  if (_htState.active) _armHypeSafety();
   updateHypeTrain();
   // Discord+ hype-train posts: ONLY real level-up transitions
   // (prevLevel >= 1 AND new level is strictly higher). Without the
@@ -11407,6 +11432,7 @@ function endHypeTrain() {
   _htState.active = false;
   _htState.expiring = false;
   if (_htTimer) { clearInterval(_htTimer); _htTimer = null; }
+  if (_htSafetyTimer) { clearTimeout(_htSafetyTimer); _htSafetyTimer = null; }
   var el = document.getElementById('sfHypeTrain');
   if (el) el.classList.remove('expiring');
   updateHypeTrain();
