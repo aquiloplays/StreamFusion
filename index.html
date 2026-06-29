@@ -1871,6 +1871,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="ttsPauseBtn" onclick="toggleTTSPause()" style="display:none"><svg class="ic"><use href="#i-pause"/></svg>Pause TTS</button>
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
+  <button class="tbtn" id="clipBtn" onclick="createClipNow()" title="Create a Twitch clip (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
   <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info \u2014 edit your title, category &amp; tags (Early Access)"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
@@ -1970,6 +1971,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="tts" onclick="switchSettingsTab('tts')">TTS</div>
         <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
         <div class="settings-tab" data-tab="goals" onclick="switchSettingsTab('goals')">Goals</div>
+        <div class="settings-tab" data-tab="checkins" onclick="switchSettingsTab('checkins')">Check-ins</div>
         <div class="settings-tab" data-tab="appearance" onclick="switchSettingsTab('appearance')">Appearance</div>
         <div class="settings-tab" data-tab="popout" onclick="switchSettingsTab('popout')">Pop Out</div>
         <div class="settings-tab" data-tab="hotkeys" onclick="switchSettingsTab('hotkeys')">Hotkeys</div>
@@ -2289,6 +2291,20 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
         </div>
 
+        <!-- ═══ CHECK-INS TAB ═══ -->
+        <div class="settings-pane" id="pane-checkins">
+          <div class="sec">
+            <div class="sec-hd">PunchCard daily check-ins</div>
+            <div class="frow" style="gap:8px">
+              <label style="font-size:11px;color:var(--mut);min-width:60px">Channel</label>
+              <input id="ci-channel" placeholder="your twitch login" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 10px;font-size:12px;outline:none" onchange="renderCheckinsTab()">
+              <button onclick="renderCheckinsTab()" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">Refresh</button>
+            </div>
+            <div style="font-size:11px;color:var(--mut);margin:6px 0 10px">Live daily check-ins from PunchCard (aquilo.gg/punchcard). Auto-refreshes every 15s while this tab is open.</div>
+            <div id="ci-feed" style="border:1px solid var(--bdr);border-radius:8px;background:var(--surf);max-height:440px;overflow-y:auto"></div>
+          </div>
+        </div>
+
         <!-- ═══ APPEARANCE TAB ═══ -->
         <div class="settings-pane" id="pane-appearance">
           <div class="sec">
@@ -2329,6 +2345,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Badges</span><input type="checkbox" id="popShowBadges" checked onchange="onPopCfgChange()"></label>
             <label class="frow"><span>Quick actions hotbar</span><input type="checkbox" id="popShowHotbar" checked onchange="onPopCfgChange()"></label>
             <label class="frow"><span>Hide animations <span style="color:var(--mut);font-weight:400">(confetti, banners, shake)</span></span><input type="checkbox" id="popHideAnimations" onchange="onPopCfgChange()"></label>
+            <label class="frow"><span>Performance mode <span style="color:var(--mut);font-weight:400">(freeze emotes + effects, best while gaming)</span></span><input type="checkbox" id="popPerfMode" onchange="onPopCfgChange()"></label>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PLATFORMS</div>
             <label class="frow"><span style="color:var(--tw)">Twitch</span><input type="checkbox" id="popPlatTw" checked onchange="onPopCfgChange()"></label>
@@ -2527,6 +2544,31 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               Not in aquilo.gg&rsquo;s Discord yet?
               <a href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" style="color:#5865F2;text-decoration:none;font-weight:700">Join here</a>,
               then link Patreon in Discord settings.
+            </div>
+
+            <!-- ═══ Twitch Connect (Clips + direct Helix) ═══ -->
+            <!-- NOT an EA path. Chat, events, mod actions and stream info all
+                 come through Streamer.bot; this connects the broadcaster's own
+                 Twitch app for the few things SB doesn't do , today the Clip
+                 button. Mirrors the Discord connect card above. -->
+            <div style="height:1px;background:var(--bdr);margin:18px 0 14px"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#9146FF;flex-shrink:0"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
+              <div style="font-size:14px;font-weight:700;color:var(--txt)">Connect Twitch (for Clips)</div>
+            </div>
+            <div style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:10px">
+              Connects your own Twitch app so StreamFusion can <strong style="color:var(--txt)">create clips</strong> on your channel from the toolbar. Chat, mod actions and stream info already run through Streamer.bot &mdash; this is only for clipping (and future direct-Twitch features). You must be live to clip.
+            </div>
+            <div id="twitchStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+              <div id="twitchStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
+              <div id="twitchStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Sign in with Twitch to enable clipping from StreamFusion.</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button id="twitchConnectBtn" onclick="connectTwitch()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#9146FF;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                <span id="twitchConnectBtnText">Connect Twitch</span>
+              </button>
+              <button id="twitchClipTestBtn" onclick="createClipNow()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Test clip</button>
+              <button id="twitchSignOutBtn" onclick="disconnectTwitch()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
             </div>
           </div>
         </div>
@@ -3218,6 +3260,73 @@ function renderEaSettings() {
   window.electronAPI.onDiscordEntitlementChanged(function(state) { applyDiscordState(state); });
   if (window.electronAPI.discordGetEntitlement) {
     window.electronAPI.discordGetEntitlement().then(applyDiscordState).catch(function() {});
+  }
+})();
+
+// ── Twitch account (Clip + future direct-Helix; chat/mod/stream-info via SB) ──
+// Mirrors the Discord connect flow. NOT an entitlement path — purely a direct
+// line to the broadcaster's Twitch app for the Clip button (and future Helix).
+function _twToast(m) {
+  try { if (typeof toast === 'function') return toast(m); } catch (e) {}
+  try { if (typeof sysMsg === 'function') return sysMsg('tw', m); } catch (e) {}
+  try { console.log('[twitch]', m); } catch (e) {}
+}
+var _twitchSigningInBusy = false;
+function applyTwitchStatus(st) {
+  S.twitch = st || { signedIn: false };
+  renderTwitchSettings();
+  var clipBtn = document.getElementById('clipBtn');
+  if (clipBtn) clipBtn.style.display = (S.twitch && S.twitch.signedIn) ? '' : 'none';
+}
+async function connectTwitch() {
+  if (!window.electronAPI || !window.electronAPI.twitchBeginAuth || _twitchSigningInBusy) return;
+  _twitchSigningInBusy = true;
+  var bt = document.getElementById('twitchConnectBtnText');
+  if (bt) bt.textContent = 'Opening Twitch…';
+  try { applyTwitchStatus(await window.electronAPI.twitchBeginAuth()); }
+  catch (e) { console.error('twitch connect failed:', e); }
+  finally { _twitchSigningInBusy = false; renderTwitchSettings(); }
+}
+async function disconnectTwitch() {
+  if (!window.electronAPI || !window.electronAPI.twitchSignOut) return;
+  applyTwitchStatus(await window.electronAPI.twitchSignOut());
+}
+async function createClipNow() {
+  if (!S.twitch || !S.twitch.signedIn) { _twToast('Connect Twitch in Settings to clip'); return; }
+  if (!window.electronAPI || !window.electronAPI.twitchCreateClip) return;
+  _twToast('Creating clip…');
+  try {
+    var r = await window.electronAPI.twitchCreateClip();
+    if (r && r.ok) { _twToast('Clip created'); if (r.editUrl) window.open(r.editUrl, '_blank'); }
+    else { _twToast('Clip failed: ' + ((r && r.error === 'not_connected') ? 'connect Twitch' : ((r && r.error) || 'are you live?'))); }
+  } catch (e) { _twToast('Clip failed'); }
+}
+function renderTwitchSettings() {
+  var statusText = document.getElementById('twitchStatusText');
+  var statusSub  = document.getElementById('twitchStatusSub');
+  var btnText    = document.getElementById('twitchConnectBtnText');
+  var signOut    = document.getElementById('twitchSignOutBtn');
+  var clipTest   = document.getElementById('twitchClipTestBtn');
+  if (!statusText || !statusSub) return;
+  var st = S.twitch || {};
+  if (st.signedIn) {
+    statusText.textContent = 'Connected as @' + (st.displayName || st.login || 'you');
+    statusText.style.color = 'var(--ok, #22c55e)';
+    statusSub.textContent = 'Clipping enabled. Use the Clip button in the toolbar while live.';
+  } else {
+    statusText.textContent = 'Not connected';
+    statusText.style.color = 'var(--txt)';
+    statusSub.textContent = 'Sign in with Twitch to enable clipping from StreamFusion.';
+  }
+  if (btnText) btnText.textContent = st.signedIn ? 'Reconnect' : 'Connect Twitch';
+  if (signOut) signOut.style.display = st.signedIn ? '' : 'none';
+  if (clipTest) clipTest.style.display = st.signedIn ? '' : 'none';
+}
+(function initTwitch() {
+  if (!window.electronAPI || !window.electronAPI.onTwitchStatusChanged) return;
+  window.electronAPI.onTwitchStatusChanged(function(st) { applyTwitchStatus(st); });
+  if (window.electronAPI.twitchGetStatus) {
+    window.electronAPI.twitchGetStatus().then(applyTwitchStatus).catch(function() {});
   }
 })();
 
@@ -9201,7 +9310,53 @@ function switchSettingsTab(tab) {
   if (tab === 'theme') renderThemeTab();
   if (tab === 'discordea') renderDiscordTab();
   if (tab === 'integrations') renderDiscordStatus();
+  if (tab === 'checkins') renderCheckinsTab();
   if (tab === 'about' && typeof _renderEventTrail === 'function') _renderEventTrail();
+}
+
+// ── PunchCard check-ins tab ─────────────────────────────────────────────────
+// Polls the PunchCard worker's public recent-check-ins feed for the connected
+// channel and renders it. No auth needed (check-ins are shown on stream).
+var _ciTimer = null;
+function _ciEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function _ciAgo(ts) { var d = (Date.now() - ts) / 1000; if (d < 60) return 'just now'; if (d < 3600) return Math.floor(d / 60) + 'm ago'; if (d < 86400) return Math.floor(d / 3600) + 'h ago'; return Math.floor(d / 86400) + 'd ago'; }
+function _ciPoll() {
+  var feed = document.getElementById('ci-feed');
+  var inp = document.getElementById('ci-channel');
+  var ch = ((inp && inp.value) || '').trim().toLowerCase();
+  if (!feed) return;
+  if (!ch) { feed.innerHTML = '<div style="opacity:.6;padding:14px;font-size:12px">Enter your Twitch channel above to see check-ins.</div>'; return; }
+  fetch('https://loadout-discord.aquiloplays.workers.dev/api/punchcard/recent?ch=' + encodeURIComponent(ch))
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (!feed) return;
+      if (!j || !j.ok) { feed.innerHTML = '<div style="opacity:.6;padding:14px;font-size:12px">' + (j && j.error === 'unknown-channel' ? 'No PunchCard set up for that channel yet — claim it at aquilo.gg/punchcard.' : 'Could not load check-ins.') + '</div>'; return; }
+      var rec = j.recent || [];
+      if (!rec.length) { feed.innerHTML = '<div style="opacity:.6;padding:14px;font-size:12px">No check-ins yet.</div>'; return; }
+      feed.innerHTML = rec.map(function(c) {
+        var streak = (Number(c.s) > 1) ? ('🔥 ' + c.s + ' day streak') : 'day 1';
+        var msg = c.msg ? ('<span style="flex:1;font-size:12px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _ciEsc(c.msg) + '</span>') : '<span style="flex:1"></span>';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr)">'
+          + '<span style="font-weight:700;font-size:13px">🥊 ' + _ciEsc(c.display || c.v) + '</span>'
+          + '<span style="font-size:11px;color:var(--mut);white-space:nowrap">' + streak + '</span>'
+          + msg
+          + (c.dup ? '<span style="font-size:10px;color:var(--mut);opacity:.6">again</span>' : '')
+          + '<span style="font-size:11px;color:var(--mut);white-space:nowrap">' + _ciAgo(c.ts) + '</span>'
+          + '</div>';
+      }).join('');
+    })
+    .catch(function() { if (feed) feed.innerHTML = '<div style="opacity:.6;padding:14px;font-size:12px">Could not reach PunchCard.</div>'; });
+}
+function renderCheckinsTab() {
+  var inp = document.getElementById('ci-channel');
+  if (inp && !inp.value && S.twitch && S.twitch.login) inp.value = S.twitch.login;
+  _ciPoll();
+  clearInterval(_ciTimer);
+  _ciTimer = setInterval(function() {
+    var pane = document.getElementById('pane-checkins');
+    if (!pane || !pane.classList.contains('active')) { clearInterval(_ciTimer); return; }
+    _ciPoll();
+  }, 15000);
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
@@ -12188,6 +12343,7 @@ setTimeout(_renderPopPresetBtns, 200);
 var _popCfg = {
   showChat: true, showViewers: true, showRevenue: true, showHype: true, showEvents: true,
   showAvatars: true, showBadges: true, showHotbar: true, hideAnimations: false,
+  perfMode: false,
   platTw: true, platYt: true, platTt: true, platKk: true,
   bgOpacity: 0.80, winOpacity: 1.00, textSize: 13, maxMsgs: 40
 };
@@ -12209,6 +12365,7 @@ function applyPopCfgToUI() {
   _setChecked('popShowBadges', _popCfg.showBadges);
   _setChecked('popShowHotbar', _popCfg.showHotbar);
   _setChecked('popHideAnimations', _popCfg.hideAnimations);
+  _setChecked('popPerfMode', _popCfg.perfMode);
   _setChecked('popPlatTw', _popCfg.platTw);
   _setChecked('popPlatYt', _popCfg.platYt);
   _setChecked('popPlatTt', _popCfg.platTt);
@@ -12229,6 +12386,7 @@ function _readPopCfgFromUI() {
   if (byId('popShowBadges')) _popCfg.showBadges = byId('popShowBadges').checked;
   if (byId('popShowHotbar')) _popCfg.showHotbar = byId('popShowHotbar').checked;
   if (byId('popHideAnimations')) _popCfg.hideAnimations = byId('popHideAnimations').checked;
+  if (byId('popPerfMode')) _popCfg.perfMode = byId('popPerfMode').checked;
   if (byId('popPlatTw')) _popCfg.platTw = byId('popPlatTw').checked;
   if (byId('popPlatYt')) _popCfg.platYt = byId('popPlatYt').checked;
   if (byId('popPlatTt')) _popCfg.platTt = byId('popPlatTt').checked;
