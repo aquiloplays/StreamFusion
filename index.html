@@ -2570,6 +2570,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <button id="twitchClipTestBtn" onclick="createClipNow()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Test clip</button>
               <button id="twitchSignOutBtn" onclick="disconnectTwitch()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
             </div>
+            <label class="frow" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bdr)"><span>Pull Twitch events directly (EventSub)</span><input type="checkbox" id="eventsubToggle" onchange="onEventsubToggle()"></label>
+            <div style="font-size:10px;color:var(--mut);margin-top:2px;line-height:1.5">Subs, bits, follows, raids &amp; channel-point redeems straight from Twitch via your OAuth — so SF doesn't lean on Streamer.bot for events. Deduped if SB is also connected. Needs a Twitch reconnect to grant the event scopes. <span id="eventsubStatus" style="color:var(--accent)"></span></div>
           </div>
         </div>
 
@@ -3277,6 +3279,7 @@ function applyTwitchStatus(st) {
   renderTwitchSettings();
   var clipBtn = document.getElementById('clipBtn');
   if (clipBtn) clipBtn.style.display = (S.twitch && S.twitch.signedIn) ? '' : 'none';
+  if (typeof _esSyncFromStatus === 'function') _esSyncFromStatus();
 }
 async function connectTwitch() {
   if (!window.electronAPI || !window.electronAPI.twitchBeginAuth || _twitchSigningInBusy) return;
@@ -3329,6 +3332,134 @@ function renderTwitchSettings() {
     window.electronAPI.twitchGetStatus().then(applyTwitchStatus).catch(function() {});
   }
 })();
+
+// ── Twitch EventSub (native events straight from Twitch via the OAuth token) ──
+// Runs the EventSub WebSocket in the renderer; subscriptions are POSTed through
+// the existing twitch-helix IPC (user token stays in main). Notifications are
+// normalized into the SB {key,data} shape and routed through handleSBEvent, so
+// they reuse every sound/banner/stat/Discord side-effect. Deduped against
+// Streamer.bot inside handleSBEvent (only while EventSub is on).
+var _es = { ws: null, on: false, session: null, backoff: 1000, seen: {} };
+var ES_SUBS = [
+  { type: 'channel.follow', version: '2', mod: true },
+  { type: 'channel.subscribe', version: '1' },
+  { type: 'channel.subscription.message', version: '1' },
+  { type: 'channel.subscription.gift', version: '1' },
+  { type: 'channel.cheer', version: '1' },
+  { type: 'channel.raid', version: '1', raidTo: true },
+  { type: 'channel.channel_points_custom_reward_redemption.add', version: '1' }
+];
+function _esTier(t) { return ({ '1000': 1, '2000': 2, '3000': 3 })[String(t)] || (Number(t) || 1); }
+function _esStatus(msg, isErr) { var el = document.getElementById('eventsubStatus'); if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--err, #ef4444)' : 'var(--accent)'; } }
+// Canonical event type so SB key aliases (Twitch.Subscribe) and our EventSub
+// keys (Twitch.Sub) collapse to one signature for dedupe.
+function _esCanon(e) {
+  e = String(e || '');
+  if (/Follow/.test(e)) return 'follow';
+  if (/ReSub|Resub/.test(e)) return 'resub';
+  if (/Gift|MassSub|CommunitySub|MassGift/.test(e)) return 'gift';
+  if (/Sub/.test(e)) return 'sub';
+  if (/Cheer|Bits/.test(e)) return 'cheer';
+  if (/Raid/.test(e)) return 'raid';
+  if (/Redemption|RewardRedeemed/.test(e)) return 'redeem';
+  return null;
+}
+function _esDedup(event, data) {
+  if (!_es.on) return false;
+  if (String(event).indexOf('Twitch.') !== 0) return false;  // EventSub is Twitch-only — never touch YouTube/Kick/TikTok events
+  var canon = _esCanon(event);
+  if (!canon) return false;   // never dedupe chat / announce / mod / stream-update
+  data = data || {};
+  var u = (typeof gu === 'function' ? gu(data) : (data.user || data.gifter || '')) || '';
+  // Only fold in a value field that's identical across SB + EventSub for the
+  // same event. For follow/sub/resub/gift, user+type within the window is
+  // enough (a user can't repeat them) — and dropping gift count means a
+  // gift-bomb collapses to one alert instead of multiplying.
+  var val = '';
+  if (canon === 'cheer') val = data.bits || '';
+  else if (canon === 'raid') val = data.viewers || data.viewer_count || data.raidViewerCount || '';
+  else if (canon === 'redeem') val = String(data.rewardTitle || data.reward_title || (data.reward && data.reward.title) || '').slice(0, 30);
+  var sig = canon + '|' + String(u).toLowerCase() + '|' + String(val);
+  var now = Date.now();
+  for (var k in _es.seen) { if (now - _es.seen[k] > 15000) delete _es.seen[k]; }
+  if (_es.seen[sig] && now - _es.seen[sig] < 15000) { _es.seen[sig] = now; return true; }
+  _es.seen[sig] = now;
+  return false;
+}
+// Map an EventSub notification to the {source,type} + data shape Streamer.bot
+// uses, so handleSBEvent's existing handlers + dispatch keys match. Types
+// mirror SB's (Follow/Sub/ReSub/GiftSub/CommunitySubGift/Cheer/Raid/
+// RewardRedemption) so keys collide and dedupe lines up.
+function _esRoute(subType, ev) {
+  ev = ev || {};
+  var r = null;  // [sbType, data]
+  if (subType === 'channel.follow')
+    r = ['Follow', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, follower: { name: ev.user_name, login: ev.user_login, displayName: ev.user_name } }];
+  else if (subType === 'channel.subscribe') {
+    if (ev.is_gift) return;   // gift recipients arrive via channel.subscription.gift
+    r = ['Sub', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, subTier: ev.tier, tier: _esTier(ev.tier) }];
+  } else if (subType === 'channel.subscription.message')
+    r = ['ReSub', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, subTier: ev.tier, tier: _esTier(ev.tier), text: ev.message && ev.message.text, message: ev.message && ev.message.text, months: ev.cumulative_months, cumulativeMonths: ev.cumulative_months }];
+  else if (subType === 'channel.subscription.gift') {
+    var n = ev.total || 1, g = ev.is_anonymous ? 'Anonymous' : ev.user_name;
+    r = [n > 1 ? 'CommunitySubGift' : 'GiftSub', { user: g, user_name: g, displayName: g, gifter: g, gifterName: g, giftCount: n, gifts: n, subTier: ev.tier, tier: _esTier(ev.tier) }];
+  } else if (subType === 'channel.cheer') {
+    var cu = ev.is_anonymous ? 'Anonymous' : ev.user_name;
+    r = ['Cheer', { user: cu, user_name: cu, displayName: cu, bits: ev.bits, text: ev.message, message: ev.message }];
+  } else if (subType === 'channel.raid')
+    r = ['Raid', { user: ev.from_broadcaster_user_name, user_name: ev.from_broadcaster_user_name, displayName: ev.from_broadcaster_user_name, viewers: ev.viewers, viewer_count: ev.viewers, raidViewerCount: ev.viewers }];
+  else if (subType === 'channel.channel_points_custom_reward_redemption.add')
+    r = ['RewardRedemption', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, redeemer: ev.user_name, rewardTitle: ev.reward && ev.reward.title, reward_title: ev.reward && ev.reward.title, rewardCost: ev.reward && ev.reward.cost, reward: ev.reward, text: ev.user_input, message: ev.user_input }];
+  if (!r) return;
+  try { handleSBEvent({ source: 'Twitch', type: r[0] }, r[1]); } catch (e) { console.warn('[eventsub] route', e); }
+}
+async function _esSubscribe() {
+  var uid = S.twitch && S.twitch.userId;
+  if (!uid || !_es.session || !window.electronAPI || !window.electronAPI.twitchHelix) return;
+  var ok = 0, denied = false;
+  for (var i = 0; i < ES_SUBS.length; i++) {
+    var s = ES_SUBS[i];
+    var cond = s.raidTo ? { to_broadcaster_user_id: uid } : { broadcaster_user_id: uid };
+    if (s.mod) cond.moderator_user_id = uid;
+    try {
+      var res = await window.electronAPI.twitchHelix({ method: 'POST', path: 'eventsub/subscriptions', body: { type: s.type, version: s.version, condition: cond, transport: { method: 'websocket', session_id: _es.session } } });
+      if (res && (res.status === 202 || res.status === 200 || res.status === 409)) ok++;
+      else if (res && res.status === 403) denied = true;
+    } catch (e) { /* keep going */ }
+  }
+  if (denied) _esStatus('⚠ reconnect Twitch to grant the event scopes', true);
+  else if (ok) _esStatus('on · ' + ok + ' event types live');
+  else _esStatus('couldn’t subscribe — try reconnecting Twitch', true);
+}
+function _esConnect() {
+  if (!_es.on) return;
+  try { _es.ws = new WebSocket('wss://eventsub.wss.twitch.tv/ws'); } catch (e) { return; }
+  _es.ws.onmessage = function (m) {
+    var d; try { d = JSON.parse(m.data); } catch (e) { return; }
+    var t = d.metadata && d.metadata.message_type;
+    if (t === 'session_welcome') { _es.session = d.payload.session.id; _es.backoff = 1000; _esSubscribe(); }
+    else if (t === 'notification') { _esRoute(d.payload.subscription.type, d.payload.event); }
+    else if (t === 'session_reconnect') { try { _es.ws.close(); } catch (e) {} }  // onclose reconnects + re-subscribes
+  };
+  _es.ws.onclose = function () { if (_es.on) { _es.backoff = Math.min(_es.backoff * 2, 30000); setTimeout(_esConnect, _es.backoff); } };
+  _es.ws.onerror = function () {};
+}
+function eventSubStart() { if (_es.on && _es.ws) return; _es.on = true; _esStatus('connecting…'); _esConnect(); }
+function eventSubStop() { _es.on = false; if (_es.ws) { try { _es.ws.close(); } catch (e) {} _es.ws = null; } _esStatus(''); }
+function onEventsubToggle() {
+  var cb = document.getElementById('eventsubToggle');
+  var want = !!(cb && cb.checked);
+  if (want && (!S.twitch || !S.twitch.signedIn)) { _esStatus('connect Twitch first', true); if (cb) cb.checked = false; want = false; }
+  try { localStorage.setItem('sf-eventsub-on', want ? '1' : '0'); } catch (e) {}
+  if (want) eventSubStart(); else eventSubStop();
+}
+function _esSyncFromStatus() {
+  var pref = false; try { pref = localStorage.getItem('sf-eventsub-on') === '1'; } catch (e) {}
+  var cb = document.getElementById('eventsubToggle');
+  if (cb) cb.checked = pref;
+  if (pref && S.twitch && S.twitch.signedIn) eventSubStart();
+  else { eventSubStop(); if (pref && cb) _esStatus('connect Twitch to start', true); }
+}
 
 // ── Feature flags (early-access manifest) ─────────────────────────────────────
 // Mirrors features.json — the canonical manifest the dedicated SF Patreon-gated
@@ -7644,6 +7775,11 @@ function handleSBEvent(event, data) {
   else if (srcL === 'twitch') src = 'Twitch';
   else if (srcL === 'kick') src = 'Kick';
   var key = src + '.' + type;
+  // Cross-source dedupe: when the EventSub feed is on, the same event can also
+  // arrive via Streamer.bot (different IDs, so _sbDedup below misses it). This
+  // gate folds SB + EventSub deliveries of the same alert into one. Inert when
+  // EventSub is off, so SB-only setups are untouched.
+  if (typeof _esDedup === 'function' && _esDedup(key, data || {})) { trailLog('deduped-es', { key: key, user: gu(data || {}) }); return; }
   // Forensic trail: record every inbound event before any dedup / filter so a
   // later "where did it go" investigation can prove receipt. Skip the
   // high-frequency chat + viewer-count chatter so 50 slots stay useful for

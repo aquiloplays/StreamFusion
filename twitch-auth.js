@@ -49,10 +49,17 @@ const HELIX = 'https://api.twitch.tv/helix';
 //   http://localhost:17831/callback
 const LOOPBACK_PORTS = [17829, 17830, 17831];
 
-// clips:edit lets the broadcaster create clips on their own channel. Mod
-// actions + stream info stay on Streamer.bot, so we don't request those
-// scopes here.
-const SCOPES = ['clips:edit'];
+// clips:edit lets the broadcaster create clips on their own channel. The
+// read scopes power the optional EventSub event source (subs/bits/follows/
+// redeems direct from Twitch); raids need no scope. Adding scopes here means
+// the user re-authorizes (Connect Twitch again) to grant them.
+const SCOPES = [
+  'clips:edit',
+  'channel:read:subscriptions',   // subs, resubs, gifts
+  'bits:read',                    // cheers
+  'moderator:read:followers',     // follows
+  'channel:read:redemptions',     // channel-point redeems
+];
 
 const STATE_SCHEMA_V = 1;
 
