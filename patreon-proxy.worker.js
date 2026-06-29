@@ -102,6 +102,13 @@ export default {
     if (path === '/discord-token') {
       return handleDiscordTokenProxy(request, env);
     }
+    // Twitch — OAuth broker for the docks + loopback token exchange for the app.
+    if (path === '/twitch/login')    return handleTwitchLogin(request, env);
+    if (path === '/twitch/callback') return handleTwitchCallback(request, env);
+    if (path === '/twitch/me')       return handleTwitchMe(request, env);
+    if (path === '/twitch/api')      return handleTwitchApi(request, env);
+    if (path === '/twitch/logout')   return handleTwitchLogout(request, env);
+    if (path === '/twitch-token')    return handleTwitchTokenProxy(request, env);
     // Default: Patreon token proxy (unchanged behavior from before).
     return handlePatreonTokenProxy(request, env);
   }
@@ -625,4 +632,278 @@ async function _verifyPatreonSupporter(accessToken, env) {
     email:    email,
     reason:   entitled ? 'patreon_patron' : 'patreon_not_supporting'
   };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Twitch — OAuth broker + Helix proxy
+// ════════════════════════════════════════════════════════════════════════════
+//
+// One Twitch app (the broadcaster's own, registered at dev.twitch.tv/console),
+// two kinds of consumer:
+//
+//   • StreamFusion desktop (Electron) does the OAuth dance itself with an
+//     http://localhost loopback redirect (same shape as Patreon/Discord) and
+//     POSTs the code to /twitch-token for the secret-side exchange. The app
+//     holds the tokens (safeStorage) and calls Helix directly, refreshing via
+//     /twitch-token grant_type=refresh_token.
+//
+//   • Browser docks (Raid Finder, StreamFusion OBS) can't run a loopback
+//     server, so the Worker brokers everything and the access token NEVER
+//     reaches the browser:
+//        GET  /twitch/login?state=<sessionId>&return=<dockUrl>
+//             → 302 to Twitch authorize (redirect_uri = /twitch/callback)
+//        GET  /twitch/callback?code=&state=
+//             → exchanges the code, stores tokens in KV under the session id,
+//               302s back to the dock with #twitch=ok
+//        GET  /twitch/me?session=<id>      → { authed, login, user_id, scope }
+//        POST /twitch/api  { session, method, path, query, body }
+//             → session-keyed Helix proxy (the session id is the bearer; the
+//               real token + refresh stay in KV and are refreshed server-side)
+//        GET  /twitch/logout?session=<id>  → forget the session
+//
+// Owner setup (once):
+//   1. dev.twitch.tv/console → Register Your Application
+//        Name: StreamFusion / Aquilo   Category: Broadcasting Suite
+//        Client Type: Confidential
+//        OAuth Redirect URLs:
+//          https://auth.aquilo.gg/twitch/callback     (docks)
+//          http://localhost:17829/callback            (desktop app)
+//   2. wrangler.toml [vars] → TWITCH_CLIENT_ID = "<your client id>"
+//   3. wrangler secret put TWITCH_CLIENT_SECRET        (never in the repo)
+//   4. wrangler kv namespace create TWITCH_SESSIONS    → bind in wrangler.toml
+//
+const TWITCH_OAUTH = 'https://id.twitch.tv/oauth2';
+const TWITCH_HELIX = 'https://api.twitch.tv/helix';
+const TWITCH_CALLBACK_DEFAULT = 'https://auth.aquilo.gg/twitch/callback';
+// Scopes the docks + app need: start/cancel raids, mod timeout/ban + delete
+// message, create clips, and read the user's identity. Override via env if a
+// surface ever needs more (e.g. channel:read:subscriptions).
+const TWITCH_SCOPES = [
+  'channel:manage:raids',
+  'moderator:manage:banned_users',
+  'moderator:manage:chat_messages',
+  'clips:edit',
+  'user:read:email'
+].join(' ');
+// Helix path prefixes the session proxy will forward. Keeps a leaked session
+// id from being a skeleton key to the whole API.
+const TWITCH_HELIX_ALLOW = [
+  'users', 'streams', 'channels', 'search/channels', 'games',
+  'raids', 'moderation/bans', 'moderation/chat', 'clips'
+];
+
+// The docks call /twitch/me + /twitch/api cross-origin (aquilo.gg →
+// auth.aquilo.gg), so those need CORS. The session id is the bearer and lives
+// only in the dock's own localStorage, so echoing the dock origin is safe.
+function twitchCors(request) {
+  var origin = request.headers.get('Origin') || '';
+  var ok = false;
+  try {
+    var u = new URL(origin);
+    ok = (u.hostname === 'localhost' || u.hostname === '127.0.0.1' ||
+          u.origin === 'https://aquilo.gg' || u.origin === 'https://widget.aquilo.gg');
+  } catch (e) { ok = false; }
+  return {
+    'Access-Control-Allow-Origin': ok ? origin : 'https://aquilo.gg',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin'
+  };
+}
+
+// Only let the dock bounce the browser back to a trusted origin.
+function _twitchReturnAllowed(ret) {
+  try {
+    var u = new URL(ret);
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return true;
+    return (u.origin === 'https://aquilo.gg' || u.origin === 'https://widget.aquilo.gg');
+  } catch (e) { return false; }
+}
+
+function _b64urlEncode(s) {
+  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function _b64urlDecode(s) {
+  s = String(s).replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+// Put our status on the fragment so it never lands in a server log.
+function _appendHash(urlStr, hash) {
+  return urlStr + (urlStr.indexOf('#') === -1 ? '#' : '&') + hash;
+}
+
+// id.twitch.tv token exchange (authorization_code or refresh_token), with the
+// client_id + secret injected here so neither ever ships in a dock or binary.
+async function _twitchExchange(env, params) {
+  var form = new URLSearchParams();
+  form.set('client_id', env.TWITCH_CLIENT_ID);
+  form.set('client_secret', env.TWITCH_CLIENT_SECRET);
+  Object.keys(params).forEach(function (k) { form.set(k, params[k]); });
+  var resp;
+  try {
+    resp = await fetch(TWITCH_OAUTH + '/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+  } catch (e) { return null; }
+  if (!resp.ok) return null;
+  try { return await resp.json(); } catch (e) { return null; }
+}
+
+// Load a dock session from KV, transparently refreshing the access token when
+// it's within 2 minutes of expiry.
+async function _twitchSession(env, session) {
+  if (!session || !env.TWITCH_SESSIONS) return null;
+  var raw = await env.TWITCH_SESSIONS.get('tw:' + session);
+  if (!raw) return null;
+  var rec; try { rec = JSON.parse(raw); } catch (e) { return null; }
+  if (rec.expires_at && (rec.expires_at - Date.now() < 120000) && rec.refresh_token) {
+    var t = await _twitchExchange(env, { grant_type: 'refresh_token', refresh_token: rec.refresh_token });
+    if (t && t.access_token) {
+      rec.access_token = t.access_token;
+      if (t.refresh_token) rec.refresh_token = t.refresh_token;
+      rec.expires_at = Date.now() + ((t.expires_in || 3600) * 1000);
+      rec.scope = Array.isArray(t.scope) ? t.scope.join(' ') : (t.scope || rec.scope);
+      await env.TWITCH_SESSIONS.put('tw:' + session, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 60 });
+    }
+  }
+  return rec;
+}
+
+// One Helix call with the broadcaster's token + the app Client-Id.
+async function _twitchHelix(env, accessToken, method, path, query, body) {
+  var u = TWITCH_HELIX + '/' + path + (query ? ('?' + query) : '');
+  var init = {
+    method: method,
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Client-Id': env.TWITCH_CLIENT_ID,
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body != null && method !== 'GET' && method !== 'HEAD') init.body = JSON.stringify(body);
+  var resp = await fetch(u, init);
+  var text = await resp.text();
+  var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { raw: text }; }
+  return { status: resp.status, data: data };
+}
+
+// GET /twitch/login?state=<sessionId>&return=<dockUrl> → 302 to Twitch.
+async function handleTwitchLogin(request, env) {
+  if (!env.TWITCH_CLIENT_ID) return json({ error: 'twitch_not_configured' }, 500);
+  var url = new URL(request.url);
+  var session = url.searchParams.get('state') || url.searchParams.get('session') || '';
+  var ret = url.searchParams.get('return') || url.searchParams.get('redirect') || '';
+  if (!session || session.length < 16) return json({ error: 'missing_or_short_session' }, 400);
+  if (!ret || !_twitchReturnAllowed(ret)) return json({ error: 'return_not_allowed' }, 400);
+  var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
+  var state = _b64urlEncode(JSON.stringify({ s: session, r: ret }));
+  var authUrl = TWITCH_OAUTH + '/authorize'
+    + '?client_id=' + encodeURIComponent(env.TWITCH_CLIENT_ID)
+    + '&redirect_uri=' + encodeURIComponent(redirectUri)
+    + '&response_type=code'
+    + '&scope=' + encodeURIComponent(env.TWITCH_SCOPES || TWITCH_SCOPES)
+    + '&state=' + encodeURIComponent(state);
+  return new Response(null, { status: 302, headers: { 'Location': authUrl, 'Cache-Control': 'no-store' } });
+}
+
+// GET /twitch/callback?code=&state= → exchange, store in KV, 302 back to dock.
+async function handleTwitchCallback(request, env) {
+  var url = new URL(request.url);
+  var err = url.searchParams.get('error');
+  var code = url.searchParams.get('code');
+  var state; try { state = JSON.parse(_b64urlDecode(url.searchParams.get('state') || '')); } catch (e) { state = null; }
+  var ret = (state && state.r) || '';
+  var session = (state && state.s) || '';
+  if (!ret || !_twitchReturnAllowed(ret) || !session) return json({ error: 'bad_state' }, 400);
+  if (err || !code) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=error') } });
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET || !env.TWITCH_SESSIONS) {
+    return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=error&reason=not_configured') } });
+  }
+  var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
+  var tok = await _twitchExchange(env, { grant_type: 'authorization_code', code: code, redirect_uri: redirectUri });
+  if (!tok || !tok.access_token) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=error&reason=exchange') } });
+  var meRes = await _twitchHelix(env, tok.access_token, 'GET', 'users', '', null);
+  var u = meRes && meRes.data && meRes.data.data && meRes.data.data[0];
+  var rec = {
+    access_token: tok.access_token,
+    refresh_token: tok.refresh_token || '',
+    expires_at: Date.now() + ((tok.expires_in || 3600) * 1000),
+    scope: Array.isArray(tok.scope) ? tok.scope.join(' ') : (tok.scope || ''),
+    login: u ? u.login : '',
+    user_id: u ? u.id : '',
+    display_name: u ? u.display_name : ''
+  };
+  await env.TWITCH_SESSIONS.put('tw:' + session, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 60 });
+  return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=ok'), 'Cache-Control': 'no-store' } });
+}
+
+// GET /twitch/me?session=<id> → auth status + the dock's own broadcaster id.
+async function handleTwitchMe(request, env) {
+  var cors = twitchCors(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  var url = new URL(request.url);
+  var rec = await _twitchSession(env, url.searchParams.get('session') || '');
+  if (!rec || !rec.access_token) return json({ authed: false }, 200, cors);
+  return json({ authed: true, login: rec.login, user_id: rec.user_id, display_name: rec.display_name, scope: rec.scope }, 200, cors);
+}
+
+// POST /twitch/api { session, method, path, query, body } → Helix proxy.
+async function handleTwitchApi(request, env) {
+  var cors = twitchCors(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400, cors); }
+  var session = body && body.session;
+  var method = ((body && body.method) || 'GET').toUpperCase();
+  var clean = String((body && body.path) || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  var query = (body && body.query) || '';
+  var payload = (body && body.body) || null;
+  var allowed = TWITCH_HELIX_ALLOW.some(function (p) { return clean === p || clean.indexOf(p + '/') === 0; });
+  if (!allowed) return json({ error: 'path_not_allowed', path: clean }, 403, cors);
+  if (['GET', 'POST', 'DELETE', 'PATCH', 'PUT'].indexOf(method) === -1) return json({ error: 'bad_method' }, 400, cors);
+  var rec = await _twitchSession(env, session);
+  if (!rec || !rec.access_token) return json({ error: 'not_authed' }, 401, cors);
+  var res;
+  try { res = await _twitchHelix(env, rec.access_token, method, clean, query, payload); }
+  catch (e) { return json({ error: 'helix_unreachable', detail: String(e) }, 502, cors); }
+  return json({ status: res.status, data: res.data, broadcaster_id: rec.user_id, login: rec.login }, 200, cors);
+}
+
+// GET /twitch/logout?session=<id> → drop the KV session.
+async function handleTwitchLogout(request, env) {
+  var cors = twitchCors(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  var url = new URL(request.url);
+  var session = url.searchParams.get('session') || '';
+  if (session && env.TWITCH_SESSIONS) await env.TWITCH_SESSIONS.delete('tw:' + session);
+  return json({ ok: true }, 200, cors);
+}
+
+// POST /twitch-token — desktop loopback exchange, same shape as /discord-token.
+// The app runs the OAuth dance with an http://localhost redirect and POSTs the
+// code here; the app holds the returned tokens itself.
+async function handleTwitchTokenProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400); }
+  var grant = body && body.grant_type;
+  if (grant !== 'authorization_code' && grant !== 'refresh_token') return json({ error: 'unsupported_grant_type' }, 400);
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET) return json({ error: 'twitch_not_configured' }, 500);
+  var params = { grant_type: grant };
+  if (grant === 'authorization_code') {
+    if (!body.code || !body.redirect_uri) return json({ error: 'missing_code_or_redirect' }, 400);
+    var allowed = (env.ALLOWED_REDIRECT_HOSTS || '127.0.0.1,localhost').split(',').map(function (s) { return s.trim(); });
+    var ru; try { ru = new URL(body.redirect_uri); } catch (e) { return json({ error: 'invalid_redirect_uri' }, 400); }
+    if (allowed.indexOf(ru.hostname) === -1) return json({ error: 'redirect_host_not_allowed' }, 400);
+    params.code = body.code;
+    params.redirect_uri = body.redirect_uri;
+  } else {
+    if (!body.refresh_token) return json({ error: 'missing_refresh_token' }, 400);
+    params.refresh_token = body.refresh_token;
+  }
+  var t = await _twitchExchange(env, params);
+  if (!t) return json({ error: 'upstream_unreachable' }, 502);
+  return json(t, 200);
 }

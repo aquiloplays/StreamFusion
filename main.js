@@ -20,6 +20,12 @@ const patreonAuth = require('./patreon-auth');
 // discord.entitled). See discord-auth.js.
 const discordAuth = require('./discord-auth');
 
+// ── Twitch account (direct Helix: Clip + future) ────────────────────────────
+// Chat, events, mod actions and stream info all come through Streamer.bot;
+// this connects the broadcaster's OWN Twitch app for the few things SB
+// doesn't expose (today: the Clip button). See twitch-auth.js.
+const twitchAuth = require('./twitch-auth');
+
 // ── OBS overlay server (EA-only) ────────────────────────────────────────────
 // Local HTTP + SSE server that powers browser-source overlays (chat feed,
 // alerts, shoutouts) for OBS. Starts on app launch and stays up regardless
@@ -981,6 +987,8 @@ app.whenReady().then(() => {
   patreonAuth.registerIpcHandlers();
   discordAuth.setMainWindow(mainWindow);
   discordAuth.registerIpcHandlers();
+  twitchAuth.setMainWindow(mainWindow);
+  twitchAuth.registerIpcHandlers();
 
   // OBS overlay server comes up alongside the main window. It always
   // listens (so the streamer can bookmark the URLs without worrying about

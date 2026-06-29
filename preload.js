@@ -187,6 +187,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   discordSignOut:                ()  => ipcRenderer.invoke('discord-sign-out'),
   onDiscordEntitlementChanged:   (fn) => ipcRenderer.on('discord-entitlement-changed', (e, state) => fn(state)),
 
+  // ── Twitch account (direct Helix: Clip + future; chat/mod/stream-info stay on Streamer.bot) ──
+  twitchBeginAuth:       ()   => ipcRenderer.invoke('twitch-begin-auth'),
+  twitchGetStatus:       ()   => ipcRenderer.invoke('twitch-get-status'),
+  twitchSignOut:         ()   => ipcRenderer.invoke('twitch-sign-out'),
+  twitchCreateClip:      ()   => ipcRenderer.invoke('twitch-create-clip'),
+  twitchHelix:           (p)  => ipcRenderer.invoke('twitch-helix', p || {}),
+  onTwitchStatusChanged: (fn) => ipcRenderer.on('twitch-status-changed', (e, status) => fn(status)),
+
   // ── OBS overlays (EA-only — broadcasts are no-ops until entitled) ───────
   // Renderer-side fan-out: anything the main app learns (chat msg, event,
   // shoutout click) goes to the OBS overlay server, which forwards to

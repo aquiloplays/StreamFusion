@@ -1,0 +1,31 @@
+# aquilo-auth-proxy — Patreon / Discord OAuth token-exchange proxy.
+# Same code as the old streamfusion-patreon-proxy, redeployed onto the
+# aquilo Cloudflare account behind auth.aquilo.gg so its URL is no longer
+# tied to a personal *.workers.dev account.
+#
+# Secrets are set on the Worker, NOT here (dashboard or `wrangler secret put`):
+#   PATREON_CLIENT_SECRET, DISCORD_CLIENT_SECRET, GITHUB_BETA_TOKEN,
+#   COMMUNITY_RECAP_WEBHOOK, TWITCH_CLIENT_SECRET
+name = "aquilo-auth-proxy"
+main = "patreon-proxy.worker.js"
+compatibility_date = "2025-09-01"
+account_id = "fa3738ee91624ee17c9ef4401ee8a493"
+
+[vars]
+PATREON_CLIENT_ID = "tPN89A6Yz_NEpvQIQ2hDXcfCpyrrYha6YsgZ-aUcQP2y8Lcnaxm7-xSY8W3Zn4QO"
+DISCORD_CLIENT_ID = "1494759611922645003"
+ALLOWED_REDIRECT_HOSTS = "127.0.0.1,localhost,aquilo.gg"
+# Twitch broker (see the Twitch section in patreon-proxy.worker.js).
+# Paste your Twitch app's Client ID here; the Client SECRET goes in via
+# `wrangler secret put TWITCH_CLIENT_SECRET` and is never committed.
+TWITCH_CLIENT_ID = "24i7na6gc2j9glbeee8450eydmd3qw"
+TWITCH_REDIRECT_URI = "https://auth.aquilo.gg/twitch/callback"
+
+# Dock OAuth sessions for the Twitch broker.
+[[kv_namespaces]]
+binding = "TWITCH_SESSIONS"
+id = "f54215e7c65841dc8c9da84c6662250d"
+
+[[routes]]
+pattern = "auth.aquilo.gg"
+custom_domain = true
