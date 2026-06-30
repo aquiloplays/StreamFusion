@@ -2365,7 +2365,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <input id="ci-channel" placeholder="auto-detected from Streamer.bot" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 10px;font-size:12px;outline:none" onchange="_ciSaveChannel()">
               <button onclick="renderCheckinsTab()" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">Refresh</button>
             </div>
-            <div style="font-size:11px;color:var(--mut);margin:6px 0 10px">Live daily check-ins from PunchCard (aquilo.gg/punchcard). Auto-refreshes every 15s while this tab is open.</div>
+            <div style="font-size:11px;color:var(--mut);margin:6px 0 8px">Live daily check-ins from PunchCard (aquilo.gg/punchcard). Auto-refreshes every 15s while this tab is open.</div>
+            <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt);margin:0 0 10px;cursor:pointer">
+              <input type="checkbox" id="ci-show-in-feed" checked onchange="_ciToggleFeed()">
+              Also show check-ins in the live <b>Events</b> feed, in real time
+            </label>
             <div id="ci-feed" style="border:1px solid var(--bdr);border-radius:8px;background:var(--surf);max-height:440px;overflow-y:auto"></div>
           </div>
         </div>
@@ -9470,6 +9474,9 @@ function onChatInput() {
 document.addEventListener('DOMContentLoaded', function() {
   var ci = document.getElementById('chatInput');
   if (ci) ci.addEventListener('blur', function() { setTimeout(hideCmdPop, 120); });
+  // Start the PunchCard check-in → events-feed poller (self-gates on channel +
+  // toggle, so it's inert until Streamer.bot reports a channel).
+  if (typeof _pcFeedStart === 'function') _pcFeedStart();
 });
 function sendMessage() {
   var input = document.getElementById('chatInput'), text = input.value.trim(); if (!text) return;
@@ -9804,6 +9811,9 @@ function _ciPoll() {
 function renderCheckinsTab() {
   var inp = document.getElementById('ci-channel');
   if (inp && !inp.value) { var auto = _ciChannel(); if (auto) inp.value = auto; }
+  var fb = document.getElementById('ci-show-in-feed');
+  if (fb) fb.checked = _pcFeedEnabled();
+  _pcFeedStart();
   _ciPoll();
   clearInterval(_ciTimer);
   _ciTimer = setInterval(function() {
@@ -9811,6 +9821,64 @@ function renderCheckinsTab() {
     if (!pane || !pane.classList.contains('active')) { clearInterval(_ciTimer); return; }
     _ciPoll();
   }, 15000);
+}
+
+// ── Live check-ins in the Events feed ──────────────────────────────────────
+// Poll the worker's recent check-ins and inject NEW ones into the main events
+// feed, so they land in real time next to follows/subs/raids. Runs independently
+// of the Check-ins tab — whenever a channel is known and the toggle is on. The
+// worker has no push channel, so an 8s poll is the live signal.
+var _pcFeedSeen = null, _pcFeedTimer = null;
+function _pcFeedEnabled() {
+  try { return localStorage.getItem('sf-ci-feed') !== '0'; } catch (e) { return true; }   // default ON
+}
+function _pcInjectCheckin(c) {
+  var raw = String(c.v || '');
+  var plat = raw.indexOf('yt:') === 0 ? 'yt' : raw.indexOf('kk:') === 0 ? 'kk' : raw.indexOf('tt:') === 0 ? 'tt' : 'tw';
+  var login = raw.replace(/^(yt:|kk:|tt:)/, '');
+  var name = c.display || login || 'Someone';
+  var streak = (Number(c.s) > 1) ? (' — ' + c.s + ' day streak 🔥') : '';
+  var dup = c.dup ? ' (again)' : '';
+  var note = c.msg ? (': ' + c.msg) : '';
+  pushMsg({
+    plat: plat, isEv: true, evType: 'checkin', user: name,
+    text: name + ' checked in' + streak + dup + note,
+    avatar: (typeof _resolveEvAvatar === 'function') ? _resolveEvAvatar(plat, { login: login, name: name }, login) : ''
+  });
+}
+function _pcFeedPoll() {
+  if (!_pcFeedEnabled()) return;
+  var ch = (typeof _ciChannel === 'function') ? _ciChannel() : '';
+  if (!ch) return;
+  fetch('https://loadout-discord.aquiloplays.workers.dev/api/punchcard/recent?ch=' + encodeURIComponent(ch))
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok || !Array.isArray(j.recent)) return;
+      var list = j.recent.slice().reverse();   // worker returns newest-first; inject oldest-first
+      if (_pcFeedSeen === null) {               // first good poll: seed, don't backfill history
+        _pcFeedSeen = {};
+        list.forEach(function (c) { if (c) _pcFeedSeen[c.v + '|' + c.ts] = 1; });
+        return;
+      }
+      list.forEach(function (c) {
+        if (!c) return;
+        var id = c.v + '|' + c.ts;
+        if (!_pcFeedSeen[id]) { _pcFeedSeen[id] = 1; _pcInjectCheckin(c); }
+      });
+      var keys = Object.keys(_pcFeedSeen);      // bound the seen-set
+      if (keys.length > 300) keys.slice(0, keys.length - 300).forEach(function (k) { delete _pcFeedSeen[k]; });
+    })
+    .catch(function () {});
+}
+function _pcFeedStart() {
+  if (_pcFeedTimer) return;
+  _pcFeedTimer = setInterval(_pcFeedPoll, 8000);
+  _pcFeedPoll();
+}
+function _ciToggleFeed() {
+  var on = !!((document.getElementById('ci-show-in-feed') || {}).checked);
+  try { localStorage.setItem('sf-ci-feed', on ? '1' : '0'); } catch (e) {}
+  if (on) { _pcFeedSeen = null; _pcFeedStart(); }   // re-seed so we don't dump the backlog at once
 }
 
 // ── OBS Overlays tab ───────────────────────────────────────────────────────
