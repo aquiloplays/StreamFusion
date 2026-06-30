@@ -1416,6 +1416,10 @@ button:disabled:hover{transform:none!important;filter:none!important;box-shadow:
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+/* Performance mode (streaming): flatten looping + transition animations so the
+   GPU isn't repainting decorative pulses/shimmer while OBS encodes. */
+body.perf-mode *,body.perf-mode *::before,body.perf-mode *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+body.perf-mode #sfConfetti{display:none!important}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    POLISH PASS — focus rings, press feedback, smooth modals, toast system,
@@ -2395,6 +2399,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="size-row"><label>Text size</label><input type="range" id="textSize" min="10" max="22" step="1" value="13" oninput="updateTextSize(this.value)"><span class="size-val" id="sizeVal">13px</span></div>
             <label class="frow"><span>Show user avatars</span><input type="checkbox" id="showAvatarsChk" checked onchange="showAvatars=this.checked;saveSettings()"></label>
             <label class="frow"><span>Hide animations <span style="color:var(--mut);font-weight:400">(confetti, banners, shake)</span></span><input type="checkbox" id="hideAnimationsChk" onchange="hideMainAnimations=this.checked;saveSettings()"></label>
+            <label class="frow"><span>Performance mode <span style="color:var(--mut);font-weight:400">(for streaming — trims history, stops confetti + looping animations)</span></span><input type="checkbox" id="perfModeChk" onchange="perfMode=this.checked;applyPerfMode();saveSettings()"></label>
           </div>
           <div class="sec">
             <div class="sec-hd">Twitch Emotes</div>
@@ -3821,6 +3826,7 @@ var ttsEventTypes = {
 };
 var showAvatars = true;
 var hideMainAnimations = false;
+var perfMode = false;   // streaming perf mode: trims history, kills confetti + looping animations + per-msg tint
 // Show the now-playing bar (album art + track + Spotify controls) under
 // the live-bar when the Rotation widget is connected. Toggle lives in
 // Settings → Integrations → Rotation Widget; default on.
@@ -3901,6 +3907,7 @@ function loadSettings() {
     if (d.ttsInstant !== undefined) ttsInstant = !!d.ttsInstant;
     if (d.ttsGiftCoinMin !== undefined) ttsGiftCoinMin = Math.max(0, parseInt(d.ttsGiftCoinMin) || 0);
     if (d.hideMainAnimations !== undefined) hideMainAnimations = !!d.hideMainAnimations;
+    if (d.perfMode !== undefined) perfMode = !!d.perfMode;
     if (d.showNowPlaying !== undefined) showNowPlaying = !!d.showNowPlaying;
     if (d.filterChatProfanity !== undefined) filterChatProfanity = !!d.filterChatProfanity;
     // Raid Finder persisted preferences
@@ -3961,7 +3968,7 @@ function saveSettings() {
     ttsVolume: ttsVolume, ttsRate: ttsRate, ttsEventPlats: ttsEventPlats, showAvatars: showAvatars,
     discordWebhook: discordWebhook, discordEnabled: discordEnabled,
     ttsInstant: ttsInstant, ttsGiftCoinMin: ttsGiftCoinMin,
-    hideMainAnimations: hideMainAnimations,
+    hideMainAnimations: hideMainAnimations, perfMode: perfMode,
     showNowPlaying: showNowPlaying,
     filterChatProfanity: filterChatProfanity,
     rfRangeMode: S.raidFinder.rangeMode, rfRangeLowPct: S.raidFinder.rangeLowPct,
@@ -4031,6 +4038,7 @@ loadSettings();
   var ttsInstantEl = document.getElementById('ttsInstant'); if (ttsInstantEl) ttsInstantEl.checked = ttsInstant;
   var ttsGcm = document.getElementById('ttsGiftCoinMin'); if (ttsGcm) ttsGcm.value = ttsGiftCoinMin;
   var haChk = document.getElementById('hideAnimationsChk'); if (haChk) haChk.checked = hideMainAnimations;
+  var pmChk = document.getElementById('perfModeChk'); if (pmChk) pmChk.checked = perfMode; applyPerfMode();
   // Smart Shoutouts
   var soEn = document.getElementById('soEnabled'); if (soEn) soEn.checked = S.shoutout.enabled;
   var soAf = document.getElementById('soAutoFire'); if (soAf) soAf.checked = S.shoutout.autoFire;
@@ -8942,8 +8950,8 @@ function pushMsg(m) {
   tintBackground(m.plat, 'light');
   m.isFirstWords = isFirstWords;
   sendOverlayChat(m);
-  while (feed.children.length > 800) { var f = feed.firstChild; if (f && f.id !== 'emptyState') feed.removeChild(f); else break; }
-  if (S.autoScroll) feed.scrollTop = feed.scrollHeight;
+  while (feed.children.length > (perfMode ? 250 : 800)) { var f = feed.firstChild; if (f && f.id !== 'emptyState') feed.removeChild(f); else break; }
+  if (S.autoScroll) _scrollToBottom();
 }
 function ttsPrepareTtext(user, rawText, html) {
   var t = (rawText || '').replace(/<[^>]*>/g, '').trim();
@@ -9004,7 +9012,25 @@ function saveTTSEventTypes() {
 }
 
 // ── Background Tint ──────────────────────────────────────────────────────────
+// Streaming performance mode: toggles a body class that flattens looping/
+// transition animations (same trick as prefers-reduced-motion). Confetti +
+// per-message tint + the chat cap are gated separately in JS.
+function applyPerfMode() {
+  try { document.body.classList.toggle('perf-mode', !!perfMode); } catch (e) {}
+}
+// Coalesce chat auto-scroll into one layout per frame — a chat flood becomes a
+// single reflow instead of one per message. Universal (helps even off perf mode).
+var _scrollRAF = 0;
+function _scrollToBottom() {
+  if (_scrollRAF) return;
+  _scrollRAF = requestAnimationFrame(function () {
+    _scrollRAF = 0;
+    if (S.autoScroll && feed) feed.scrollTop = feed.scrollHeight;
+  });
+}
+
 function tintBackground(plat, intensity) {
+  if (perfMode) return;   // skip the per-message background tint while streaming
   var colors = {tw:'25,15,50',yt:'50,10,10',tt:'10,40,40',kk:'15,45,10',se:'30,40,10',cc:'40,30,15',ev:'40,30,10'};
   var c = colors[plat] || '20,20,30';
   var alpha = intensity === 'strong' ? 0.12 : 0.05;
@@ -9491,6 +9517,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Start the PunchCard check-in → events-feed poller (self-gates on channel +
   // toggle, so it's inert until Streamer.bot reports a channel).
   if (typeof _pcFeedStart === 'function') _pcFeedStart();
+  // Apply the saved performance-mode body class on boot (loadSettings already ran).
+  if (typeof applyPerfMode === 'function') applyPerfMode();
 });
 function sendMessage() {
   var input = document.getElementById('chatInput'), text = input.value.trim(); if (!text) return;
@@ -11159,7 +11187,7 @@ function _resolveConfettiColors(arg) {
   return _PLATFORM_CONFETTI.sf;
 }
 function triggerConfetti(primaryColorOrPlat, opts) {
-  if (hideMainAnimations) return;
+  if (hideMainAnimations || perfMode) return;
   var canvas = document.getElementById('sfConfetti');
   if (!canvas) return;
   canvas.width = window.innerWidth; canvas.height = window.innerHeight;
