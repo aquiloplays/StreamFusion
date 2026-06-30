@@ -49,12 +49,15 @@ const HELIX = 'https://api.twitch.tv/helix';
 //   http://localhost:17831/callback
 const LOOPBACK_PORTS = [17829, 17830, 17831];
 
-// clips:edit lets the broadcaster create clips on their own channel. The
-// read scopes power the optional EventSub event source (subs/bits/follows/
-// redeems direct from Twitch); raids need no scope. Adding scopes here means
-// the user re-authorizes (Connect Twitch again) to grant them.
+// clips:edit lets the broadcaster create clips on their own channel.
+// channel:manage:raids lets the Raid Finder start/cancel raids directly via
+// Helix (POST /helix/raids) instead of routing through Streamer.bot. The read
+// scopes power the optional EventSub event source (subs/bits/follows/redeems
+// direct from Twitch). Adding scopes here means the user re-authorizes
+// (Connect Twitch again) to grant them.
 const SCOPES = [
   'clips:edit',
+  'channel:manage:raids',         // start/cancel raids (Raid Finder, native)
   'channel:read:subscriptions',   // subs, resubs, gifts
   'bits:read',                    // cheers
   'moderator:read:followers',     // follows

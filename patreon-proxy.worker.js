@@ -799,12 +799,20 @@ async function handleTwitchLogin(request, env) {
   if (!session || session.length < 16) return json({ error: 'missing_or_short_session' }, 400);
   if (!ret || !_twitchReturnAllowed(ret)) return json({ error: 'return_not_allowed' }, 400);
   var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
+  // Scope mode: viewers signing in on aquilo.gg only need their identity, so
+  // they get a friendly identity-only consent screen instead of being asked to
+  // grant raid/mod/clip powers. The broadcaster docks omit ?scope and get the
+  // full TWITCH_SCOPES set. ?scope=identity (or =viewer) → user:read:email only.
+  var scopeMode = (url.searchParams.get('scope') || '').toLowerCase();
+  var scopes = (scopeMode === 'identity' || scopeMode === 'viewer')
+    ? 'user:read:email'
+    : (env.TWITCH_SCOPES || TWITCH_SCOPES);
   var state = _b64urlEncode(JSON.stringify({ s: session, r: ret }));
   var authUrl = TWITCH_OAUTH + '/authorize'
     + '?client_id=' + encodeURIComponent(env.TWITCH_CLIENT_ID)
     + '&redirect_uri=' + encodeURIComponent(redirectUri)
     + '&response_type=code'
-    + '&scope=' + encodeURIComponent(env.TWITCH_SCOPES || TWITCH_SCOPES)
+    + '&scope=' + encodeURIComponent(scopes)
     + '&state=' + encodeURIComponent(state);
   return new Response(null, { status: 302, headers: { 'Location': authUrl, 'Cache-Control': 'no-store' } });
 }

@@ -981,6 +981,38 @@ body.has-sf-notice { padding-top: 42px !important; }
 .sidebar>.sec{transition:opacity .25s ease .05s}
 .sidebar.closed>.sec{opacity:0;transition:opacity .15s ease}
 
+/* ═══ TWITCH SIGN-IN SCREEN ════════════════════════════════════════════════ */
+.tw-screen{position:fixed;inset:0;z-index:9200;display:none;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(circle at 50% -10%,rgba(145,70,255,0.22),transparent 60%),rgba(8,9,14,0.92);backdrop-filter:blur(6px)}
+.tw-screen.show{display:flex;animation:overlayFade .25s var(--ease-soft)}
+.tw-card{position:relative;width:560px;max-width:94vw;max-height:92vh;overflow:auto;background:var(--surf);border:1px solid var(--bdr-strong);
+  border-radius:18px;padding:34px 36px 26px;box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 0 1px rgba(145,70,255,0.15);text-align:center}
+.tw-screen.show .tw-card{animation:modalIn .4s var(--ease-spring)}
+.tw-skip{position:absolute;top:14px;right:16px;background:none;border:0;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;padding:6px;border-radius:6px;transition:color .15s}
+.tw-skip:hover{color:var(--txt)}
+.tw-logo{width:74px;height:74px;margin:4px auto 16px;display:flex;align-items:center;justify-content:center;border-radius:18px;
+  background:linear-gradient(145deg,rgba(145,70,255,0.22),rgba(145,70,255,0.06));border:1px solid rgba(145,70,255,0.4)}
+.tw-h1{margin:0 0 8px;font-size:23px;font-weight:800;color:var(--txt);letter-spacing:-0.01em}
+.tw-sub{margin:0 auto 22px;font-size:13px;line-height:1.6;color:var(--mut);max-width:430px}
+.tw-feats{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;margin-bottom:24px}
+@media (max-width:520px){.tw-feats{grid-template-columns:1fr}}
+.tw-feat{display:flex;gap:10px;align-items:flex-start;background:var(--surf2);border:1px solid var(--bdr);border-radius:10px;padding:11px 12px}
+.tw-fi{flex-shrink:0;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(145,70,255,0.14);color:#b69bff}
+.tw-fi .ic{width:16px;height:16px}
+.tw-feat b{display:block;font-size:12.5px;color:var(--txt);font-weight:700;margin-bottom:2px}
+.tw-feat small{display:block;font-size:11px;color:var(--mut);line-height:1.45}
+.tw-actions{display:flex;flex-direction:column;gap:9px;align-items:center}
+.tw-cta{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;max-width:340px;padding:13px 18px;border:0;border-radius:10px;
+  background:#9146FF;color:#fff;font-size:14px;font-weight:800;cursor:pointer;transition:transform .15s,box-shadow .25s,filter .15s;box-shadow:0 8px 24px rgba(145,70,255,0.35)}
+.tw-cta:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 12px 30px rgba(145,70,255,0.45)}
+.tw-cta:active{transform:translateY(0)}
+.tw-cta:disabled{opacity:.7;cursor:default;transform:none}
+.tw-secondary{width:100%;max-width:340px;padding:10px 16px;border:1px solid var(--bdr);border-radius:9px;background:var(--surf2);color:var(--txt);font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s}
+.tw-secondary:hover{border-color:var(--bdr-strong);background:var(--surf3)}
+.tw-fine{margin:18px auto 0;font-size:10.5px;line-height:1.5;color:var(--mut);max-width:420px;opacity:.85}
+/* topbar account chip reflects connection */
+.tbtn.tw-connected{color:#fff;border-color:rgba(145,70,255,0.55);background:linear-gradient(135deg,rgba(145,70,255,0.28),rgba(145,70,255,0.1))}
+
 /* ═══ SETTINGS MODAL ═══════════════════════════════════════════════════════ */
 .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .settings-overlay.show{display:flex}
@@ -1862,6 +1894,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <div class="logo"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion</div>
   <div class="vcounts" id="vcounts"><div class="vc total"><svg class="ic"><use href="#i-eye"/></svg><span id="vcTotal">0</span> total</div></div>
   <button class="tbtn" id="sbBtn" onclick="toggleSettingsModal()"><svg class="ic"><use href="#i-cog"/></svg>Settings</button>
+  <button class="tbtn" id="twitchAccountBtn" onclick="openTwitchSignIn()" title="Connect your Twitch account"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg><span id="twitchAccountBtnText">Twitch</span></button>
   <button class="tbtn" id="overlayLockBtn" onclick="toggleOverlayLockFromMain()" title="Lock pop-out (click-through)" style="display:none"><svg class="ic"><use href="#i-unlock"/></svg>Lock</button>
   <button class="tbtn" id="pauseBtn" onclick="togglePause()"><svg class="ic"><use href="#i-pause"/></svg>Pause</button>
   <button class="tbtn" onclick="clearChat()"><svg class="ic"><use href="#i-trash"/></svg>Clear</button>
@@ -1935,6 +1968,38 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
 <div class="hotbar hidden" id="hotbar">
   <div id="hotbarBtns" style="display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0"></div>
   <button class="hbtn hbtn-edit" onclick="openHotbarEditor()"><svg class="ic"><use href="#i-plus"/></svg>Edit Actions</button>
+</div>
+
+<!-- ═══ Dedicated Twitch sign-in screen ═══ -->
+<!-- Full-window OAuth landing. Auto-shows on first launch when not connected
+     (unless dismissed), and is reachable any time from the topbar "Twitch"
+     button. Drives the same connectTwitch()/disconnectTwitch() flow as the
+     compact Settings row. Connecting here unlocks every direct-Helix feature:
+     native Raid Finder, Clips, and EventSub events. -->
+<div class="tw-screen" id="twitchSignInScreen" onclick="if(event.target===this)closeTwitchSignIn()">
+  <div class="tw-card">
+    <button class="tw-skip" id="twScreenSkip" onclick="dismissTwitchSignIn()" title="Close">Skip for now &times;</button>
+    <div class="tw-logo">
+      <svg viewBox="0 0 24 24" style="width:38px;height:38px;fill:#9146FF"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
+    </div>
+    <h1 class="tw-h1" id="twScreenHeading">Connect your Twitch account</h1>
+    <p class="tw-sub" id="twScreenSub">Sign in once with Twitch to unlock the features StreamFusion drives directly through your own Twitch app &mdash; no Streamer.bot setup required.</p>
+    <div class="tw-feats">
+      <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-rocket"/></svg></span><div><b>Raid Finder</b><small>Search for live channels and start a raid in one click.</small></div></div>
+      <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-camera"/></svg></span><div><b>Create clips</b><small>Clip your stream straight from the toolbar while live.</small></div></div>
+      <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-party"/></svg></span><div><b>Native events (EventSub)</b><small>Subs, bits, follows, raids &amp; redeems straight from Twitch.</small></div></div>
+      <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-pencil"/></svg></span><div><b>Stream info &amp; more</b><small>Future direct-Twitch features reuse this one connection.</small></div></div>
+    </div>
+    <div class="tw-actions">
+      <button class="tw-cta" id="twScreenCta" onclick="connectTwitch()">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#fff"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
+        <span id="twScreenCtaText">Sign in with Twitch</span>
+      </button>
+      <button class="tw-secondary" id="twScreenSignOut" onclick="disconnectTwitch()" style="display:none">Sign out</button>
+      <button class="tw-secondary" id="twScreenContinue" onclick="closeTwitchSignIn()" style="display:none">Continue &rarr;</button>
+    </div>
+    <p class="tw-fine">StreamFusion never sees your password. Sign-in opens Twitch in your browser; only your account name and the scopes you approve are stored, encrypted, on this PC.</p>
+  </div>
 </div>
 
 <div class="layout">
@@ -2554,10 +2619,10 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="height:1px;background:var(--bdr);margin:18px 0 14px"></div>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
               <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#9146FF;flex-shrink:0"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
-              <div style="font-size:14px;font-weight:700;color:var(--txt)">Connect Twitch (for Clips)</div>
+              <div style="font-size:14px;font-weight:700;color:var(--txt)">Twitch account</div>
             </div>
             <div style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:10px">
-              Connects your own Twitch app so StreamFusion can <strong style="color:var(--txt)">create clips</strong> on your channel from the toolbar. Chat, mod actions and stream info already run through Streamer.bot &mdash; this is only for clipping (and future direct-Twitch features). You must be live to clip.
+              Connects your own Twitch app so StreamFusion can drive Twitch directly &mdash; <strong style="color:var(--txt)">Raid Finder</strong> (no Streamer.bot needed), <strong style="color:var(--txt)">clips</strong> from the toolbar, and native <strong style="color:var(--txt)">events</strong> (EventSub). For the full walkthrough, open the <a onclick="openTwitchSignIn();return false" style="color:#9146FF;cursor:pointer;text-decoration:none;font-weight:700">Twitch sign-in screen</a>.
             </div>
             <div id="twitchStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
               <div id="twitchStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
@@ -3277,18 +3342,72 @@ var _twitchSigningInBusy = false;
 function applyTwitchStatus(st) {
   S.twitch = st || { signedIn: false };
   renderTwitchSettings();
+  renderTwitchSignIn();
   var clipBtn = document.getElementById('clipBtn');
   if (clipBtn) clipBtn.style.display = (S.twitch && S.twitch.signedIn) ? '' : 'none';
   if (typeof _esSyncFromStatus === 'function') _esSyncFromStatus();
 }
+
+// ── Dedicated Twitch sign-in screen ──────────────────────────────────────────
+// Full-window OAuth landing reachable from the topbar "Twitch" button and
+// auto-shown once on first launch (until dismissed). Reuses connectTwitch().
+var TW_SEEN_KEY = 'sf_twitch_signin_seen';
+function openTwitchSignIn() {
+  var el = document.getElementById('twitchSignInScreen');
+  if (!el) return;
+  renderTwitchSignIn();
+  el.classList.add('show');
+}
+function closeTwitchSignIn() {
+  var el = document.getElementById('twitchSignInScreen');
+  if (el) el.classList.remove('show');
+}
+function dismissTwitchSignIn() {
+  try { localStorage.setItem(TW_SEEN_KEY, '1'); } catch (e) {}
+  closeTwitchSignIn();
+}
+function renderTwitchSignIn() {
+  var st = S.twitch || {};
+  var heading = document.getElementById('twScreenHeading');
+  var sub     = document.getElementById('twScreenSub');
+  var ctaText = document.getElementById('twScreenCtaText');
+  var cta     = document.getElementById('twScreenCta');
+  var signOut = document.getElementById('twScreenSignOut');
+  var cont    = document.getElementById('twScreenContinue');
+  var skip    = document.getElementById('twScreenSkip');
+  // topbar chip
+  var accBtn  = document.getElementById('twitchAccountBtn');
+  var accTxt  = document.getElementById('twitchAccountBtnText');
+  if (accBtn) accBtn.classList.toggle('tw-connected', !!st.signedIn);
+  if (accTxt) accTxt.textContent = st.signedIn ? ('@' + (st.displayName || st.login || 'you')) : 'Twitch';
+  if (!heading) return;
+  if (st.signedIn) {
+    heading.textContent = 'Twitch connected';
+    sub.innerHTML = 'Signed in as <b style="color:var(--txt)">@' + escapeHtml(st.displayName || st.login || 'you') + '</b>. Raid Finder, Clips and native events are ready to go.';
+    if (ctaText) ctaText.textContent = 'Reconnect / change scopes';
+    if (signOut) signOut.style.display = '';
+    if (cont) cont.style.display = '';
+    if (skip) skip.textContent = 'Close ×';
+  } else {
+    heading.textContent = 'Connect your Twitch account';
+    sub.innerHTML = 'Sign in once with Twitch to unlock the features StreamFusion drives directly through your own Twitch app &mdash; no Streamer.bot setup required.';
+    if (ctaText) ctaText.textContent = _twitchSigningInBusy ? 'Opening Twitch…' : 'Sign in with Twitch';
+    if (cta) cta.disabled = _twitchSigningInBusy;
+    if (signOut) signOut.style.display = 'none';
+    if (cont) cont.style.display = 'none';
+    if (skip) skip.textContent = 'Skip for now ×';
+  }
+}
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 async function connectTwitch() {
   if (!window.electronAPI || !window.electronAPI.twitchBeginAuth || _twitchSigningInBusy) return;
   _twitchSigningInBusy = true;
   var bt = document.getElementById('twitchConnectBtnText');
   if (bt) bt.textContent = 'Opening Twitch…';
+  renderTwitchSignIn();
   try { applyTwitchStatus(await window.electronAPI.twitchBeginAuth()); }
   catch (e) { console.error('twitch connect failed:', e); }
-  finally { _twitchSigningInBusy = false; renderTwitchSettings(); }
+  finally { _twitchSigningInBusy = false; renderTwitchSettings(); renderTwitchSignIn(); }
 }
 async function disconnectTwitch() {
   if (!window.electronAPI || !window.electronAPI.twitchSignOut) return;
@@ -3315,11 +3434,11 @@ function renderTwitchSettings() {
   if (st.signedIn) {
     statusText.textContent = 'Connected as @' + (st.displayName || st.login || 'you');
     statusText.style.color = 'var(--ok, #22c55e)';
-    statusSub.textContent = 'Clipping enabled. Use the Clip button in the toolbar while live.';
+    statusSub.textContent = 'Raid Finder, Clips and native events are ready.';
   } else {
     statusText.textContent = 'Not connected';
     statusText.style.color = 'var(--txt)';
-    statusSub.textContent = 'Sign in with Twitch to enable clipping from StreamFusion.';
+    statusSub.textContent = 'Sign in with Twitch to unlock Raid Finder, Clips and native events.';
   }
   if (btnText) btnText.textContent = st.signedIn ? 'Reconnect' : 'Connect Twitch';
   if (signOut) signOut.style.display = st.signedIn ? '' : 'none';
@@ -3329,7 +3448,16 @@ function renderTwitchSettings() {
   if (!window.electronAPI || !window.electronAPI.onTwitchStatusChanged) return;
   window.electronAPI.onTwitchStatusChanged(function(st) { applyTwitchStatus(st); });
   if (window.electronAPI.twitchGetStatus) {
-    window.electronAPI.twitchGetStatus().then(applyTwitchStatus).catch(function() {});
+    window.electronAPI.twitchGetStatus().then(function(st) {
+      applyTwitchStatus(st);
+      // First-launch nudge: auto-open the sign-in screen once if not connected
+      // and the user hasn't dismissed it before. Never nags after that.
+      var seen = false; try { seen = localStorage.getItem(TW_SEEN_KEY) === '1'; } catch (e) {}
+      if (!(st && st.signedIn) && !seen) {
+        try { localStorage.setItem(TW_SEEN_KEY, '1'); } catch (e) {}
+        setTimeout(openTwitchSignIn, 700);
+      }
+    }).catch(function() {});
   }
 })();
 
@@ -6268,8 +6396,17 @@ function _favApplyHeadless(f) {
 })();
 
 function openRaidFinder() {
+  // Native (OAuth) path wins when the broadcaster is signed in with Twitch —
+  // no Streamer.bot required. The panel opens immediately and pulls the
+  // current game + viewers straight from Helix.
+  if (_rfNative()) {
+    _rfRenderPanel();
+    _rfNativeRefreshGame();
+    return;
+  }
+  // Fallback: Streamer.bot actions.
   if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
-    sysMsg('tw', 'Connect to Streamer.bot to use the Raid Finder.');
+    sysMsg('tw', 'Sign in with Twitch (the Twitch button) or connect Streamer.bot to use the Raid Finder.');
     return;
   }
   _rfCheckActions(function(haveBoth) {
@@ -6544,7 +6681,7 @@ function _rfRenderPanel() {
     + (!_rfHasGameSignal()
         ? '<span style="font-size:11px;color:var(--warn,#f59e0b);line-height:1.4">No game detected. Start streaming, then click <svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-refresh"/></svg> to refresh.</span>'
         : !gameId
-          ? '<span style="font-size:11px;color:var(--mut);line-height:1.4">Searching by name <strong style="color:var(--txt)">' + esc(S.raidFinder.gameOverride || S.twGame) + '</strong> \u2014 SB will resolve the ID.</span>'
+          ? '<span style="font-size:11px;color:var(--mut);line-height:1.4">Searching by name <strong style="color:var(--txt)">' + esc(S.raidFinder.gameOverride || S.twGame) + '</strong> \u2014 the ID resolves automatically.</span>'
           : '')
     + '</div>'
     + '<div id="rfResults" style="max-height:300px;overflow-y:auto"></div>'
@@ -6578,6 +6715,8 @@ function _rfUpdateRange() {
 }
 
 function _rfRefreshGame() {
+  // Native path: ask Helix directly for the current game + viewers.
+  if (_rfNative()) { _rfNativeRefreshGame(); return; }
   console.log('[SF rf] _rfRefreshGame \u2014 firing GetBroadcaster + TwitchGetChannelInfo fallback + decapi fallback');
   if (S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) {
     S.sbWS.send(JSON.stringify({ request: 'GetBroadcaster', id: 'sf-broadcaster' }));
@@ -6651,8 +6790,158 @@ function _rfDecapiFallback() {
     .catch(function() { /* silent */ });
 }
 
+// ═══ Native Raid Finder (direct Twitch Helix via the SF OAuth token) ═════════
+// When the broadcaster has signed in with Twitch (the dedicated sign-in screen),
+// the Raid Finder talks straight to Helix through the twitch-helix IPC — no
+// Streamer.bot actions to install. It paginates /helix/streams for the current
+// game, filters by the viewer range, enriches avatars via /helix/users, and
+// starts the raid with POST /helix/raids (needs channel:manage:raids). If the
+// user isn't Twitch-connected, every entry point falls back to the Streamer.bot
+// path below. This is the "hybrid" engine.
+function _rfNative() {
+  return !!(S.twitch && S.twitch.signedIn && S.twitch.userId &&
+            window.electronAPI && window.electronAPI.twitchHelix);
+}
+async function _rfHelix(method, path, query, body) {
+  try {
+    var r = await window.electronAPI.twitchHelix({ method: method, path: path, query: query || '', body: body || null });
+    return r || { status: 0, data: {} };
+  } catch (e) { return { status: 0, data: { error: e && e.message } }; }
+}
+function _rfComputeRange() {
+  var rf = S.raidFinder;
+  var viewers = Math.max(1, S.viewers.tw || 1);
+  var low, high;
+  if (rf.rangeMode === 'percent') {
+    low = Math.max(0, Math.floor(viewers * rf.rangeLowPct));
+    high = Math.max(low, Math.ceil(viewers * rf.rangeHighPct));
+  } else {
+    low = Math.max(0, rf.rangeLowAbs);
+    high = Math.max(low, rf.rangeHighAbs);
+  }
+  // Same small-streamer floor as the SB path: a just-live/offline channel
+  // collapses percent mode to a window matching almost nobody.
+  if (high < 30) { low = Math.min(low, 1); high = Math.max(high, 30); }
+  return { low: low, high: high };
+}
+function _rfLookupId(login) {
+  var res = S.raidFinder.lastResults;
+  var streams = (res && res.streams) || [];
+  login = String(login || '').toLowerCase();
+  for (var i = 0; i < streams.length; i++) {
+    if (String(streams[i].user_login || '').toLowerCase() === login) return streams[i].user_id;
+  }
+  return '';
+}
+// Pull the broadcaster's current game + live viewer count straight from Helix.
+async function _rfNativeRefreshGame() {
+  var el = document.getElementById('rfGameName');
+  if (el) el.textContent = 'Refreshing…';
+  var me = S.twitch && S.twitch.userId;
+  if (!me) return;
+  try {
+    var ch = await _rfHelix('GET', 'channels', 'broadcaster_id=' + encodeURIComponent(me));
+    var c = ch.data && ch.data.data && ch.data.data[0];
+    if (c) {
+      if (c.game_name) S.twGame = c.game_name;
+      if (c.game_id && String(c.game_id) !== '0') S.twGameId = String(c.game_id);
+    }
+    var st = await _rfHelix('GET', 'streams', 'user_id=' + encodeURIComponent(me));
+    var s = st.data && st.data.data && st.data.data[0];
+    if (s) { S.viewers.tw = s.viewer_count || 0; }
+    S.twViewersFetched = true;
+  } catch (e) { /* best effort */ }
+  try { saveSettings(); } catch (e) {}
+  var modalEl = document.getElementById('modal');
+  if (modalEl && modalEl.innerHTML.indexOf('Raid Finder') !== -1) { try { _rfRenderPanel(); } catch (e) {} }
+}
+async function _rfNativeFindTargets() {
+  var rf = S.raidFinder;
+  rf.lastReqId = 'native-' + Date.now();
+  rf.searching = true;
+  rf.lastResults = null;
+  var btn = document.getElementById('rfSearchBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Searching…'; }
+  var resEl = document.getElementById('rfResults');
+  if (resEl) resEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mut);font-size:12px">Searching Twitch for streamers…</div>';
+
+  // Resolve a game id from the name if we don't have one (manual override wins).
+  var gameId = rf.gameIdOverride || S.twGameId || '';
+  var gameName = rf.gameOverride || S.twGame || '';
+  if (!gameId && gameName) {
+    var g = await _rfHelix('GET', 'games', 'name=' + encodeURIComponent(gameName));
+    var gd = g.data && g.data.data && g.data.data[0];
+    if (gd && gd.id) { gameId = String(gd.id); if (!S.twGameId) S.twGameId = gameId; }
+  }
+  if (!gameId) {
+    rf.searching = false; rf.lastResults = { error: 'missing_gameId' };
+    _rfRenderResults(); _rfResetSearchBtn(); return;
+  }
+
+  var r = _rfComputeRange();
+  var collected = [], cursor = '', pages = 0, scanned = 0;
+  var PAGE_CAP = 6; // up to 600 streamers — plenty for any small/mid streamer
+  var err = null;
+  while (pages < PAGE_CAP) {
+    var q = 'game_id=' + encodeURIComponent(gameId) + '&first=100' + (cursor ? ('&after=' + encodeURIComponent(cursor)) : '');
+    var resp = await _rfHelix('GET', 'streams', q);
+    if (resp.status < 200 || resp.status >= 300) { err = 'helix_' + (resp.status || 0); break; }
+    var arr = (resp.data && resp.data.data) || [];
+    scanned += arr.length;
+    for (var i = 0; i < arr.length; i++) {
+      var s = arr[i];
+      if (s.viewer_count >= r.low && s.viewer_count <= r.high) collected.push(s);
+    }
+    cursor = resp.data && resp.data.pagination && resp.data.pagination.cursor;
+    pages++;
+    // /helix/streams is viewer-count descending, so once we page past the low
+    // bound there's nothing smaller worth fetching.
+    if (!arr.length || !cursor) break;
+    if (arr[arr.length - 1].viewer_count < r.low) break;
+    if (collected.length >= rf.wantCount * 3) break;
+  }
+  if (err) {
+    rf.searching = false; rf.lastResults = { error: err };
+    _rfRenderResults(); _rfResetSearchBtn(); return;
+  }
+  // Closest-to-you first: streamers near the top of the range raid best.
+  collected.sort(function(a, b) { return b.viewer_count - a.viewer_count; });
+  var top = collected.slice(0, rf.wantCount);
+  // Enrich avatars (the streams endpoint omits profile_image_url).
+  if (top.length) {
+    var idsQ = top.map(function(s) { return 'id=' + encodeURIComponent(s.user_id); }).join('&');
+    var u = await _rfHelix('GET', 'users', idsQ);
+    var map = {};
+    ((u.data && u.data.data) || []).forEach(function(x) { map[x.id] = x.profile_image_url; });
+    top.forEach(function(s) { s.profile_image_url = map[s.user_id] || ''; });
+  }
+  rf.searching = false;
+  rf.lastResults = { streams: top, scanned: scanned, pages: pages, pagesCap: PAGE_CAP, hitCap: !!cursor, inRange: collected.length };
+  _rfRenderResults(); _rfResetSearchBtn();
+}
+async function _rfNativeFire(login, displayName) {
+  var targetId = _rfLookupId(login);
+  if (!targetId) {
+    var u = await _rfHelix('GET', 'users', 'login=' + encodeURIComponent(String(login).toLowerCase()));
+    targetId = u.data && u.data.data && u.data.data[0] && u.data.data[0].id;
+  }
+  if (!targetId) { sysMsg('tw', 'Couldn’t find ' + (displayName || login) + ' on Twitch.'); return; }
+  var me = S.twitch.userId;
+  var r = await _rfHelix('POST', 'raids', 'from_broadcaster_id=' + encodeURIComponent(me) + '&to_broadcaster_id=' + encodeURIComponent(targetId));
+  if (r.status >= 200 && r.status < 300) {
+    sysMsg('tw', 'Raiding ' + (displayName || login) + '… give Twitch a few seconds.');
+  } else if (r.status === 401 || r.status === 403) {
+    sysMsg('tw', 'Raid needs the manage-raids permission. Click the Twitch button and reconnect to grant it.');
+  } else {
+    var msg = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+    // Twitch 400s when you're offline or already raiding.
+    sysMsg('tw', 'Raid failed: ' + msg);
+  }
+}
+
 // ── Search ───────────────────────────────────────────────────────────────────
 function _rfFindTargets() {
+  if (_rfNative()) { _rfNativeFindTargets(); return; }
   var rf = S.raidFinder;
   if (!rf.actions.find) { sysMsg('tw', 'Raid Finder SB action not installed.'); return; }
   // v3: search fires with whatever signal we have. The SB action resolves
@@ -6854,10 +7143,13 @@ function _rfRenderResults() {
 // the scheduled raid is the one firing.
 function _rfStartRaid(login, displayName, opts) {
   opts = opts || {};
-  if (!S.raidFinder.actions.startRaid) { sysMsg('tw', 'Raid action not installed.'); return; }
-  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
-    sysMsg('tw', 'Streamer.bot is not connected. Reconnect and try again.');
-    return;
+  var native = _rfNative();
+  if (!native) {
+    if (!S.raidFinder.actions.startRaid) { sysMsg('tw', 'Raid action not installed.'); return; }
+    if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) {
+      sysMsg('tw', 'Streamer.bot is not connected. Reconnect and try again.');
+      return;
+    }
   }
   if (!opts.skipConfirm) {
     confirmDialog({
@@ -6877,25 +7169,31 @@ function _rfStartRaid(login, displayName, opts) {
   // command so it lands while the raid countdown is still visible.
   // Template placeholders: {target}, {game}, {channel}.
   var tmpl = (S.raidFinder.preRaidMessage || '').trim();
-  if (tmpl) {
+  var sbLive = S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN;
+  // Pre-raid chat message goes out through Streamer.bot's chat sender (the
+  // native OAuth scopes don't include chat-write), so it only fires when SB
+  // is also connected. The raid itself still works native-only.
+  if (tmpl && sbLive) {
     var msg = tmpl
       .replace(/\{target\}/g,  displayName || login)
       .replace(/\{game\}/g,    S.raidFinder.gameOverride || S.twGame || '')
       .replace(/\{channel\}/g, S.twLogin || 'the team');
-    // SF already has handleTwitchCommand for sending chat via SB. Using
-    // that path means the message respects Twitch's chat rate-limits and
-    // whatever SB account is configured as the sender.
     try { if (typeof handleTwitchCommand === 'function') handleTwitchCommand(msg); } catch (e) {}
   }
 
-  S.sbWS.send(JSON.stringify({
-    request: 'DoAction',
-    id: 'sf-rf-raid-' + Date.now(),
-    action: S.raidFinder.actions.startRaid,
-    args: { raidTarget: login }
-  }));
-  var prefix = opts.fromSchedule ? 'Scheduled raid firing now: ' : 'Raiding ';
-  sysMsg('tw', prefix + (displayName || login) + '\u2026 give Twitch a few seconds.');
+  if (native) {
+    // Direct Helix raid (POST /helix/raids). Emits its own status toast.
+    _rfNativeFire(login, displayName);
+  } else {
+    S.sbWS.send(JSON.stringify({
+      request: 'DoAction',
+      id: 'sf-rf-raid-' + Date.now(),
+      action: S.raidFinder.actions.startRaid,
+      args: { raidTarget: login }
+    }));
+    var prefix = opts.fromSchedule ? 'Scheduled raid firing now: ' : 'Raiding ';
+    sysMsg('tw', prefix + (displayName || login) + '\u2026 give Twitch a few seconds.');
+  }
   // closeModal() shuts the Raid Finder UI after a user-initiated raid lands.
   // Was previously gated on !opts.skipConfirm, but the polish-pass refactor
   // (1.6.3+) splits the confirm into a styled dialog, so the post-confirm
