@@ -511,6 +511,20 @@ body.has-sf-notice { padding-top: 42px !important; }
 .ev-gift-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
 .ev-gift-wrap .gift-img{width:52px;height:52px;object-fit:contain;border-radius:6px}
 .ev-item.big .ev-gift-wrap .gift-img{width:72px;height:72px}
+/* PunchCard check-in card rendered into the events feed (rich giftHtml) */
+.pc-ev-card{flex:1 1 100%;margin-top:2px;padding:8px 10px;border-radius:8px;background:linear-gradient(135deg,rgba(124,92,255,.10),rgba(91,255,149,.06));border:1px solid var(--bdr);border-left:3px solid var(--accent)}
+.pc-ev-ring-bronze{border-left-color:#cd7f32}.pc-ev-ring-silver{border-left-color:#c7ced8}.pc-ev-ring-gold{border-left-color:#ffcf4d}.pc-ev-ring-aurora{border-left-color:#9a82ff}
+.pc-ev-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.pc-ev-metarow{margin-top:2px}
+.pc-ev-streak{font-size:13px;font-weight:600;color:var(--txt)}.pc-ev-streak b{font-size:15px}
+.pc-ev-new{color:var(--mut);font-weight:500}
+.pc-ev-meta{font-size:11px;color:var(--mut)}
+.pc-ev-badge{font-size:10px;font-weight:600;padding:1px 6px;border-radius:999px;background:var(--surf3);color:var(--txt)}
+.pc-ev-crown{background:rgba(255,207,77,.18)}.pc-ev-sub{background:rgba(124,92,255,.18)}.pc-ev-dup{opacity:.6;font-weight:500}
+.pc-ev-msg{margin-top:5px;font-size:12px;color:var(--txt);line-height:1.45;word-break:break-word}
+.pc-ev-emote{height:20px;vertical-align:-5px;margin:0 1px}
+.ev-item:has(.pc-ev-card) .ev-avatar,.ev-item:has(.pc-ev-card) .ev-pico{width:40px;height:40px}
+.ev-item:has(.pc-ev-ring-bronze) .ev-avatar{box-shadow:0 0 0 2px #cd7f32}.ev-item:has(.pc-ev-ring-silver) .ev-avatar{box-shadow:0 0 0 2px #c7ced8}.ev-item:has(.pc-ev-ring-gold) .ev-avatar{box-shadow:0 0 0 2px #ffcf4d}.ev-item:has(.pc-ev-ring-aurora) .ev-avatar{box-shadow:0 0 0 2px #9a82ff}
 .ev-likes{padding:9px 12px;border-bottom:1px solid var(--bdr);display:none;align-items:center;justify-content:center;gap:8px;font-size:20px;font-weight:800;color:var(--tt);background:rgba(0,242,234,.07);flex-shrink:0;letter-spacing:.5px}
 .ev-pinned-wrap{padding:6px 8px 0;flex-shrink:0}
 .ev-pinned{border-radius:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,200,0,.1),rgba(255,165,0,.06));border:2px solid #ffd700;display:none}
@@ -9832,19 +9846,51 @@ var _pcFeedSeen = null, _pcFeedTimer = null;
 function _pcFeedEnabled() {
   try { return localStorage.getItem('sf-ci-feed') !== '0'; } catch (e) { return true; }   // default ON
 }
+// Build a check-in CARD for the events feed from the enriched /recent record
+// (avatar, streak, total/best, sub tier, crown, message + emotes), rendered as
+// rich giftHtml so it mirrors the PunchCard overlay card as far as the row
+// layout allows. Falls back gracefully when older records lack the extras.
+function _pcEmoteUrl(e) {
+  if (!e) return null;
+  if (e.u) return /^https:\/\/(static-cdn\.jtvnw\.net|cdn\.7tv\.app|cdn\.betterttv\.net|cdn\.frankerfacez\.com)\//.test(e.u) ? e.u : null;
+  var id = String(e.i || '');
+  if (e.src === '7tv') return /^[a-zA-Z0-9]{1,40}$/.test(id) ? 'https://cdn.7tv.app/emote/' + id + '/2x.webp' : null;
+  return /^[a-zA-Z0-9_\-]{1,100}$/.test(id) ? 'https://static-cdn.jtvnw.net/emoticons/v2/' + id + '/' + (e.a ? 'animated' : 'static') + '/dark/2.0' : null;
+}
+function _pcMsgHtml(msg, emotes) {
+  if (!msg) return '';
+  var map = {};
+  (emotes || []).forEach(function (e) { if (e && e.n) map[e.n] = e; });
+  return String(msg).split(/(\s+)/).map(function (tk) {
+    if (!tk || /^\s+$/.test(tk)) return tk;
+    var u = map[tk] && _pcEmoteUrl(map[tk]);
+    return u ? '<img class="pc-ev-emote" src="' + esc(u) + '" alt="' + esc(tk) + '" referrerpolicy="no-referrer">' : esc(tk);
+  }).join('');
+}
+function _pcCardHtml(c) {
+  var s = Number(c.s) || 0, total = Number(c.t) || 0, best = Number(c.b) || 0, st = Number(c.st) || 0;
+  var streak = s > 1
+    ? '<span class="pc-ev-streak">🔥 <b>' + s + '</b> day streak</span>'
+    : '<span class="pc-ev-streak pc-ev-new">first check-in of the day</span>';
+  var crown = c.crown ? '<span class="pc-ev-badge pc-ev-crown" title="First to check in today">👑 first</span>' : '';
+  var sub = st >= 1 ? '<span class="pc-ev-badge pc-ev-sub" title="Subscriber">★ Tier ' + st + '</span>' : '';
+  var dup = c.dup ? '<span class="pc-ev-badge pc-ev-dup">again today</span>' : '';
+  var meta = total ? '<span class="pc-ev-meta">' + total + ' total' + (best > 1 ? ' · best ' + best + ' days' : '') + '</span>' : '';
+  var msg = c.msg ? '<div class="pc-ev-msg">' + _pcMsgHtml(c.msg, c.em) + '</div>' : '';
+  var ringCls = ({ bronze: 1, silver: 1, gold: 1, aurora: 1 }[c.ring]) ? (' pc-ev-ring-' + c.ring) : '';
+  return '<div class="pc-ev-card' + ringCls + '">'
+    + '<div class="pc-ev-row">' + streak + crown + sub + dup + '</div>'
+    + (meta ? '<div class="pc-ev-row pc-ev-metarow">' + meta + '</div>' : '')
+    + msg + '</div>';
+}
 function _pcInjectCheckin(c) {
   var raw = String(c.v || '');
   var plat = raw.indexOf('yt:') === 0 ? 'yt' : raw.indexOf('kk:') === 0 ? 'kk' : raw.indexOf('tt:') === 0 ? 'tt' : 'tw';
   var login = raw.replace(/^(yt:|kk:|tt:)/, '');
   var name = c.display || login || 'Someone';
-  var streak = (Number(c.s) > 1) ? (' — ' + c.s + ' day streak 🔥') : '';
-  var dup = c.dup ? ' (again)' : '';
-  var note = c.msg ? (': ' + c.msg) : '';
-  pushMsg({
-    plat: plat, isEv: true, evType: 'checkin', user: name,
-    text: name + ' checked in' + streak + dup + note,
-    avatar: (typeof _resolveEvAvatar === 'function') ? _resolveEvAvatar(plat, { login: login, name: name }, login) : ''
-  });
+  var av = (c.av && /^https:\/\//.test(c.av)) ? c.av
+    : ((typeof _resolveEvAvatar === 'function') ? _resolveEvAvatar(plat, { login: login, name: name }, login) : '');
+  pushMsg({ plat: plat, isEv: true, evType: 'checkin', user: name, text: 'checked in', giftHtml: _pcCardHtml(c), avatar: av });
 }
 function _pcFeedPoll() {
   if (!_pcFeedEnabled()) return;
