@@ -1,15 +1,16 @@
 // aquilo-favorites — cloud sync for StreamFusion "Stream Info" favorites.
 //
 // Stores a per-user list of stream-info presets in Cloudflare KV so favorites
-// travel between machines. Scoped by the user's *Patreon* identity (the stable
-// cross-machine id SF already manages) plus the linked Twitch channel id, so a
-// streamer who runs multiple channels keeps separate favorite sets.
+// travel between machines. Scoped by the user's *Twitch* identity (the stable
+// cross-machine id SF manages, replacing Patreon 2026-06-30) plus the linked
+// Twitch channel id, so a streamer who runs multiple channels keeps separate
+// favorite sets.
 //
-// Auth: the caller passes its Patreon access token as a Bearer. The Worker
-// verifies it against Patreon's /identity endpoint and derives the user id
-// server-side — the client can't spoof another user's id. Token→id is cached
-// in KV (10 min) so we don't hit Patreon on every request. SF's main process
-// attaches the token (renderer never sees it), mirroring shared-bot-connect.
+// Auth: the caller passes its Twitch access token as a Bearer. The Worker
+// verifies it against Helix /users and derives the user id server-side — the
+// client can't spoof another user's id. Token→id is cached in KV (10 min) so we
+// don't hit Helix on every request. SF's main process attaches the token (the
+// renderer never sees it).
 //
 // Endpoints:
 //   GET  /health                      liveness
@@ -42,7 +43,7 @@ export default {
       const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
       if (!token) return json({ ok: false, error: 'no_token' }, 401);
 
-      const uid = await resolvePatreonId(token, env);
+      const uid = await resolveTwitchUserId(token, env);
       if (!uid) return json({ ok: false, error: 'invalid_token' }, 401);
 
       const twitchId = (url.searchParams.get('twitchId') || '').replace(/[^0-9]/g, '') || 'default';
@@ -73,24 +74,25 @@ export default {
   }
 };
 
-// Verify a Patreon access token and return the stable Patreon user id.
-// Cached in KV (keyed by a hash of the token) to avoid hammering Patreon.
-async function resolvePatreonId(token, env) {
+// Verify a Twitch access token and return the stable Twitch user id (replaces
+// Patreon 2026-06-30). Cached in KV (keyed by a hash of the token).
+async function resolveTwitchUserId(token, env) {
   const cacheKey = 'tok:' + (await sha256hex(token));
   const cached = await env.FAVORITES.get(cacheKey);
   if (cached) return cached;
 
+  const clientId = env.TWITCH_CLIENT_ID || '24i7na6gc2j9glbeee8450eydmd3qw';
   let resp;
   try {
-    resp = await fetch('https://www.patreon.com/api/oauth2/v2/identity', {
-      headers: { Authorization: 'Bearer ' + token, 'User-Agent': 'aquilo-favorites-worker' }
+    resp = await fetch('https://api.twitch.tv/helix/users', {
+      headers: { Authorization: 'Bearer ' + token, 'Client-Id': clientId, 'User-Agent': 'aquilo-favorites-worker' }
     });
   } catch { return null; }
   if (!resp.ok) return null;
 
   let j;
   try { j = await resp.json(); } catch { return null; }
-  const uid = j && j.data && j.data.id ? String(j.data.id) : null;
+  const uid = j && j.data && j.data[0] && j.data[0].id ? String(j.data[0].id) : null;
   if (!uid) return null;
 
   await env.FAVORITES.put(cacheKey, uid, { expirationTtl: TOKEN_CACHE_TTL });

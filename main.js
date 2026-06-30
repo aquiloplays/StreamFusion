@@ -4,10 +4,6 @@ const fs = require('fs');
 const https = require('https');
 const { spawn } = require('child_process');
 
-// ── Patreon entitlement service ─────────────────────────────────────────────
-// Optional sign-in; the app boots for everyone. Active Patrons unlock
-// Early Access (EA) features live. See patreon-auth.js.
-const patreonAuth = require('./patreon-auth');
 
 // ── Discord entitlement service (parallel path to EA) ───────────────────────
 // Second way to unlock EA for users whose Patreon OAuth has edge cases
@@ -983,8 +979,6 @@ app.whenReady().then(() => {
   // launch-time check on a small delay so the renderer has had time to
   // wire up its listeners. If the user is already signed in to either,
   // each service starts its own hourly re-verification loop.
-  patreonAuth.setMainWindow(mainWindow);
-  patreonAuth.registerIpcHandlers();
   discordAuth.setMainWindow(mainWindow);
   discordAuth.registerIpcHandlers();
   twitchAuth.setMainWindow(mainWindow);
@@ -1020,10 +1014,9 @@ app.whenReady().then(() => {
   // source and recompute the combined flag on every change. Drives:
   //   - obs-server's gated-page flag
   //   - auto-disconnect of the Discord bot when BOTH sources lose access
-  var _lastPatreonEntitled = false;
   var _lastDiscordEntitled = false;
   function _syncCombinedEntitlement() {
-    var entitled = _lastPatreonEntitled || _lastDiscordEntitled;
+    var entitled = _lastDiscordEntitled;
     try { obsServer.setEntitled(entitled); } catch (e) {}
     if (!entitled) {
       // Neither path is entitled — drop the discord-bot Gateway connection.
@@ -1032,18 +1025,6 @@ app.whenReady().then(() => {
       try { discordBot.disconnectBot(); } catch (e) {}
     }
   }
-  patreonAuth.onEntitlementChange(function(state) {
-    _lastPatreonEntitled = !!(state && state.entitled);
-    _syncCombinedEntitlement();
-    // Patron-driven icon. Patreon is the canonical source for the
-    // 'patron' palette flag. When it changes, re-render the tray +
-    // window icon so the streamer's Patreon status reflects immediately.
-    var newTier = (state && state.tier) || null;
-    if (newTier !== _currentTier) {
-      _currentTier = newTier;
-      _refreshIconForTier();
-    }
-  });
   discordAuth.onEntitlementChange(function(state) {
     _lastDiscordEntitled = !!(state && state.entitled);
     _syncCombinedEntitlement();
@@ -1059,11 +1040,6 @@ app.whenReady().then(() => {
   catch (e) { logToFile('ROTATION-RELAY', 'start threw: ' + (e && e.message)); }
 
   setTimeout(function() {
-    patreonAuth.getEntitlement().then(function(state) {
-      if (state && state.signedIn) patreonAuth.startRuntimeChecks();
-    }).catch(function(e) {
-      logToFile('AUTH-ERR', 'launch patreon entitlement check failed: ' + (e && e.message));
-    });
     discordAuth.getEntitlement().then(function(state) {
       if (state && state.signedIn) discordAuth.startRuntimeChecks();
     }).catch(function(e) {
@@ -1125,7 +1101,6 @@ app.on('before-quit', () => {
   isQuitting = true;
   try { globalShortcut.unregisterAll(); } catch (e) {}
   stopCtrlPoller();
-  try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
   try { discordAuth.stopRuntimeChecks(); } catch (e) {}
   try { obsServer.stopServer(); } catch (e) {}
   try { discordBot.disconnectBot(); } catch (e) {}
@@ -1241,32 +1216,8 @@ ipcMain.handle('discord-bot-disconnect', function() {
 ipcMain.handle('discord-bot-status', function() {
   return discordBot.getBotStatus();
 });
-// Shared-bot (SSE to hosted bot service). We look up the user's Patreon
-// access token here rather than let the renderer hand us one — the token
-// is intentionally kept out of the renderer for the same reason the
-// refresh token is.
-ipcMain.handle('shared-bot-connect', async function(event, cfg) {
-  cfg = cfg || {};
-  // Proactively refresh the Patreon access token before handing it to
-  // the bot service. Without this, a stale (~1-month-old) access token
-  // would get rejected by Patreon's identity endpoint, the bot service
-  // would treat the user as "not entitled" and return 403, and the
-  // renderer would surface "bot_service_rejected" — even though we
-  // have a perfectly good refresh_token sitting in state and could
-  // renew silently. getRawAccessTokenAsync handles the renewal.
-  var token = null;
-  try { token = await patreonAuth.getRawAccessTokenAsync(); }
-  catch (e) { token = patreonAuth.getRawAccessToken(); }
-  if (!token) return { ok: false, reason: 'not_signed_in' };
-  return discordBot.sharedBotConnect({
-    botServiceUrl: cfg.botServiceUrl,
-    guildId:       cfg.guildId,
-    accessToken:   token
-  });
-});
-ipcMain.handle('shared-bot-disconnect', function() {
-  return discordBot.sharedBotDisconnect();
-});
+// (Shared-bot SSE handlers removed 2026-06-30 — the feature was retired in
+// 1.7.x and used the Patreon token; the dead code is gone with Patreon.)
 
 // ── Stream Info favorites (cloud sync) ──────────────────────────────────────
 // Cross-machine sync for the Stream Info → Favorites presets. Backed by the
@@ -1324,8 +1275,8 @@ function favoritesHttp(method, urlStr, token, bodyObj) {
   });
 }
 async function favoritesToken() {
-  try { return await patreonAuth.getRawAccessTokenAsync(); }
-  catch (e) { try { return patreonAuth.getRawAccessToken(); } catch (e2) { return null; } }
+  try { return await twitchAuth.getRawAccessTokenAsync(); }
+  catch (e) { try { return twitchAuth.getRawAccessToken(); } catch (e2) { return null; } }
 }
 // ── Feature-flag manifest ───────────────────────────────────────────────────
 // Reads features.json (the early-access manifest). The dedicated SF Patreon-
@@ -2103,7 +2054,6 @@ ipcMain.on('install-update', () => {
   isQuitting = true;
   try { obsServer.stopServer(); }    catch (e) { logToFile('UPDATE-ERR', 'obsServer.stopServer threw: ' + (e && e.message)); }
   try { discordBot.disconnectBot(); } catch (e) { logToFile('UPDATE-ERR', 'discordBot.disconnectBot threw: ' + (e && e.message)); }
-  try { patreonAuth.stopRuntimeChecks(); } catch (e) {}
   try { discordAuth.stopRuntimeChecks(); } catch (e) {}
   try { globalShortcut.unregisterAll(); } catch (e) {}
   // quitAndInstall is a no-op if the update isn't downloaded yet, but

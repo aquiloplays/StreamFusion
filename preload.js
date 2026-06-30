@@ -128,41 +128,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Promo renderer signals it has finished loading and is ready to receive
   promoReady:         ()        => ipcRenderer.send('promo-ready'),
 
-  // ── Patreon entitlement (optional sign-in; unlocks EA features) ─────────
-  // Public entitlement shape (returned by the three functions below, and
-  // also the payload of the `patreon-entitlement-changed` event):
-  //   {
-  //     signedIn:     bool,            // a Patreon token is cached
-  //     entitled:     bool,            // signedIn AND an active paying patron
-  //     tier:         'patron' | 'follower' | 'none',
-  //     patronStatus: 'active_patron' | 'declined_patron' | 'former_patron' | null,
-  //     reason:       'entitled' | 'declined_patron' | 'former_patron'
-  //                   | 'follower' | 'not_a_member' | 'no_memberships'
-  //                   | 'offline_grace' | 'reverify_failed'
-  //                   | 'not_signed_in' | 'unknown',
-  //     userName:     string,          // Patreon full_name, blank when signed out
-  //     verifiedAt:   number | null    // epoch ms of last successful check
-  //   }
-  //
-  // Renderer usage:
-  //   const st = await window.electronAPI.patreonGetEntitlement();
-  //   if (st.entitled) { /* show EA features */ }
-  //   window.electronAPI.onPatreonEntitlementChanged(function(st) { /* react */ });
-  //
-  // Starts the OAuth flow. Opens Patreon in the system browser, catches the
-  // loopback callback, exchanges tokens via the Cloudflare proxy, and
-  // verifies the user's Patreon membership. Returns the entitlement state.
-  patreonBeginAuth:              ()  => ipcRenderer.invoke('patreon-begin-auth'),
-  // Returns the current entitlement state. Uses cache when fresh; reverifies
-  // against Patreon when the cache is older than 24h. Safe to call anytime.
-  patreonGetEntitlement:         ()  => ipcRenderer.invoke('patreon-get-entitlement'),
-  // Forgets the cached Patreon token. The app keeps working; EA features go
-  // away until the user signs in again.
-  patreonSignOut:                ()  => ipcRenderer.invoke('patreon-sign-out'),
-  // Subscribe to live entitlement changes (sign-in, sign-out, hourly
-  // re-verification, membership revocation). Handler receives the public
-  // entitlement shape documented above.
-  onPatreonEntitlementChanged:   (fn) => ipcRenderer.on('patreon-entitlement-changed', (e, state) => fn(state)),
+  // (Patreon entitlement bridges removed 2026-06-30 — Patreon is retired.)
 
   // ── Discord entitlement (parallel EA path, see discord-auth.js) ─────────
   // Second route to EA features: if the user connects their Discord and
@@ -248,13 +214,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   discordBotDisconnect: ()            => ipcRenderer.invoke('discord-bot-disconnect'),
   discordBotStatus:     ()            => ipcRenderer.invoke('discord-bot-status'),
   onDiscordEvent:       (fn)          => ipcRenderer.on('discord-event', (e, payload) => fn(payload)),
-  // Shared StreamFusion bot — SSE connection to the hosted bot service
-  // (aquilo.gg-run). The main process attaches the user's Patreon
-  // access token from its own store; the renderer never sees it.
-  sharedBotConnect:     (cfg)         => ipcRenderer.invoke('shared-bot-connect',    cfg || {}),
-  sharedBotDisconnect:  ()            => ipcRenderer.invoke('shared-bot-disconnect'),
+  // (Shared-bot bridges removed 2026-06-30 — feature retired in 1.7.x.)
 
-  // ── Stream Info favorites (cloud sync, EA) ──────────────────────────────
+  // ── Stream Info favorites (cloud sync) ──────────────────────────────────
   // Cross-machine sync for Stream Info presets. The main process attaches the
   // user's Patreon access token (renderer never sees it) and falls back to a
   // local userData cache when offline / not Patreon-linked. Returns:

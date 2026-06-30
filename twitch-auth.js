@@ -317,6 +317,18 @@ function registerIpcHandlers() {
   });
 }
 
+// Raw access-token getters for main-process cloud calls (Stream Info
+// Favorites sync). The token authenticates the user to aquilo cloud services
+// the same way the Patreon token used to; it stays out of the renderer.
+async function getRawAccessTokenAsync() {
+  try { const s = await getValidToken(); return (s && s.access_token) || null; }
+  catch (e) { return null; }
+}
+function getRawAccessToken() {
+  try { const s = readState(); return (s && s.access_token) || null; }
+  catch (e) { return null; }
+}
+
 module.exports = {
   registerIpcHandlers: registerIpcHandlers,
   setMainWindow: setMainWindow,
@@ -324,5 +336,7 @@ module.exports = {
   beginAuth: beginAuth,
   signOut: signOut,
   createClip: createClip,
-  helix: helix
+  helix: helix,
+  getRawAccessTokenAsync: getRawAccessTokenAsync,
+  getRawAccessToken: getRawAccessToken
 };

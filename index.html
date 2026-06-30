@@ -1780,19 +1780,19 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
 
     <!-- Page 9: Early Access (Patreon) -->
     <div class="ob-page" id="obPage9">
-      <div class="ob-ic" style="background:linear-gradient(135deg,#ff424d 0%,#f59e0b 100%)"><svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#fff"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg></div>
-      <div class="ob-hd">Early Access on Patreon</div>
+      <div class="ob-ic" style="background:#9146FF"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#fff"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg></div>
+      <div class="ob-hd">Support on Twitch</div>
       <div class="ob-sub" style="text-align:left">
         Every feature in StreamFusion is <strong>free for everyone</strong> &mdash; nothing here is locked behind payment.<br><br>
-        Supporting StreamFusion on Patreon gets you <strong>early access</strong>: brand-new features reach <strong>Tier 2</strong> and <strong>Tier 3</strong> supporters first, then roll out to everyone shortly after. It also helps fund development. Connecting is completely optional &mdash; you can do it now or any time later from <strong>Settings &rarr; Early Access</strong>.
+        If StreamFusion earns a spot in your stream, the best way to support development is a <strong>Twitch subscription</strong>. Totally optional &mdash; everything works without it.
       </div>
       <div id="obEaStatus" style="min-height:18px;font-size:11px;color:var(--mut);margin:4px 0;text-align:center"></div>
       <div class="ob-nav">
         <button class="ob-back" onclick="obBack()">Back</button>
         <button class="ob-skip" onclick="obNext()">Skip for now</button>
-        <button class="ob-next" id="obEaConnectBtn" onclick="obConnectPatreon()" style="background:#ff424d;border-color:#ff424d;display:flex;align-items:center;gap:6px">
-          <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg>
-          Connect Patreon
+        <button class="ob-next" onclick="window.open('https://www.twitch.tv/prodigalttv/subscribe','_blank');obNext()" style="background:#9146FF;border-color:#9146FF;display:flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
+          Subscribe on Twitch
         </button>
       </div>
     </div>
@@ -2032,7 +2032,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab active" data-tab="accounts" onclick="switchSettingsTab('accounts')">Accounts</div>
         <!-- Patreon-red accent + tiny dot icon so the supporter-only tab is
              always visible at first glance, even when the tab row wraps. -->
-        <div class="settings-tab tab-patreon" data-tab="earlyaccess" onclick="switchSettingsTab('earlyaccess')">
+        <!-- Early Access (Patreon) tab retired 2026-06-30 — Patreon removed. -->
+        <div class="settings-tab tab-patreon" data-tab="earlyaccess" onclick="switchSettingsTab('earlyaccess')" style="display:none">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Early Access
         </div>
         <!-- OBS overlays — EA-only. Same red-dot convention as Early Access
