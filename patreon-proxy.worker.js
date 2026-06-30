@@ -1,10 +1,6 @@
-// Cloudflare Worker for StreamFusion — six jobs:
-//
-//   1. /  (or anything not otherwise matched)
-//      Patreon OAuth token-exchange proxy. Holds the Patreon client_secret
-//      so it never ships in the app binary. Accepts POSTs with grant_type
-//      of authorization_code or refresh_token, adds client_id + secret,
-//      forwards to Patreon, returns the response verbatim.
+// Cloudflare Worker for StreamFusion + aquilo.gg — auth broker.
+// (Patreon support removed 2026-06-30 — Twitch is the sole identity now;
+//  any unmatched path returns 404.)
 //
 //   2. /community-recap
 //      Receives stream-recap POSTs from EA supporters who opted into
@@ -96,9 +92,6 @@ export default {
     if (path.indexOf('/beta-download/') === 0) {
       return handleBetaDownload(request, env, path);
     }
-    if (path === '/beta-updater-token') {
-      return handleBetaUpdaterToken(request, env);
-    }
     if (path === '/discord-token') {
       return handleDiscordTokenProxy(request, env);
     }
@@ -109,64 +102,9 @@ export default {
     if (path === '/twitch/api')      return handleTwitchApi(request, env);
     if (path === '/twitch/logout')   return handleTwitchLogout(request, env);
     if (path === '/twitch-token')    return handleTwitchTokenProxy(request, env);
-    // Default: Patreon token proxy (unchanged behavior from before).
-    return handlePatreonTokenProxy(request, env);
+    return json({ error: 'not_found' }, 404);
   }
 };
-
-// ── Patreon token exchange proxy ───────────────────────────────────────────
-async function handlePatreonTokenProxy(request, env) {
-  if (request.method !== 'POST') {
-    return json({ error: 'method_not_allowed' }, 405);
-  }
-  var body;
-  try { body = await request.json(); }
-  catch (e) { return json({ error: 'invalid_json' }, 400); }
-
-  var grant = body && body.grant_type;
-  if (grant !== 'authorization_code' && grant !== 'refresh_token') {
-    return json({ error: 'unsupported_grant_type' }, 400);
-  }
-  if (!env.PATREON_CLIENT_ID || !env.PATREON_CLIENT_SECRET) {
-    return json({ error: 'proxy_not_configured' }, 500);
-  }
-
-  var form = new URLSearchParams();
-  form.set('grant_type', grant);
-  form.set('client_id', env.PATREON_CLIENT_ID);
-  form.set('client_secret', env.PATREON_CLIENT_SECRET);
-
-  if (grant === 'authorization_code') {
-    if (!body.code || !body.redirect_uri) return json({ error: 'missing_code_or_redirect' }, 400);
-    var allowed = (env.ALLOWED_REDIRECT_HOSTS || '127.0.0.1').split(',').map(function(s) { return s.trim(); });
-    var u;
-    try { u = new URL(body.redirect_uri); } catch (e) { return json({ error: 'invalid_redirect_uri' }, 400); }
-    if (allowed.indexOf(u.hostname) === -1) return json({ error: 'redirect_host_not_allowed' }, 400);
-    form.set('code', body.code);
-    form.set('redirect_uri', body.redirect_uri);
-  } else {
-    if (!body.refresh_token) return json({ error: 'missing_refresh_token' }, 400);
-    form.set('refresh_token', body.refresh_token);
-  }
-
-  var patreonResp;
-  try {
-    patreonResp = await fetch('https://www.patreon.com/api/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'StreamFusion-EA-Proxy'
-      },
-      body: form.toString()
-    });
-  } catch (e) { return json({ error: 'upstream_unreachable', detail: String(e) }, 502); }
-
-  var text = await patreonResp.text();
-  return new Response(text, {
-    status: patreonResp.status,
-    headers: { 'Content-Type': 'application/json' }
-  });
-}
 
 // ── Discord OAuth token exchange proxy ─────────────────────────────────────
 // Mirrors handlePatreonTokenProxy for the StreamFusion Discord OAuth
@@ -481,157 +419,6 @@ function json(obj, status, extraHeaders) {
     status: status || 200,
     headers: headers
   });
-}
-
-// ── /beta-updater-token ─────────────────────────────────────────────────────
-// Vends GITHUB_BETA_TOKEN to verified current Tier 3 patrons (or the owner)
-// so beta installs can auto-update without the user managing a PAT file by
-// hand. Verification happens server-side against Patreon's identity API,
-// using the Patreon access token the SF app already holds. The PAT itself
-// stays secret to the Worker — clients only get it back if they prove they
-// are entitled NOW.
-//
-// Trust model:
-//   - The SF app's Patreon access token is sensitive but already held by
-//     the user (it's how SF talks to Patreon directly). Sending it to the
-//     Worker over HTTPS is the same trust as the existing /  (Patreon proxy)
-//     endpoint that handles refresh-token calls.
-//   - The vended PAT IS the same long-lived GITHUB_BETA_TOKEN the Worker
-//     uses for /beta-download. A user who saves the PAT off disk after
-//     receiving it retains beta-update access until the PAT is rotated.
-//     Acceptable risk for now — same model as today's manual-file flow,
-//     just automated.
-//   - To revoke beta access for a demoted user, the SF app deletes its
-//     local copy on the next 403 from this endpoint. They lose access on
-//     next launch.
-//
-// Request:
-//   POST /beta-updater-token
-//   { "patreonAccessToken": "...optional Patreon access token..." }
-//
-// Response (200):
-//   { ok: true, token: "ghp_...", email: "...", tier: "patron", expiresHint: 86400000 }
-//
-// Errors (403):
-//   { ok: false, error: "not_a_patron" | "patreon_check_failed" | "no_token" }
-async function handleBetaUpdaterToken(request, env) {
-  if (request.method === 'OPTIONS') return preflightCors();
-  if (request.method !== 'POST') {
-    return json({ ok: false, error: 'method_not_allowed' }, 405, corsHeaders());
-  }
-  if (!env.GITHUB_BETA_TOKEN) {
-    return json({ ok: false, error: 'proxy_not_configured' }, 500, corsHeaders());
-  }
-  var body;
-  try { body = await request.json(); }
-  catch (e) { return json({ ok: false, error: 'invalid_json' }, 400, corsHeaders()); }
-
-  var accessToken = body && body.patreonAccessToken;
-  if (!accessToken || typeof accessToken !== 'string') {
-    return json({ ok: false, error: 'no_token' }, 400, corsHeaders());
-  }
-
-  var verdict;
-  try {
-    verdict = await _verifyPatreonSupporter(accessToken, env);
-  } catch (e) {
-    return json({ ok: false, error: 'patreon_check_failed', detail: String(e && e.message || e) }, 502, corsHeaders());
-  }
-
-  if (!verdict.entitled) {
-    return json({ ok: false, error: 'not_a_patron', tier: verdict.tier || 'none', email: verdict.email || null }, 403, corsHeaders());
-  }
-
-  return json({
-    ok: true,
-    token:       env.GITHUB_BETA_TOKEN,
-    email:       verdict.email || null,
-    tier:        verdict.tier  || 'patron',
-    expiresHint: 86400000   // 24h cache hint to the client; not enforced server-side
-  }, 200, corsHeaders());
-}
-
-// Calls Patreon's /identity endpoint with the user's access token, then
-// returns {entitled, tier, email, reason}. Mirrors the single-tier,
-// campaign-scoped rules used in patreon-auth.js inside the SF app:
-//   - active pledge of >= 500 cents ($5 "Patron" tier) ON OUR CAMPAIGN → entitled
-//   - patron_status === 'declined_patron' or 'former_patron' → blocked
-//   - owner email always grants regardless of pledge
-// The campaign filter is the load-bearing fix: without it, a $5 pledge to
-// ANY unrelated creator's Patreon would unlock our private beta token.
-const PATREON_OWNER_EMAIL = 'bisherclay@gmail.com';
-// The Aquilo campaign. Keep in sync with patreon-auth.js's
-// PATREON_CAMPAIGN_ID. Overridable via env for self-hosters/testing.
-const PATREON_CAMPAIGN_ID = '3410750';
-const PATRON_MIN_CENTS = 500;
-async function _verifyPatreonSupporter(accessToken, env) {
-  var campaignId = String((env && env.PATREON_CAMPAIGN_ID) || PATREON_CAMPAIGN_ID);
-  var url = 'https://www.patreon.com/api/oauth2/v2/identity'
-    + '?include=memberships,memberships.campaign'
-    + '&fields%5Bmember%5D=patron_status,currently_entitled_amount_cents'
-    + '&fields%5Buser%5D=email';
-  var resp;
-  try {
-    resp = await fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + accessToken },
-    });
-  } catch (e) {
-    throw new Error('Patreon fetch network error: ' + (e && e.message || e));
-  }
-  if (!resp.ok) {
-    throw new Error('Patreon identity HTTP ' + resp.status);
-  }
-  var doc;
-  try { doc = await resp.json(); }
-  catch (e) { throw new Error('Patreon identity returned non-JSON'); }
-
-  var email = (doc && doc.data && doc.data.attributes && doc.data.attributes.email) || null;
-  // Owner bypass: always entitled regardless of pledge state. Matches
-  // patreon-auth.js's strengthen-owner-bypass logic.
-  if (email && email.toLowerCase() === PATREON_OWNER_EMAIL.toLowerCase()) {
-    return { entitled: true, tier: 'patron', email: email, reason: 'owner_bypass' };
-  }
-
-  var memberships = (doc && doc.data && doc.data.relationships && doc.data.relationships.memberships && doc.data.relationships.memberships.data) || [];
-  // Build member-id -> { attrs, campaignId } from the included resources.
-  // Member resources carry relationships.campaign.data.id, which lets us
-  // confirm the pledge is on OUR campaign and not some other creator's.
-  var memberLookup = {};
-  if (Array.isArray(doc.included)) {
-    for (var i = 0; i < doc.included.length; i++) {
-      var inc = doc.included[i];
-      if (inc && inc.type === 'member') {
-        var campRef = inc.relationships && inc.relationships.campaign &&
-                      inc.relationships.campaign.data && inc.relationships.campaign.data.id;
-        memberLookup[inc.id] = {
-          attrs: inc.attributes || {},
-          campaignId: campRef != null ? String(campRef) : null
-        };
-      }
-    }
-  }
-  var bestAmount = 0;
-  for (var j = 0; j < memberships.length; j++) {
-    var rec = memberLookup[memberships[j].id];
-    if (!rec) continue;
-    // Only pledges to the Aquilo campaign count toward entitlement.
-    if (rec.campaignId !== campaignId) continue;
-    var status = rec.attrs.patron_status || null;
-    var amount = parseInt(rec.attrs.currently_entitled_amount_cents, 10) || 0;
-    // Explicit declines/former patrons can't be entitled even if a stale
-    // amount is reported.
-    if (status === 'declined_patron' || status === 'former_patron') continue;
-    if (amount > bestAmount) bestAmount = amount;
-  }
-
-  // Single paid tier: any active pledge of $5+ on our campaign is entitled.
-  var entitled = bestAmount >= PATRON_MIN_CENTS;
-  return {
-    entitled: entitled,
-    tier:     entitled ? 'patron' : 'none',
-    email:    email,
-    reason:   entitled ? 'patreon_patron' : 'patreon_not_supporting'
-  };
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -1,18 +1,15 @@
-# aquilo-auth-proxy — Patreon / Discord OAuth token-exchange proxy.
-# Same code as the old streamfusion-patreon-proxy, redeployed onto the
-# aquilo Cloudflare account behind auth.aquilo.gg so its URL is no longer
-# tied to a personal *.workers.dev account.
+# aquilo-auth-proxy — Twitch / Discord OAuth broker behind auth.aquilo.gg.
+# (Patreon support removed 2026-06-30 — Twitch is the sole identity now.)
 #
 # Secrets are set on the Worker, NOT here (dashboard or `wrangler secret put`):
-#   PATREON_CLIENT_SECRET, DISCORD_CLIENT_SECRET, GITHUB_BETA_TOKEN,
-#   COMMUNITY_RECAP_WEBHOOK, TWITCH_CLIENT_SECRET
+#   TWITCH_CLIENT_SECRET, DISCORD_CLIENT_SECRET, GITHUB_BETA_TOKEN,
+#   COMMUNITY_RECAP_WEBHOOK
 name = "aquilo-auth-proxy"
 main = "patreon-proxy.worker.js"
 compatibility_date = "2025-09-01"
 account_id = "fa3738ee91624ee17c9ef4401ee8a493"
 
 [vars]
-PATREON_CLIENT_ID = "tPN89A6Yz_NEpvQIQ2hDXcfCpyrrYha6YsgZ-aUcQP2y8Lcnaxm7-xSY8W3Zn4QO"
 DISCORD_CLIENT_ID = "1494759611922645003"
 ALLOWED_REDIRECT_HOSTS = "127.0.0.1,localhost,aquilo.gg"
 # Twitch broker (see the Twitch section in patreon-proxy.worker.js).
