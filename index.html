@@ -2362,7 +2362,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="sec-hd">PunchCard daily check-ins</div>
             <div class="frow" style="gap:8px">
               <label style="font-size:11px;color:var(--mut);min-width:60px">Channel</label>
-              <input id="ci-channel" placeholder="your twitch login" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 10px;font-size:12px;outline:none" onchange="renderCheckinsTab()">
+              <input id="ci-channel" placeholder="auto-detected from Streamer.bot" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 10px;font-size:12px;outline:none" onchange="_ciSaveChannel()">
               <button onclick="renderCheckinsTab()" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">Refresh</button>
             </div>
             <div style="font-size:11px;color:var(--mut);margin:6px 0 10px">Live daily check-ins from PunchCard (aquilo.gg/punchcard). Auto-refreshes every 15s while this tab is open.</div>
@@ -9754,9 +9754,29 @@ function switchSettingsTab(tab) {
 var _ciTimer = null;
 function _ciEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function _ciAgo(ts) { var d = (Date.now() - ts) / 1000; if (d < 60) return 'just now'; if (d < 3600) return Math.floor(d / 60) + 'm ago'; if (d < 86400) return Math.floor(d / 3600) + 'h ago'; return Math.floor(d / 86400) + 'd ago'; }
+// Resolve the channel to poll. A pinned value (the streamer typed one) wins;
+// otherwise the connected Twitch app login; otherwise — and this is the common
+// case — the broadcaster login Streamer.bot reports (S.twLogin), so the panel
+// works on an SB-only setup with no Twitch app connected.
+function _ciChannel() {
+  var pinned = '';
+  try { pinned = (localStorage.getItem('sf-ci-channel') || '').trim().toLowerCase(); } catch (e) {}
+  return pinned
+    || (((S.twitch && S.twitch.login) || '').trim().toLowerCase())
+    || ((S.twLogin || '').trim().toLowerCase());
+}
+function _ciSaveChannel() {
+  var inp = document.getElementById('ci-channel');
+  var v = ((inp && inp.value) || '').trim().toLowerCase();
+  try { localStorage.setItem('sf-ci-channel', v); } catch (e) {}
+  _ciPoll();
+}
 function _ciPoll() {
   var feed = document.getElementById('ci-feed');
   var inp = document.getElementById('ci-channel');
+  // Auto-fill if empty, re-checked each poll so a late SB connection (S.twLogin
+  // arrives after the tab opens) still seeds it.
+  if (inp && !inp.value) { var auto = _ciChannel(); if (auto) inp.value = auto; }
   var ch = ((inp && inp.value) || '').trim().toLowerCase();
   if (!feed) return;
   if (!ch) { feed.innerHTML = '<div style="opacity:.6;padding:14px;font-size:12px">Enter your Twitch channel above to see check-ins.</div>'; return; }
@@ -9783,7 +9803,7 @@ function _ciPoll() {
 }
 function renderCheckinsTab() {
   var inp = document.getElementById('ci-channel');
-  if (inp && !inp.value && S.twitch && S.twitch.login) inp.value = S.twitch.login;
+  if (inp && !inp.value) { var auto = _ciChannel(); if (auto) inp.value = auto; }
   _ciPoll();
   clearInterval(_ciTimer);
   _ciTimer = setInterval(function() {
