@@ -83,6 +83,7 @@ const SCOPES = [
   'moderator:manage:announcements',  // native /announce (schedule go-live message)
   'user:write:chat',                 // send chat as the broadcaster (bot fallback)
   'channel:bot',                     // let the connected bot account post here
+  'user:read:chat',                  // read own chat natively (SB-less chat + bot)
 ];
 
 // A separate, minimal scope set for the OPTIONAL bot account (a second Twitch

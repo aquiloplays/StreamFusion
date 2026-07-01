@@ -1330,6 +1330,28 @@ ipcMain.handle('favorites-put', async function(event, arg) {
   if (!cloud || !cloud.ok) return { ok: true, offline: true, updatedAt, syncError: (cloud && cloud.error) || 'unreachable' };
   return { ok: true, cloudSynced: true, updatedAt: cloud.updatedAt || updatedAt };
 });
+
+// ── Bot-config cloud sync (shares the favorites worker + auth) ──────────────
+// Thin proxies: the renderer owns the local copy (localStorage) and does the
+// last-write-wins reconciliation; main just attaches the Twitch token so it
+// never reaches the renderer. Same /bot-config contract as aquilo.gg's web UI.
+ipcMain.handle('bot-config-get', async function(event, twitchId) {
+  twitchId = String(twitchId || 'default');
+  const token = await favoritesToken();
+  if (!token) return { ok: false, localOnly: true };
+  const cloud = await favoritesHttp('GET', FAVORITES_WORKER_URL + '/bot-config?twitchId=' + encodeURIComponent(twitchId), token, null);
+  if (!cloud || !cloud.ok) return { ok: false, offline: true, syncError: (cloud && cloud.error) || 'unreachable' };
+  return { ok: true, config: cloud.config || null, updatedAt: cloud.updatedAt || 0 };
+});
+ipcMain.handle('bot-config-put', async function(event, arg) {
+  arg = arg || {};
+  const twitchId = String(arg.twitchId || 'default');
+  const token = await favoritesToken();
+  if (!token) return { ok: false, localOnly: true };
+  const cloud = await favoritesHttp('PUT', FAVORITES_WORKER_URL + '/bot-config?twitchId=' + encodeURIComponent(twitchId), token, { config: arg.config || {}, updatedAt: Number(arg.updatedAt) || Date.now() });
+  if (!cloud || !cloud.ok) return { ok: false, offline: true, syncError: (cloud && cloud.error) || 'unreachable' };
+  return { ok: true, updatedAt: cloud.updatedAt || 0 };
+});
 ipcMain.on('minimize-window', () => mainWindow?.minimize());
 ipcMain.on('maximize-window', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();

@@ -2408,6 +2408,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="display:flex;gap:6px;margin-bottom:6px"><button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="botCfgExport()">Export</button><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="botCfgImport()">Import</button></div>
             <textarea id="botCfgIO" placeholder="Bot config JSON appears here on Export; paste one here and press Import." rows="4" style="width:100%;font-size:10px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none;font-family:ui-monospace,monospace"></textarea>
             <div id="botCfgStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>
+            <div id="botCfgSyncLine" style="font-size:10px;color:var(--mut);margin-top:2px;min-height:12px"></div>
           </div>
         </div>
 
@@ -3614,6 +3615,13 @@ function applyTwitchStatus(st) {
   if (typeof _esSyncFromStatus === 'function') _esSyncFromStatus();
   // Keep the Stream control surface's connect-gate in sync live.
   try { if (typeof renderStreamTab === 'function') renderStreamTab(); } catch (e) {}
+  // First Twitch connect this session: reconcile bot config with aquilo.gg.
+  try {
+    if (S.twitch && S.twitch.signedIn && typeof _botCfgSync !== 'undefined' && !_botCfgSync.didInit) {
+      _botCfgSync.didInit = true;
+      setTimeout(function () { try { botConfigCloudSync(); } catch (e) {} }, 1500);
+    }
+  } catch (e) {}
 }
 
 // ── Dedicated Twitch sign-in screen ──────────────────────────────────────────
@@ -3780,7 +3788,11 @@ var ES_SUBS = [
   // Accurate live state + title/category changes (no scope needed).
   { type: 'stream.online', version: '1' },
   { type: 'stream.offline', version: '1' },
-  { type: 'channel.update', version: '2' }
+  { type: 'channel.update', version: '2' },
+  // Native chat read (scope user:read:chat; condition needs user_id too).
+  // Only rendered/processed while Streamer.bot is disconnected — see _esRoute.
+  // With this, chat + the whole bot work on Twitch with zero Streamer.bot.
+  { type: 'channel.chat.message', version: '1', chatUser: true }
 ];
 function _esTier(t) { return ({ '1000': 1, '2000': 2, '3000': 3 })[String(t)] || (Number(t) || 1); }
 function _esStatus(msg, isErr) { var el = document.getElementById('eventsubStatus'); if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--err, #ef4444)' : 'var(--accent)'; } }
@@ -3923,6 +3935,26 @@ function _esRoute(subType, ev) {
   else if (subType === 'stream.online') r = ['StreamOnline', { startedAt: ev.started_at }];
   else if (subType === 'stream.offline') r = ['StreamOffline', {}];
   else if (subType === 'channel.update') r = ['ChannelInfoUpdate', { title: ev.title, gameName: ev.category_name, gameId: ev.category_id }];
+  // ── Native chat read ──────────────────────────────────────────────────────
+  // While Streamer.bot is connected IT owns chat (richer metadata, and feeding
+  // both would double every message; chat has no _esDedup canon). The moment
+  // SB drops, this path takes over seamlessly: same Twitch.ChatMessage branch,
+  // so rendering, viewer CRM, auto-mod, commands and giveaways all still run.
+  // EventSub fragments are already the parts shape renderTwitchMessage reads
+  // ({type:'emote', text, emote:{id}}), so native Twitch emotes render too.
+  else if (subType === 'channel.chat.message') {
+    if (S.sbConnected) return;
+    var _cmBadges = (ev.badges || []).map(function (b) { return { name: b.set_id }; });
+    var _cmText = (ev.message && ev.message.text) || '';
+    r = ['ChatMessage', {
+      user: { name: ev.chatter_user_name, login: ev.chatter_user_login, displayName: ev.chatter_user_name, color: ev.color || null, badges: _cmBadges },
+      broadcaster: { id: ev.broadcaster_user_id },   // seeds 7TV/BTTV emote fetch
+      text: _cmText,
+      message: { message: _cmText, msgId: ev.message_id },
+      messageId: ev.message_id,
+      parts: (ev.message && ev.message.fragments) || null
+    }];
+  }
   if (!r) return;
   try { handleSBEvent({ source: 'Twitch', type: r[0] }, r[1], true); } catch (e) { console.warn('[eventsub] route', e); }
 }
@@ -3935,6 +3967,7 @@ async function _esSubscribe() {
     var s = ES_SUBS[i];
     var cond = s.raidTo ? { to_broadcaster_user_id: uid } : { broadcaster_user_id: uid };
     if (s.mod) cond.moderator_user_id = uid;
+    if (s.chatUser) cond.user_id = uid;
     try {
       var res = await window.electronAPI.twitchHelix({ method: 'POST', path: 'eventsub/subscriptions', body: { type: s.type, version: s.version, condition: cond, transport: { method: 'websocket', session_id: _es.session } } });
       var _accepted = res && (res.status === 202 || res.status === 200 || res.status === 409);
@@ -4122,7 +4155,7 @@ function _schedNewId() { return 's' + Math.random().toString(36).slice(2, 8); }
 function _schedParseTime(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim()); if (!m) return null; var h = +m[1], mi = +m[2]; if (h > 23 || mi > 59) return null; return h * 60 + mi; }
 function _schedFmtTime(mins) { var h = Math.floor(mins / 60), m = mins % 60; var ap = h < 12 ? 'AM' : 'PM'; var h12 = h % 12 || 12; return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ap; }
 function _schedTags(slot) { return slot && slot.tags ? String(slot.tags).split(',').map(function (x) { return x.trim(); }).filter(Boolean) : []; }
-function _schedFill(tpl, slot) { return String(tpl || '').replace(/\{title\}/g, slot.title || '').replace(/\{game\}/g, slot.gameName || '').replace(/\{label\}/g, slot.label || ''); }
+function _schedFill(tpl, slot) { var lit = function (v) { return function () { return v; }; }; return String(tpl || '').replace(/\{title\}/g, lit(slot.title || '')).replace(/\{game\}/g, lit(slot.gameName || '')).replace(/\{label\}/g, lit(slot.label || '')); }
 // Best slot for "now": scheduled today, within the match window (started up to
 // windowMin ago, or up to 30 min early), nearest to now wins.
 function _schedMatchNow() {
@@ -4325,6 +4358,20 @@ function disconnectBotAccount() {
   window.electronAPI.twitchBotSignOut().then(applyTwitchBotStatus).catch(function () {});
 }
 
+// ── Local bot executor switch ──
+// Whether THIS StreamFusion instance runs the bot (replies to commands, fires
+// automated messages, enforces auto-mod, accepts giveaway entries). Turn it
+// off when the aquilo.gg cloud bot is handling your channel so the two never
+// double-post. Per-device on purpose (localStorage sf_bot_run_local, default
+// on): it is about where execution happens, so it is NOT part of the synced
+// bot-config bundle.
+var _botRunLocal = true;
+function botSetRunLocal(v) {
+  _botRunLocal = !!v;
+  try { localStorage.setItem('sf_bot_run_local', _botRunLocal ? '1' : '0'); } catch (e) {}
+  if (typeof renderBotTab === 'function') { try { renderBotTab(); } catch (e) {} }
+}
+
 // ── Automated messages engine ──
 var _autoMsg = null;
 var _autoMsgChatCount = 0;   // viewer chat lines seen this session (gate)
@@ -4341,6 +4388,7 @@ function _autoMsgLoad() {
 function _autoMsgSave() { try { localStorage.setItem('sf_auto_messages', JSON.stringify(_autoMsg)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function _autoMsgLive() { try { return (typeof _isPlatLive === 'function' && _isPlatLive('tw')) || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active); } catch (e) { return false; } }
 function _autoMsgTick() {
+  if (!_botRunLocal) return;
   if (!_autoMsg || !_autoMsg.enabled || !_autoMsg.msgs.length) return;
   if (_autoMsg.onlyLive && !_autoMsgLive()) return;
   var now = Date.now(), minL = Number(_autoMsg.minLines) || 0;
@@ -4399,6 +4447,13 @@ function renderBotTab() {
         + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">Optional. Connect a separate Twitch account (your own bot) so messages post under its name. Without one, messages post from your own channel account (or Streamer.bot if connected).</div>'
         + '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="connectBotAccount()">Connect bot account</button><div id="botAcctStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>';
     }
+    // Executor switch: shown in both states. Off = this device is view/edit
+    // only (for when the aquilo.gg cloud bot is running your channel).
+    ac.innerHTML += '<div style="border-top:1px solid var(--bdr);margin-top:10px;padding-top:8px">'
+      + '<label class="frow" style="margin:0"><span>Run the bot from this app</span><input type="checkbox"' + (_botRunLocal ? ' checked' : '') + ' onchange="botSetRunLocal(this.checked)"></label>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:3px">' + (_botRunLocal
+          ? 'This PC replies to commands, sends automated messages, and enforces auto-mod. Turn off if the aquilo.gg cloud bot runs your channel, so they never double-post.'
+          : '<strong style="color:#f0883e">Paused on this device.</strong> Settings still sync; nothing posts or filters from here.') + '</div></div>';
   }
   // Global automated-message settings
   var g = document.getElementById('autoMsgGlobals');
@@ -4435,14 +4490,18 @@ function _botUptime() {
   return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
 }
 function _fillCmdVars(tpl, ctx) {
+  // Function-form replacements throughout: viewer-controlled values ({args},
+  // {touser}) may contain "$&"-style sequences that string replacements would
+  // expand into match text. Functions return values verbatim.
+  var lit = function (v) { return function () { return v; }; };
   return String(tpl || '')
-    .replace(/\{user\}/gi, ctx.user || '')
-    .replace(/\{touser\}/gi, ctx.arg1 || ctx.user || '')
-    .replace(/\{args\}/gi, ctx.args || '')
-    .replace(/\{count\}/gi, ctx.count != null ? String(ctx.count) : '')
-    .replace(/\{channel\}/gi, S.twLogin || '')
-    .replace(/\{game\}/gi, S.twGame || '')
-    .replace(/\{uptime\}/gi, _botUptime())
+    .replace(/\{user\}/gi, lit(ctx.user || ''))
+    .replace(/\{touser\}/gi, lit(ctx.arg1 || ctx.user || ''))
+    .replace(/\{args\}/gi, lit(ctx.args || ''))
+    .replace(/\{count\}/gi, lit(ctx.count != null ? String(ctx.count) : ''))
+    .replace(/\{channel\}/gi, lit(S.twLogin || ''))
+    .replace(/\{game\}/gi, lit(S.twGame || ''))
+    .replace(/\{uptime\}/gi, lit(_botUptime()))
     .replace(/\{random:([^}]+)\}/gi, function (_m, list) { var a = list.split('|'); return a[Math.floor(Math.random() * a.length)] || ''; });
 }
 function _botUserLevel(u) {
@@ -4457,8 +4516,8 @@ function _botUserLevel(u) {
   return 0;
 }
 function maybeFireCommand(text, u, plat) {
+  if (!_botRunLocal) return;
   if (!_cmds) _cmdLoad();
-  if (!_cmds.length) return;
   text = String(text || '').trim();
   if (text.charAt(0) !== '!') return;
   // Loop guard: ignore our own last-sent line and the bot account's messages.
@@ -4571,6 +4630,7 @@ function _automodLoad() {
 function _automodSave() { try { localStorage.setItem('sf_automod', JSON.stringify(_automod)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function botPermit(login) { if (!_automod) _automodLoad(); _permits[String(login || '').toLowerCase()] = Date.now() + (Number(_automod.permitSec) || 60) * 1000; }
 function maybeAutoMod(text, u, msgId) {
+  if (!_botRunLocal) return false;
   if (!_automod) _automodLoad();
   if (!_automod || !_automod.enabled) return false;
   var lvl = _botUserLevel(u);
@@ -4690,7 +4750,7 @@ function _gwLoadCfg() { try { var d = JSON.parse(localStorage.getItem('sf_giveaw
 function _gwSaveCfg() { try { localStorage.setItem('sf_giveaway_cfg', JSON.stringify({ keyword: _giveaway.keyword, subLuck: _giveaway.subLuck, minLevel: _giveaway.minLevel })); } catch (e) {} }
 function _gwEntryCount() { return Object.keys(_giveaway.entries).length; }
 function maybeGiveawayEntry(text, u) {
-  if (!_giveaway.active) return;
+  if (!_botRunLocal || !_giveaway.active) return;
   if (String(text || '').trim().toLowerCase() !== String(_giveaway.keyword || '').trim().toLowerCase()) return;
   if (_botUserLevel(u) < (_CMD_LEVELS[_giveaway.minLevel] || 0)) return;
   var login = (u.login || u.name || u.displayName || '').toLowerCase();
@@ -4729,7 +4789,10 @@ function gwSetCfg(f, v) { _giveaway[f] = v; _gwSaveCfg(); _botConfigTouch(); }
 // CRM + analytics are per-device and are not part of this bundle.
 // ══════════════════════════════════════════════════════════════════════════
 var SF_BOT_CFG_VERSION = 1;
-function _botConfigTouch() { try { localStorage.setItem('sf_bot_updated', String(Date.now())); } catch (e) {} }
+function _botConfigTouch() {
+  try { localStorage.setItem('sf_bot_updated', String(Date.now())); } catch (e) {}
+  if (typeof _botCfgSchedulePush === 'function') { try { _botCfgSchedulePush(); } catch (e) {} }
+}
 function _botUpdatedAt() { return Number(localStorage.getItem('sf_bot_updated') || 0) || 0; }
 function sfBotConfig() {
   if (!_cmds) _cmdLoad(); if (!_autoMsg) _autoMsgLoad(); if (!_automod) _automodLoad(); if (!_quotes) _quotesLoad(); if (!_schedule) _schedLoad(); if (!_giveaway) { }
@@ -4770,6 +4833,47 @@ function botCfgImport() {
   var obj; try { obj = JSON.parse(ta.value); } catch (e) { if (st) { st.textContent = 'That is not valid JSON.'; st.style.color = 'var(--red)'; } return; }
   var ok = applyBotConfig(obj);
   if (st) { st.textContent = ok ? 'Imported and applied.' : 'Import failed.'; st.style.color = ok ? 'var(--grn)' : 'var(--red)'; }
+}
+
+// ── Cloud sync (aquilo.gg /bot-config, same worker + auth as favorites) ──
+// Pull on Twitch connect: newer cloud config is applied here; newer local
+// config is pushed up. After that, any local edit debounce-pushes. The web UI
+// at aquilo.gg edits the same bundle, so changes made there arrive on the
+// next launch/connect (and vice versa). Last-write-wins via updatedAt.
+var _botCfgSync = { didInit: false, applying: false, pushTimer: null };
+function _botCfgSyncLine(msg, tone) {
+  var el = document.getElementById('botCfgSyncLine');
+  if (el) { el.textContent = msg || ''; el.style.color = tone === 'err' ? 'var(--red)' : tone === 'ok' ? 'var(--grn)' : 'var(--mut)'; }
+}
+async function botConfigCloudSync() {
+  if (!window.electronAPI || !window.electronAPI.botConfigGet) return;
+  try {
+    var res = await window.electronAPI.botConfigGet(_twUid() || 'default');
+    if (!res || !res.ok) { _botCfgSyncLine(res && res.localOnly ? 'Sync: connect Twitch to enable.' : 'Sync: offline (local settings in use).'); return; }
+    var localAt = _botUpdatedAt();
+    if (res.config && (res.updatedAt || 0) > localAt) {
+      _botCfgSync.applying = true;
+      try { applyBotConfig(res.config); } finally { _botCfgSync.applying = false; }
+      _botCfgSyncLine('Sync: pulled newer settings from aquilo.gg.', 'ok');
+    } else if (localAt > (res.updatedAt || 0)) {
+      _botCfgPushNow();
+    } else {
+      _botCfgSyncLine('Sync: up to date with aquilo.gg.', 'ok');
+    }
+  } catch (e) { /* non-fatal */ }
+}
+async function _botCfgPushNow() {
+  if (!window.electronAPI || !window.electronAPI.botConfigPut) return;
+  try {
+    var cfg = sfBotConfig();
+    var res = await window.electronAPI.botConfigPut(_twUid() || 'default', cfg, cfg.updatedAt);
+    _botCfgSyncLine(res && res.ok ? 'Sync: pushed to aquilo.gg.' : 'Sync: offline (will retry on next change).', res && res.ok ? 'ok' : '');
+  } catch (e) { /* non-fatal */ }
+}
+function _botCfgSchedulePush() {
+  if (_botCfgSync.applying) return;   // cloud-applied config must not echo back
+  if (_botCfgSync.pushTimer) clearTimeout(_botCfgSync.pushTimer);
+  _botCfgSync.pushTimer = setTimeout(function () { _botCfgSync.pushTimer = null; _botCfgPushNow(); }, 5000);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -14851,6 +14955,7 @@ setTimeout(function() {
   _automodLoad();
   _quotesLoad();
   _gwLoadCfg();
+  try { _botRunLocal = localStorage.getItem('sf_bot_run_local') !== '0'; } catch (e) {}
   // Viewer CRM: load + flush to localStorage every 15s (writes are throttled
   // so per-message tracking doesn't hammer disk) and once more on unload.
   _viewersLoad();

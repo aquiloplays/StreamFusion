@@ -243,6 +243,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   favoritesGet: (twitchId)                       => ipcRenderer.invoke('favorites-get', twitchId),
   favoritesPut: (twitchId, favorites, updatedAt) => ipcRenderer.invoke('favorites-put', { twitchId: twitchId, favorites: favorites, updatedAt: updatedAt }),
+  // Bot-config cloud sync (same worker + Twitch-token auth as favorites).
+  botConfigGet: (twitchId)                    => ipcRenderer.invoke('bot-config-get', twitchId),
+  botConfigPut: (twitchId, config, updatedAt) => ipcRenderer.invoke('bot-config-put', { twitchId: twitchId, config: config, updatedAt: updatedAt }),
 
   // Stream Info quick-swap global hotkeys. Map: { open, fav1..fav5 }. Returns
   // { ok, registered, failed, conflicted }. Main fires open-stream-info /

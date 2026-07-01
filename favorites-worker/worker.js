@@ -70,6 +70,54 @@ export default {
       return json({ ok: false, error: 'method_not_allowed' }, 405);
     }
 
+    // ── Bot config sync ─────────────────────────────────────────────────────
+    // Shared contract between StreamFusion desktop and aquilo.gg's web bot UI:
+    // both read/write the SAME versioned bundle so a streamer's commands,
+    // automated messages, auto-mod, quotes, giveaway and schedule settings are
+    // identical everywhere. Same auth as /favorites (Bearer = Twitch access
+    // token, uid derived server-side). Last-write-wins via updatedAt; clients
+    // must adopt the winning side's updatedAt after reconciling.
+    //   GET /bot-config?twitchId=<id>  -> { ok, config:{}|null, updatedAt }
+    //   PUT /bot-config?twitchId=<id>  body { config:{}, updatedAt } -> { ok, updatedAt }
+    // config shape (v1, defined in SF index.html sfBotConfig()):
+    //   { v:1, updatedAt, commands:[], autoMessages:{}, automod:{}, quotes:[],
+    //     giveaway:{}, schedule:{} }
+    // Bot ACCOUNT tokens are never part of this payload; each client does its
+    // own OAuth. Execution locality (which client actually posts) is also NOT
+    // synced; it is a per-device choice.
+    if (path === '/bot-config') {
+      if (!env.FAVORITES) return json({ ok: false, error: 'kv_unbound' }, 503);
+
+      const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      if (!token) return json({ ok: false, error: 'no_token' }, 401);
+
+      const uid = await resolveTwitchUserId(token, env);
+      if (!uid) return json({ ok: false, error: 'invalid_token' }, 401);
+
+      const twitchId = (url.searchParams.get('twitchId') || '').replace(/[^0-9]/g, '') || 'default';
+      const key = 'botcfg:' + uid + ':' + twitchId;
+
+      if (req.method === 'GET') {
+        const raw = await env.FAVORITES.get(key);
+        const data = raw ? safeParse(raw) : null;
+        return json({ ok: true, config: (data && data.config) || null, updatedAt: (data && data.updatedAt) || 0 });
+      }
+
+      if (req.method === 'PUT') {
+        let body;
+        try { body = await req.json(); } catch { return json({ ok: false, error: 'bad_json' }, 400); }
+        const config = (body.config && typeof body.config === 'object') ? body.config : null;
+        if (!config) return json({ ok: false, error: 'no_config' }, 400);
+        const updatedAt = Number(body.updatedAt) || Date.now();
+        const payload = JSON.stringify({ config, updatedAt });
+        if (payload.length > MAX_PAYLOAD) return json({ ok: false, error: 'too_large' }, 400);
+        await env.FAVORITES.put(key, payload);
+        return json({ ok: true, updatedAt });
+      }
+
+      return json({ ok: false, error: 'method_not_allowed' }, 405);
+    }
+
     return json({ ok: false, error: 'not_found' }, 404);
   }
 };
