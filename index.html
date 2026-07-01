@@ -350,6 +350,9 @@ body.has-sf-notice { padding-top: 42px !important; }
 .badge.mod{background:#00ad03;color:#fff}.badge.vip{background:#e005b9;color:#fff}
 .badge.sub{background:var(--tw);color:#fff}.badge.owner{background:#f90;color:#000}.badge.member{background:#0a8f2c;color:#fff}
 .susp-badge{font-size:11px;line-height:1;margin:0 3px;color:#f0883e;cursor:help;filter:drop-shadow(0 0 3px rgba(240,136,62,.5))}
+.viewer-card-wrap{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px}
+.viewer-card{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:16px 18px;width:340px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.mname.vclick{cursor:pointer}.mname.vclick:hover{text-decoration:underline}
 .tw-badge{width:18px;height:18px;vertical-align:middle;margin:0 1px;border-radius:2px;image-rendering:auto;flex-shrink:0}
 .pronoun{font-size:10px;color:var(--mut);background:var(--surf3);border-radius:3px;padding:0 4px;margin-left:2px;font-weight:500;vertical-align:middle}
 .mtext{font-size:var(--chat-size);line-height:1.8;color:var(--txt);word-break:break-word}
@@ -2055,6 +2058,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="stream" onclick="switchSettingsTab('stream')">Stream</div>
         <div class="settings-tab" data-tab="schedule" onclick="switchSettingsTab('schedule')">Schedule</div>
         <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
+        <div class="settings-tab" data-tab="viewers" onclick="switchSettingsTab('viewers')">Viewers</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
         <div class="settings-tab" data-tab="tts" onclick="switchSettingsTab('tts')">TTS</div>
         <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
@@ -2395,6 +2399,19 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="sec-hd">Quotes</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">In chat: <code>!quote</code> shows a random one, <code>!quote 3</code> shows #3, and a mod can <code>!quote add some text</code> or <code>!quote del 3</code>.</div>
             <div id="quoteList"></div>
+          </div>
+        </div>
+
+        <!-- ═══ VIEWERS TAB (CRM) ═══ -->
+        <div class="settings-pane" id="pane-viewers">
+          <div class="sec">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+              <div class="sec-hd" style="margin:0">Viewers</div>
+              <span id="viewerCount" style="font-size:10px;color:var(--mut)"></span>
+            </div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Everyone who chats gets a profile: messages, days seen, contributions, plus your own notes and tags. Click any name in chat (or a row here) to open their card. Stored only on this device.</div>
+            <input class="minput" id="viewerSearch" placeholder="Search name or notes..." oninput="renderViewersTab()" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:8px">
+            <div id="viewerList"></div>
           </div>
         </div>
 
@@ -4670,6 +4687,106 @@ function giveawayDraw() {
   _renderGiveaway();
 }
 function gwSetCfg(f, v) { _giveaway[f] = v; _gwSaveCfg(); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Viewer CRM. Per-chatter profiles (msgs, days seen, contributed $, notes,
+// tags) built from chat + contribution events. Click any Twitch chat name to
+// open a card; a Viewers tab lists/searches them. Local-only (sf_viewers),
+// throttled writes + pruning so it can't grow unbounded.
+// ══════════════════════════════════════════════════════════════════════════
+var _viewers = null, _viewersDirty = false, _VTAGS = ['regular', 'vip', 'friend', 'watch'];
+function _viewersLoad() { try { _viewers = JSON.parse(localStorage.getItem('sf_viewers') || '{}') || {}; } catch (e) { _viewers = {}; } if (!_viewers || typeof _viewers !== 'object') _viewers = {}; }
+function _viewersPrune() {
+  var keys = Object.keys(_viewers); if (keys.length <= 3000) return;
+  var prunable = keys.filter(function (k) { var p = _viewers[k]; return !(p.notes && p.notes.trim()) && (!p.tags || !p.tags.length); });
+  prunable.sort(function (a, b) { return (_viewers[a].last || 0) - (_viewers[b].last || 0); });
+  var need = keys.length - 2000;
+  for (var i = 0; i < need && i < prunable.length; i++) delete _viewers[prunable[i]];
+}
+function _viewersFlush() { if (!_viewersDirty || !_viewers) return; _viewersDirty = false; try { _viewersPrune(); localStorage.setItem('sf_viewers', JSON.stringify(_viewers)); } catch (e) {} }
+function _vProfile(login, name) {
+  login = String(login || '').toLowerCase(); if (!login) return null;
+  var p = _viewers[login];
+  if (!p) { p = { login: login, name: name || login, first: Date.now(), last: 0, msgs: 0, streams: 0, lastDay: 0, contributed: 0, notes: '', tags: [] }; _viewers[login] = p; }
+  if (name) p.name = name;
+  return p;
+}
+function _viewerTrackMsg(login, name) {
+  if (!_viewers) _viewersLoad();
+  var p = _vProfile(login, name); if (!p) return;
+  p.msgs = (p.msgs || 0) + 1; p.last = Date.now();
+  var d = new Date(), day = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  if (p.lastDay !== day) { p.streams = (p.streams || 0) + 1; p.lastDay = day; }
+  _viewersDirty = true;
+}
+function _viewerAddContribution(name, amount) {
+  if (!_viewers) _viewersLoad();
+  var p = _vProfile(name, name); if (!p) return;
+  p.contributed = (p.contributed || 0) + (Number(amount) || 0); p.last = Date.now();
+  _viewersDirty = true;
+}
+function _viewerSetNotes(login, notes) { var p = _vProfile(login); if (!p) return; p.notes = notes; _viewersDirty = true; /* flushed by the 15s interval + beforeunload, not per keystroke */ }
+function _viewerToggleTag(login, tag) { var p = _vProfile(login); if (!p) return; p.tags = p.tags || []; var i = p.tags.indexOf(tag); if (i >= 0) p.tags.splice(i, 1); else p.tags.push(tag); _viewersDirty = true; _viewersFlush(); if (typeof _renderViewerCard === 'function') _renderViewerCard(login); if (typeof renderViewersTab === 'function') renderViewersTab(); }
+function _agoStr(ts) { if (!ts) return 'never'; var s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return 'just now'; var m = Math.floor(s / 60); if (m < 60) return m + 'm ago'; var h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return Math.floor(h / 24) + 'd ago'; }
+
+// ── Viewer card (opens on chat-name click) ──
+var _viewerCardLogin = null;
+function openViewerCard(login, name) {
+  if (!_viewers) _viewersLoad();
+  _viewerCardLogin = String(login || '').toLowerCase();
+  _vProfile(_viewerCardLogin, name);
+  var card = document.getElementById('viewerCard');
+  if (!card) { card = document.createElement('div'); card.id = 'viewerCard'; card.className = 'viewer-card-wrap'; card.addEventListener('click', closeViewerCard); document.body.appendChild(card); }
+  card.style.display = 'flex';
+  _renderViewerCard(_viewerCardLogin);
+}
+function closeViewerCard() { var c = document.getElementById('viewerCard'); if (c) c.style.display = 'none'; _viewerCardLogin = null; }
+function _renderViewerCard(login) {
+  var card = document.getElementById('viewerCard'); if (!card) return;
+  var p = _viewers[login]; if (!p) { closeViewerCard(); return; }
+  var tags = _VTAGS.map(function (t) { var on = (p.tags || []).indexOf(t) >= 0; return '<button onclick="_viewerToggleTag(\'' + login + '\',\'' + t + '\')" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;cursor:pointer;border:1px solid var(--bdr);background:' + (on ? 'var(--accent);color:#fff' : 'var(--surf2);color:var(--mut)') + '">' + t + '</button>'; }).join('');
+  card.innerHTML = '<div class="viewer-card" onclick="event.stopPropagation()">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><div style="font-size:15px;font-weight:800;color:var(--txt);flex:1">' + esc(p.name || login) + '</div>'
+    +   '<a href="https://twitch.tv/' + encodeURIComponent(login) + '" target="_blank" style="font-size:10px;color:var(--tw);text-decoration:none">open channel</a>'
+    +   '<button onclick="closeViewerCard()" style="background:none;border:0;color:var(--mut);font-size:18px;cursor:pointer;line-height:1">&times;</button></div>'
+    + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0;font-size:11px;color:var(--mut)">'
+    +   '<span>Messages <strong style="color:var(--txt)">' + (p.msgs || 0) + '</strong></span>'
+    +   '<span>Days seen <strong style="color:var(--txt)">' + (p.streams || 0) + '</strong></span>'
+    +   '<span>Contributed <strong style="color:var(--txt)">$' + (Number(p.contributed) || 0).toFixed(2) + '</strong></span>'
+    +   '<span>Last <strong style="color:var(--txt)">' + _agoStr(p.last) + '</strong></span>'
+    +   '<span>First <strong style="color:var(--txt)">' + _agoStr(p.first) + '</strong></span>'
+    + '</div>'
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">' + tags + '</div>'
+    + '<textarea id="viewerNotes" placeholder="Private notes about this viewer..." oninput="_viewerSetNotes(\'' + login + '\',this.value)" rows="3" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(p.notes || '') + '</textarea>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+    +   '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 11px;border-radius:6px" onclick="replyTo(\'' + esc(p.name || login) + '\');closeViewerCard()">Reply</button>'
+    +   '<button class="cbtn" style="background:rgba(248,81,73,.14);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 11px;border-radius:6px" onclick="modAction(\'timeout\',\'' + esc(login) + '\',600,\'\')">Timeout 10m</button>'
+    +   '<button class="cbtn" style="background:rgba(248,81,73,.14);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 11px;border-radius:6px" onclick="modAction(\'ban\',\'' + esc(login) + '\',0,\'\')">Ban</button>'
+    + '</div>'
+    + '</div>';
+}
+
+// ── Viewers tab ──
+function renderViewersTab() {
+  var host = document.getElementById('viewerList'); if (!host) return;
+  if (!_viewers) _viewersLoad();
+  var q = ((document.getElementById('viewerSearch') || {}).value || '').trim().toLowerCase();
+  var arr = Object.keys(_viewers).map(function (k) { return _viewers[k]; });
+  if (q) arr = arr.filter(function (p) { return (p.login || '').indexOf(q) >= 0 || (p.name || '').toLowerCase().indexOf(q) >= 0 || (p.notes || '').toLowerCase().indexOf(q) >= 0; });
+  arr.sort(function (a, b) { return (b.last || 0) - (a.last || 0); });
+  var total = arr.length;
+  arr = arr.slice(0, 150);
+  var cnt = document.getElementById('viewerCount'); if (cnt) cnt.textContent = total + ' viewer' + (total === 1 ? '' : 's');
+  if (!arr.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">' + (q ? 'No matches.' : 'No viewers tracked yet. They appear here as people chat.') + '</div>'; return; }
+  host.innerHTML = arr.map(function (p) {
+    var tagChips = (p.tags || []).map(function (t) { return '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--surf3);color:var(--accent)">' + t + '</span>'; }).join(' ');
+    return '<div onclick="openViewerCard(\'' + esc(p.login) + '\',\'' + esc(p.name || p.login) + '\')" style="display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;padding:7px 9px;margin-bottom:5px;cursor:pointer">'
+      + '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--txt)">' + esc(p.name || p.login) + ' ' + tagChips + '</div>'
+      + (p.notes ? '<div style="font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.notes) + '</div>' : '') + '</div>'
+      + '<div style="text-align:right;font-size:10px;color:var(--mut);flex-shrink:0">' + (p.msgs || 0) + ' msgs · ' + (p.streams || 0) + 'd' + (Number(p.contributed) ? ' · $' + Number(p.contributed).toFixed(0) : '') + '<br>' + _agoStr(p.last) + '</div>'
+      + '</div>';
+  }).join('');
+}
 function _renderGiveaway() {
   var host = document.getElementById('giveawayBox'); if (!host) return;
   var lvlOpts = ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (_giveaway.minLevel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join('');
@@ -9504,7 +9621,9 @@ function handleSBEvent(event, data, fromES) {
         }
       }
     }
-    pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg });
+    pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', login: _twLoginKey, html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg });
+    // Viewer CRM: track this chatter (msgs / days seen / last seen).
+    if (_twLoginKey && typeof _viewerTrackMsg === 'function') { try { _viewerTrackMsg(_twLoginKey, u.displayName || u.name || _twLoginKey); } catch (e) {} }
     // Bot: auto-moderation runs on every message; if it acts, skip commands.
     var _modActed = false;
     if (typeof maybeAutoMod === 'function') { try { _modActed = maybeAutoMod(rawText, u, msgId); } catch (e) {} }
@@ -10368,7 +10487,11 @@ function pushMsg(m) {
   if (m.plat === 'tw' && m.user && _suspiciousUsers[m.user.toLowerCase()]) {
     suspHtml = '<span class="susp-badge" title="Twitch flagged this account (' + esc(String(_suspiciousUsers[m.user.toLowerCase()]).replace(/_/g, ' ')) + ')">⚠</span>';
   }
-  el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="mname ' + m.plat + '"' + nStyle + '>' + esc(m.user || '?') + '</span>' + suspHtml + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
+  // Twitch names open the viewer CRM card on click.
+  var _vLogin = (m.plat === 'tw') ? (m.login || String(m.user || '').toLowerCase()) : '';
+  var _nameCls = 'mname ' + m.plat + (_vLogin ? ' vclick' : '');
+  var _nameClick = _vLogin ? ' onclick="openViewerCard(\'' + escA(_vLogin) + '\',\'' + escA(m.user || '') + '\')"' : '';
+  el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="' + _nameCls + '"' + nStyle + _nameClick + '>' + esc(m.user || '?') + '</span>' + suspHtml + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
   feed.appendChild(el);
   tintBackground(m.plat, 'light');
   m.isFirstWords = isFirstWords;
@@ -11216,6 +11339,7 @@ function switchSettingsTab(tab) {
   else if (typeof _adTick !== 'undefined' && _adTick) { clearInterval(_adTick); _adTick = null; }
   if (tab === 'schedule' && typeof renderScheduleTab === 'function') renderScheduleTab();
   if (tab === 'bot' && typeof renderBotTab === 'function') renderBotTab();
+  if (tab === 'viewers' && typeof renderViewersTab === 'function') renderViewersTab();
   if (tab === 'hotkeys' && typeof _renderStreamHotkeyRows === 'function') _renderStreamHotkeyRows();
   if (tab === 'obsoverlays') renderObsOverlaysTab();
   if (tab === 'theme') renderThemeTab();
@@ -13246,6 +13370,9 @@ function startStreamSession() {
   if (typeof sendOverlayLive === 'function') sendOverlayLive();
 }
 function trackContributor(plat, user, amount, avatar) {
+  // Viewer CRM: accumulate all-time contribution $ per Twitch chatter (runs
+  // regardless of recap-session state, unlike the session contributor list).
+  if (plat === 'tw' && user && typeof _viewerAddContribution === 'function') { try { _viewerAddContribution(user, amount); } catch (e) {} }
   if (!_streamSession.active) return;
   var c = _streamSession.contributors;
   if (!c[plat]) c[plat] = [];
@@ -14446,6 +14573,11 @@ setTimeout(function() {
   _automodLoad();
   _quotesLoad();
   _gwLoadCfg();
+  // Viewer CRM: load + flush to localStorage every 15s (writes are throttled
+  // so per-message tracking doesn't hammer disk) and once more on unload.
+  _viewersLoad();
+  setInterval(_viewersFlush, 15000);
+  window.addEventListener('beforeunload', _viewersFlush);
   if (window.electronAPI && window.electronAPI.onTwitchBotStatusChanged) window.electronAPI.onTwitchBotStatusChanged(applyTwitchBotStatus);
   if (window.electronAPI && window.electronAPI.twitchBotGetStatus) { window.electronAPI.twitchBotGetStatus().then(applyTwitchBotStatus).catch(function () {}); }
   // Hydrate the pop-out chat-send hotkey from the main process (source
