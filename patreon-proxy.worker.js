@@ -498,6 +498,24 @@ const BROADCASTER_CONNECT_SCOPES = [
 const BOT_CONNECT_SCOPES = ['user:read:chat', 'user:write:chat', 'user:bot'].join(' ');
 function VAULT_KEY(twitchId) { return 'vault:tw:' + twitchId; }
 
+// Bot-connect binds a bot account to a broadcaster's vault under `owner`
+// (a Twitch id). Since anyone can hit /twitch/connect directly, `owner` MUST
+// be proven — the aquilo.gg /api/connect/start endpoint (which authenticated
+// the broadcaster's session) signs it with the shared CONNECT_OWNER_SECRET.
+// Without this an attacker could plant their bot token in any streamer's vault.
+async function verifyOwnerSig(env, owner, hexSig) {
+  if (!env.CONNECT_OWNER_SECRET || !owner || !hexSig) return false;
+  try {
+    var key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.CONNECT_OWNER_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    var sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(String(owner)));
+    var expect = [...new Uint8Array(sig)].map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    if (typeof hexSig !== 'string' || expect.length !== hexSig.length) return false;
+    var diff = 0;
+    for (var i = 0; i < expect.length; i++) diff |= expect.charCodeAt(i) ^ hexSig.charCodeAt(i);
+    return diff === 0;
+  } catch (e) { return false; }
+}
+
 // Helix path prefixes the session proxy will forward. Keeps a leaked session
 // id from being a skeleton key to the whole API.
 const TWITCH_HELIX_ALLOW = [
@@ -580,6 +598,11 @@ async function _twitchSession(env, session) {
       rec.expires_at = Date.now() + ((t.expires_in || 3600) * 1000);
       rec.scope = Array.isArray(t.scope) ? t.scope.join(' ') : (t.scope || rec.scope);
       await env.TWITCH_SESSIONS.put('tw:' + session, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 60 });
+    } else if (rec.expires_at <= Date.now()) {
+      // Refresh failed AND the token is already expired — the session is dead.
+      // Return null so /twitch/me reports not-authed (prompting re-auth)
+      // instead of handing callers a stale token that will 401 on Helix.
+      return null;
     }
   }
   return rec;
@@ -776,7 +799,16 @@ async function handleTwitchConnect(request, env) {
   if (!session || session.length < 16) return json({ error: 'missing_or_short_session' }, 400);
   if (!ret || !_twitchReturnAllowed(ret)) return json({ error: 'return_not_allowed' }, 400);
   var isBot = mode === 'bot';
-  if (isBot && !owner) return json({ error: 'bot_mode_requires_owner' }, 400);
+  if (isBot) {
+    if (!owner) return json({ error: 'bot_mode_requires_owner' }, 400);
+    // `owner` is the broadcaster whose vault the bot attaches to — it must be
+    // signed by the site, or an attacker could plant a bot token in anyone's
+    // vault by hitting this endpoint directly.
+    var osig = url.searchParams.get('osig') || '';
+    if (!(await verifyOwnerSig(env, owner, osig))) {
+      return json({ error: 'owner_not_authorized' }, 403);
+    }
+  }
   var scopes = isBot ? BOT_CONNECT_SCOPES : BROADCASTER_CONNECT_SCOPES;
   var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
   var state = _b64urlEncode(JSON.stringify({ s: session, r: ret, m: isBot ? 'bot' : 'connect', o: owner }));
