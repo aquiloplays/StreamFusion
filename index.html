@@ -349,6 +349,7 @@ body.has-sf-notice { padding-top: 42px !important; }
 .badge{font-size:9px;border-radius:3px;padding:1px 4px;font-weight:700}
 .badge.mod{background:#00ad03;color:#fff}.badge.vip{background:#e005b9;color:#fff}
 .badge.sub{background:var(--tw);color:#fff}.badge.owner{background:#f90;color:#000}.badge.member{background:#0a8f2c;color:#fff}
+.susp-badge{font-size:11px;line-height:1;margin:0 3px;color:#f0883e;cursor:help;filter:drop-shadow(0 0 3px rgba(240,136,62,.5))}
 .tw-badge{width:18px;height:18px;vertical-align:middle;margin:0 1px;border-radius:2px;image-rendering:auto;flex-shrink:0}
 .pronoun{font-size:10px;color:var(--mut);background:var(--surf3);border-radius:3px;padding:0 4px;margin-left:2px;font-weight:500;vertical-align:middle}
 .mtext{font-size:var(--chat-size);line-height:1.8;color:var(--txt);word-break:break-word}
@@ -2051,6 +2052,9 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         </div>
         <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
         <div class="settings-tab" data-tab="events" onclick="switchSettingsTab('events')">Events</div>
+        <div class="settings-tab" data-tab="stream" onclick="switchSettingsTab('stream')">Stream</div>
+        <div class="settings-tab" data-tab="schedule" onclick="switchSettingsTab('schedule')">Schedule</div>
+        <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
         <div class="settings-tab" data-tab="tts" onclick="switchSettingsTab('tts')">TTS</div>
         <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
@@ -2069,7 +2073,36 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-pane active" id="pane-accounts">
           <div class="sec">
             <div class="sec-hd">Twitch &amp; YouTube</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6">Chat, subs, raids, bits, Super Chats, memberships, viewer counts, and moderation all run through <strong style="color:var(--txt)">Streamer.bot</strong>. Sign in to Twitch and YouTube inside Streamer.bot once and StreamFusion picks up everything automatically &mdash; no separate sign-in here.</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6">Chat, subs, raids, bits, Super Chats, memberships, viewer counts, and moderation all run through <strong style="color:var(--txt)">Streamer.bot</strong>. Sign in to Twitch and YouTube inside Streamer.bot once and StreamFusion picks up everything automatically. The optional <strong style="color:var(--txt)">Twitch account (direct)</strong> connection below adds clips, the native Raid Finder, and accurate EventSub events on top.</div>
+          </div>
+          <!-- ═══ Twitch Connect (direct Helix + native EventSub) ═══ -->
+          <!-- Chat, events, mod actions and stream info still come through
+               Streamer.bot; this connects the broadcaster's own Twitch app for
+               the things SB doesn't do well: the Clip button, the native Raid
+               Finder, and accurate EventSub events (hype trains, ads, subs,
+               bits, follows, raids, redeems) straight from Twitch. Same IDs as
+               the old EA-pane card, so renderTwitchSignIn() drives it here. -->
+          <div class="sec">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#9146FF;flex-shrink:0"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
+              <div class="sec-hd" style="margin:0">Twitch account (direct)</div>
+            </div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:10px">
+              Sign in with your own Twitch app so StreamFusion can drive Twitch directly: <strong style="color:var(--txt)">Raid Finder</strong> (no Streamer.bot needed), <strong style="color:var(--txt)">clips</strong> from the toolbar, and accurate <strong style="color:var(--txt)">native events</strong> (EventSub) including hype trains and ad breaks. Optional, and never required for chat. For the full walkthrough, open the <a onclick="openTwitchSignIn();return false" style="color:#9146FF;cursor:pointer;text-decoration:none;font-weight:700">Twitch sign-in screen</a>.
+            </div>
+            <div id="twitchStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+              <div id="twitchStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
+              <div id="twitchStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Sign in with Twitch to enable clipping and native events from StreamFusion.</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button id="twitchConnectBtn" onclick="connectTwitch()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#9146FF;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                <span id="twitchConnectBtnText">Connect Twitch</span>
+              </button>
+              <button id="twitchClipTestBtn" onclick="createClipNow()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Test clip</button>
+              <button id="twitchSignOutBtn" onclick="disconnectTwitch()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
+            </div>
+            <label class="frow" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bdr)"><span>Pull Twitch events directly (EventSub)</span><input type="checkbox" id="eventsubToggle" onchange="onEventsubToggle()"></label>
+            <div style="font-size:10px;color:var(--mut);margin-top:2px;line-height:1.5">Subs, bits, follows, raids, redeems, hype trains &amp; ad breaks straight from Twitch via your OAuth, so SF doesn't lean on Streamer.bot for events. Deduped if SB is also connected. Needs a Twitch reconnect to grant the event scopes. <span id="eventsubStatus" style="color:var(--accent)"></span></div>
           </div>
           <div class="sec">
             <div class="sec-hd" style="color:var(--kk)">Kick</div>
@@ -2135,6 +2168,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-sub')">+ Twitch sub</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-cheer')">+ Twitch cheer</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-raid')">+ Twitch raid</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-hype')" title="Fires a sample hype train so you can see the bar, level-up fanfare, and pop-out overlay light up.">+ Hype train</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-adbreak')" title="Fires a sample ad-break heads-up banner + chat event.">+ Ad break</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-shoutout')" title="Fires a sample 'someone shouted you out' alert.">+ Shoutout</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-charity')" title="Fires a sample charity donation alert.">+ Charity</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(240,136,62,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-suspicious')" title="Flags a test user as suspicious; their chat messages get a warning marker.">+ Suspicious user</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(0,242,234,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tt-gift')">+ TikTok gift</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(83,252,24,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('kk-sub')">+ Kick sub</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(124,223,33,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tip')">+ Tip</button>
@@ -2186,6 +2224,177 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <label class="frow"><span>Other integration events</span><input type="checkbox" id="ev-ext-other" onchange="saveSettings()"></label>
               <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Events from any Streamer.bot source we don't recognize (Crowd Control, custom integrations, etc.) are routed here.</div>
             </div>
+          </div>
+        </div>
+
+        <!-- ═══ STREAM TAB (direct-Twitch control surface) ═══ -->
+        <!-- Everything here drives Twitch directly via the broadcaster's OAuth
+             (Helix), so it needs the Twitch account connected on the Accounts
+             tab. renderStreamTab() gates the whole pane on that. -->
+        <div class="settings-pane" id="pane-stream">
+          <div class="sec" id="streamNeedsTwitch" style="display:none">
+            <div class="sec-hd">Stream control</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">Connect your Twitch account to edit your title and category, run ads, launch polls and predictions, drop VOD markers, and manage your channel-point redemption queue straight from StreamFusion.</div>
+            <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 14px;border-radius:7px" onclick="switchSettingsTab('accounts')">Go to Accounts to connect</button>
+          </div>
+          <div id="streamControls" style="display:none">
+            <!-- Title + Category -->
+            <div class="sec">
+              <div class="sec-hd">Title &amp; Category</div>
+              <input class="minput" id="siTitleInput" maxlength="140" placeholder="Stream title" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
+              <div style="position:relative">
+                <input class="minput" id="siCatInput" placeholder="Search a game or category..." oninput="siCategorySearch(this.value)" autocomplete="off" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2)">
+                <div id="siCatResults" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:0 0 8px 8px;max-height:220px;overflow:auto"></div>
+              </div>
+              <div id="siCatChosen" style="font-size:11px;color:var(--mut);margin:6px 0 4px"></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+                <button class="cbtn" style="flex:1;min-width:120px;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="siApplyChannelInfo()">Update stream</button>
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="siLoadChannelInfo()">Reload</button>
+              </div>
+              <div id="siInfoStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            </div>
+            <!-- Ads -->
+            <div class="sec">
+              <div class="sec-hd">Ads</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+                <div id="adNextLine" style="font-size:12px;color:var(--txt);font-weight:600">Next ad: unknown</div>
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:10px;padding:5px 9px;border-radius:6px" onclick="adRefreshSchedule()">Refresh</button>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adSnooze()">Snooze next</button>
+                <button class="cbtn" style="background:rgba(240,136,62,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adRun(30)">Run 30s</button>
+                <button class="cbtn" style="background:rgba(240,136,62,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adRun(60)">Run 60s</button>
+                <button class="cbtn" style="background:rgba(240,136,62,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adRun(90)">Run 90s</button>
+              </div>
+              <div id="adStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            </div>
+            <!-- Poll -->
+            <div class="sec">
+              <div class="sec-hd">Poll</div>
+              <input class="minput" id="pollTitleInput" maxlength="60" placeholder="Poll question" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
+              <textarea id="pollChoicesInput" placeholder="One choice per line (2 to 5)" rows="3" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none"></textarea>
+              <div class="frow" style="gap:6px;margin-top:6px"><label style="font-size:11px">Duration (sec)</label><input class="minput" id="pollDurInput" type="number" min="15" max="1800" value="120" style="width:80px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                <button class="cbtn" style="flex:1;min-width:120px;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="startPollFromSF()">Start poll</button>
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="endActivePoll()">End now</button>
+              </div>
+              <div id="pollStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            </div>
+            <!-- Prediction -->
+            <div class="sec">
+              <div class="sec-hd">Prediction</div>
+              <input class="minput" id="predTitleInput" maxlength="45" placeholder="Prediction title" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
+              <input class="minput" id="predOutAInput" maxlength="25" placeholder="Outcome 1" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
+              <input class="minput" id="predOutBInput" maxlength="25" placeholder="Outcome 2" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2)">
+              <div class="frow" style="gap:6px;margin-top:6px"><label style="font-size:11px">Window (sec)</label><input class="minput" id="predWindowInput" type="number" min="30" max="1800" value="120" style="width:80px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                <button class="cbtn" style="flex:1;min-width:120px;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="startPredictionFromSF()">Start prediction</button>
+              </div>
+              <div id="predActiveControls" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="lockActivePrediction()">Lock</button>
+                <button class="cbtn" style="background:rgba(83,252,24,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" id="predWinBtnA" onclick="resolveActivePrediction(0)">Outcome 1 wins</button>
+                <button class="cbtn" style="background:rgba(83,252,24,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" id="predWinBtnB" onclick="resolveActivePrediction(1)">Outcome 2 wins</button>
+                <button class="cbtn" style="background:rgba(248,81,73,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="cancelActivePrediction()">Cancel</button>
+              </div>
+              <div id="predStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            </div>
+            <!-- Stream marker -->
+            <div class="sec">
+              <div class="sec-hd">Stream marker</div>
+              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:6px">Bookmark this moment in your VOD so you can find it later for clipping.</div>
+              <div style="display:flex;gap:6px">
+                <input class="minput" id="markerDescInput" maxlength="140" placeholder="Marker note (optional)" style="flex:1;font-size:12px;padding:7px 9px;background:var(--surf2)">
+                <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 14px;border-radius:7px" onclick="createStreamMarker()">Drop marker</button>
+              </div>
+              <div id="markerStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            </div>
+            <!-- Redemption queue -->
+            <div class="sec">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div class="sec-hd" style="margin:0">Redemption queue</div>
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:10px;padding:5px 9px;border-radius:6px" onclick="loadRedemptionQueue()">Refresh</button>
+              </div>
+              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:5px 0 8px">Twitch only lets an app manage rewards it created, so this lists pending redemptions for StreamFusion-created rewards. Approve marks them fulfilled; refund returns the points.</div>
+              <div id="redemptionQueue" style="display:flex;flex-direction:column;gap:6px"></div>
+              <div id="redemptionStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ SCHEDULE TAB (go-live auto-updates) ═══ -->
+        <!-- Recurring weekly slots that auto-apply title/category/tags + post a
+             go-live announcement when SF detects the stream going live. Drives
+             Twitch via the same Helix connection as the Stream tab. -->
+        <div class="settings-pane" id="pane-schedule">
+          <div class="sec" id="schedNeedsTwitch" style="display:none">
+            <div class="sec-hd">Schedule</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">Connect your Twitch account to set up a go-live schedule. When you go live, StreamFusion will auto-apply the title, category and tags for the slot that matches, and post your go-live announcement.</div>
+            <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 14px;border-radius:7px" onclick="switchSettingsTab('accounts')">Go to Accounts to connect</button>
+          </div>
+          <div id="schedBody" style="display:none">
+            <div class="sec">
+              <div class="sec-hd">Go-live auto-updates</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Define your weekly slots below. When you go live, the slot matching the current day and time is applied to your Twitch channel automatically.</div>
+              <div id="schedGlobals"></div>
+              <div id="schedNextLine" style="font-size:11px;margin-top:8px;padding:8px 10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;line-height:1.4"></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="schedRunAutomationNow()" title="Apply the currently-matching slot right now, as if you just went live.">Run go-live automation now</button>
+                <span id="schedRunNowStatus" style="font-size:10px;color:var(--mut)"></span>
+              </div>
+            </div>
+            <div class="sec">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+                <div class="sec-hd" style="margin:0">Slots</div>
+                <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="schedAddSlot()">+ Add slot</button>
+              </div>
+              <div id="schedSlots"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ BOT TAB (automated messages + bot account) ═══ -->
+        <div class="settings-pane" id="pane-bot">
+          <div class="sec">
+            <div class="sec-hd">Bot account</div>
+            <div id="botAcctCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px"></div>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">Tip: create a second free Twitch account for your bot, make it a moderator of your channel, then connect it here. Requires reconnecting your main Twitch account once so it can authorize the bot to post.</div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Automated messages</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Post recurring messages to chat on a timer (socials, commands reminder, follow prompt, etc.). Each message waits its interval AND the minimum chat lines below, so it never talks to an empty room.</div>
+            <div id="autoMsgGlobals"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0 8px">
+              <div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px">MESSAGES</div>
+              <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="autoMsgAdd()">+ Add message</button>
+            </div>
+            <div id="autoMsgList"></div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Chat commands</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:6px">Viewers type a <code>!command</code> and the bot replies. Set who can use it and a cooldown. Turn on <strong style="color:var(--txt)">Counter</strong> for things like <code>!deaths</code> where mods can do <code>!deaths +</code> / <code>-</code> / <code>set 5</code> / <code>reset</code>.</div>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:8px">Variables: <code>{user}</code> chatter, <code>{touser}</code> first word after the command, <code>{args}</code> everything after, <code>{count}</code> counter value, <code>{game}</code>, <code>{uptime}</code>, <code>{channel}</code>, <code>{random:a|b|c}</code>.</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+              <div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px">COMMANDS</div>
+              <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="cmdAdd()">+ Add command</button>
+            </div>
+            <div id="cmdList"></div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Auto-moderation</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Automatically delete (and optionally time out) messages that break your rules. Deletes run through your Twitch connection or Streamer.bot.</div>
+            <div id="automodGlobals"></div>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px;margin:10px 0 6px">FILTERS</div>
+            <div id="automodFilters"></div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Giveaway</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Run a keyword giveaway: start it, viewers type the keyword to enter, then draw a weighted-random winner. Subs can get extra tickets.</div>
+            <div id="giveawayBox"></div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Quotes</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">In chat: <code>!quote</code> shows a random one, <code>!quote 3</code> shows #3, and a mod can <code>!quote add some text</code> or <code>!quote del 3</code>.</div>
+            <div id="quoteList"></div>
           </div>
         </div>
 
@@ -2531,6 +2740,16 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
 
           <div class="sec">
+            <div class="sec-hd">Stream control actions</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:6px">
+              Bind the direct-Twitch actions from the <button class="tbtn" onclick="switchSettingsTab('stream')" style="font-size:11px;font-weight:700;padding:2px 8px">Stream</button> tab to a global hotkey so you can fire them mid-game. Click a binding, press a key combo (<code>Ctrl+Shift+M</code>), a lone F-key (<code>F13</code>), or a mouse side button (<code>Mouse4</code> / <code>Mouse5</code>). Poll/prediction/title actions use whatever you have typed in the Stream tab fields.
+            </div>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:8px">
+              <strong style="color:var(--txt)">Extra keyboard / mouse buttons (Logitech, Razer, etc.):</strong> Windows only distinguishes the two side buttons natively (<code>Mouse4</code> / <code>Mouse5</code>). For G-keys, macro keys, or extra mouse buttons, open your device software (Logitech G HUB / Logi Options+, Razer Synapse, Corsair iCUE) and map each button to an unused combo. <code>F13</code> to <code>F24</code> are ideal since nothing else uses them, then bind those here.
+            </div>
+            <div id="streamHotkeyRows"></div>
+          </div>
+          <div class="sec">
             <div class="sec-hd">Per-feature shortcuts</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.6">
               Quick-action hotbar slots and Stream Info quick-swap bindings are set where you build them, since each one points at a specific slot or favorite. Find hotbar slot keys on the hotbar editor, and Stream Info quick-swap keys under Stream Info &rarr; Hotkeys.
@@ -2635,32 +2854,6 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               then link Patreon in Discord settings.
             </div>
 
-            <!-- ═══ Twitch Connect (Clips + direct Helix) ═══ -->
-            <!-- NOT an EA path. Chat, events, mod actions and stream info all
-                 come through Streamer.bot; this connects the broadcaster's own
-                 Twitch app for the few things SB doesn't do , today the Clip
-                 button. Mirrors the Discord connect card above. -->
-            <div style="height:1px;background:var(--bdr);margin:18px 0 14px"></div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#9146FF;flex-shrink:0"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
-              <div style="font-size:14px;font-weight:700;color:var(--txt)">Twitch account</div>
-            </div>
-            <div style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:10px">
-              Connects your own Twitch app so StreamFusion can drive Twitch directly &mdash; <strong style="color:var(--txt)">Raid Finder</strong> (no Streamer.bot needed), <strong style="color:var(--txt)">clips</strong> from the toolbar, and native <strong style="color:var(--txt)">events</strong> (EventSub). For the full walkthrough, open the <a onclick="openTwitchSignIn();return false" style="color:#9146FF;cursor:pointer;text-decoration:none;font-weight:700">Twitch sign-in screen</a>.
-            </div>
-            <div id="twitchStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
-              <div id="twitchStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
-              <div id="twitchStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Sign in with Twitch to enable clipping from StreamFusion.</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button id="twitchConnectBtn" onclick="connectTwitch()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#9146FF;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-                <span id="twitchConnectBtnText">Connect Twitch</span>
-              </button>
-              <button id="twitchClipTestBtn" onclick="createClipNow()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Test clip</button>
-              <button id="twitchSignOutBtn" onclick="disconnectTwitch()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
-            </div>
-            <label class="frow" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bdr)"><span>Pull Twitch events directly (EventSub)</span><input type="checkbox" id="eventsubToggle" onchange="onEventsubToggle()"></label>
-            <div style="font-size:10px;color:var(--mut);margin-top:2px;line-height:1.5">Subs, bits, follows, raids &amp; channel-point redeems straight from Twitch via your OAuth — so SF doesn't lean on Streamer.bot for events. Deduped if SB is also connected. Needs a Twitch reconnect to grant the event scopes. <span id="eventsubStatus" style="color:var(--accent)"></span></div>
           </div>
         </div>
 
@@ -3370,6 +3563,8 @@ function applyTwitchStatus(st) {
   var clipBtn = document.getElementById('clipBtn');
   if (clipBtn) clipBtn.style.display = (S.twitch && S.twitch.signedIn) ? '' : 'none';
   if (typeof _esSyncFromStatus === 'function') _esSyncFromStatus();
+  // Keep the Stream control surface's connect-gate in sync live.
+  try { if (typeof renderStreamTab === 'function') renderStreamTab(); } catch (e) {}
 }
 
 // ── Dedicated Twitch sign-in screen ──────────────────────────────────────────
@@ -3491,7 +3686,12 @@ function renderTwitchSettings() {
 // normalized into the SB {key,data} shape and routed through handleSBEvent, so
 // they reuse every sound/banner/stat/Discord side-effect. Deduped against
 // Streamer.bot inside handleSBEvent (only while EventSub is on).
-var _es = { ws: null, on: false, session: null, backoff: 1000, seen: {} };
+var _es = { ws: null, on: false, session: null, backoff: 1000, seen: {}, hype: false, cats: {} };
+// Users Twitch has flagged as suspicious (likely ban-evader / manually
+// monitored / restricted). Keyed by lowercased login -> status string. Used to
+// badge their chat messages and gate the mod tools. Populated by the
+// channel.suspicious_user EventSub handler.
+var _suspiciousUsers = {};
 var ES_SUBS = [
   { type: 'channel.follow', version: '2', mod: true },
   { type: 'channel.subscribe', version: '1' },
@@ -3499,7 +3699,39 @@ var ES_SUBS = [
   { type: 'channel.subscription.gift', version: '1' },
   { type: 'channel.cheer', version: '1' },
   { type: 'channel.raid', version: '1', raidTo: true },
-  { type: 'channel.channel_points_custom_reward_redemption.add', version: '1' }
+  { type: 'channel.channel_points_custom_reward_redemption.add', version: '1' },
+  // Hype trains straight from Twitch (exact level/points/goal/timer), so the
+  // bar is accurate instead of leaning on Streamer.bot's looser hype events.
+  { type: 'channel.hype_train.begin', version: '1', cat: 'hype' },
+  { type: 'channel.hype_train.progress', version: '1', cat: 'hype' },
+  { type: 'channel.hype_train.end', version: '1', cat: 'hype' },
+  // Ad-break heads-up: fires the moment an ad roll starts so SF can warn the
+  // streamer (banner + chat event + OBS alert) with the exact duration.
+  { type: 'channel.ad_break.begin', version: '1' },
+  // Native polls + predictions: exact live vote / point pools.
+  { type: 'channel.poll.begin', version: '1', cat: 'poll' },
+  { type: 'channel.poll.progress', version: '1', cat: 'poll' },
+  { type: 'channel.poll.end', version: '1', cat: 'poll' },
+  { type: 'channel.prediction.begin', version: '1', cat: 'pred' },
+  { type: 'channel.prediction.progress', version: '1', cat: 'pred' },
+  { type: 'channel.prediction.lock', version: '1', cat: 'pred' },
+  { type: 'channel.prediction.end', version: '1', cat: 'pred' },
+  // Charity fundraiser progress.
+  { type: 'channel.charity_campaign.start', version: '1', cat: 'charity' },
+  { type: 'channel.charity_campaign.progress', version: '1', cat: 'charity' },
+  { type: 'channel.charity_campaign.donate', version: '1', cat: 'charity' },
+  { type: 'channel.charity_campaign.stop', version: '1', cat: 'charity' },
+  // Shoutout received (needs moderator_user_id, hence mod:true).
+  { type: 'channel.shoutout.receive', version: '1', mod: true, cat: 'shoutout' },
+  // Power-ups / automatic channel-point rewards (gigantify, celebrations, etc).
+  { type: 'channel.channel_points_automatic_reward_redemption.add', version: '1', cat: 'powerup' },
+  // Suspicious-user (likely ban-evader / flagged) alerts for mods.
+  { type: 'channel.suspicious_user.message', version: '1', mod: true, cat: 'suspicious' },
+  { type: 'channel.suspicious_user.update', version: '1', mod: true, cat: 'suspicious' },
+  // Accurate live state + title/category changes (no scope needed).
+  { type: 'stream.online', version: '1' },
+  { type: 'stream.offline', version: '1' },
+  { type: 'channel.update', version: '2' }
 ];
 function _esTier(t) { return ({ '1000': 1, '2000': 2, '3000': 3 })[String(t)] || (Number(t) || 1); }
 function _esStatus(msg, isErr) { var el = document.getElementById('eventsubStatus'); if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--err, #ef4444)' : 'var(--accent)'; } }
@@ -3514,6 +3746,21 @@ function _esCanon(e) {
   if (/Cheer|Bits/.test(e)) return 'cheer';
   if (/Raid/.test(e)) return 'raid';
   if (/Redemption|RewardRedeemed/.test(e)) return 'redeem';
+  return null;
+}
+// Map a Streamer.bot event *type* (src already checked === 'Twitch') to the
+// EventSub category that, when live, makes Twitch authoritative. Returns null
+// for user-keyed alert types (those are merged by _esDedup instead) and for
+// anything EventSub doesn't own.
+function _esCatForKey(type) {
+  type = String(type || '');
+  if (/HypeTrain/i.test(type)) return 'hype';
+  if (/Poll/i.test(type)) return 'poll';
+  if (/Prediction/i.test(type)) return 'pred';
+  if (/Charity/i.test(type)) return 'charity';
+  if (/Shoutout/i.test(type)) return 'shoutout';
+  if (/Powerup|AutomaticReward|AutoReward/i.test(type)) return 'powerup';
+  if (/Suspicious/i.test(type)) return 'suspicious';
   return null;
 }
 function _esDedup(event, data) {
@@ -3562,23 +3809,91 @@ function _esRoute(subType, ev) {
     r = ['Raid', { user: ev.from_broadcaster_user_name, user_name: ev.from_broadcaster_user_name, displayName: ev.from_broadcaster_user_name, viewers: ev.viewers, viewer_count: ev.viewers, raidViewerCount: ev.viewers }];
   else if (subType === 'channel.channel_points_custom_reward_redemption.add')
     r = ['RewardRedemption', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, redeemer: ev.user_name, rewardTitle: ev.reward && ev.reward.title, reward_title: ev.reward && ev.reward.title, rewardCost: ev.reward && ev.reward.cost, reward: ev.reward, text: ev.user_input, message: ev.user_input }];
+  // ── Hype train (begin/progress/end) ──────────────────────────────────────
+  // Twitch sends cumulative `total` plus within-level `progress`/`goal`; the
+  // SF bar renders total/goal, so feed it `progress` as the total so the bar
+  // reflects progress toward the *next* level (not the all-time cumulative).
+  // expires_at (ISO) becomes a countdown in seconds. top_contributions map to
+  // the {userName} shape updateHypeTrain reads.
+  else if (subType === 'channel.hype_train.begin' || subType === 'channel.hype_train.progress') {
+    var _htTop = (ev.top_contributions || []).map(function(c) { return { userName: c.user_name, total: c.total }; });
+    var _htCd = ev.expires_at ? Math.max(0, Math.round((new Date(ev.expires_at).getTime() - Date.now()) / 1000)) : 300;
+    var _htData = { level: ev.level, total: ev.progress, goal: ev.goal, countdown: _htCd, topContributors: _htTop };
+    r = [subType === 'channel.hype_train.begin' ? 'HypeTrainStart' : 'HypeTrainProgress', _htData];
+  }
+  else if (subType === 'channel.hype_train.end')
+    r = ['HypeTrainEnd', { level: ev.level, total: ev.total }];
+  // ── Ad break begin ───────────────────────────────────────────────────────
+  else if (subType === 'channel.ad_break.begin')
+    r = ['AdBreakBegin', { duration: ev.duration_seconds, durationSeconds: ev.duration_seconds, isAutomatic: ev.is_automatic, user: ev.requester_user_name, user_name: ev.requester_user_name }];
+  // ── Polls ────────────────────────────────────────────────────────────────
+  // EventSub choice vote counts live in per-source fields (channel_points_votes
+  // + bits_votes + votes); fold them into a single `votes` the handler reads.
+  else if (subType === 'channel.poll.begin' || subType === 'channel.poll.progress' || subType === 'channel.poll.end') {
+    var _pCh = (ev.choices || []).map(function (c) {
+      var v = (c.votes != null) ? c.votes : ((c.channel_points_votes || 0) + (c.bits_votes || 0) + (c.base_votes || 0));
+      return { title: c.title, votes: v };
+    });
+    r = [subType === 'channel.poll.begin' ? 'PollCreated' : subType === 'channel.poll.end' ? 'PollCompleted' : 'PollUpdated', { title: ev.title, choices: _pCh }];
+  }
+  // ── Predictions ──────────────────────────────────────────────────────────
+  else if (subType.indexOf('channel.prediction.') === 0) {
+    var _prOut = (ev.outcomes || []).map(function (o) {
+      return { title: o.title, votes: o.users, users: o.users, channelPoints: o.channel_points, color: o.color, winner: !!(ev.winning_outcome_id && o.id === ev.winning_outcome_id) };
+    });
+    var _prWin = null;
+    for (var _wi = 0; _wi < _prOut.length; _wi++) { if (_prOut[_wi].winner) { _prWin = _prOut[_wi]; break; } }
+    var _prKey = subType === 'channel.prediction.begin' ? 'PredictionCreated'
+      : subType === 'channel.prediction.progress' ? 'PredictionUpdated'
+      : subType === 'channel.prediction.lock' ? 'PredictionLocked'
+      : (ev.status === 'canceled' ? 'PredictionCanceled' : 'PredictionResolved');
+    r = [_prKey, { title: ev.title, outcomes: _prOut, winningOutcome: _prWin }];
+  }
+  // ── Charity campaign ──────────────────────────────────────────────────────
+  else if (subType.indexOf('channel.charity_campaign.') === 0) {
+    var _amt = function (a) { return a ? (Number(a.value || 0) / Math.pow(10, Number(a.decimal_places || 0))) : 0; };
+    r = ['CharityUpdate', {
+      phase: subType.slice('channel.charity_campaign.'.length),  // start|progress|donate|stop
+      charityName: ev.charity_name, campaignName: ev.campaign_name || ev.charity_name,
+      current: _amt(ev.current_amount), target: _amt(ev.target_amount),
+      donationUser: ev.user_name, donationAmount: _amt(ev.amount)
+    }];
+  }
+  // ── Shoutout received ─────────────────────────────────────────────────────
+  else if (subType === 'channel.shoutout.receive')
+    r = ['ShoutoutReceive', { user: ev.from_broadcaster_user_name, user_name: ev.from_broadcaster_user_name, displayName: ev.from_broadcaster_user_name, viewers: ev.viewer_count, viewer_count: ev.viewer_count }];
+  // ── Power-up / automatic channel-point reward ─────────────────────────────
+  else if (subType === 'channel.channel_points_automatic_reward_redemption.add') {
+    var _rw = ev.reward || {};
+    r = ['AutoReward', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, rewardType: _rw.type, rewardTitle: _rw.type, rewardCost: _rw.cost, text: ev.message && ev.message.text, message: ev.message && ev.message.text }];
+  }
+  // ── Suspicious user ───────────────────────────────────────────────────────
+  else if (subType === 'channel.suspicious_user.message' || subType === 'channel.suspicious_user.update')
+    r = ['SuspiciousUser', { user: ev.user_name, user_name: ev.user_name, displayName: ev.user_name, status: ev.low_trust_status || ev.status, banEvasion: ev.ban_evasion_evaluation, types: ev.types, text: ev.message && ev.message.text }];
+  // ── Stream state + channel info ───────────────────────────────────────────
+  else if (subType === 'stream.online') r = ['StreamOnline', { startedAt: ev.started_at }];
+  else if (subType === 'stream.offline') r = ['StreamOffline', {}];
+  else if (subType === 'channel.update') r = ['ChannelInfoUpdate', { title: ev.title, gameName: ev.category_name, gameId: ev.category_id }];
   if (!r) return;
-  try { handleSBEvent({ source: 'Twitch', type: r[0] }, r[1]); } catch (e) { console.warn('[eventsub] route', e); }
+  try { handleSBEvent({ source: 'Twitch', type: r[0] }, r[1], true); } catch (e) { console.warn('[eventsub] route', e); }
 }
 async function _esSubscribe() {
   var uid = S.twitch && S.twitch.userId;
   if (!uid || !_es.session || !window.electronAPI || !window.electronAPI.twitchHelix) return;
   var ok = 0, denied = false;
+  _es.cats = {};   // categories EventSub is authoritative for (accepted subs)
   for (var i = 0; i < ES_SUBS.length; i++) {
     var s = ES_SUBS[i];
     var cond = s.raidTo ? { to_broadcaster_user_id: uid } : { broadcaster_user_id: uid };
     if (s.mod) cond.moderator_user_id = uid;
     try {
       var res = await window.electronAPI.twitchHelix({ method: 'POST', path: 'eventsub/subscriptions', body: { type: s.type, version: s.version, condition: cond, transport: { method: 'websocket', session_id: _es.session } } });
-      if (res && (res.status === 202 || res.status === 200 || res.status === 409)) ok++;
+      var _accepted = res && (res.status === 202 || res.status === 200 || res.status === 409);
+      if (_accepted) { ok++; if (s.cat) _es.cats[s.cat] = true; }
       else if (res && res.status === 403) denied = true;
     } catch (e) { /* keep going */ }
   }
+  _es.hype = !!_es.cats.hype;   // back-compat alias used by older guards
   if (denied) _esStatus('⚠ reconnect Twitch to grant the event scopes', true);
   else if (ok) _esStatus('on · ' + ok + ' event types live');
   else _esStatus('couldn’t subscribe — try reconnecting Twitch', true);
@@ -3597,13 +3912,958 @@ function _esConnect() {
   _es.ws.onerror = function () {};
 }
 function eventSubStart() { if (_es.on && _es.ws) return; _es.on = true; _esStatus('connecting…'); _esConnect(); }
-function eventSubStop() { _es.on = false; if (_es.ws) { try { _es.ws.close(); } catch (e) {} _es.ws = null; } _esStatus(''); }
+function eventSubStop() { _es.on = false; _es.hype = false; _es.cats = {}; if (_es.ws) { try { _es.ws.close(); } catch (e) {} _es.ws = null; } _esStatus(''); }
 function onEventsubToggle() {
   var cb = document.getElementById('eventsubToggle');
   var want = !!(cb && cb.checked);
   if (want && (!S.twitch || !S.twitch.signedIn)) { _esStatus('connect Twitch first', true); if (cb) cb.checked = false; want = false; }
   try { localStorage.setItem('sf-eventsub-on', want ? '1' : '0'); } catch (e) {}
   if (want) eventSubStart(); else eventSubStop();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Stream control surface (Settings → Stream). Every action here drives Twitch
+// directly through the broadcaster's OAuth via the generic twitchHelix IPC.
+// The helper returns { status, data }; 2xx means success, and Twitch puts a
+// human-readable reason in data.message on failure.
+// ══════════════════════════════════════════════════════════════════════════
+var _siChosenCat = null;   // { id, name } category picked in the title editor
+var _siCatTimer = null;    // debounce for category search
+var _activePollId = null;  // last poll we started (for End now)
+var _activePred = null;    // { id, outcomes:[{id,title}] } for lock/resolve
+var _adTick = null;        // countdown interval for the "next ad" label
+var _adNextAt = 0;         // unix seconds of the next scheduled ad
+
+function _twUid() { return (S.twitch && S.twitch.userId) || ''; }
+function _twReady() { return !!(S.twitch && S.twitch.signedIn && _twUid() && window.electronAPI && window.electronAPI.twitchHelix); }
+function _twReq(method, path, query, body) {
+  return window.electronAPI.twitchHelix({ method: method, path: path, query: query || '', body: body || null });
+}
+function _twOK(res) { return res && res.status >= 200 && res.status < 300; }
+function _twErr(res) {
+  if (!res) return 'no response';
+  var m = res.data && (res.data.message || res.data.error);
+  return (m ? m : ('HTTP ' + res.status));
+}
+function _setStat(id, msg, isErr) {
+  var el = document.getElementById(id);
+  if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--err,#ef4444)' : 'var(--accent)'; }
+}
+
+// Show/hide the whole control surface based on Twitch connection. Called from
+// switchSettingsTab('stream') and after a connect/disconnect.
+function renderStreamTab() {
+  var ready = _twReady();
+  var ctl = document.getElementById('streamControls');
+  var need = document.getElementById('streamNeedsTwitch');
+  if (ctl) ctl.style.display = ready ? '' : 'none';
+  if (need) need.style.display = ready ? 'none' : '';
+  // Only hit Helix when the pane is actually visible, so a background
+  // twitch-status refresh doesn't fire channel/ad requests off-screen.
+  var pane = document.getElementById('pane-stream');
+  if (ready && pane && pane.classList.contains('active')) { siLoadChannelInfo(); adRefreshSchedule(); }
+}
+// Re-render when channel.update EventSub reports an external title/category
+// change so the editor never shows stale values.
+function _onTwitchChannelInfoUpdated(d) {
+  var p = document.getElementById('pane-stream');
+  if (!p || !p.classList.contains('active')) return;
+  var t = document.getElementById('siTitleInput'); if (t && d.title) t.value = d.title;
+  if (d.gameId) { _siChosenCat = { id: String(d.gameId), name: d.gameName || '' }; var c = document.getElementById('siCatChosen'); if (c) c.textContent = d.gameName ? ('Category: ' + d.gameName) : ''; }
+}
+
+// ── Title + Category ──
+async function siLoadChannelInfo() {
+  if (!_twReady()) return;
+  _setStat('siInfoStatus', 'loading…');
+  try {
+    var res = await _twReq('GET', 'channels', 'broadcaster_id=' + encodeURIComponent(_twUid()));
+    if (!_twOK(res)) { _setStat('siInfoStatus', 'Could not load: ' + _twErr(res), true); return; }
+    var c = (res.data && res.data.data && res.data.data[0]) || {};
+    var t = document.getElementById('siTitleInput'); if (t) t.value = c.title || '';
+    if (c.game_id && String(c.game_id) !== '0') { _siChosenCat = { id: String(c.game_id), name: c.game_name || '' }; }
+    else { _siChosenCat = null; }
+    var ch = document.getElementById('siCatChosen'); if (ch) ch.textContent = (c.game_name ? ('Category: ' + c.game_name) : 'No category set');
+    var ci = document.getElementById('siCatInput'); if (ci) ci.value = '';
+    _setStat('siInfoStatus', '');
+  } catch (e) { _setStat('siInfoStatus', 'Load failed', true); }
+}
+function siCategorySearch(q) {
+  q = (q || '').trim();
+  var box = document.getElementById('siCatResults');
+  if (_siCatTimer) clearTimeout(_siCatTimer);
+  if (!q) { if (box) box.style.display = 'none'; return; }
+  _siCatTimer = setTimeout(async function () {
+    if (!_twReady()) return;
+    try {
+      var res = await _twReq('GET', 'search/categories', 'query=' + encodeURIComponent(q) + '&first=8');
+      var items = (res.data && res.data.data) || [];
+      if (!box) return;
+      if (!items.length) { box.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:var(--mut)">No matches</div>'; box.style.display = ''; return; }
+      box.innerHTML = items.map(function (g) {
+        return '<div class="si-cat-row" data-id="' + esc(g.id) + '" data-name="' + esc(g.name) + '" style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:12px" onmouseenter="this.style.background=\'var(--surf2)\'" onmouseleave="this.style.background=\'\'" onclick="siPickCategory(this)">'
+          + (g.box_art_url ? '<img src="' + esc(g.box_art_url.replace('{width}', '24').replace('{height}', '32')) + '" style="width:18px;height:24px;border-radius:3px;object-fit:cover">' : '')
+          + '<span>' + esc(g.name) + '</span></div>';
+      }).join('');
+      box.style.display = '';
+    } catch (e) { /* ignore */ }
+  }, 280);
+}
+function siPickCategory(el) {
+  _siChosenCat = { id: el.getAttribute('data-id'), name: el.getAttribute('data-name') };
+  var ch = document.getElementById('siCatChosen'); if (ch) ch.textContent = 'Category: ' + _siChosenCat.name;
+  var box = document.getElementById('siCatResults'); if (box) box.style.display = 'none';
+  var ci = document.getElementById('siCatInput'); if (ci) ci.value = '';
+}
+// Core channel-info writer. opts: { title, gameId, gameName, tags:[] } — only
+// provided fields are sent. Returns { ok, error }. Shared by the Stream-tab
+// editor and the go-live schedule so both patch Twitch the same way.
+async function _twApplyChannelInfo(opts) {
+  opts = opts || {};
+  if (!_twReady()) return { ok: false, error: 'Twitch not connected' };
+  var body = {};
+  if (opts.title && String(opts.title).trim()) body.title = String(opts.title).trim();
+  if (opts.gameId) body.game_id = String(opts.gameId);
+  if (Array.isArray(opts.tags) && opts.tags.length) body.tags = opts.tags.slice(0, 10);
+  if (!Object.keys(body).length) return { ok: false, error: 'nothing to update' };
+  try {
+    var res = await _twReq('PATCH', 'channels', 'broadcaster_id=' + encodeURIComponent(_twUid()), body);
+    if (_twOK(res)) { if (body.game_id) S.twGameId = body.game_id; if (opts.gameName) S.twGame = opts.gameName; return { ok: true }; }
+    return { ok: false, error: _twErr(res) };
+  } catch (e) { return { ok: false, error: 'request failed' }; }
+}
+async function siApplyChannelInfo() {
+  if (!_twReady()) { _setStat('siInfoStatus', 'Connect Twitch first', true); return; }
+  var title = (document.getElementById('siTitleInput') || {}).value || '';
+  var opts = { title: title };
+  if (_siChosenCat && _siChosenCat.id) { opts.gameId = _siChosenCat.id; opts.gameName = _siChosenCat.name; }
+  if (!String(title).trim() && !opts.gameId) { _setStat('siInfoStatus', 'Nothing to update', true); return; }
+  _setStat('siInfoStatus', 'updating…');
+  var r = await _twApplyChannelInfo(opts);
+  _setStat('siInfoStatus', r.ok ? 'Stream updated ✓' : ('Update failed: ' + r.error), !r.ok);
+}
+// Post the go-live chat announcement: Streamer.bot /announce if connected,
+// else native Twitch Helix (needs moderator:manage:announcements).
+async function _sfAnnounce(text) {
+  text = String(text || '').trim();
+  if (!text) return;
+  if (S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) { announceOnTwitch(text); return; }
+  if (_twReady()) {
+    try { await _twReq('POST', 'chat/announcements', 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&moderator_id=' + encodeURIComponent(_twUid()), { message: text.slice(0, 500) }); } catch (e) {}
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Go-live schedule. Streamers define recurring weekly slots (day(s) + time)
+// each carrying a title, category, tags and a go-live chat announcement. When
+// SF detects go-live (accurate stream.online EventSub, or the viewer-based
+// monitor as a fallback), the slot matching "now" is auto-applied to Twitch
+// and the announcement posts. Persisted in localStorage (sf_schedule).
+// ══════════════════════════════════════════════════════════════════════════
+var _schedule = null;
+var _DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function _schedDefault() { return { enabled: false, autoApply: true, autoAnnounce: true, windowMin: 120, slots: [] }; }
+function _schedLoad() {
+  try { _schedule = Object.assign(_schedDefault(), JSON.parse(localStorage.getItem('sf_schedule') || '{}') || {}); }
+  catch (e) { _schedule = _schedDefault(); }
+  if (!Array.isArray(_schedule.slots)) _schedule.slots = [];
+}
+function _schedSave() { try { localStorage.setItem('sf_schedule', JSON.stringify(_schedule)); } catch (e) {} }
+function _schedNewId() { return 's' + Math.random().toString(36).slice(2, 8); }
+function _schedParseTime(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim()); if (!m) return null; var h = +m[1], mi = +m[2]; if (h > 23 || mi > 59) return null; return h * 60 + mi; }
+function _schedFmtTime(mins) { var h = Math.floor(mins / 60), m = mins % 60; var ap = h < 12 ? 'AM' : 'PM'; var h12 = h % 12 || 12; return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ap; }
+function _schedTags(slot) { return slot && slot.tags ? String(slot.tags).split(',').map(function (x) { return x.trim(); }).filter(Boolean) : []; }
+function _schedFill(tpl, slot) { return String(tpl || '').replace(/\{title\}/g, slot.title || '').replace(/\{game\}/g, slot.gameName || '').replace(/\{label\}/g, slot.label || ''); }
+// Best slot for "now": scheduled today, within the match window (started up to
+// windowMin ago, or up to 30 min early), nearest to now wins.
+function _schedMatchNow() {
+  if (!_schedule || !_schedule.enabled || !_schedule.slots.length) return null;
+  var now = new Date(), dow = now.getDay(), mins = now.getHours() * 60 + now.getMinutes();
+  var win = Math.max(15, Number(_schedule.windowMin) || 120);
+  var best = null, bestScore = Infinity;
+  _schedule.slots.forEach(function (s) {
+    if (!s || s.disabled) return;
+    if (Array.isArray(s.days) && s.days.length && s.days.indexOf(dow) === -1) return;
+    var t = _schedParseTime(s.time); if (t == null) return;
+    var delta = mins - t;
+    if (delta < -30 || delta > win) return;
+    if (Math.abs(delta) < bestScore) { bestScore = Math.abs(delta); best = s; }
+  });
+  return best;
+}
+// The upcoming slot (next 7 days) for the "Next up" preview.
+function _schedNextUpcoming() {
+  if (!_schedule || !_schedule.slots.length) return null;
+  var now = new Date(), nowMin = now.getDay() * 1440 + now.getHours() * 60 + now.getMinutes();
+  var best = null, bestIn = Infinity;
+  _schedule.slots.forEach(function (s) {
+    if (!s || s.disabled) return;
+    var t = _schedParseTime(s.time); if (t == null) return;
+    var days = (Array.isArray(s.days) && s.days.length) ? s.days : [0, 1, 2, 3, 4, 5, 6];
+    days.forEach(function (d) {
+      var slotMin = d * 1440 + t;
+      var inMin = slotMin - nowMin; if (inMin < 0) inMin += 10080;  // wrap a week
+      if (inMin < bestIn) { bestIn = inMin; best = { slot: s, inMin: inMin, day: d }; }
+    });
+  });
+  return best;
+}
+// Auto-apply on go-live (called from startStreamSession, once per session).
+async function applyScheduleForGoLive() {
+  if (!_schedule) _schedLoad();
+  if (!_schedule || !_schedule.enabled) return;
+  var slot = _schedMatchNow();
+  if (!slot) return;
+  if (_schedule.autoApply) {
+    var r = await _twApplyChannelInfo({ title: slot.title, gameId: slot.gameId, gameName: slot.gameName, tags: _schedTags(slot) });
+    addEvHistory('StreamFusion', r.ok ? ('Schedule applied on go-live: "' + (slot.label || slot.title || 'slot') + '"') : ('Schedule apply failed: ' + r.error), 'tw', false);
+  }
+  if (_schedule.autoAnnounce && slot.announce) { _sfAnnounce(_schedFill(slot.announce, slot)); }
+}
+
+// ── Schedule tab UI ──
+function schedSetGlobal(field, val) { if (!_schedule) _schedLoad(); _schedule[field] = val; _schedSave(); _renderScheduleNextLine(); }
+function schedAddSlot() { if (!_schedule) _schedLoad(); _schedule.slots.push({ id: _schedNewId(), label: '', days: [], time: '19:00', title: '', gameId: '', gameName: '', tags: '', announce: '' }); _schedSave(); _renderScheduleTab(); }
+function schedRemoveSlot(idx) { _schedule.slots.splice(idx, 1); _schedSave(); _renderScheduleTab(); }
+function schedSetField(idx, field, val) { if (!_schedule.slots[idx]) return; _schedule.slots[idx][field] = val; _schedSave(); _renderScheduleNextLine(); }
+function schedToggleDay(idx, d) { var s = _schedule.slots[idx]; if (!s) return; s.days = s.days || []; var i = s.days.indexOf(d); if (i >= 0) s.days.splice(i, 1); else s.days.push(d); s.days.sort(); _schedSave(); _renderScheduleTab(); }
+function _schedSetStatus(idx, msg, isErr) { var el = document.getElementById('schedStatus-' + idx); if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--red)' : 'var(--grn)'; } }
+async function schedApplyNow(idx) {
+  var s = _schedule.slots[idx]; if (!s) return;
+  if (!_twReady()) { _schedSetStatus(idx, 'Connect Twitch first', true); return; }
+  _schedSetStatus(idx, 'applying…');
+  var r = await _twApplyChannelInfo({ title: s.title, gameId: s.gameId, gameName: s.gameName, tags: _schedTags(s) });
+  _schedSetStatus(idx, r.ok ? 'Applied to your channel ✓' : ('Failed: ' + r.error), !r.ok);
+}
+async function schedRunAutomationNow() {
+  var el = document.getElementById('schedRunNowStatus');
+  var slot = _schedMatchNow();
+  if (!slot) { if (el) { el.style.color = 'var(--mut)'; el.textContent = 'No slot matches the current day/time window.'; } return; }
+  if (el) { el.style.color = 'var(--accent)'; el.textContent = 'Running "' + (slot.label || slot.title || 'slot') + '"…'; }
+  await applyScheduleForGoLive();
+  if (el) { el.style.color = 'var(--grn)'; el.textContent = 'Ran go-live automation for "' + (slot.label || slot.title || 'slot') + '".'; }
+}
+var _schedCatTimer = null;
+function schedCatSearch(idx, q) {
+  q = (q || '').trim();
+  var box = document.getElementById('schedCatRes-' + idx);
+  if (_schedCatTimer) clearTimeout(_schedCatTimer);
+  if (!q) { if (box) box.style.display = 'none'; return; }
+  _schedCatTimer = setTimeout(async function () {
+    if (!box) return;
+    if (!_twReady()) { box.innerHTML = '<div style="padding:6px 8px;font-size:10px;color:var(--mut)">Connect Twitch to search categories</div>'; box.style.display = ''; return; }
+    try {
+      var res = await _twReq('GET', 'search/categories', 'query=' + encodeURIComponent(q) + '&first=6');
+      var items = (res.data && res.data.data) || [];
+      box.innerHTML = items.length ? items.map(function (g) {
+        var nm = esc(g.name || '').replace(/"/g, '&quot;');
+        return '<div data-idx="' + idx + '" data-id="' + esc(g.id) + '" data-name="' + nm + '" onclick="schedPickCatEl(this)" onmouseenter="this.style.background=\'var(--surf2)\'" onmouseleave="this.style.background=\'\'" style="padding:5px 8px;cursor:pointer;font-size:11px">' + esc(g.name) + '</div>';
+      }).join('') : '<div style="padding:6px 8px;font-size:10px;color:var(--mut)">No matches</div>';
+      box.style.display = '';
+    } catch (e) {}
+  }, 280);
+}
+function schedPickCatEl(el) {
+  var idx = +el.getAttribute('data-idx'), s = _schedule.slots[idx];
+  if (!s) return;
+  s.gameId = el.getAttribute('data-id'); s.gameName = el.getAttribute('data-name') || '';
+  _schedSave();
+  var box = document.getElementById('schedCatRes-' + idx); if (box) box.style.display = 'none';
+  _renderScheduleTab();
+}
+function schedClearCat(idx) { var s = _schedule.slots[idx]; if (!s) return; s.gameId = ''; s.gameName = ''; _schedSave(); _renderScheduleTab(); }
+function _renderScheduleNextLine() {
+  var el = document.getElementById('schedNextLine'); if (!el) return;
+  if (!_schedule || !_schedule.enabled) { el.textContent = 'Auto-updates are off.'; el.style.color = 'var(--mut)'; return; }
+  var nx = _schedNextUpcoming();
+  if (!nx) { el.textContent = 'No slots yet. Add one below.'; el.style.color = 'var(--mut)'; return; }
+  var h = Math.floor(nx.inMin / 60), m = nx.inMin % 60;
+  var when = h >= 24 ? (Math.floor(h / 24) + 'd ' + (h % 24) + 'h') : (h > 0 ? (h + 'h ' + m + 'm') : (m + 'm'));
+  var s = nx.slot;
+  el.style.color = 'var(--accent)';
+  el.innerHTML = 'Next up in ' + when + ': <strong>' + esc(s.label || s.title || 'Untitled') + '</strong> on ' + _DOW[nx.day] + ' ' + _schedFmtTime(_schedParseTime(s.time) || 0) + (s.gameName ? ' · ' + esc(s.gameName) : '');
+}
+function _renderScheduleTab() {
+  if (!_schedule) _schedLoad();
+  var g = document.getElementById('schedGlobals');
+  if (g) {
+    var chk = function (on) { return on ? ' checked' : ''; };
+    g.innerHTML =
+      '<label class="frow"><span>Enable schedule auto-updates</span><input type="checkbox"' + chk(_schedule.enabled) + ' onchange="schedSetGlobal(\'enabled\',this.checked)"></label>'
+      + '<label class="frow"><span>Apply title / category on go-live</span><input type="checkbox"' + chk(_schedule.autoApply) + ' onchange="schedSetGlobal(\'autoApply\',this.checked)"></label>'
+      + '<label class="frow"><span>Post go-live chat announcement</span><input type="checkbox"' + chk(_schedule.autoAnnounce) + ' onchange="schedSetGlobal(\'autoAnnounce\',this.checked)"></label>'
+      + '<div class="frow" style="gap:6px"><label style="font-size:11px">Match window after start (min)</label><input class="minput" type="number" min="15" max="360" value="' + (Number(_schedule.windowMin) || 120) + '" onchange="schedSetGlobal(\'windowMin\',parseInt(this.value,10)||120)" style="width:80px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>';
+  }
+  _renderScheduleNextLine();
+  var host = document.getElementById('schedSlots');
+  if (!host) return;
+  if (!_schedule.slots.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">No slots yet. Click "Add slot" to build your week.</div>'; return; }
+  host.innerHTML = _schedule.slots.map(function (s, idx) {
+    var dayBtns = _DOW.map(function (d, di) {
+      var on = Array.isArray(s.days) && s.days.indexOf(di) >= 0;
+      return '<button onclick="schedToggleDay(' + idx + ',' + di + ')" style="font-size:10px;font-weight:700;padding:3px 6px;border-radius:5px;cursor:pointer;border:1px solid var(--bdr);background:' + (on ? 'var(--accent);color:#fff' : 'var(--surf2);color:var(--mut)') + '">' + d + '</button>';
+    }).join('');
+    return '<div class="sec" style="background:var(--surf2);margin-bottom:10px">'
+      + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
+      +   '<input class="minput" value="' + esc(s.label || '') + '" placeholder="Slot name (e.g. Monday Variety)" oninput="schedSetField(' + idx + ',\'label\',this.value)" style="flex:1;font-size:12px;font-weight:700;padding:6px 8px;background:var(--surf3)">'
+      +   '<button class="tbtn hk-reset" onclick="schedRemoveSlot(' + idx + ')" title="Delete slot">Delete</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + dayBtns + '<span style="font-size:10px;color:var(--mut);align-self:center;margin-left:4px">(none = every day)</span></div>'
+      + '<div class="frow" style="gap:6px;margin-bottom:6px"><label style="font-size:11px">Start time</label><input class="minput" type="time" value="' + esc(s.time || '19:00') + '" onchange="schedSetField(' + idx + ',\'time\',this.value)" style="width:110px;font-size:12px;padding:4px 6px;background:var(--surf3)"></div>'
+      + '<input class="minput" value="' + esc(s.title || '') + '" maxlength="140" placeholder="Stream title" oninput="schedSetField(' + idx + ',\'title\',this.value)" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);margin-bottom:6px">'
+      + '<div style="position:relative;margin-bottom:6px">'
+      +   '<input class="minput" placeholder="Search category/game..." oninput="schedCatSearch(' + idx + ',this.value)" autocomplete="off" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3)">'
+      +   '<div id="schedCatRes-' + idx + '" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:0 0 8px 8px;max-height:180px;overflow:auto"></div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--mut);margin-bottom:6px">' + (s.gameName ? ('Category: <strong style="color:var(--txt)">' + esc(s.gameName) + '</strong> <button class="tbtn" style="font-size:9px;padding:1px 6px" onclick="schedClearCat(' + idx + ')">clear</button>') : 'No category set') + '</div>'
+      + '<input class="minput" value="' + esc(s.tags || '') + '" placeholder="Tags (comma separated, optional)" oninput="schedSetField(' + idx + ',\'tags\',this.value)" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);margin-bottom:6px">'
+      + '<textarea placeholder="Go-live announcement message (optional). {title} {game} {label} are filled in." oninput="schedSetField(' + idx + ',\'announce\',this.value)" rows="2" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(s.announce || '') + '</textarea>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="schedApplyNow(' + idx + ')">Apply now</button><span id="schedStatus-' + idx + '" style="font-size:10px;color:var(--accent)"></span></div>'
+      + '</div>';
+  }).join('');
+}
+function renderScheduleTab() {
+  var ready = _twReady();
+  var need = document.getElementById('schedNeedsTwitch');
+  var body = document.getElementById('schedBody');
+  if (need) need.style.display = ready ? 'none' : '';
+  if (body) body.style.display = ready ? '' : 'none';
+  if (ready) _renderScheduleTab();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Bot: unified chat send + automated (timed) messages. Sending posts as, in
+// priority order: (1) the connected bot account, (2) the broadcaster's own
+// Twitch account, (3) Streamer.bot. So streamers can run their OWN bot account
+// (not a shared StreamFusion identity) and it still works with no bot / no SB.
+// ══════════════════════════════════════════════════════════════════════════
+async function sfSendChat(text) {
+  text = String(text || '').trim();
+  if (!text) return { ok: false, error: 'empty' };
+  text = text.slice(0, 500);
+  // Remember our own output so command detection never re-triggers on it.
+  _lastBotSent = { text: text, at: Date.now() };
+  // 1) Dedicated bot account (posts under the bot's name).
+  if (S.twitchBot && S.twitchBot.signedIn && _twUid() && window.electronAPI && window.electronAPI.twitchBotSendChat) {
+    try { var rb = await window.electronAPI.twitchBotSendChat({ broadcasterId: _twUid(), message: text }); if (rb && rb.ok) return { ok: true, via: 'bot' }; } catch (e) {}
+  }
+  // 2) Broadcaster's own Twitch account (native Helix Send Chat Message).
+  if (_twReady()) {
+    try {
+      var res = await _twReq('POST', 'chat/messages', '', { broadcaster_id: _twUid(), sender_id: _twUid(), message: text });
+      if (_twOK(res)) { var d = res.data && res.data.data && res.data.data[0]; if (!(d && d.is_sent === false)) return { ok: true, via: 'broadcaster' }; }
+    } catch (e) {}
+  }
+  // 3) Streamer.bot (uses whatever bot account SB is configured with).
+  if (S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) {
+    try { S.sbWS.send(JSON.stringify({ request: 'SendMessage', id: 'sf-auto', platform: 'twitch', message: text, bot: true, internal: false })); return { ok: true, via: 'sb' }; } catch (e) {}
+  }
+  return { ok: false, error: 'no send path (connect Twitch or Streamer.bot)' };
+}
+
+// ── Bot account (optional second Twitch login) ──
+function applyTwitchBotStatus(st) {
+  S.twitchBot = st || { signedIn: false };
+  if (typeof renderBotTab === 'function') { try { renderBotTab(); } catch (e) {} }
+}
+function connectBotAccount() {
+  if (!window.electronAPI || !window.electronAPI.twitchBotBeginAuth) return;
+  var el = document.getElementById('botAcctStatus'); if (el) { el.textContent = 'Opening Twitch sign-in… pick your BOT account.'; el.style.color = 'var(--accent)'; }
+  window.electronAPI.twitchBotBeginAuth().then(applyTwitchBotStatus).catch(function () {});
+}
+function disconnectBotAccount() {
+  if (!window.electronAPI || !window.electronAPI.twitchBotSignOut) return;
+  window.electronAPI.twitchBotSignOut().then(applyTwitchBotStatus).catch(function () {});
+}
+
+// ── Automated messages engine ──
+var _autoMsg = null;
+var _autoMsgChatCount = 0;   // viewer chat lines seen this session (gate)
+var _autoMsgTimer = null;
+function _autoMsgDefault() { return { enabled: false, onlyLive: true, minLines: 5, msgs: [] }; }
+function _autoMsgLoad() {
+  try { _autoMsg = Object.assign(_autoMsgDefault(), JSON.parse(localStorage.getItem('sf_auto_messages') || '{}') || {}); }
+  catch (e) { _autoMsg = _autoMsgDefault(); }
+  if (!Array.isArray(_autoMsg.msgs)) _autoMsg.msgs = [];
+  // Reset per-message timers on load so a stale lastSent doesn't fire a burst
+  // right at startup; each message then waits a full interval.
+  _autoMsg.msgs.forEach(function (m) { m._lastSent = Date.now(); m._linesAtSend = _autoMsgChatCount; });
+}
+function _autoMsgSave() { try { localStorage.setItem('sf_auto_messages', JSON.stringify(_autoMsg)); } catch (e) {} }
+function _autoMsgLive() { try { return (typeof _isPlatLive === 'function' && _isPlatLive('tw')) || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active); } catch (e) { return false; } }
+function _autoMsgTick() {
+  if (!_autoMsg || !_autoMsg.enabled || !_autoMsg.msgs.length) return;
+  if (_autoMsg.onlyLive && !_autoMsgLive()) return;
+  var now = Date.now(), minL = Number(_autoMsg.minLines) || 0;
+  var due = null;
+  for (var i = 0; i < _autoMsg.msgs.length; i++) {
+    var m = _autoMsg.msgs[i];
+    if (!m || !m.enabled || !m.text) continue;
+    if (now - (m._lastSent || 0) < Math.max(1, Number(m.intervalMin) || 15) * 60000) continue;
+    if ((_autoMsgChatCount - (m._linesAtSend || 0)) < minL) continue;
+    // Most-overdue wins so nothing starves; only one send per tick.
+    if (!due || (m._lastSent || 0) < (due._lastSent || 0)) due = m;
+  }
+  if (due) { due._lastSent = now; due._linesAtSend = _autoMsgChatCount; _autoMsgSave(); sfSendChat(due.text); }
+}
+function _autoMsgStart() { if (_autoMsgTimer) return; _autoMsgTimer = setInterval(_autoMsgTick, 20000); }
+// UI
+function autoMsgSetGlobal(field, val) { if (!_autoMsg) _autoMsgLoad(); _autoMsg[field] = val; _autoMsgSave(); }
+function autoMsgAdd() { if (!_autoMsg) _autoMsgLoad(); _autoMsg.msgs.push({ id: 's' + Math.random().toString(36).slice(2, 8), text: '', intervalMin: 15, enabled: true, _lastSent: Date.now(), _linesAtSend: _autoMsgChatCount }); _autoMsgSave(); _renderAutoMsgs(); }
+function autoMsgRemove(idx) { _autoMsg.msgs.splice(idx, 1); _autoMsgSave(); _renderAutoMsgs(); }
+function autoMsgSetField(idx, field, val) { if (!_autoMsg.msgs[idx]) return; _autoMsg.msgs[idx][field] = val; _autoMsgSave(); }
+async function autoMsgSendNow(idx) {
+  var m = _autoMsg.msgs[idx]; if (!m || !m.text) return;
+  var el = document.getElementById('autoMsgStatus-' + idx); if (el) { el.textContent = 'sending…'; el.style.color = 'var(--accent)'; }
+  var r = await sfSendChat(m.text);
+  m._lastSent = Date.now(); m._linesAtSend = _autoMsgChatCount; _autoMsgSave();
+  if (el) { el.textContent = r.ok ? ('Sent (as ' + (r.via === 'bot' ? 'bot' : r.via === 'broadcaster' ? 'you' : 'Streamer.bot') + ') ✓') : ('Failed: ' + r.error); el.style.color = r.ok ? 'var(--grn)' : 'var(--red)'; }
+}
+function _renderAutoMsgs() {
+  var host = document.getElementById('autoMsgList'); if (!host) return;
+  if (!_autoMsg) _autoMsgLoad();
+  if (!_autoMsg.msgs.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">No automated messages yet. Click "Add message".</div>'; return; }
+  host.innerHTML = _autoMsg.msgs.map(function (m, idx) {
+    return '<div class="sec" style="background:var(--surf2);margin-bottom:8px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +   '<label class="frow" style="flex:0 0 auto;gap:6px;margin:0"><span style="font-size:11px">On</span><input type="checkbox"' + (m.enabled ? ' checked' : '') + ' onchange="autoMsgSetField(' + idx + ',\'enabled\',this.checked)"></label>'
+      +   '<label style="font-size:11px;color:var(--mut)">Every</label><input class="minput" type="number" min="1" max="1440" value="' + (Number(m.intervalMin) || 15) + '" onchange="autoMsgSetField(' + idx + ',\'intervalMin\',parseInt(this.value,10)||15)" style="width:64px;font-size:12px;padding:4px 6px;background:var(--surf3)"><span style="font-size:11px;color:var(--mut)">min</span>'
+      +   '<button class="tbtn hk-reset" style="margin-left:auto" onclick="autoMsgRemove(' + idx + ')">Delete</button>'
+      + '</div>'
+      + '<textarea placeholder="Message text (e.g. Follow so you don\'t miss the next stream!)" oninput="autoMsgSetField(' + idx + ',\'text\',this.value)" rows="2" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(m.text || '') + '</textarea>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:5px 11px;border-radius:6px" onclick="autoMsgSendNow(' + idx + ')">Send now</button><span id="autoMsgStatus-' + idx + '" style="font-size:10px"></span></div>'
+      + '</div>';
+  }).join('');
+}
+function renderBotTab() {
+  if (!_autoMsg) _autoMsgLoad();
+  // Bot account card
+  var ac = document.getElementById('botAcctCard');
+  if (ac) {
+    var b = S.twitchBot || {};
+    if (b.signedIn) {
+      ac.innerHTML = '<div style="font-size:12px;color:var(--txt);font-weight:700;margin-bottom:2px">Bot account: ' + esc(b.displayName || b.login || 'connected') + '</div>'
+        + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">Automated messages and bot replies post as this account.</div>'
+        + '<button class="cbtn" style="background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="disconnectBotAccount()">Disconnect bot</button>';
+    } else {
+      ac.innerHTML = '<div style="font-size:12px;color:var(--txt);font-weight:700;margin-bottom:2px">No bot account connected</div>'
+        + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">Optional. Connect a separate Twitch account (your own bot) so messages post under its name. Without one, messages post from your own channel account (or Streamer.bot if connected).</div>'
+        + '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="connectBotAccount()">Connect bot account</button><div id="botAcctStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>';
+    }
+  }
+  // Global automated-message settings
+  var g = document.getElementById('autoMsgGlobals');
+  if (g) {
+    var chk = function (on) { return on ? ' checked' : ''; };
+    g.innerHTML =
+      '<label class="frow"><span>Enable automated messages</span><input type="checkbox"' + chk(_autoMsg.enabled) + ' onchange="autoMsgSetGlobal(\'enabled\',this.checked)"></label>'
+      + '<label class="frow"><span>Only send while live</span><input type="checkbox"' + chk(_autoMsg.onlyLive) + ' onchange="autoMsgSetGlobal(\'onlyLive\',this.checked)"></label>'
+      + '<div class="frow" style="gap:6px"><label style="font-size:11px">Minimum chat lines between sends</label><input class="minput" type="number" min="0" max="200" value="' + (Number(_autoMsg.minLines) || 0) + '" onchange="autoMsgSetGlobal(\'minLines\',parseInt(this.value,10)||0)" style="width:70px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>';
+  }
+  _renderAutoMsgs();
+  if (typeof _renderCommands === 'function') _renderCommands();
+  if (typeof _renderAutomod === 'function') _renderAutomod();
+  if (typeof _renderQuotes === 'function') _renderQuotes();
+  if (typeof _renderGiveaway === 'function') _renderGiveaway();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Custom chat commands. Viewers type !trigger; the bot fills variables and
+// replies via sfSendChat, honoring per-command cooldown + permission level.
+// Counter commands (!deaths) support mod-only +/-/set/reset. Loop-safe: the
+// bot never processes its own last-sent line or messages from the bot account.
+// ══════════════════════════════════════════════════════════════════════════
+var _cmds = null;
+var _cmdCooldowns = {};
+var _lastBotSent = { text: '', at: 0 };
+var _CMD_LEVELS = { everyone: 0, sub: 1, vip: 2, mod: 3, broadcaster: 4 };
+function _cmdLoad() { try { _cmds = JSON.parse(localStorage.getItem('sf_commands') || '[]') || []; } catch (e) { _cmds = []; } if (!Array.isArray(_cmds)) _cmds = []; }
+function _cmdSave() { try { localStorage.setItem('sf_commands', JSON.stringify(_cmds)); } catch (e) {} }
+function _botUptime() {
+  var start = S.twLiveStartedAt || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active && _streamSession.startTime) || 0;
+  if (!start) return 'offline';
+  var s = Math.floor((Date.now() - start) / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+}
+function _fillCmdVars(tpl, ctx) {
+  return String(tpl || '')
+    .replace(/\{user\}/gi, ctx.user || '')
+    .replace(/\{touser\}/gi, ctx.arg1 || ctx.user || '')
+    .replace(/\{args\}/gi, ctx.args || '')
+    .replace(/\{count\}/gi, ctx.count != null ? String(ctx.count) : '')
+    .replace(/\{channel\}/gi, S.twLogin || '')
+    .replace(/\{game\}/gi, S.twGame || '')
+    .replace(/\{uptime\}/gi, _botUptime())
+    .replace(/\{random:([^}]+)\}/gi, function (_m, list) { var a = list.split('|'); return a[Math.floor(Math.random() * a.length)] || ''; });
+}
+function _botUserLevel(u) {
+  u = u || {};
+  var badges = (u.badges || []).map(function (b) { return ((b && (b.name || b.type)) || '').toLowerCase(); });
+  var has = function (n) { return badges.some(function (x) { return x.indexOf(n) >= 0; }); };
+  var login = (u.login || u.name || u.displayName || '').toLowerCase();
+  if (u.role === 4 || u.isBroadcaster || has('broadcaster') || has('owner') || (S.twLogin && login === String(S.twLogin).toLowerCase())) return 4;
+  if (u.role === 3 || u.isModerator || u.isMod || has('moderator')) return 3;
+  if (u.role === 2 || u.isVip || has('vip')) return 2;
+  if (u.subscribed || u.isSubscribed || u.isSubscriber || has('subscriber') || has('founder')) return 1;
+  return 0;
+}
+function maybeFireCommand(text, u, plat) {
+  if (!_cmds) _cmdLoad();
+  if (!_cmds.length) return;
+  text = String(text || '').trim();
+  if (text.charAt(0) !== '!') return;
+  // Loop guard: ignore our own last-sent line and the bot account's messages.
+  if (_lastBotSent.text && text === _lastBotSent.text && (Date.now() - _lastBotSent.at) < 6000) return;
+  var login = ((u && (u.login || u.name || u.displayName)) || '').toLowerCase();
+  if (S.twitchBot && S.twitchBot.signedIn && S.twitchBot.login && login === String(S.twitchBot.login).toLowerCase()) return;
+  var sp = text.split(/\s+/);
+  var trig = sp[0].toLowerCase();
+  // Built-in commands (take precedence over custom ones).
+  if (trig === '!permit' && _botUserLevel(u) >= 3 && sp[1]) {
+    var pu = sp[1].replace(/^@/, '');
+    botPermit(pu);
+    sfSendChat('@' + pu + ' you can post one link.');
+    return;
+  }
+  if (trig === '!quote') { _handleQuoteCmd(sp, u); return; }
+  var cmd = null;
+  for (var i = 0; i < _cmds.length; i++) {
+    var c = _cmds[i]; if (!c || !c.enabled) continue;
+    var trigs = [String(c.trigger || '').toLowerCase()].concat(String(c.aliases || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean));
+    if (trigs.indexOf(trig) >= 0) { cmd = c; break; }
+  }
+  if (!cmd) return;
+  if (_botUserLevel(u) < (_CMD_LEVELS[cmd.minLevel] || 0)) return;
+  var now = Date.now(), cd = Math.max(0, Number(cmd.cooldownSec) || 0) * 1000;
+  if (cd && _cmdCooldowns[cmd.id] && (now - _cmdCooldowns[cmd.id]) < cd) return;
+  var lvl = _botUserLevel(u);
+  var ctx = { user: u.displayName || u.name || u.login || '', arg1: sp[1] || '', args: sp.slice(1).join(' '), count: null };
+  if (cmd.isCounter) {
+    var op = (sp[1] || '').toLowerCase();
+    if (lvl >= 3 && (op === '+' || op === '+1' || op === 'add')) cmd.count = (Number(cmd.count) || 0) + 1;
+    else if (lvl >= 3 && (op === '-' || op === '-1' || op === 'sub')) cmd.count = (Number(cmd.count) || 0) - 1;
+    else if (lvl >= 3 && op === 'set') cmd.count = parseInt(sp[2], 10) || 0;
+    else if (lvl >= 3 && op === 'reset') cmd.count = 0;
+    ctx.count = Number(cmd.count) || 0;
+    _cmdSave();
+  }
+  _cmdCooldowns[cmd.id] = now;
+  var out = _fillCmdVars(cmd.response, ctx);
+  if (out.trim()) sfSendChat(out);
+}
+// Commands UI
+function cmdAdd() { if (!_cmds) _cmdLoad(); _cmds.push({ id: 'c' + Math.random().toString(36).slice(2, 8), trigger: '!newcmd', aliases: '', response: '', cooldownSec: 5, minLevel: 'everyone', enabled: true, isCounter: false, count: 0 }); _cmdSave(); _renderCommands(); }
+function cmdRemove(i) { _cmds.splice(i, 1); _cmdSave(); _renderCommands(); }
+function cmdSet(i, f, v) { if (!_cmds[i]) return; _cmds[i][f] = v; _cmdSave(); if (f === 'isCounter') _renderCommands(); }
+function cmdTest(i) {
+  var c = _cmds[i]; if (!c) return;
+  var out = _fillCmdVars(c.response, { user: S.twLogin || 'you', arg1: '', args: '', count: c.isCounter ? (Number(c.count) || 0) : null });
+  var el = document.getElementById('cmdStatus-' + i);
+  if (!out.trim()) { if (el) { el.textContent = 'Empty response'; el.style.color = 'var(--red)'; } return; }
+  sfSendChat(out).then(function (r) { if (el) { el.textContent = r.ok ? 'Sent ✓' : ('Failed: ' + r.error); el.style.color = r.ok ? 'var(--grn)' : 'var(--red)'; } });
+}
+function _renderCommands() {
+  var host = document.getElementById('cmdList'); if (!host) return;
+  if (!_cmds) _cmdLoad();
+  if (!_cmds.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">No commands yet. Click "Add command". Try trigger <code>!socials</code> with a response, or a counter like <code>!deaths</code> using <code>{count}</code>.</div>'; return; }
+  var levelOpts = function (sel) { return ['everyone', 'sub', 'vip', 'mod', 'broadcaster'].map(function (l) { return '<option value="' + l + '"' + (sel === l ? ' selected' : '') + '>' + l + '</option>'; }).join(''); };
+  host.innerHTML = _cmds.map(function (c, i) {
+    return '<div class="sec" style="background:var(--surf2);margin-bottom:8px">'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +   '<label class="frow" style="flex:0 0 auto;gap:6px;margin:0"><span style="font-size:11px">On</span><input type="checkbox"' + (c.enabled ? ' checked' : '') + ' onchange="cmdSet(' + i + ',\'enabled\',this.checked)"></label>'
+      +   '<input class="minput" value="' + esc(c.trigger || '') + '" placeholder="!command" oninput="cmdSet(' + i + ',\'trigger\',this.value)" style="flex:1;min-width:80px;font-size:12px;font-weight:700;padding:5px 8px;background:var(--surf3);font-family:ui-monospace,monospace">'
+      +   '<button class="tbtn hk-reset" onclick="cmdRemove(' + i + ')">Delete</button>'
+      + '</div>'
+      + '<textarea placeholder="Response (use {user} {touser} {count} {game} {uptime} {args})" oninput="cmdSet(' + i + ',\'response\',this.value)" rows="2" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(c.response || '') + '</textarea>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">'
+      +   '<label style="font-size:10px;color:var(--mut)">Who</label><select onchange="cmdSet(' + i + ',\'minLevel\',this.value)" style="font-size:11px;padding:3px 6px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:5px">' + levelOpts(c.minLevel || 'everyone') + '</select>'
+      +   '<label style="font-size:10px;color:var(--mut)">Cooldown</label><input class="minput" type="number" min="0" max="3600" value="' + (Number(c.cooldownSec) || 0) + '" onchange="cmdSet(' + i + ',\'cooldownSec\',parseInt(this.value,10)||0)" style="width:56px;font-size:11px;padding:3px 6px;background:var(--surf3)"><span style="font-size:10px;color:var(--mut)">s</span>'
+      +   '<label class="frow" style="gap:5px;margin:0"><span style="font-size:10px;color:var(--mut)">Counter</span><input type="checkbox"' + (c.isCounter ? ' checked' : '') + ' onchange="cmdSet(' + i + ',\'isCounter\',this.checked)" title="Enables mod-only + / - / set / reset and the {count} variable"></label>'
+      +   (c.isCounter ? '<span style="font-size:10px;color:var(--mut)">count: <strong style="color:var(--txt)">' + (Number(c.count) || 0) + '</strong></span>' : '')
+      +   '<button class="cbtn" style="margin-left:auto;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px" onclick="cmdTest(' + i + ')">Test</button>'
+      +   '<span id="cmdStatus-' + i + '" style="font-size:10px"></span>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Auto-moderation. Per-filter toggles act via the native modAction() path
+// (delete + optional timeout). Mods/broadcaster are always exempt; each filter
+// also has an exempt level. `!permit <user>` (mod) grants a short link pass.
+// ══════════════════════════════════════════════════════════════════════════
+var _automod = null;
+var _permits = {};   // login -> link-permit expiry ts
+var _AM_FILTERS = [
+  { key: 'links', label: 'Block links' },
+  { key: 'caps', label: 'Excessive caps' },
+  { key: 'symbols', label: 'Symbol / special-char spam' },
+  { key: 'length', label: 'Very long messages' },
+  { key: 'repeat', label: 'Repeated characters' },
+  { key: 'words', label: 'Blocked words / phrases' }
+];
+function _automodDefault() {
+  return {
+    enabled: false, permitSec: 60,
+    filters: {
+      links: { on: false, timeout: 0, exempt: 'sub', warn: '{user}, please ask before posting links.' },
+      caps: { on: false, timeout: 0, exempt: 'vip', warn: '' },
+      symbols: { on: false, timeout: 0, exempt: 'vip', warn: '' },
+      length: { on: false, timeout: 0, exempt: 'vip', warn: '' },
+      repeat: { on: false, timeout: 0, exempt: 'vip', warn: '' },
+      words: { on: false, timeout: 600, exempt: 'mod', warn: '', list: '' }
+    }
+  };
+}
+function _automodLoad() {
+  try { var d = JSON.parse(localStorage.getItem('sf_automod') || '{}') || {}; _automod = _automodDefault(); _automod.enabled = !!d.enabled; if (d.permitSec != null) _automod.permitSec = d.permitSec; if (d.filters) Object.keys(_automod.filters).forEach(function (k) { if (d.filters[k]) Object.assign(_automod.filters[k], d.filters[k]); }); }
+  catch (e) { _automod = _automodDefault(); }
+}
+function _automodSave() { try { localStorage.setItem('sf_automod', JSON.stringify(_automod)); } catch (e) {} }
+function botPermit(login) { if (!_automod) _automodLoad(); _permits[String(login || '').toLowerCase()] = Date.now() + (Number(_automod.permitSec) || 60) * 1000; }
+function maybeAutoMod(text, u, msgId) {
+  if (!_automod) _automodLoad();
+  if (!_automod || !_automod.enabled) return false;
+  var lvl = _botUserLevel(u);
+  if (lvl >= 3) return false;   // mods + broadcaster never filtered
+  var login = (u.login || u.name || u.displayName || '').toLowerCase();
+  var f = _automod.filters, ex = function (flt) { return lvl < (_CMD_LEVELS[flt.exempt] || 0); };
+  // Links
+  if (f.links.on && ex(f.links)) {
+    var permitted = _permits[login] && Date.now() < _permits[login];
+    if (!permitted && /(https?:\/\/|www\.[a-z0-9-]+\.|\b[a-z0-9-]{2,}\.(com|net|org|tv|gg|io|co|link|xyz|me|ly|live|stream|shop|store|info|biz)\b)/i.test(text)) return _amAct('links', u, msgId, login);
+  }
+  // Caps %
+  if (f.caps.on && ex(f.caps)) {
+    var letters = text.replace(/[^a-zA-Z]/g, '');
+    if (letters.length >= 12 && ((text.match(/[A-Z]/g) || []).length / letters.length) * 100 >= 70) return _amAct('caps', u, msgId, login);
+  }
+  // Symbol ratio
+  if (f.symbols.on && ex(f.symbols)) {
+    if (text.length >= 8 && ((text.match(/[^a-zA-Z0-9\s]/g) || []).length / text.length) * 100 >= 60) return _amAct('symbols', u, msgId, login);
+  }
+  // Length
+  if (f.length.on && ex(f.length) && text.length > 400) return _amAct('length', u, msgId, login);
+  // Repeated chars
+  if (f.repeat.on && ex(f.repeat) && /(.)\1{9,}/.test(text)) return _amAct('repeat', u, msgId, login);
+  // Blocked words
+  if (f.words.on && ex(f.words)) {
+    var low = text.toLowerCase(), list = String(f.words.list || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+    for (var i = 0; i < list.length; i++) { if (list[i] && low.indexOf(list[i]) >= 0) return _amAct('words', u, msgId, login); }
+  }
+  return false;
+}
+function _amAct(key, u, msgId, login) {
+  var flt = _automod.filters[key];
+  try {
+    if (msgId && typeof modAction === 'function') modAction('delete', login, 0, msgId);
+    if ((Number(flt.timeout) || 0) > 0 && typeof modAction === 'function') modAction('timeout', login, Number(flt.timeout), '');
+  } catch (e) {}
+  if (flt.warn && flt.warn.trim()) sfSendChat(_fillCmdVars(flt.warn, { user: u.displayName || u.name || login }));
+  try { addEvHistory('AutoMod', 'Filtered ' + (u.displayName || login) + ' · ' + key + (Number(flt.timeout) > 0 ? ' (' + flt.timeout + 's)' : ''), 'tw', false); } catch (e) {}
+  return true;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Quotes. Chat-driven: !quote (random), !quote N, !quote add <text> (mod),
+// !quote del N (mod). Also a light list UI in the Bot tab.
+// ══════════════════════════════════════════════════════════════════════════
+var _quotes = null;
+function _quotesLoad() { try { _quotes = JSON.parse(localStorage.getItem('sf_quotes') || '[]') || []; } catch (e) { _quotes = []; } if (!Array.isArray(_quotes)) _quotes = []; }
+function _quotesSave() { try { localStorage.setItem('sf_quotes', JSON.stringify(_quotes)); } catch (e) {} }
+function _handleQuoteCmd(sp, u) {
+  if (!_quotes) _quotesLoad();
+  var sub = (sp[1] || '').toLowerCase(), lvl = _botUserLevel(u);
+  if (sub === 'add') {
+    if (lvl < 3) return;
+    var t = sp.slice(2).join(' ').trim(); if (!t) return;
+    _quotes.push({ text: t.slice(0, 300), by: u.displayName || u.name || '', game: S.twGame || '', at: Date.now() });
+    _quotesSave(); if (typeof _renderQuotes === 'function') _renderQuotes();
+    sfSendChat('Quote #' + _quotes.length + ' added.'); return;
+  }
+  if (sub === 'del' || sub === 'remove') {
+    if (lvl < 3) return;
+    var n = parseInt(sp[2], 10);
+    if (n >= 1 && n <= _quotes.length) { _quotes.splice(n - 1, 1); _quotesSave(); if (typeof _renderQuotes === 'function') _renderQuotes(); sfSendChat('Quote #' + n + ' removed.'); }
+    return;
+  }
+  if (!_quotes.length) { sfSendChat('No quotes yet.'); return; }
+  var asNum = parseInt(sp[1], 10), idx = (asNum >= 1 && asNum <= _quotes.length) ? asNum - 1 : Math.floor(Math.random() * _quotes.length);
+  var q = _quotes[idx];
+  sfSendChat('#' + (idx + 1) + ': "' + q.text + '"' + (q.game ? ' [' + q.game + ']' : ''));
+}
+function quoteRemove(i) { _quotes.splice(i, 1); _quotesSave(); _renderQuotes(); }
+function _renderQuotes() {
+  var host = document.getElementById('quoteList'); if (!host) return;
+  if (!_quotes) _quotesLoad();
+  if (!_quotes.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:6px 0">No quotes yet. In chat, a mod can add one with <code>!quote add your text here</code>.</div>'; return; }
+  host.innerHTML = _quotes.map(function (q, i) {
+    return '<div style="display:flex;gap:8px;align-items:center;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:6px 8px;margin-bottom:5px">'
+      + '<span style="font-size:10px;color:var(--mut);font-weight:700">#' + (i + 1) + '</span>'
+      + '<span style="flex:1;font-size:11px;color:var(--txt)">' + esc(q.text) + (q.game ? ' <span style="color:var(--mut)">[' + esc(q.game) + ']</span>' : '') + '</span>'
+      + '<button class="tbtn hk-reset" style="font-size:9px;padding:2px 7px" onclick="quoteRemove(' + i + ')">x</button>'
+      + '</div>';
+  }).join('');
+}
+function _renderAutomod() {
+  var g = document.getElementById('automodGlobals');
+  if (g) {
+    if (!_automod) _automodLoad();
+    g.innerHTML = '<label class="frow"><span>Enable auto-moderation</span><input type="checkbox"' + (_automod.enabled ? ' checked' : '') + ' onchange="automodSetGlobal(\'enabled\',this.checked)"></label>'
+      + '<div class="frow" style="gap:6px"><label style="font-size:11px">!permit lasts</label><input class="minput" type="number" min="10" max="600" value="' + (Number(_automod.permitSec) || 60) + '" onchange="automodSetGlobal(\'permitSec\',parseInt(this.value,10)||60)" style="width:70px;font-size:12px;padding:5px 8px;background:var(--surf2)"><span style="font-size:11px;color:var(--mut)">sec</span></div>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:4px">Mods and you are always exempt. "Exempt" sets who else is immune. Timeout of 0 just deletes the message.</div>';
+  }
+  var host = document.getElementById('automodFilters'); if (!host) return;
+  var lvlSel = function (sel) { return ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (sel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join(''); };
+  host.innerHTML = _AM_FILTERS.map(function (ff) {
+    var f = _automod.filters[ff.key];
+    return '<div class="sec" style="background:var(--surf2);margin-bottom:7px">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +   '<label class="frow" style="flex:1 1 auto;gap:6px;margin:0;min-width:150px"><input type="checkbox"' + (f.on ? ' checked' : '') + ' onchange="automodSetFilter(\'' + ff.key + '\',\'on\',this.checked)"><span style="font-size:12px;font-weight:700">' + ff.label + '</span></label>'
+      +   '<label style="font-size:10px;color:var(--mut)">Timeout</label><input class="minput" type="number" min="0" max="86400" value="' + (Number(f.timeout) || 0) + '" onchange="automodSetFilter(\'' + ff.key + '\',\'timeout\',parseInt(this.value,10)||0)" style="width:64px;font-size:11px;padding:3px 6px;background:var(--surf3)"><span style="font-size:10px;color:var(--mut)">s</span>'
+      +   '<label style="font-size:10px;color:var(--mut)">Exempt</label><select onchange="automodSetFilter(\'' + ff.key + '\',\'exempt\',this.value)" style="font-size:11px;padding:3px 6px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:5px">' + lvlSel(f.exempt || 'sub') + '</select>'
+      + '</div>'
+      + (ff.key === 'words' ? '<input class="minput" value="' + esc(f.list || '') + '" placeholder="banned words / phrases, comma separated" oninput="automodSetFilter(\'words\',\'list\',this.value)" style="width:100%;font-size:11px;padding:5px 8px;background:var(--surf3);margin-top:6px">' : '')
+      + '<input class="minput" value="' + esc(f.warn || '') + '" placeholder="Optional chat warning ({user})" oninput="automodSetFilter(\'' + ff.key + '\',\'warn\',this.value)" style="width:100%;font-size:11px;padding:5px 8px;background:var(--surf3);margin-top:6px">'
+      + '</div>';
+  }).join('');
+}
+function automodSetGlobal(f, v) { if (!_automod) _automodLoad(); _automod[f] = v; _automodSave(); }
+function automodSetFilter(key, f, v) { if (!_automod) _automodLoad(); if (!_automod.filters[key]) return; _automod.filters[key][f] = v; _automodSave(); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Giveaways. Keyword entry from chat; subs can get extra tickets. Draw a
+// weighted-random winner and announce it. Ephemeral (not persisted); the
+// config (keyword / sub-luck / who) is saved so it's remembered next time.
+// ══════════════════════════════════════════════════════════════════════════
+var _giveaway = { active: false, keyword: '!enter', entries: {}, subLuck: 1, minLevel: 'everyone', lastWinner: '' };
+function _gwLoadCfg() { try { var d = JSON.parse(localStorage.getItem('sf_giveaway_cfg') || '{}') || {}; if (d.keyword) _giveaway.keyword = d.keyword; if (d.subLuck != null) _giveaway.subLuck = d.subLuck; if (d.minLevel) _giveaway.minLevel = d.minLevel; } catch (e) {} }
+function _gwSaveCfg() { try { localStorage.setItem('sf_giveaway_cfg', JSON.stringify({ keyword: _giveaway.keyword, subLuck: _giveaway.subLuck, minLevel: _giveaway.minLevel })); } catch (e) {} }
+function _gwEntryCount() { return Object.keys(_giveaway.entries).length; }
+function maybeGiveawayEntry(text, u) {
+  if (!_giveaway.active) return;
+  if (String(text || '').trim().toLowerCase() !== String(_giveaway.keyword || '').trim().toLowerCase()) return;
+  if (_botUserLevel(u) < (_CMD_LEVELS[_giveaway.minLevel] || 0)) return;
+  var login = (u.login || u.name || u.displayName || '').toLowerCase();
+  if (!login || _giveaway.entries[login]) return;
+  var tickets = 1;
+  if (_botUserLevel(u) >= 1) tickets = Math.max(1, Number(_giveaway.subLuck) || 1);   // sub+ luck
+  _giveaway.entries[login] = { name: u.displayName || u.name || login, tickets: tickets };
+  var el = document.getElementById('gwEntryCount'); if (el) el.textContent = _gwEntryCount() + ' entered';
+}
+function giveawayStart() {
+  _giveaway.active = true; _giveaway.entries = {}; _giveaway.lastWinner = '';
+  _gwSaveCfg();
+  sfSendChat('🎉 Giveaway is OPEN! Type ' + _giveaway.keyword + ' to enter.');
+  _renderGiveaway();
+}
+function giveawayStop() { _giveaway.active = false; _renderGiveaway(); }
+function giveawayDraw() {
+  var pool = [];
+  Object.keys(_giveaway.entries).forEach(function (login) { var e = _giveaway.entries[login]; for (var i = 0; i < (Number(e.tickets) || 1); i++) pool.push(e); });
+  if (!pool.length) { var s = document.getElementById('gwStatus'); if (s) { s.textContent = 'No entries yet.'; s.style.color = 'var(--mut)'; } return; }
+  var win = pool[Math.floor(Math.random() * pool.length)];
+  _giveaway.lastWinner = win.name;
+  // Remove the winner so a re-draw picks someone else.
+  Object.keys(_giveaway.entries).forEach(function (login) { if (_giveaway.entries[login] === win) delete _giveaway.entries[login]; });
+  sfSendChat('🎉 Winner: @' + win.name + ' ! Congratulations!');
+  _renderGiveaway();
+}
+function gwSetCfg(f, v) { _giveaway[f] = v; _gwSaveCfg(); }
+function _renderGiveaway() {
+  var host = document.getElementById('giveawayBox'); if (!host) return;
+  var lvlOpts = ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (_giveaway.minLevel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join('');
+  host.innerHTML =
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
+    + '<label style="font-size:11px;color:var(--mut)">Keyword</label><input class="minput" value="' + esc(_giveaway.keyword) + '" oninput="gwSetCfg(\'keyword\',this.value)" style="width:110px;font-size:12px;padding:5px 8px;background:var(--surf2);font-family:ui-monospace,monospace"' + (_giveaway.active ? ' disabled' : '') + '>'
+    + '<label style="font-size:11px;color:var(--mut)">Sub tickets</label><input class="minput" type="number" min="1" max="10" value="' + (Number(_giveaway.subLuck) || 1) + '" onchange="gwSetCfg(\'subLuck\',parseInt(this.value,10)||1)" style="width:56px;font-size:12px;padding:5px 8px;background:var(--surf2)">'
+    + '<label style="font-size:11px;color:var(--mut)">Who</label><select onchange="gwSetCfg(\'minLevel\',this.value)" style="font-size:11px;padding:4px 6px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px">' + lvlOpts + '</select>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+    + (_giveaway.active
+        ? '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayStop()">Close entries</button>'
+          + '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayDraw()">Draw winner</button>'
+          + '<span id="gwEntryCount" style="font-size:11px;color:var(--accent);font-weight:700">' + _gwEntryCount() + ' entered</span>'
+        : '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayStart()">Start giveaway</button>'
+          + (_gwEntryCount() ? '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayDraw()">Draw from last</button>' : ''))
+    + '<span id="gwStatus" style="font-size:10px;color:var(--mut)"></span>'
+    + '</div>'
+    + (_giveaway.lastWinner ? '<div style="font-size:12px;margin-top:8px;color:var(--txt)">Last winner: <strong style="color:var(--grn)">' + esc(_giveaway.lastWinner) + '</strong></div>' : '');
+}
+
+// ── Ads ──
+async function adRefreshSchedule() {
+  if (!_twReady()) return;
+  _setStat('adStatus', '');
+  try {
+    var res = await _twReq('GET', 'channels/ads', 'broadcaster_id=' + encodeURIComponent(_twUid()));
+    if (!_twOK(res)) { document.getElementById('adNextLine').textContent = 'Next ad: unavailable'; return; }
+    var a = (res.data && res.data.data && res.data.data[0]) || {};
+    _adNextAt = Number(a.next_ad_at || 0) || 0;
+    _adRenderCountdown();
+    if (_adTick) clearInterval(_adTick);
+    _adTick = setInterval(_adRenderCountdown, 1000);
+  } catch (e) { /* ignore */ }
+}
+function _adRenderCountdown() {
+  var el = document.getElementById('adNextLine');
+  if (!el) { if (_adTick) { clearInterval(_adTick); _adTick = null; } return; }
+  if (!_adNextAt) { el.textContent = 'Next ad: none scheduled'; return; }
+  var secs = _adNextAt - Math.floor(Date.now() / 1000);
+  if (secs <= 0) { el.textContent = 'Next ad: due now'; return; }
+  var m = Math.floor(secs / 60), s = secs % 60;
+  el.textContent = 'Next ad in ' + m + ':' + (s < 10 ? '0' : '') + s;
+}
+async function adSnooze() {
+  if (!_twReady()) return;
+  _setStat('adStatus', 'snoozing…');
+  try {
+    var res = await _twReq('POST', 'channels/ads/schedule/snooze', 'broadcaster_id=' + encodeURIComponent(_twUid()));
+    if (_twOK(res)) { var d = (res.data && res.data.data && res.data.data[0]) || {}; if (d.next_ad_at) { _adNextAt = Number(d.next_ad_at) || _adNextAt; _adRenderCountdown(); } _setStat('adStatus', 'Snoozed ✓ (' + (d.snooze_count != null ? d.snooze_count + ' left' : 'ok') + ')'); }
+    else _setStat('adStatus', 'Snooze failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('adStatus', 'Snooze failed', true); }
+}
+async function adRun(len) {
+  if (!_twReady()) return;
+  _setStat('adStatus', 'starting ' + len + 's ad…');
+  try {
+    var res = await _twReq('POST', 'channels/commercial', '', { broadcaster_id: _twUid(), length: len });
+    if (_twOK(res)) { _setStat('adStatus', 'Ad started ✓'); setTimeout(adRefreshSchedule, 1500); }
+    else _setStat('adStatus', 'Ad failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('adStatus', 'Ad failed', true); }
+}
+
+// ── Polls ──
+async function startPollFromSF() {
+  if (!_twReady()) { _setStat('pollStatus', 'Connect Twitch first', true); return; }
+  var title = ((document.getElementById('pollTitleInput') || {}).value || '').trim();
+  var choices = ((document.getElementById('pollChoicesInput') || {}).value || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 5);
+  var dur = parseInt((document.getElementById('pollDurInput') || {}).value, 10) || 120;
+  if (!title) { _setStat('pollStatus', 'Add a poll question', true); return; }
+  if (choices.length < 2) { _setStat('pollStatus', 'Add at least 2 choices', true); return; }
+  _setStat('pollStatus', 'starting…');
+  try {
+    var res = await _twReq('POST', 'polls', '', { broadcaster_id: _twUid(), title: title, choices: choices.map(function (c) { return { title: c.slice(0, 25) }; }), duration: Math.max(15, Math.min(1800, dur)) });
+    if (_twOK(res)) { var p = (res.data && res.data.data && res.data.data[0]) || {}; _activePollId = p.id || null; _setStat('pollStatus', 'Poll live ✓'); }
+    else _setStat('pollStatus', 'Failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('pollStatus', 'Failed', true); }
+}
+async function endActivePoll() {
+  if (!_twReady()) return;
+  _setStat('pollStatus', 'ending…');
+  try {
+    var id = _activePollId;
+    if (!id) { var g = await _twReq('GET', 'polls', 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&first=1'); var pp = (g.data && g.data.data && g.data.data[0]); if (pp && pp.status === 'ACTIVE') id = pp.id; }
+    if (!id) { _setStat('pollStatus', 'No active poll', true); return; }
+    var res = await _twReq('PATCH', 'polls', '', { broadcaster_id: _twUid(), id: id, status: 'TERMINATED' });
+    if (_twOK(res)) { _activePollId = null; _setStat('pollStatus', 'Poll ended ✓'); }
+    else _setStat('pollStatus', 'Failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('pollStatus', 'Failed', true); }
+}
+
+// ── Predictions ──
+async function startPredictionFromSF() {
+  if (!_twReady()) { _setStat('predStatus', 'Connect Twitch first', true); return; }
+  var title = ((document.getElementById('predTitleInput') || {}).value || '').trim();
+  var a = ((document.getElementById('predOutAInput') || {}).value || '').trim();
+  var b = ((document.getElementById('predOutBInput') || {}).value || '').trim();
+  var win = parseInt((document.getElementById('predWindowInput') || {}).value, 10) || 120;
+  if (!title || !a || !b) { _setStat('predStatus', 'Fill title and both outcomes', true); return; }
+  _setStat('predStatus', 'starting…');
+  try {
+    var res = await _twReq('POST', 'predictions', '', { broadcaster_id: _twUid(), title: title.slice(0, 45), outcomes: [{ title: a.slice(0, 25) }, { title: b.slice(0, 25) }], prediction_window: Math.max(30, Math.min(1800, win)) });
+    if (_twOK(res)) {
+      var p = (res.data && res.data.data && res.data.data[0]) || {};
+      _activePred = { id: p.id || null, outcomes: (p.outcomes || []).map(function (o) { return { id: o.id, title: o.title }; }) };
+      _setStat('predStatus', 'Prediction live ✓');
+      _renderPredControls();
+    } else _setStat('predStatus', 'Failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('predStatus', 'Failed', true); }
+}
+function _renderPredControls() {
+  var box = document.getElementById('predActiveControls');
+  if (!box) return;
+  var on = !!(_activePred && _activePred.id);
+  box.style.display = on ? 'flex' : 'none';
+  if (on && _activePred.outcomes && _activePred.outcomes.length >= 2) {
+    var ba = document.getElementById('predWinBtnA'), bb = document.getElementById('predWinBtnB');
+    if (ba) ba.textContent = (_activePred.outcomes[0].title || 'Outcome 1') + ' wins';
+    if (bb) bb.textContent = (_activePred.outcomes[1].title || 'Outcome 2') + ' wins';
+  }
+}
+async function _predPatch(status, winIdx) {
+  if (!_twReady() || !_activePred || !_activePred.id) { _setStat('predStatus', 'No active prediction', true); return; }
+  var body = { broadcaster_id: _twUid(), id: _activePred.id, status: status };
+  if (status === 'RESOLVED') {
+    var o = _activePred.outcomes && _activePred.outcomes[winIdx];
+    if (!o || !o.id) { _setStat('predStatus', 'Unknown outcome', true); return; }
+    body.winning_outcome_id = o.id;
+  }
+  _setStat('predStatus', status.toLowerCase() + '…');
+  try {
+    var res = await _twReq('PATCH', 'predictions', '', body);
+    if (_twOK(res)) {
+      _setStat('predStatus', status === 'LOCKED' ? 'Locked ✓' : status === 'RESOLVED' ? 'Resolved ✓' : 'Canceled ✓');
+      if (status !== 'LOCKED') { _activePred = null; _renderPredControls(); }
+    } else _setStat('predStatus', 'Failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('predStatus', 'Failed', true); }
+}
+function lockActivePrediction() { _predPatch('LOCKED'); }
+function resolveActivePrediction(idx) { _predPatch('RESOLVED', idx); }
+function cancelActivePrediction() { _predPatch('CANCELED'); }
+
+// ── Stream marker ──
+async function createStreamMarker() {
+  if (!_twReady()) { _setStat('markerStatus', 'Connect Twitch first', true); return; }
+  var desc = ((document.getElementById('markerDescInput') || {}).value || '').trim().slice(0, 140);
+  _setStat('markerStatus', 'marking…');
+  try {
+    var body = { user_id: _twUid() }; if (desc) body.description = desc;
+    var res = await _twReq('POST', 'streams/markers', '', body);
+    if (_twOK(res)) { var m = (res.data && res.data.data && res.data.data[0]) || {}; _setStat('markerStatus', 'Marker dropped ✓' + (m.position_seconds != null ? ' at ' + Math.floor(m.position_seconds / 60) + 'm' + (m.position_seconds % 60) + 's' : '')); var di = document.getElementById('markerDescInput'); if (di) di.value = ''; }
+    else _setStat('markerStatus', 'Failed (are you live?): ' + _twErr(res), true);
+  } catch (e) { _setStat('markerStatus', 'Failed', true); }
+}
+
+// ── Redemption queue (only rewards created by this app, per Twitch) ──
+async function loadRedemptionQueue() {
+  var box = document.getElementById('redemptionQueue');
+  if (!_twReady()) { _setStat('redemptionStatus', 'Connect Twitch first', true); return; }
+  _setStat('redemptionStatus', 'loading…');
+  if (box) box.innerHTML = '';
+  try {
+    var rw = await _twReq('GET', 'channel_points/custom_rewards', 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&only_manageable_rewards=true');
+    var rewards = (rw.data && rw.data.data) || [];
+    if (!rewards.length) { _setStat('redemptionStatus', 'No StreamFusion-managed rewards.'); return; }
+    var total = 0, html = '';
+    for (var i = 0; i < rewards.length; i++) {
+      var rid = rewards[i].id;
+      var q = 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&reward_id=' + encodeURIComponent(rid) + '&status=UNFULFILLED&first=20';
+      var rd = await _twReq('GET', 'channel_points/custom_rewards/redemptions', q);
+      var reds = (rd.data && rd.data.data) || [];
+      for (var j = 0; j < reds.length; j++) {
+        total++;
+        var r = reds[j];
+        html += '<div style="display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;padding:7px 9px">'
+          + '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:var(--txt)">' + esc(r.user_name || '?') + '<span style="color:var(--mut);font-weight:400"> · ' + esc((r.reward && r.reward.title) || '') + '</span></div>'
+          + (r.user_input ? '<div style="font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(r.user_input) + '</div>' : '') + '</div>'
+          + '<button class="cbtn" style="background:rgba(83,252,24,.16);color:var(--txt);border:1px solid var(--bdr);font-size:10px;font-weight:700;padding:5px 9px;border-radius:6px" onclick="updateRedemption(\'' + esc(rid) + '\',\'' + esc(r.id) + '\',\'FULFILLED\',this)">Approve</button>'
+          + '<button class="cbtn" style="background:rgba(248,81,73,.16);color:var(--txt);border:1px solid var(--bdr);font-size:10px;font-weight:700;padding:5px 9px;border-radius:6px" onclick="updateRedemption(\'' + esc(rid) + '\',\'' + esc(r.id) + '\',\'CANCELED\',this)">Refund</button>'
+          + '</div>';
+      }
+    }
+    if (box) box.innerHTML = html;
+    _setStat('redemptionStatus', total ? (total + ' pending') : 'Queue empty');
+  } catch (e) { _setStat('redemptionStatus', 'Load failed', true); }
+}
+async function updateRedemption(rewardId, redemptionId, status, btn) {
+  if (!_twReady()) return;
+  try {
+    var q = 'id=' + encodeURIComponent(redemptionId) + '&broadcaster_id=' + encodeURIComponent(_twUid()) + '&reward_id=' + encodeURIComponent(rewardId);
+    var res = await _twReq('PATCH', 'channel_points/custom_rewards/redemptions', q, { status: status });
+    if (_twOK(res)) { if (btn && btn.parentNode) btn.parentNode.remove(); _setStat('redemptionStatus', status === 'FULFILLED' ? 'Approved ✓' : 'Refunded ✓'); }
+    else _setStat('redemptionStatus', 'Failed: ' + _twErr(res), true);
+  } catch (e) { _setStat('redemptionStatus', 'Failed', true); }
 }
 function _esSyncFromStatus() {
   var pref = false; try { pref = localStorage.getItem('sf-eventsub-on') === '1'; } catch (e) {}
@@ -4378,6 +5638,27 @@ function testEvent(kind) {
     case 'tw-raid':
       addEvHistory('test_raider', 'test_raider raided with 42 viewers!', 'tw', true);
       break;
+    case 'tw-hype':
+      // Drive the real hype path (fromES=true) so the bar, level-up fanfare,
+      // and pop-out overlay all light up exactly as a live EventSub train would.
+      try {
+        handleSBEvent({ source: 'Twitch', type: 'HypeTrainStart' }, { level: 2, total: 900, goal: 1600, countdown: 300, topContributors: [{ userName: 'test_viewer' }] }, true);
+      } catch (e) {}
+      break;
+    case 'tw-adbreak':
+      try {
+        handleSBEvent({ source: 'Twitch', type: 'AdBreakBegin' }, { duration: 180, isAutomatic: true }, true);
+      } catch (e) {}
+      break;
+    case 'tw-shoutout':
+      try { handleSBEvent({ source: 'Twitch', type: 'ShoutoutReceive' }, { user: 'BigStreamer', viewers: 1200 }, true); } catch (e) {}
+      break;
+    case 'tw-charity':
+      try { handleSBEvent({ source: 'Twitch', type: 'CharityUpdate' }, { phase: 'donate', charityName: 'Test Charity', donationUser: 'test_donor', donationAmount: 25, current: 525, target: 1000 }, true); } catch (e) {}
+      break;
+    case 'tw-suspicious':
+      try { handleSBEvent({ source: 'Twitch', type: 'SuspiciousUser' }, { user: 'sketchy_user', status: 'active_monitoring', banEvasion: 'likely' }, true); } catch (e) {}
+      break;
     case 'tt-gift':
       addEvHistory('test_tiktok', 'test_tiktok sent Rose ×10 (10 coins)', 'tt', false);
       break;
@@ -4838,13 +6119,40 @@ function toggleModMenu(el) {
   openModMenu = el.classList.contains('show') ? el : null;
 }
 function modAction(action, username, duration, msgId) {
-  if (!S.sbConnected || !S.sbWS || S.sbWS.readyState !== WebSocket.OPEN) { sysMsg('tw', 'Connect to Streamer.bot to use mod actions.'); return; }
   if (openModMenu) { openModMenu.classList.remove('show'); openModMenu = null; }
-  var cmd = '';
-  if (action === 'timeout') cmd = '/timeout ' + username + ' ' + duration;
-  else if (action === 'ban') cmd = '/ban ' + username;
-  else if (action === 'delete' && msgId) cmd = '/delete ' + msgId;
-  if (cmd) S.sbWS.send(JSON.stringify({ request: 'SendMessage', id: 'sf-mod', platform: 'twitch', message: cmd, bot: false, internal: false }));
+  var sbUp = S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN;
+  if (sbUp) {
+    var cmd = '';
+    if (action === 'timeout') cmd = '/timeout ' + username + ' ' + duration;
+    else if (action === 'ban') cmd = '/ban ' + username;
+    else if (action === 'delete' && msgId) cmd = '/delete ' + msgId;
+    if (cmd) S.sbWS.send(JSON.stringify({ request: 'SendMessage', id: 'sf-mod', platform: 'twitch', message: cmd, bot: false, internal: false }));
+    return;
+  }
+  // Streamer.bot isn't connected: fall back to the broadcaster's own Twitch
+  // OAuth so moderation still works with SB down (native Helix).
+  if (typeof _twReady === 'function' && _twReady()) { twitchModAction(action, username, duration, msgId); return; }
+  sysMsg('tw', 'Connect Streamer.bot or your Twitch account to use mod actions.');
+}
+// Native Twitch moderation via Helix. Ban/timeout need the target's user_id,
+// so resolve the login first; delete works off the message id directly.
+async function twitchModAction(action, username, duration, msgId) {
+  try {
+    var uid = _twUid();
+    if (action === 'delete') {
+      if (!msgId) return;
+      var dr = await _twReq('DELETE', 'moderation/chat', 'broadcaster_id=' + encodeURIComponent(uid) + '&moderator_id=' + encodeURIComponent(uid) + '&message_id=' + encodeURIComponent(msgId));
+      if (!_twOK(dr)) sysMsg('tw', 'Delete failed: ' + _twErr(dr));
+      return;
+    }
+    var lu = await _twReq('GET', 'users', 'login=' + encodeURIComponent(String(username).toLowerCase()));
+    var tgt = (lu.data && lu.data.data && lu.data.data[0]);
+    if (!tgt) { sysMsg('tw', 'Could not find user ' + username); return; }
+    var body = { data: { user_id: tgt.id } };
+    if (action === 'timeout') body.data.duration = duration || 600;
+    var res = await _twReq('POST', 'moderation/bans', 'broadcaster_id=' + encodeURIComponent(uid) + '&moderator_id=' + encodeURIComponent(uid), body);
+    if (!_twOK(res)) sysMsg('tw', 'Mod action failed: ' + _twErr(res));
+  } catch (e) { sysMsg('tw', 'Mod action failed'); }
 }
 
 // ── Emotes ────────────────────────────────────────────────────────────────────
@@ -8092,7 +9400,7 @@ function copyEventTrail() {
   try { navigator.clipboard.writeText(_eventTrailText()); } catch (e) {}
 }
 
-function handleSBEvent(event, data) {
+function handleSBEvent(event, data, fromES) {
   var src = (event && event.source) || '', type = (event && event.type) || '';
   // Normalize source casing so 'youtube', 'Youtube', 'YouTube' all match
   var srcL = src.toLowerCase();
@@ -8100,6 +9408,18 @@ function handleSBEvent(event, data) {
   else if (srcL === 'twitch') src = 'Twitch';
   else if (srcL === 'kick') src = 'Kick';
   var key = src + '.' + type;
+  // EventSub authority: when the direct Twitch feed owns a category (its
+  // subscription was accepted this session), Twitch is the source of truth and
+  // its numbers are exact, so Streamer.bot's parallel delivery of that category
+  // is dropped to avoid double bars / banners / conflicting totals. The
+  // user-keyed alert types (follow/sub/cheer/raid/redeem) are instead merged by
+  // _esDedup above. If the scope wasn't granted, the category isn't in
+  // _es.cats, so SB still drives it as before. fromES marks the EventSub path
+  // so its own deliveries are never suppressed.
+  if (!fromES && _es && _es.on && _es.cats && src === 'Twitch') {
+    var _esCat = _esCatForKey(type);
+    if (_esCat && _es.cats[_esCat]) { trailLog && trailLog('es-auth-suppressed', { key: key, cat: _esCat }); return; }
+  }
   // Cross-source dedupe: when the EventSub feed is on, the same event can also
   // arrive via Streamer.bot (different IDs, so _sbDedup below misses it). This
   // gate folds SB + EventSub deliveries of the same alert into one. Inert when
@@ -8185,6 +9505,12 @@ function handleSBEvent(event, data) {
       }
     }
     pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg });
+    // Bot: auto-moderation runs on every message; if it acts, skip commands.
+    var _modActed = false;
+    if (typeof maybeAutoMod === 'function') { try { _modActed = maybeAutoMod(rawText, u, msgId); } catch (e) {} }
+    if (!_modActed && typeof maybeGiveawayEntry === 'function') { try { maybeGiveawayEntry(rawText, u); } catch (e) {} }
+    // Custom chat commands (bot). Runs on the raw text with the chatter's role.
+    if (!_modActed && rawText && rawText.charAt(0) === '!' && typeof maybeFireCommand === 'function') { try { maybeFireCommand(rawText, u, 'tw'); } catch (e) {} }
   } else if (key === 'Twitch.AnnouncementMessage' || key === 'Twitch.Announcement' || key === 'Twitch.ChatMessageAnnouncement' || key === 'Twitch.AnnouncementSent') {
     if (chk('ev-tw-announce')) return;
     var _annUser = gu(data) || 'Announcement';
@@ -8571,8 +9897,16 @@ function handleSBEvent(event, data) {
     // type (no EVENT_META entry).
     sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: data.level || 1, phase: 'start' });
   } else if (key === 'Twitch.HypeTrainUpdate' || key === 'Twitch.HypeTrainProgress') {
+    var _preHypeLvl = _htState.level || 0;
     updateHypeTrainProgress(data);
-    if ((data.total || 0) >= (data.goal || _htState.goal)) {
+    // Level-up detection differs by source. EventSub is authoritative and
+    // resets within-level `progress` right after a level, so total>=goal never
+    // catches it — use the real level increase instead. Streamer.bot keeps its
+    // existing total>=goal heuristic (its level field lags the point totals).
+    var _leveledUp = fromES
+      ? (_htState.level > _preHypeLvl && _preHypeLvl >= 1)
+      : ((data.total || 0) >= (data.goal || _htState.goal));
+    if (_leveledUp) {
       var _hlvl = data.level || _htState.level;
       pushMsg({ plat: 'tw', isEv: true, evType: 'hype', big: true, user: 'Hype Train', text: 'LEVEL UP! Level ' + _hlvl });
       showBanner('i-target', 'LEVEL UP!', 'Hype Train Level ' + _hlvl, null, 'org');
@@ -8641,6 +9975,61 @@ function handleSBEvent(event, data) {
     pushMsg({ plat: 'tw', isEv: true, evType: 'prediction', user: 'Prediction', text: 'Prediction canceled: ' + pxTitle });
     sendOverlayPrediction({ status: 'ended', title: pxTitle, outcomes: [] });
 
+  // ── Charity campaign (direct EventSub) ────────────────────────────────────
+  } else if (key === 'Twitch.CharityUpdate') {
+    var _chName = data.charityName || data.campaignName || 'Charity';
+    var _chCur = Number(data.current || 0), _chTgt = Number(data.target || 0);
+    var _chBar = _chTgt ? (' ($' + _chCur.toFixed(0) + ' / $' + _chTgt.toFixed(0) + ')') : (_chCur ? (' ($' + _chCur.toFixed(0) + ' raised)') : '');
+    if (data.phase === 'donate' && data.donationUser) {
+      var _chAmt = Number(data.donationAmount || 0);
+      pushMsg({ plat: 'tw', isEv: true, evType: 'tip', big: _chAmt >= 20, user: data.donationUser, text: data.donationUser + ' donated $' + _chAmt.toFixed(2) + ' to ' + _chName + '!' + _chBar });
+      sendObsAlert({ eventType: 'tip', platform: 'tw', user: data.donationUser, amount: _chAmt, message: _chName + ' donation' });
+    } else if (data.phase === 'start') {
+      showBanner('i-bolt', 'CHARITY', _chName + ' fundraiser started', _chBar || null, 'org');
+      pushMsg({ plat: 'tw', isEv: true, evType: 'tip', user: 'Charity', text: _chName + ' fundraiser started!' + _chBar });
+    } else if (data.phase === 'stop') {
+      pushMsg({ plat: 'tw', isEv: true, evType: 'tip', user: 'Charity', text: _chName + ' fundraiser ended.' + _chBar });
+    }
+  // ── Shoutout received (someone shouted YOU out) ───────────────────────────
+  } else if (key === 'Twitch.ShoutoutReceive') {
+    var _soUser = gu(data) || data.user || 'Someone';
+    var _soV = Number(data.viewers || data.viewer_count || 0);
+    pushMsg({ plat: 'tw', isEv: true, evType: 'raid', big: true, user: _soUser, text: _soUser + ' gave you a shoutout' + (_soV ? ' to ' + _soV + ' viewers' : '') + '!' });
+    showBanner('i-bolt', 'SHOUTOUT', _soUser + ' shouted you out', (_soV ? _soV + ' viewers' : null), 'tw');
+    sendObsAlert({ eventType: 'raid', platform: 'tw', user: _soUser, message: 'Shoutout received', amount: _soV });
+  // ── Power-up / automatic channel-point reward ─────────────────────────────
+  } else if (key === 'Twitch.AutoReward') {
+    var _arUser = gu(data) || 'Viewer';
+    var _arType = String(data.rewardType || 'reward').replace(/_/g, ' ');
+    pushMsg({ plat: 'tw', isEv: true, evType: 'redeem', user: _arUser, text: _arUser + ' used ' + _arType + (data.text ? ': "' + data.text + '"' : '') });
+  // ── Suspicious user flagged (mod safety) ──────────────────────────────────
+  } else if (key === 'Twitch.SuspiciousUser') {
+    var _suUser = gu(data) || 'user';
+    var _suLogin = String(_suUser).toLowerCase();
+    var _suStat = data.status || 'flagged';
+    _suspiciousUsers[_suLogin] = _suStat;
+    var _suEvas = (data.banEvasion && !/^(unknown|none)$/i.test(data.banEvasion)) ? (' • ban-evasion: ' + data.banEvasion) : '';
+    // Mod-facing alert; only show when the mod-events filter is on.
+    if (!chk('ev-tw-mod')) {
+      pushMsg({ plat: 'tw', isEv: true, user: '⚠ Suspicious', text: _suUser + ' flagged (' + String(_suStat).replace(/_/g, ' ') + ')' + _suEvas });
+    }
+  // ── Accurate live state + channel info (direct EventSub) ──────────────────
+  } else if (key === 'Twitch.StreamOnline') {
+    if (data.startedAt) { var _soT = new Date(data.startedAt).getTime(); if (_soT) S.twLiveStartedAt = _soT; }
+    try { if (typeof renderStreamInfo === 'function') renderStreamInfo(); } catch (e) {}
+    // Accurate go-live signal: start the session now (guarded against double
+    // start) so the schedule auto-apply + Discord announce fire immediately,
+    // rather than waiting up to a minute for the viewer-count monitor.
+    try { if (typeof startStreamSession === 'function') startStreamSession(); } catch (e) {}
+  } else if (key === 'Twitch.StreamOffline') {
+    S.twLiveStartedAt = null;
+    try { if (typeof renderStreamInfo === 'function') renderStreamInfo(); } catch (e) {}
+    try { if (typeof endStreamSession === 'function' && _streamSession && _streamSession.active) endStreamSession(); } catch (e) {}
+  } else if (key === 'Twitch.ChannelInfoUpdate') {
+    if (data.gameId) S.twGameId = String(data.gameId);
+    if (data.gameName) S.twGame = data.gameName;
+    try { if (typeof _onTwitchChannelInfoUpdated === 'function') _onTwitchChannelInfoUpdated(data); } catch (e) {}
+
   } else if (/^Twitch\.(Extension(Transaction|Bits|BitsUsed|BitsTransaction|Purchase)|BitsTransaction|BitsUsed|PowerupUsed|Powerup|BitsExtensionUsed)$/i.test(key) || (key === 'Twitch.Cheer' && data.product)) {
     // Bits spent in a Twitch extension (emote powerup, extension
     // purchase, channel-specific extension, etc). SB has shipped these
@@ -8681,6 +10070,17 @@ function handleSBEvent(event, data) {
     sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: _htState.level, phase: 'end' });
   } else if (key === 'Twitch.HypeTrainConductorUpdate') {
     updateHypeTrainProgress(data);
+  } else if (key === 'Twitch.AdBreakBegin') {
+    // Ad-break heads-up (direct from Twitch EventSub). Warn the streamer the
+    // moment a roll starts, with the exact length, so they can wrap the bit
+    // they're on. Banner + chat-feed event + OBS alert reuse existing surfaces.
+    var _adSecs = Number(data.duration || data.durationSeconds || 0) || 0;
+    var _adMin = Math.round(_adSecs / 60);
+    var _adLen = _adSecs >= 60 ? (_adMin + (_adMin === 1 ? ' min' : ' mins')) : (_adSecs + 's');
+    var _adWhy = data.isAutomatic ? 'Automatic ad break' : 'Ad break started';
+    showBanner('i-bolt', 'AD BREAK', _adWhy + ' • ' + _adLen, null, 'org');
+    pushMsg({ plat: 'tw', isEv: true, evType: 'hype', user: 'Ad Break', text: _adWhy + ' (' + _adLen + ')' });
+    sendObsAlert({ eventType: 'adBreak', platform: 'tw', user: 'Ad Break', message: _adWhy, amount: _adSecs });
   } else if (src === 'Twitch' && /^Goal/i.test(type || '')) {
     // Silently consume Twitch channel Goal events (GoalBegin, GoalProgress,
     // GoalEnd, GoalUpdate). These fire on every follow/sub tick and aren't
@@ -8706,6 +10106,19 @@ function handleSBEvent(event, data) {
     // if a numeric viewer value is present in the payload.
     // Drop noisy housekeeping events that aren't user-facing actions
     if (/RewardUpdated|RewardCreated|RewardDeleted|ChannelUpdate|StreamUpdate|PollCreated|PredictionCreated/i.test(type)) return;
+    // Streamer.bot's "Custom" events (General.Custom and friends) are an
+    // internal action-to-action message bus, not viewer events. SB setups and
+    // third-party integrations fire a burst of these on connect, which used to
+    // surface as "General: Custom" spam in the feed at startup. The ones SF
+    // actually consumes (sf_raid_finder, sf_stream_info, PayPal) are handled
+    // above and returned; anything else here with no real user AND no message
+    // is bus noise, so drop it. A custom event that carries a genuine user or
+    // message still shows (so intentional third-party alerts aren't lost).
+    if (/^Custom$/i.test(type)) {
+      var _cuUser = (typeof gu === 'function' ? gu(data) : '') || '';
+      var _cuMsg = data && (data.message || data.text || data.description);
+      if (!_cuUser && !_cuMsg) return;
+    }
     if (/viewer.?count|viewers$|streamstats|presentviewers/i.test(type)) {
       var _vcAny = data.viewers != null ? data.viewers
         : data.viewerCount != null ? data.viewerCount
@@ -8852,6 +10265,9 @@ function pushMsg(m) {
   if (m && m.plat && _lastChatActivity[m.plat] != null) {
     _lastChatActivity[m.plat] = Date.now();
   }
+  // Count real viewer chat lines for the automated-message "min chat lines"
+  // gate (don't count events, system messages, or the bot's own output).
+  if (!m.isEv && m.user) { _autoMsgChatCount++; }
   // Events go to the events panel only, not the chat feed
   if (m.isEv) {
     if (S.paused) { trailLog('paused', { type: m.evType || 'event', user: m.user || '' }); return; }
@@ -8946,7 +10362,13 @@ function pushMsg(m) {
   var firstBadgeUnder = isFirstMsg
     ? '<div class="first-badge-row"><span class="first-msg-badge">NEW VIEWER!</span></div>'
     : (isFirstWords ? '<div class="first-badge-row"><span class="first-words-badge">FIRST WORDS</span></div>' : '');
-  el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="mname ' + m.plat + '"' + nStyle + '>' + esc(m.user || '?') + '</span>' + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
+  // Twitch suspicious-user flag (from the channel.suspicious_user EventSub feed):
+  // warn mods inline that this account is monitored / restricted / likely evading.
+  var suspHtml = '';
+  if (m.plat === 'tw' && m.user && _suspiciousUsers[m.user.toLowerCase()]) {
+    suspHtml = '<span class="susp-badge" title="Twitch flagged this account (' + esc(String(_suspiciousUsers[m.user.toLowerCase()]).replace(/_/g, ' ')) + ')">⚠</span>';
+  }
+  el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="mname ' + m.plat + '"' + nStyle + '>' + esc(m.user || '?') + '</span>' + suspHtml + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
   feed.appendChild(el);
   tintBackground(m.plat, 'light');
   m.isFirstWords = isFirstWords;
@@ -9790,6 +11212,11 @@ function switchSettingsTab(tab) {
   // Per-tab lazy render. We only refresh server state / read inputs when
   // the tab actually becomes visible to avoid doing extra work on app
   // boot or when the user clicks a different settings section.
+  if (tab === 'stream') renderStreamTab();
+  else if (typeof _adTick !== 'undefined' && _adTick) { clearInterval(_adTick); _adTick = null; }
+  if (tab === 'schedule' && typeof renderScheduleTab === 'function') renderScheduleTab();
+  if (tab === 'bot' && typeof renderBotTab === 'function') renderBotTab();
+  if (tab === 'hotkeys' && typeof _renderStreamHotkeyRows === 'function') _renderStreamHotkeyRows();
   if (tab === 'obsoverlays') renderObsOverlaysTab();
   if (tab === 'theme') renderThemeTab();
   if (tab === 'discordea') renderDiscordTab();
@@ -11812,6 +13239,8 @@ function startStreamSession() {
   // Discord announcement.
   if (typeof _shoutoutResetSession === 'function') _shoutoutResetSession();
   if (typeof _discordAnnounceFireGoLive === 'function') _discordAnnounceFireGoLive();
+  // Apply the matching schedule slot (title / category / tags / announcement).
+  if (typeof applyScheduleForGoLive === 'function') { try { applyScheduleForGoLive(); } catch (e) {} }
   addEvHistory('StreamFusion', 'Stream session started \u2014 recap will be generated when you go offline.', 'tw', false);
   if (typeof updateLiveBar === 'function') updateLiveBar();
   if (typeof sendOverlayLive === 'function') sendOverlayLive();
@@ -12621,6 +14050,7 @@ function _resetAllCaptureFlags() {
   _capturingPopVisHotkey = false;
   _capturingSOHotkey = false;
   _capturingPopChatSendHotkey = false;
+  _capturingStreamAction = null;
 }
 function captureSOHotkey() {
   _resetAllCaptureFlags();
@@ -12875,6 +14305,124 @@ window.addEventListener('mousedown', function(e) {
   e.preventDefault();
   e.stopPropagation();
 }, true);
+
+// ══════════════════════════════════════════════════════════════════════════
+// Stream control-action hotkeys. Each of the direct-Twitch actions (marker,
+// ads, polls, predictions, title update, clip, redemption refresh) can be
+// bound to a global keyboard accelerator or a Mouse4/Mouse5 side button so it
+// fires mid-game with SF unfocused. Extra keyboard/mouse macro keys work by
+// mapping them (in Logitech G HUB / Razer Synapse / etc.) to an unused combo
+// like F13-F24, then binding that here.
+// ══════════════════════════════════════════════════════════════════════════
+var _capturingStreamAction = null;   // actionId currently being captured
+var STREAM_ACTIONS = [
+  { id: 'clip',          label: 'Create clip',                 run: function () { if (typeof createClipNow === 'function') createClipNow(); } },
+  { id: 'marker',        label: 'Drop stream marker',          run: function () { if (typeof createStreamMarker === 'function') createStreamMarker(); } },
+  { id: 'update-stream', label: 'Update title / category',     run: function () { if (typeof siApplyChannelInfo === 'function') siApplyChannelInfo(); } },
+  { id: 'ad-snooze',     label: 'Snooze next ad',              run: function () { if (typeof adSnooze === 'function') adSnooze(); } },
+  { id: 'ad-run-30',     label: 'Run 30s ad',                  run: function () { if (typeof adRun === 'function') adRun(30); } },
+  { id: 'ad-run-60',     label: 'Run 60s ad',                  run: function () { if (typeof adRun === 'function') adRun(60); } },
+  { id: 'ad-run-90',     label: 'Run 90s ad',                  run: function () { if (typeof adRun === 'function') adRun(90); } },
+  { id: 'poll-start',    label: 'Start poll',                  run: function () { if (typeof startPollFromSF === 'function') startPollFromSF(); } },
+  { id: 'poll-end',      label: 'End poll',                    run: function () { if (typeof endActivePoll === 'function') endActivePoll(); } },
+  { id: 'pred-start',    label: 'Start prediction',            run: function () { if (typeof startPredictionFromSF === 'function') startPredictionFromSF(); } },
+  { id: 'pred-lock',     label: 'Lock prediction',             run: function () { if (typeof lockActivePrediction === 'function') lockActivePrediction(); } },
+  { id: 'pred-win-a',    label: 'Prediction: outcome 1 wins',  run: function () { if (typeof resolveActivePrediction === 'function') resolveActivePrediction(0); } },
+  { id: 'pred-win-b',    label: 'Prediction: outcome 2 wins',  run: function () { if (typeof resolveActivePrediction === 'function') resolveActivePrediction(1); } },
+  { id: 'pred-cancel',   label: 'Cancel prediction',           run: function () { if (typeof cancelActivePrediction === 'function') cancelActivePrediction(); } },
+  { id: 'redemptions',   label: 'Refresh redemption queue',    run: function () { if (typeof loadRedemptionQueue === 'function') loadRedemptionQueue(); } }
+];
+var _streamHotkeys = {};   // actionId -> accel
+function _loadStreamHotkeys() { try { _streamHotkeys = JSON.parse(localStorage.getItem('sf_stream_hotkeys') || '{}') || {}; } catch (e) { _streamHotkeys = {}; } }
+function _saveStreamHotkeys() { try { localStorage.setItem('sf_stream_hotkeys', JSON.stringify(_streamHotkeys)); } catch (e) {} }
+function fireStreamAction(id) {
+  for (var i = 0; i < STREAM_ACTIONS.length; i++) { if (STREAM_ACTIONS[i].id === id) { try { STREAM_ACTIONS[i].run(); } catch (e) { console.warn('[stream-action]', id, e); } return; } }
+}
+function syncStreamHotkeys() {
+  if (!window.electronAPI || !window.electronAPI.streamHotkeysSync) return;
+  var map = {};   // accel -> actionId (one accel drives one action)
+  Object.keys(_streamHotkeys).forEach(function (id) { var a = _streamHotkeys[id]; if (a) map[a] = id; });
+  Promise.resolve(window.electronAPI.streamHotkeysSync(map)).catch(function () {});
+}
+// Which SF binding (if any) already owns this accel, so we can warn instead of
+// silently shadowing. Checks the four global hotkeys plus the other stream
+// actions. (Hotbar / SI collisions are reported by main's register() result.)
+function _findStreamHotkeyConflict(accel, selfId) {
+  if (!accel) return null;
+  if (typeof _findHotkeyConflict === 'function') { var owner = _findHotkeyConflict(accel, null); if (owner) return owner; }
+  for (var i = 0; i < STREAM_ACTIONS.length; i++) {
+    var id = STREAM_ACTIONS[i].id;
+    if (id !== selfId && _streamHotkeys[id] === accel) return STREAM_ACTIONS[i].label;
+  }
+  return null;
+}
+function captureStreamHotkey(id) {
+  _resetAllCaptureFlags();
+  _capturingStreamAction = id;
+  _renderStreamHotkeyRows();
+}
+function clearStreamHotkey(id) {
+  _resetAllCaptureFlags();
+  delete _streamHotkeys[id];
+  _saveStreamHotkeys();
+  syncStreamHotkeys();
+  _renderStreamHotkeyRows();
+}
+function _commitStreamHotkey(id, accel) {
+  _capturingStreamAction = null;
+  var conflict = _findStreamHotkeyConflict(accel, id);
+  if (conflict) { _renderStreamHotkeyRows(); _setStreamHkNote(id, 'Already bound to ' + conflict, true); return; }
+  _streamHotkeys[id] = accel;
+  _saveStreamHotkeys();
+  syncStreamHotkeys();
+  _renderStreamHotkeyRows();
+}
+function _setStreamHkNote(id, msg, isErr) {
+  var el = document.getElementById('shkNote-' + id);
+  if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--red)' : 'var(--grn)'; }
+}
+function _renderStreamHotkeyRows() {
+  var host = document.getElementById('streamHotkeyRows');
+  if (!host) return;
+  host.innerHTML = STREAM_ACTIONS.map(function (a) {
+    var cur = _streamHotkeys[a.id];
+    var capturing = _capturingStreamAction === a.id;
+    var label = capturing ? 'Press combo… (Esc to cancel)' : (cur ? _formatAccel(cur) : 'Unbound');
+    return '<div class="hk-row" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr)">'
+      + '<div style="flex:1;font-size:12px;color:var(--txt)">' + esc(a.label) + '</div>'
+      + '<button class="tbtn" onclick="captureStreamHotkey(\'' + a.id + '\')" style="font-size:11px;font-weight:700;min-width:150px;font-family:ui-monospace,monospace">' + esc(label) + '</button>'
+      + '<button class="tbtn hk-reset" onclick="clearStreamHotkey(\'' + a.id + '\')" title="Unbind">Clear</button>'
+      + '<span id="shkNote-' + a.id + '" style="font-size:10px;min-width:0;flex-basis:100%;order:9"></span>'
+      + '</div>';
+  }).join('');
+}
+// Capture keydown / mouse side buttons for the stream-action being bound.
+window.addEventListener('keydown', function (e) {
+  if (!_capturingStreamAction) return;
+  if (e.key === 'Escape') { _capturingStreamAction = null; _renderStreamHotkeyRows(); e.preventDefault(); return; }
+  var accel = _accelFromKeyEvent(e);
+  if (!accel) return;
+  e.preventDefault(); e.stopPropagation();
+  _commitStreamHotkey(_capturingStreamAction, accel);
+}, true);
+window.addEventListener('mousedown', function (e) {
+  if (!_capturingStreamAction) return;
+  if (e.button !== 3 && e.button !== 4) return;
+  e.preventDefault(); e.stopPropagation();
+  _commitStreamHotkey(_capturingStreamAction, e.button === 3 ? 'Mouse4' : 'Mouse5');
+}, true);
+// Fire on global binding + re-push after the overlay wipes globalShortcuts.
+if (window.electronAPI && window.electronAPI.onStreamActionFire) {
+  window.electronAPI.onStreamActionFire(function (id) { fireStreamAction(id); });
+}
+if (window.electronAPI && window.electronAPI.onRehydrateHotkeys) {
+  window.electronAPI.onRehydrateHotkeys(function () {
+    try { if (typeof syncHotbarHotkeys === 'function') syncHotbarHotkeys(); } catch (e) {}
+    try { if (typeof _siSyncHotkeysToMain === 'function') _siSyncHotkeysToMain(); } catch (e) {}
+    try { syncStreamHotkeys(); } catch (e) {}
+  });
+}
+
 // On boot, push the saved hotkeys to main process so they're registered even if
 // the user never opens settings
 setTimeout(function() {
@@ -12884,6 +14432,22 @@ setTimeout(function() {
   _renderPopChatSendHotkeyBtn();
   _pushOverlayHotkey(_overlayHotkey);
   _pushPopVisHotkey(_popVisHotkey);
+  // Register the saved stream control-action hotkeys globally on boot.
+  _loadStreamHotkeys();
+  syncStreamHotkeys();
+  // Load the go-live schedule so auto-apply works even if the tab is never
+  // opened this session.
+  _schedLoad();
+  // Automated messages: load + start the timer engine so they fire without
+  // opening the Bot tab. Hydrate bot-account status + listen for changes.
+  _autoMsgLoad();
+  _autoMsgStart();
+  _cmdLoad();
+  _automodLoad();
+  _quotesLoad();
+  _gwLoadCfg();
+  if (window.electronAPI && window.electronAPI.onTwitchBotStatusChanged) window.electronAPI.onTwitchBotStatusChanged(applyTwitchBotStatus);
+  if (window.electronAPI && window.electronAPI.twitchBotGetStatus) { window.electronAPI.twitchBotGetStatus().then(applyTwitchBotStatus).catch(function () {}); }
   // Hydrate the pop-out chat-send hotkey from the main process (source
   // of truth, persisted to popout-send-hotkey.json). Don't push it back
   // since main already loaded it on startup.

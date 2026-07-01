@@ -661,6 +661,31 @@ body.pulse-ev{--pulse-col:rgba(255,215,0,.45)}
   }
 }
 
+/* ── Performance mode (body.perf-lite) ──────────────────────────────────
+   For streamers running the pop-out over a game. A transparent always-on-top
+   window only costs GPU when its pixels change, so any *continuous* animation
+   forces the OS to recomposite the whole overlay over gameplay every frame.
+   This kills the steady-state repaint sources: the infinite live-dot pulse,
+   the shimmer sweeps, and the per-message entrance pop. Animated emotes are
+   frozen separately in JS (freezeEmotesIn) since CSS can't pause webp/gif. */
+body.perf-lite .ov-live-dot{animation:none!important}
+body.perf-lite .ov-msg{animation:none!important}
+body.perf-lite .ov-hype-fill::after{animation:none!important;display:none}
+/* backdrop-filter resamples the moving game behind each toast every frame
+   it's on screen; one of the heaviest GPU costs during gift/sub bombs. */
+body.perf-lite .ov-event{backdrop-filter:none!important}
+body.perf-lite .ov-event::after,
+body.perf-lite .ov-banner::before,
+body.perf-lite .ov-banner::after,
+body.perf-lite .ov-banner .ov-bn-icon,
+body.perf-lite .ov-raid-icon,
+body.perf-lite .ov-raid-card{animation:none!important}
+body.perf-lite.activity-pulse::before,
+body.perf-lite.activity-pulse .ov-drag,
+body.perf-lite.activity-pulse .ov-live,
+body.perf-lite.activity-pulse .ov-stats,
+body.perf-lite.activity-pulse .ov-chat-bar{animation:none!important}
+
 /* (stats bar styles consolidated above) */
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -858,6 +883,7 @@ var api = window.electronAPI || {};
 var cfg = {
   showChat: true, showViewers: true, showRevenue: true, showHype: true, showEvents: true,
   showAvatars: true, showBadges: true, showHotbar: true, hideAnimations: false,
+  perfMode: false,
   platTw: true, platYt: true, platTt: true, platKk: true,
   bgOpacity: 0.80, winOpacity: 1.00, textSize: 13, maxMsgs: 40, clickThrough: false,
   hotbar: []
@@ -922,7 +948,59 @@ function applyConfig() {
   applyBgOpacity();
   applyWinOpacity();
   applyClickThrough(cfg.clickThrough);
+  document.body.classList.toggle('perf-lite', !!cfg.perfMode);
+  // When perf mode is switched on mid-stream, freeze the emotes already on
+  // screen too, not just future messages.
+  if (cfg.perfMode) freezeEmotesIn(feed);
   renderHotbar();
+}
+
+// ── Emote freezing (perf mode) ──────────────────────────────────────────
+// Animated 7TV/BTTV/Twitch emotes (webp/gif) keep repainting forever, which
+// on a transparent always-on-top overlay forces the OS to recomposite the
+// whole window over gameplay every frame, the main cause of in-game lag.
+// CSS can't pause animated webp/gif, so we paint frame 0 to a canvas and
+// swap the <img> src to a static PNG data URL. We reload each emote through
+// a CORS-enabled Image so the canvas isn't tainted (7TV/BTTV/Twitch/Kick
+// CDNs all send Access-Control-Allow-Origin); if a CDN doesn't, the emote
+// simply stays animated (no worse than before). Results are cached by URL so
+// every unique emote is converted at most once for the whole session.
+var _emoteFreeze = {}; // origUrl -> 'pending' | <static data URL>
+function freezeEmotesIn(root) {
+  if (!root || !cfg.perfMode) return;
+  var imgs = root.querySelectorAll('img.emote');
+  for (var i = 0; i < imgs.length; i++) {
+    var img = imgs[i];
+    var orig = img.getAttribute('src') || '';
+    if (!orig || orig.indexOf('data:') === 0) continue;
+    var cached = _emoteFreeze[orig];
+    if (typeof cached === 'string' && cached !== 'pending') { img.src = cached; continue; }
+    _freezeEmote(orig);
+  }
+}
+function _freezeEmote(orig) {
+  if (_emoteFreeze[orig]) return; // already done or in flight
+  _emoteFreeze[orig] = 'pending';
+  var loader = new Image();
+  loader.crossOrigin = 'anonymous';
+  loader.onload = function() {
+    try {
+      var w = loader.naturalWidth, h = loader.naturalHeight;
+      if (!w || !h) { delete _emoteFreeze[orig]; return; }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(loader, 0, 0);
+      var data = c.toDataURL('image/png');
+      _emoteFreeze[orig] = data;
+      // Swap any copies of this emote currently on screen.
+      var live = feed.querySelectorAll('img.emote');
+      for (var j = 0; j < live.length; j++) {
+        if (live[j].getAttribute('src') === orig) live[j].src = data;
+      }
+    } catch (e) { delete _emoteFreeze[orig]; /* tainted/CORS, leave animated */ }
+  };
+  loader.onerror = function() { delete _emoteFreeze[orig]; };
+  loader.src = orig;
 }
 
 // ── Quick-action hotbar ─────────────────────────────────────
@@ -1123,6 +1201,7 @@ function addMsg(d) {
   el.innerHTML = parts;
   // column-reverse: prepend so newest is first DOM child = visual bottom
   feed.insertBefore(el, feed.firstChild);
+  if (cfg.perfMode) freezeEmotesIn(el);
   while (feed.children.length > cfg.maxMsgs) feed.removeChild(feed.lastChild);
   // column-reverse pins scroll naturally, no manual scrollTop needed
   triggerActivityPulse(d.plat);
@@ -1528,7 +1607,7 @@ var _shakeTimer = null;
 // the CSS shake runs in parallel so the effect feels cohesive even if the
 // OS is slow to repaint the window at its new position.
 function shakeOverlayContents() {
-  if (cfg.hideAnimations) return;
+  if (cfg.hideAnimations || cfg.perfMode) return;
   var body = document.body;
   body.classList.remove('ov-shake');
   void body.offsetWidth;
@@ -1540,7 +1619,7 @@ function shakeOverlayContents() {
 }
 function showBigBanner(d) {
   if (!platAllowed(d.plat)) return;
-  if (cfg.hideAnimations) return;
+  if (cfg.hideAnimations || cfg.perfMode) return;
   // Route to external banner window (outside the pop-out) so it never
   // gets clipped by the monitor edge.
   if (api.showExternalBanner) {
@@ -1553,7 +1632,7 @@ function showBigBanner(d) {
 
 // ── Raid Splash ──────────────────────────────────────────────
 function showRaidSplash(d) {
-  if (cfg.hideAnimations) return;
+  if (cfg.hideAnimations || cfg.perfMode) return;
   if (!platAllowed(d.plat)) return;
   // Route to external banner window (outside the pop-out)
   if (api.showExternalBanner) {
@@ -1576,7 +1655,7 @@ window.addEventListener('resize', _resizeConf);
 _resizeConf();
 
 function fireConfetti(count) {
-  if (cfg.hideAnimations) return;
+  if (cfg.hideAnimations || cfg.perfMode) return;
   var colors = ['#7c5cff','#9a82ff','#5bff95','#6ee0c0','#ffffff','#ff66cc','#ffd700'];
   var w = _confCanvas.width;
   for (var i = 0; i < count; i++) {
@@ -1670,7 +1749,7 @@ function triggerHypeAnim() {
 // ── Full-overlay LEVEL UP fanfare (mirrors the main app version) ──
 var _hluOvTimer = null;
 function triggerHypeLevelUpOverlay(level) {
-  if (cfg.hideAnimations) return;
+  if (cfg.hideAnimations || cfg.perfMode) return;
   var el = document.getElementById('ovHypeLevelUp');
   if (!el) return;
   var numEl = document.getElementById('ovHluLvNum');

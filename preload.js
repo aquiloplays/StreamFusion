@@ -72,6 +72,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   overlayFireHotbar:(idx)     => ipcRenderer.send('overlay-fire-hotbar', idx),
   // Main renderer listens for hotbar-fire requests forwarded from the overlay
   onOverlayFireHotbar:(fn)    => ipcRenderer.on('overlay-fire-hotbar', (e, idx) => fn(idx)),
+  // Direct-Twitch "Stream" control-action hotkeys. Renderer owns persistence
+  // and pushes the full { accel -> actionId } map; main registers globally
+  // (keyboard accelerators incl. F13-F24) + Mouse4/Mouse5 via the poller, then
+  // sends 'stream-action-fire' with the actionId when a binding fires.
+  streamHotkeysSync:(map)     => ipcRenderer.invoke('stream-hotkeys-sync', map || {}),
+  onStreamActionFire:(fn)     => ipcRenderer.on('stream-action-fire', (e, id) => fn(id)),
+  // After the overlay re-registers its hotkeys (globalShortcut.unregisterAll),
+  // main asks the renderer to re-push hotbar / stream-info / stream-action
+  // bindings so they survive the wipe.
+  onRehydrateHotkeys:(fn)     => ipcRenderer.on('rehydrate-hotkeys', () => fn()),
   // Overlay -> main renderer: trigger a mod action (timeout/ban/delete) via the
   // main app's SB websocket, so the overlay doesn't need platform credentials.
   sendOverlayModAction:(payload) => ipcRenderer.send('overlay-mod-action', payload || {}),
@@ -160,6 +170,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   twitchCreateClip:      ()   => ipcRenderer.invoke('twitch-create-clip'),
   twitchHelix:           (p)  => ipcRenderer.invoke('twitch-helix', p || {}),
   onTwitchStatusChanged: (fn) => ipcRenderer.on('twitch-status-changed', (e, status) => fn(status)),
+  // Optional bot account (second Twitch login) for automated messages / bot.
+  twitchBotBeginAuth:       ()   => ipcRenderer.invoke('twitch-bot-begin-auth'),
+  twitchBotGetStatus:       ()   => ipcRenderer.invoke('twitch-bot-get-status'),
+  twitchBotSignOut:         ()   => ipcRenderer.invoke('twitch-bot-sign-out'),
+  twitchBotSendChat:        (p)  => ipcRenderer.invoke('twitch-bot-send-chat', p || {}),
+  onTwitchBotStatusChanged: (fn) => ipcRenderer.on('twitch-bot-status-changed', (e, status) => fn(status)),
 
   // ── OBS overlays (EA-only — broadcasts are no-ops until entitled) ───────
   // Renderer-side fan-out: anything the main app learns (chat msg, event,

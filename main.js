@@ -327,6 +327,14 @@ function registerAllOverlayHotkeys() {
       });
     } catch (e) { console.error('[overlay] failed to register chat-send hotkey', popoutSendHotkeyAccel, e); }
   }
+  // globalShortcut.unregisterAll() above also wiped the hotbar / stream-info /
+  // stream-action accelerators. Ask the renderer to re-push them so those
+  // bindings survive an overlay open / hotkey change. No-op before the main
+  // window exists (startup registers overlay hotkeys after the renderer has
+  // already synced, so nothing is lost then).
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rehydrate-hotkeys');
+  } catch (e) {}
 }
 
 function registerOverlayHotkey(accel) {
@@ -450,6 +458,12 @@ function _dispatchMouseSideButton(btn) {
     var slot = mouseHotbarBindings[btn];
     if (typeof slot === 'number' && slot >= 0 && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('overlay-fire-hotbar', slot);
+    }
+    // (c) Stream control action: fires when this side button is bound to a
+    // direct-Twitch action (marker, ad, poll, prediction, etc.).
+    var streamId = (typeof mouseStreamBindings !== 'undefined') ? mouseStreamBindings[btn] : null;
+    if (streamId && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('stream-action-fire', streamId);
     }
   } catch (e) { console.error('[mouse-dispatch]', e); }
 }
@@ -1763,6 +1777,41 @@ ipcMain.handle('stream-info-sync-hotkeys', (event, payload) => {
       });
     })(i);
   }
+  return { ok: true, registered, failed, conflicted };
+});
+
+// ── Direct-Twitch "Stream" control-action hotkeys ───────────────────────────
+// Fire a Stream-tab action (drop marker, snooze/run ad, start/end poll, lock/
+// resolve prediction, update title, etc.) from a global keyboard accelerator
+// (F13-F24 are ideal for extra keyboard/mouse macro keys mapped in Logitech G
+// HUB / Razer Synapse) or a Mouse4 / Mouse5 side button. Renderer owns the
+// bindings and pushes the full { accel -> actionId } map; we re-register
+// atomically and forward 'stream-action-fire' with the actionId.
+let _streamRegistered = new Set();
+let mouseStreamBindings = { Mouse4: null, Mouse5: null }; // -> actionId | null
+ipcMain.handle('stream-hotkeys-sync', (event, payload) => {
+  payload = (payload && typeof payload === 'object') ? payload : {};
+  _streamRegistered.forEach(a => { try { globalShortcut.unregister(a); } catch (e) {} });
+  _streamRegistered.clear();
+  mouseStreamBindings.Mouse4 = null;
+  mouseStreamBindings.Mouse5 = null;
+  const registered = [], failed = [], conflicted = [];
+  Object.keys(payload).forEach(function(accel) {
+    accel = String(accel || '').trim();
+    const id = String(payload[accel] || '');
+    if (!accel || !id) return;
+    if (accel === 'Mouse4' || accel === 'Mouse5') { mouseStreamBindings[accel] = id; registered.push(accel); return; }
+    // Don't clash with the overlay / hotbar / stream-info accelerators.
+    if (accel === overlayHotkeyAccel || accel === overlayVisHotkeyAccel || accel === popoutSendHotkeyAccel
+        || _hotbarRegistered.has(accel) || _siRegistered.has(accel) || _streamRegistered.has(accel)) { conflicted.push(accel); return; }
+    let ok = false;
+    try {
+      ok = globalShortcut.register(accel, () => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('stream-action-fire', id);
+      });
+    } catch (e) { console.warn('[stream-hotkey] register threw', accel, e && e.message); }
+    if (ok) { _streamRegistered.add(accel); registered.push(accel); } else failed.push(accel);
+  });
   return { ok: true, registered, failed, conflicted };
 });
 

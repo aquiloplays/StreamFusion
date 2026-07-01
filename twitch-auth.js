@@ -61,7 +61,36 @@ const SCOPES = [
   'channel:read:subscriptions',   // subs, resubs, gifts
   'bits:read',                    // cheers
   'moderator:read:followers',     // follows
-  'channel:read:redemptions',     // channel-point redeems
+  'channel:read:redemptions',     // channel-point redeems + power-up auto-rewards
+  'channel:read:hype_train',      // accurate hype trains (begin/progress/end)
+  'channel:read:ads',             // ad-break heads-up + ad schedule countdown
+  // ── Accuracy pass: native polls / predictions / charity ──
+  'channel:read:polls',           // accurate live poll results
+  'channel:read:predictions',     // accurate live prediction pools
+  'channel:read:charity',         // charity campaign progress tracker
+  // ── Alert overlays: shoutouts + suspicious-user mod safety ──
+  'moderator:read:shoutouts',     // shoutout received/given events
+  'moderator:read:suspicious_users', // flag likely ban-evaders in chat
+  // ── Control surface (write scopes): SF drives Twitch directly ──
+  'channel:manage:broadcast',     // edit title/category + create stream markers
+  'channel:manage:ads',           // snooze the next scheduled ad
+  'channel:edit:commercial',      // start an ad break on demand
+  'channel:manage:polls',         // launch / end polls from SF
+  'channel:manage:predictions',   // launch / lock / resolve predictions from SF
+  'channel:manage:redemptions',   // approve / refund channel-point redemptions
+  'moderator:manage:banned_users',   // native timeout / ban / unban
+  'moderator:manage:chat_messages',  // native delete message
+  'moderator:manage:announcements',  // native /announce (schedule go-live message)
+  'user:write:chat',                 // send chat as the broadcaster (bot fallback)
+  'channel:bot',                     // let the connected bot account post here
+];
+
+// A separate, minimal scope set for the OPTIONAL bot account (a second Twitch
+// login the streamer connects so automated messages post under the bot's name
+// instead of their own). It only ever needs to send chat.
+const BOT_SCOPES = [
+  'user:write:chat',   // send chat messages
+  'user:bot',          // be recognized as a bot (rate limits + allowed to post)
 ];
 
 const STATE_SCHEMA_V = 1;
@@ -72,23 +101,25 @@ let loopbackServer = null;
 let expectedState = null;
 let mainWindowRef = null;
 
-function statePath() { return path.join(app.getPath('userData'), 'twitch-auth.json'); }
+// role: 'broadcaster' (default) or 'bot'. The bot account persists to its own
+// file so it never collides with the broadcaster's tokens.
+function statePath(role) { return path.join(app.getPath('userData'), role === 'bot' ? 'twitch-bot-auth.json' : 'twitch-auth.json'); }
 
-function writeState(obj) {
+function writeState(obj, role) {
   try {
     obj.schema_v = STATE_SCHEMA_V;
     const json = JSON.stringify(obj);
     if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()) {
       const enc = safeStorage.encryptString(json).toString('base64');
-      fs.writeFileSync(statePath(), JSON.stringify({ v: 1, enc: enc }), 'utf8');
+      fs.writeFileSync(statePath(role), JSON.stringify({ v: 1, enc: enc }), 'utf8');
     } else {
-      fs.writeFileSync(statePath(), JSON.stringify({ v: 1, raw: obj }), 'utf8');
+      fs.writeFileSync(statePath(role), JSON.stringify({ v: 1, raw: obj }), 'utf8');
     }
   } catch (e) { console.error('[twitch-auth] writeState failed:', e); }
 }
-function readState() {
+function readState(role) {
   try {
-    const parsed = JSON.parse(fs.readFileSync(statePath(), 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(statePath(role), 'utf8'));
     if (parsed.enc && safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()) {
       return JSON.parse(safeStorage.decryptString(Buffer.from(parsed.enc, 'base64')));
     }
@@ -96,7 +127,7 @@ function readState() {
     return null;
   } catch (e) { return null; }
 }
-function clearState() { try { fs.unlinkSync(statePath()); } catch (e) {} }
+function clearState(role) { try { fs.unlinkSync(statePath(role)); } catch (e) {} }
 
 // ── HTTP helpers ─────────────────────────────────────────────────────────────
 function postJson(url, body) {
@@ -154,8 +185,8 @@ function exchange(params) {
 }
 
 // Return a valid access token, refreshing if expired. Throws if not signed in.
-async function getValidToken() {
-  const state = readState();
+async function getValidToken(role) {
+  const state = readState(role);
   if (!state || !state.access_token) throw new Error('not signed in');
   if (state.expires_at && Date.now() >= (state.expires_at - 60000) && state.refresh_token) {
     try {
@@ -164,7 +195,7 @@ async function getValidToken() {
         state.access_token = t.access_token;
         if (t.refresh_token) state.refresh_token = t.refresh_token;
         state.expires_at = t.expires_in ? (Date.now() + t.expires_in * 1000) : null;
-        writeState(state);
+        writeState(state, role);
       }
     } catch (e) { /* fall through; a 401 below will surface the real failure */ }
   }
@@ -173,8 +204,8 @@ async function getValidToken() {
 
 // Generic Helix call (auto-refresh + one retry on 401). path is relative,
 // e.g. 'clips', query is a querystring without '?'.
-async function helix(method, path, query, body) {
-  let state = await getValidToken();
+async function helix(method, path, query, body, role) {
+  let state = await getValidToken(role);
   const url = HELIX + '/' + String(path).replace(/^\/+/, '') + (query ? ('?' + query) : '');
   let res = await helixRequest(method, url, state.access_token, body);
   if (res.status === 401 && state.refresh_token) {
@@ -183,7 +214,7 @@ async function helix(method, path, query, body) {
       state.access_token = t.access_token;
       if (t.refresh_token) state.refresh_token = t.refresh_token;
       state.expires_at = t.expires_in ? (Date.now() + t.expires_in * 1000) : null;
-      writeState(state);
+      writeState(state, role);
       res = await helixRequest(method, url, state.access_token, body);
     }
   }
@@ -230,22 +261,29 @@ function publicStatus(state) {
   if (!state || !state.access_token) return { signedIn: false, login: '', displayName: '', userId: '' };
   return { signedIn: true, login: state.login || '', displayName: state.display_name || '', userId: state.user_id || '' };
 }
-function emitStatus(status) {
-  try { if (mainWindowRef && !mainWindowRef.isDestroyed()) mainWindowRef.webContents.send('twitch-status-changed', status); }
+function emitStatus(status, role) {
+  var channel = role === 'bot' ? 'twitch-bot-status-changed' : 'twitch-status-changed';
+  try { if (mainWindowRef && !mainWindowRef.isDestroyed()) mainWindowRef.webContents.send(channel, status); }
   catch (e) { /* non-fatal */ }
 }
 
 // ── Public flow ──────────────────────────────────────────────────────────────
-async function beginAuth() {
+// role: 'broadcaster' (default, full control scopes) or 'bot' (chat-send only).
+async function beginAuth(role) {
   stopLoopbackServer();
   const port = await startLoopbackServer();
   const redirectUri = 'http://localhost:' + port + '/callback';
   expectedState = crypto.randomBytes(16).toString('hex');
+  // force_verify makes Twitch always show the account picker, so the streamer
+  // can pick a DIFFERENT account for the bot instead of silently reusing the
+  // one they're already logged into in the browser.
+  const scopeList = role === 'bot' ? BOT_SCOPES : SCOPES;
   const authUrl = TWITCH_OAUTH + '/authorize' +
     '?response_type=code' +
     '&client_id=' + encodeURIComponent(TWITCH_CLIENT_ID) +
     '&redirect_uri=' + encodeURIComponent(redirectUri) +
-    '&scope=' + encodeURIComponent(SCOPES.join(' ')) +
+    '&scope=' + encodeURIComponent(scopeList.join(' ')) +
+    (role === 'bot' ? '&force_verify=true' : '') +
     '&state=' + expectedState;
   const codePromise = new Promise(function (resolve, reject) {
     authResolver = { resolve: resolve, reject: reject };
@@ -269,16 +307,34 @@ async function beginAuth() {
       expires_at: tokens.expires_in ? (Date.now() + tokens.expires_in * 1000) : null,
       login: login, user_id: userId, display_name: displayName
     };
-    writeState(state);
+    writeState(state, role);
     const pub = publicStatus(state);
-    emitStatus(pub);
+    emitStatus(pub, role);
     return pub;
   } finally { stopLoopbackServer(); }
 }
 
-function getStatus() { return publicStatus(readState()); }
+function getStatus(role) { return publicStatus(readState(role)); }
 
-async function signOut() { clearState(); const pub = publicStatus(null); emitStatus(pub); return pub; }
+async function signOut(role) { clearState(role); const pub = publicStatus(null); emitStatus(pub, role); return pub; }
+
+// Send a chat message to `broadcasterId` AS the connected bot account (native
+// Helix Send Chat Message). Requires the bot token (user:write:chat + user:bot)
+// and the broadcaster having granted channel:bot (or the bot being a mod).
+async function sendBotChat(broadcasterId, message) {
+  const bs = readState('bot');
+  if (!bs || !bs.access_token || !bs.user_id) return { ok: false, error: 'bot_not_connected' };
+  if (!broadcasterId || !message) return { ok: false, error: 'missing_args' };
+  try {
+    const res = await helix('POST', 'chat/messages', '', { broadcaster_id: String(broadcasterId), sender_id: String(bs.user_id), message: String(message).slice(0, 500) }, 'bot');
+    if (res.status >= 200 && res.status < 300) {
+      const d = res.data && res.data.data && res.data.data[0];
+      if (d && d.is_sent === false) return { ok: false, error: (d.drop_reason && (d.drop_reason.message || d.drop_reason.code)) || 'message dropped' };
+      return { ok: true };
+    }
+    return { ok: false, error: (res.data && (res.data.message || res.data.error)) || ('HTTP ' + res.status) };
+  } catch (e) { return { ok: false, error: e.message || String(e) }; }
+}
 
 // Create a clip on the broadcaster's own channel. Returns
 // { ok, id?, editUrl?, error? }. Twitch requires the channel to be LIVE.
@@ -307,6 +363,17 @@ function registerIpcHandlers() {
   ipcMain.handle('twitch-get-status', async function () { return getStatus(); });
   ipcMain.handle('twitch-sign-out',   async function () { return signOut(); });
   ipcMain.handle('twitch-create-clip', async function () { return createClip(); });
+  // ── Optional bot account (second login, chat-send only) ──
+  ipcMain.handle('twitch-bot-begin-auth', async function () {
+    try { return await beginAuth('bot'); }
+    catch (err) { return { signedIn: false, login: '', displayName: '', userId: '', error: err.message || String(err) }; }
+  });
+  ipcMain.handle('twitch-bot-get-status', async function () { return getStatus('bot'); });
+  ipcMain.handle('twitch-bot-sign-out',   async function () { return signOut('bot'); });
+  ipcMain.handle('twitch-bot-send-chat',  async function (event, payload) {
+    const p = payload || {};
+    return await sendBotChat(p.broadcasterId, p.message);
+  });
   // Generic Helix passthrough for future direct-Helix features. Returns
   // { status, data }. The renderer only needs this for things SB can't do.
   ipcMain.handle('twitch-helix', async function (event, payload) {
