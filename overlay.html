@@ -85,6 +85,10 @@ body.clickthrough.interactive .ov-drag-title{color:var(--accent)}
 .ov-live-chip.on.tt{color:var(--tt);border-color:var(--tt);background:rgba(0,242,234,.15);box-shadow:0 0 10px rgba(0,242,234,.3)}
 .ov-live-chip.on.kk{color:var(--kk);border-color:var(--kk);background:rgba(83,252,24,.15);box-shadow:0 0 10px rgba(83,252,24,.3)}
 .ov-live-timer{margin-left:auto;font-size:14px;font-weight:900;color:var(--txt);font-variant-numeric:tabular-nums;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:10px;padding:4px 10px;flex-shrink:0;letter-spacing:1px}
+/* Ops rundown chip: current segment + countdown mirrored from the main app,
+   so the streamer sees the schedule over the game. Overtime turns red. */
+.ov-rundown{margin-left:auto;font-size:13px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:10px;padding:4px 10px;flex-shrink:0;white-space:nowrap;max-width:46%;overflow:hidden;text-overflow:ellipsis}
+.ov-rundown.over{color:var(--red);border-color:var(--red)}
 .ov-live-timer.off{color:var(--mut);opacity:.55}
 
 /* ── Stats bar ─────────────────────────────────────────────────── */
@@ -793,6 +797,7 @@ body.layout-hud::before {
   <span class="ov-live-chip yt" id="ovLiveYt"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M23 7s-.2-1.7-1-2.4c-1-1-2.2-1-2.7-1.1C16.2 3.3 12 3.3 12 3.3s-4.2 0-7.3.2c-.5.1-1.7.1-2.7 1.1C1.2 5.3 1 7 1 7S.8 9 .8 11v1.8c0 2.1.2 4.1.2 4.1s.2 1.7 1 2.4c1 1 2.2 1 2.7 1.1 2 .2 8.3.2 8.3.2s4.2 0 7.3-.2c.5-.1 1.7-.1 2.7-1.1.8-.7 1-2.4 1-2.4s.2-2.1.2-4.1V11c0-2.1-.2-4-.2-4zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg></span>
   <span class="ov-live-chip tt" id="ovLiveTt"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19.3 6.4a4.8 4.8 0 0 1-3.1-2.8A4.7 4.7 0 0 1 15.8 2h-3.5v13.7a2.9 2.9 0 0 1-2.9 2.7 2.9 2.9 0 0 1-2.9-2.9 2.9 2.9 0 0 1 2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 0 0-.9-.1A6.4 6.4 0 0 0 3 15.5a6.4 6.4 0 0 0 6.4 6.4 6.4 6.4 0 0 0 6.4-6.4v-7a8.3 8.3 0 0 0 4.9 1.6V6.5c-.5 0-1-.1-1.4-.1z"/></svg></span>
   <span class="ov-live-chip kk" id="ovLiveKk"><svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 4h3v6.5L14.7 4H18l-5.8 7.5L18 20h-3.3L9 13.5V20H6V4z"/></svg></span>
+  <span class="ov-rundown" id="ovRundown" style="display:none"></span>
   <span class="ov-live-timer off" id="ovLiveTimer">00:00:00</span>
 </div>
 <div class="ov-stats" id="ovStats"></div>
@@ -1449,6 +1454,10 @@ function _fmtDur(ms) {
   function pad(n){return n < 10 ? '0'+n : ''+n;}
   return pad(h) + ':' + pad(m) + ':' + pad(sec);
 }
+// Ops rundown state pushed from the main app ({running, name, minutes,
+// segStart}). The countdown is computed locally on each renderLiveBar tick,
+// same pattern as the live timer, so no per-second IPC is needed.
+var _ovRundown = null;
 function renderLiveBar() {
   var platKey = { tw:'platTw', yt:'platYt', tt:'platTt', kk:'platKk' };
   ['tw','yt','tt','kk'].forEach(function(p) {
@@ -1465,6 +1474,21 @@ function renderLiveBar() {
   } else {
     t.classList.add('off');
     t.textContent = '00:00:00';
+  }
+  // Rundown chip: show current segment + remaining while a rundown runs.
+  var rn = document.getElementById('ovRundown');
+  if (rn) {
+    var rr = _ovRundown;
+    if (rr && rr.running) {
+      var rem = (Number(rr.minutes) || 0) * 60 - Math.floor((Date.now() - (rr.segStart || Date.now())) / 1000);
+      var ov = rem < 0, ab = Math.abs(rem);
+      var rm = Math.floor(ab / 60), rs = ab % 60;
+      rn.style.display = '';
+      rn.classList.toggle('over', ov);
+      rn.textContent = String(rr.name || 'Segment').slice(0, 16) + ' ' + (ov ? '+' : '') + rm + ':' + (rs < 10 ? '0' : '') + rs;
+    } else {
+      rn.style.display = 'none';
+    }
   }
 }
 
@@ -1908,6 +1932,7 @@ if (api.onOverlayData) {
     else if (d.type === 'stats') updateStats(d);
     else if (d.type === 'goals') updateGoals(d);
     else if (d.type === 'live') updateLive(d);
+    else if (d.type === 'rundown') { _ovRundown = d; renderLiveBar(); }
     else if (d.type === 'hype') updateHype(d);
     else if (d.type === 'hype-level-up') { triggerHypeAnim(); triggerHypeLevelUpOverlay(d.level); }
     else if (d.type === 'banner') showBigBanner(d);

@@ -5154,7 +5154,16 @@ function _renderOpsChecklist() {
   }).join('');
   host.innerHTML = rows + '<div style="display:flex;gap:6px;margin-top:6px"><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="opsChkAdd()">+ Add item</button><button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="opsChkReset()">Uncheck all</button></div>';
 }
+// Mirror the rundown to the pop-out overlay. State only; the overlay computes
+// the countdown locally each second (same pattern as its live timer).
+function sendOverlayRundown() {
+  if (typeof sendToOverlay !== 'function' || !_ops) return;
+  var r = _ops.rundown || {};
+  var seg = (r.running && _ops.segments && _ops.segments[r.idx]) || null;
+  sendToOverlay({ type: 'rundown', running: !!seg, name: (seg && seg.name) || '', minutes: (seg && seg.minutes) || 0, segStart: r.segStart || 0 });
+}
 function _renderOpsRundown() {
+  if (typeof sendOverlayRundown === 'function') { try { sendOverlayRundown(); } catch (e) {} }
   var host = document.getElementById('opsRundown'); if (!host) return; if (!_ops) _opsLoad();
   var r = _ops.rundown;
   var controls = r.running
@@ -15260,7 +15269,7 @@ function toggleOverlay() {
     _overlayLocked = false; // overlay always starts unlocked
     _updateOverlayLockBtn();
     document.getElementById('overlayBtn').classList.add('on');
-    setTimeout(function() { sendOverlayStats(); sendOverlayHype(); sendOverlayLive(); pushPopCfg(); }, 600);
+    setTimeout(function() { sendOverlayStats(); sendOverlayHype(); sendOverlayLive(); pushPopCfg(); if (typeof sendOverlayRundown === 'function') { try { sendOverlayRundown(); } catch (e) {} } }, 600);
   }).catch(function(err) {
     console.error('[overlay] open failed:', err);
     _overlayOpen = false;
