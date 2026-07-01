@@ -89,7 +89,10 @@ const SCOPES = [
 // A separate, minimal scope set for the OPTIONAL bot account (a second Twitch
 // login the streamer connects so automated messages post under the bot's name
 // instead of their own). It only ever needs to send chat.
+// Kept identical to the auth.aquilo.gg vault's BOT_CONNECT_SCOPES so a bot
+// account connected through either flow carries the same grant.
 const BOT_SCOPES = [
+  'user:read:chat',    // read chat as the bot (cloud bot parity)
   'user:write:chat',   // send chat messages
   'user:bot',          // be recognized as a bot (rate limits + allowed to post)
 ];
