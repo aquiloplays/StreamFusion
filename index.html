@@ -1044,6 +1044,14 @@ body.has-sf-notice { padding-top: 42px !important; }
 .settings-tab{padding:7px 14px;font-size:11px;font-weight:700;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;border-radius:6px 6px 0 0;white-space:nowrap}
 .settings-tab:hover{color:var(--txt);background:var(--surf2)}
 .settings-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+/* Section labels inside the tab strip. flex-basis:100% forces each group onto
+   its own row, turning the old 19-tab wrap-jumble into scannable sections. */
+.settings-tab-grp{flex-basis:100%;font-size:9px;font-weight:800;letter-spacing:1.4px;color:var(--mut);opacity:.6;padding:7px 2px 1px;user-select:none;pointer-events:none}
+.settings-tab-grp:first-child{padding-top:0}
+/* Live-bar rundown chip: current segment + countdown while a rundown runs. */
+.lb-rundown{font-size:11px;font-weight:800;color:var(--accent);background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:3px 8px;margin-left:auto;cursor:pointer;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.lb-rundown:hover{border-color:var(--accent)}
+.lb-rundown.over{color:var(--red);border-color:var(--red)}
 .settings-body{flex:1;overflow-y:auto;padding:0}
 .settings-body::-webkit-scrollbar{width:4px}
 .settings-body::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
@@ -1928,6 +1936,10 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
   <button class="tbtn" id="clipBtn" onclick="createClipNow()" title="Create a Twitch clip (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
   <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info \u2014 edit your title, category &amp; tags (Early Access)"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
+  <!-- Bot status chip: dot = green (running from this app with something
+       enabled), orange (paused on this device), grey (idle). Click opens
+       Settings > Bot. Updated by updateBotStateBtn(). -->
+  <button class="tbtn" id="botStateBtn" onclick="openSettingsTab('bot')" title="Bot"><span id="botStateDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#666;margin-right:5px;vertical-align:middle"></span>Bot</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
@@ -1947,6 +1959,9 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <span class="lb-chip yt" id="lbYt"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M23 7s-.2-1.7-1-2.4c-1-1-2.2-1-2.7-1.1C16.2 3.3 12 3.3 12 3.3s-4.2 0-7.3.2c-.5.1-1.7.1-2.7 1.1C1.2 5.3 1 7 1 7S.8 9 .8 11v1.8c0 2.1.2 4.1.2 4.1s.2 1.7 1 2.4c1 1 2.2 1 2.7 1.1 2 .2 8.3.2 8.3.2s4.2 0 7.3-.2c.5-.1 1.7-.1 2.7-1.1.8-.7 1-2.4 1-2.4s.2-2.1.2-4.1V11c0-2.1-.2-4-.2-4zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg></span>
   <span class="lb-chip tt" id="lbTt"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19.3 6.4a4.8 4.8 0 0 1-3.1-2.8A4.7 4.7 0 0 1 15.8 2h-3.5v13.7a2.9 2.9 0 0 1-2.9 2.7 2.9 2.9 0 0 1-2.9-2.9 2.9 2.9 0 0 1 2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 0 0-.9-.1A6.4 6.4 0 0 0 3 15.5a6.4 6.4 0 0 0 6.4 6.4 6.4 6.4 0 0 0 6.4-6.4v-7a8.3 8.3 0 0 0 4.9 1.6V6.5c-.5 0-1-.1-1.4-.1z"/></svg></span>
   <span class="lb-chip kk" id="lbKk"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg></span>
+  <!-- Rundown chip: current segment + countdown while an Ops rundown runs,
+       visible at all times without opening Settings. Click jumps to Ops. -->
+  <span class="lb-rundown" id="lbRundown" style="display:none" onclick="openSettingsTab('ops')" title="Show rundown: click to open Ops"></span>
   <span class="lb-timer off" id="lbTimer">00:00:00</span>
 </div>
 <!-- Now-playing bar — surfaces when the Aquilo Spotify Widget is registered
@@ -2033,44 +2048,45 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <button class="settings-close" onclick="closeSettingsModal()" title="Close"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
       <div class="settings-tabs" id="settingsTabs">
+        <!-- Grouped nav: each .settings-tab-grp label starts its own row, so
+             the strip reads as four scannable sections instead of a wall of
+             19 wrapping tabs. Red-dot tabs keep their convention. -->
+        <div class="settings-tab-grp">SETUP</div>
         <div class="settings-tab active" data-tab="accounts" onclick="switchSettingsTab('accounts')">Accounts</div>
-        <!-- Patreon-red accent + tiny dot icon so the supporter-only tab is
-             always visible at first glance, even when the tab row wraps. -->
-        <!-- Early Access (Patreon) tab retired 2026-06-30 — Patreon removed. -->
+        <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
+        <!-- Early Access (Patreon) tab retired 2026-06-30 (Patreon removed). -->
         <div class="settings-tab tab-patreon" data-tab="earlyaccess" onclick="switchSettingsTab('earlyaccess')" style="display:none">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Early Access
         </div>
-        <!-- OBS overlays — EA-only. Same red-dot convention as Early Access
-             so supporter-gated features stay visually grouped. -->
         <div class="settings-tab tab-patreon" data-tab="obsoverlays" onclick="switchSettingsTab('obsoverlays')">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>OBS Overlays
         </div>
-        <!-- Theme customization — EA-only. -->
         <div class="settings-tab tab-patreon" data-tab="theme" onclick="switchSettingsTab('theme')">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Theme
         </div>
-        <!-- Discord+ (event posts, records, bot gateway) — EA-only. -->
         <div class="settings-tab tab-patreon" data-tab="discordea" onclick="switchSettingsTab('discordea')">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Discord+
         </div>
-        <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
-        <div class="settings-tab" data-tab="events" onclick="switchSettingsTab('events')">Events</div>
+        <div class="settings-tab-grp">MANAGE</div>
         <div class="settings-tab" data-tab="stream" onclick="switchSettingsTab('stream')">Stream</div>
         <div class="settings-tab" data-tab="schedule" onclick="switchSettingsTab('schedule')">Schedule</div>
         <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
         <div class="settings-tab" data-tab="viewers" onclick="switchSettingsTab('viewers')">Viewers</div>
         <div class="settings-tab" data-tab="analytics" onclick="switchSettingsTab('analytics')">Analytics</div>
         <div class="settings-tab" data-tab="ops" onclick="switchSettingsTab('ops')">Ops</div>
+        <div class="settings-tab-grp">CHAT &amp; ALERTS</div>
+        <div class="settings-tab" data-tab="events" onclick="switchSettingsTab('events')">Events</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
         <div class="settings-tab" data-tab="tts" onclick="switchSettingsTab('tts')">TTS</div>
-        <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
         <div class="settings-tab" data-tab="goals" onclick="switchSettingsTab('goals')">Goals</div>
         <div class="settings-tab" data-tab="checkins" onclick="switchSettingsTab('checkins')">Check-ins</div>
+        <div class="settings-tab" data-tab="blocklist" onclick="switchSettingsTab('blocklist')">Blocklist</div>
+        <div class="settings-tab-grp">APP</div>
+        <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
         <div class="settings-tab" data-tab="appearance" onclick="switchSettingsTab('appearance')">Appearance</div>
         <div class="settings-tab" data-tab="popout" onclick="switchSettingsTab('popout')">Pop Out</div>
         <div class="settings-tab" data-tab="hotkeys" onclick="switchSettingsTab('hotkeys')">Hotkeys</div>
         <div class="settings-tab" data-tab="demo" onclick="switchSettingsTab('demo')">Demo</div>
-        <div class="settings-tab" data-tab="blocklist" onclick="switchSettingsTab('blocklist')">Blocklist</div>
         <div class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">About</div>
       </div>
       <div class="settings-body">
@@ -4370,6 +4386,7 @@ function botSetRunLocal(v) {
   _botRunLocal = !!v;
   try { localStorage.setItem('sf_bot_run_local', _botRunLocal ? '1' : '0'); } catch (e) {}
   if (typeof renderBotTab === 'function') { try { renderBotTab(); } catch (e) {} }
+  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
 }
 
 // ── Automated messages engine ──
@@ -4469,6 +4486,7 @@ function renderBotTab() {
   if (typeof _renderAutomod === 'function') _renderAutomod();
   if (typeof _renderQuotes === 'function') _renderQuotes();
   if (typeof _renderGiveaway === 'function') _renderGiveaway();
+  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -4792,6 +4810,7 @@ var SF_BOT_CFG_VERSION = 1;
 function _botConfigTouch() {
   try { localStorage.setItem('sf_bot_updated', String(Date.now())); } catch (e) {}
   if (typeof _botCfgSchedulePush === 'function') { try { _botCfgSchedulePush(); } catch (e) {} }
+  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
 }
 function _botUpdatedAt() { return Number(localStorage.getItem('sf_bot_updated') || 0) || 0; }
 function sfBotConfig() {
@@ -11686,6 +11705,29 @@ function clearChatFilter() {
 
 // ── UI toggles ────────────────────────────────────────────────────────────────
 function toggleSb() { toggleSettingsModal(); }
+// Open Settings directly on a specific tab (used by the topbar Bot chip and
+// the live-bar rundown chip). No-ops the toggle when Settings is already open.
+function openSettingsTab(tab) {
+  var ov = document.getElementById('settingsOverlay');
+  if (ov && !ov.classList.contains('show')) toggleSettingsModal();
+  switchSettingsTab(tab);
+}
+// Topbar Bot chip dot: orange = paused on this device, green = running with
+// at least one thing enabled (auto-messages, auto-mod, or any command),
+// grey = idle / nothing configured yet.
+function updateBotStateBtn() {
+  var d = document.getElementById('botStateDot');
+  if (!d) return;
+  var active = false;
+  try { active = !!(_botRunLocal && ((_autoMsg && _autoMsg.enabled) || (_automod && _automod.enabled) || (_cmds && _cmds.length))); } catch (e) {}
+  var paused = false;
+  try { paused = !_botRunLocal; } catch (e) {}
+  d.style.background = paused ? '#f0883e' : (active ? 'var(--grn, #5bff95)' : '#666');
+  var b = document.getElementById('botStateBtn');
+  if (b) b.title = paused ? 'Bot paused on this device (settings still sync). Click to manage.'
+    : active ? 'Bot running from this app. Click to manage.'
+    : 'Bot idle: nothing enabled yet. Click to set up commands and automated messages.';
+}
 function toggleSettingsModal() {
   var ov = document.getElementById('settingsOverlay');
   var open = ov.classList.contains('show');
@@ -14401,6 +14443,24 @@ function updateLiveBar() {
       t.textContent = '00:00:00';
     }
   }
+  // Ops rundown chip: piggybacks this 1s tick. Shows the current segment and
+  // its countdown (overtime in red) whenever a rundown is running, so the
+  // streamer stays on schedule without opening Settings.
+  var rc = document.getElementById('lbRundown');
+  if (rc) {
+    var _run = (typeof _ops !== 'undefined') && _ops && _ops.rundown && _ops.rundown.running && _ops.segments && _ops.segments.length;
+    if (_run) {
+      var _seg = _ops.segments[_ops.rundown.idx] || {};
+      var _rem = (Number(_seg.minutes) || 0) * 60 - Math.floor((Date.now() - _ops.rundown.segStart) / 1000);
+      var _over = _rem < 0, _abs = Math.abs(_rem);
+      var _mm = Math.floor(_abs / 60), _ss = _abs % 60;
+      rc.style.display = '';
+      rc.classList.toggle('over', _over);
+      rc.textContent = String(_seg.name || ('Segment ' + (_ops.rundown.idx + 1))).slice(0, 18) + ' ' + (_over ? '+' : '') + _mm + ':' + (_ss < 10 ? '0' : '') + _ss;
+    } else {
+      rc.style.display = 'none';
+    }
+  }
   // If any chip state changed, push immediately to overlay (the 1s tick also
   // keeps the timer in sync on the overlay)
   if (prev.tw !== _liveBar.tw || prev.yt !== _liveBar.yt || prev.tt !== _liveBar.tt || prev.kk !== _liveBar.kk) {
@@ -14956,6 +15016,7 @@ setTimeout(function() {
   _quotesLoad();
   _gwLoadCfg();
   try { _botRunLocal = localStorage.getItem('sf_bot_run_local') !== '0'; } catch (e) {}
+  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
   // Viewer CRM: load + flush to localStorage every 15s (writes are throttled
   // so per-message tracking doesn't hammer disk) and once more on unload.
   _viewersLoad();
