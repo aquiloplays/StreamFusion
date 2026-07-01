@@ -2059,6 +2059,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="schedule" onclick="switchSettingsTab('schedule')">Schedule</div>
         <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
         <div class="settings-tab" data-tab="viewers" onclick="switchSettingsTab('viewers')">Viewers</div>
+        <div class="settings-tab" data-tab="analytics" onclick="switchSettingsTab('analytics')">Analytics</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
         <div class="settings-tab" data-tab="tts" onclick="switchSettingsTab('tts')">TTS</div>
         <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
@@ -2399,6 +2400,15 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="sec-hd">Quotes</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">In chat: <code>!quote</code> shows a random one, <code>!quote 3</code> shows #3, and a mod can <code>!quote add some text</code> or <code>!quote del 3</code>.</div>
             <div id="quoteList"></div>
+          </div>
+        </div>
+
+        <!-- ═══ ANALYTICS TAB ═══ -->
+        <div class="settings-pane" id="pane-analytics">
+          <div class="sec">
+            <div class="sec-hd">Analytics</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:10px">Trends across every stream, combining Twitch, YouTube, Kick and TikTok (via Streamer.bot and TikFinity). A summary is saved automatically each time a stream ends. Stored only on this device.</div>
+            <div id="analyticsBody"></div>
           </div>
         </div>
 
@@ -4786,6 +4796,109 @@ function renderViewersTab() {
       + '<div style="text-align:right;font-size:10px;color:var(--mut);flex-shrink:0">' + (p.msgs || 0) + ' msgs · ' + (p.streams || 0) + 'd' + (Number(p.contributed) ? ' · $' + Number(p.contributed).toFixed(0) : '') + '<br>' + _agoStr(p.last) + '</div>'
       + '</div>';
   }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Analytics. Persist each stream's recap snapshot (which already spans Twitch,
+// YouTube, Kick and TikTok via Streamer.bot + TikFinity) into a local history,
+// then show all-time totals, a per-platform breakdown, best game / best day,
+// and a recent-session list. Local-only (sf_analytics, capped at 200).
+// ══════════════════════════════════════════════════════════════════════════
+var _AN_PLATS = [{ k: 'tw', n: 'Twitch', c: 'var(--tw)' }, { k: 'yt', n: 'YouTube', c: 'var(--yt)' }, { k: 'kk', n: 'Kick', c: 'var(--kk)' }, { k: 'tt', n: 'TikTok', c: 'var(--tt)' }];
+var _DOWFULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function _analyticsLoad() { try { var h = JSON.parse(localStorage.getItem('sf_analytics') || '[]') || []; return Array.isArray(h) ? h : []; } catch (e) { return []; } }
+function _analyticsAdd(snap) {
+  if (!snap) return;
+  var contrib = snap.contributors || {};
+  var pr = function (p) { return (contrib[p] || []).reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0); };
+  var plats = {};
+  ['tw', 'yt', 'kk', 'tt'].forEach(function (p) { plats[p] = { peak: (snap.peakViewers || {})[p] || 0, msgs: (snap.msgsByPlat || {})[p] || 0, follows: (snap.followsByPlat || {})[p] || 0, rev: pr(p) }; });
+  var tips = pr('se');
+  var entry = {
+    at: _streamSession.startTime || Date.now(),
+    durMs: Date.now() - (_streamSession.startTime || Date.now()),
+    game: S.twGame || '',
+    platforms: plats,
+    peakTotal: snap.peakTotal || 0,
+    msgs: snap.totalMsgs || 0, follows: snap.newFollows || 0, subs: snap.newSubs || 0,
+    bits: snap.newBits || 0, coins: snap.newCoins || 0, chPoints: snap.chPoints || 0,
+    tips: tips, rev: plats.tw.rev + plats.yt.rev + plats.kk.rev + plats.tt.rev + tips,
+    topChatter: (snap.top5 && snap.top5[0]) ? snap.top5[0].name : '',
+    topContrib: (snap.topContribs && snap.topContribs[0]) ? { user: snap.topContribs[0].user, amount: snap.topContribs[0].amount } : null
+  };
+  var hist = _analyticsLoad(); hist.push(entry);
+  if (hist.length > 200) hist = hist.slice(hist.length - 200);
+  try { localStorage.setItem('sf_analytics', JSON.stringify(hist)); } catch (e) {}
+}
+function _anCard(label, value, sub) {
+  return '<div style="flex:1;min-width:92px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:9px 11px">'
+    + '<div style="font-size:18px;font-weight:800;color:var(--txt)">' + value + '</div>'
+    + '<div style="font-size:10px;color:var(--mut)">' + label + (sub ? ' · ' + sub : '') + '</div></div>';
+}
+function _anBar(label, val, max, color, valStr) {
+  var pct = max > 0 ? Math.round(val / max * 100) : 0;
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+    + '<span style="width:56px;font-size:11px;color:var(--mut);flex-shrink:0">' + label + '</span>'
+    + '<div style="flex:1;height:14px;background:var(--surf3);border-radius:7px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:7px"></div></div>'
+    + '<span style="width:70px;text-align:right;font-size:11px;color:var(--txt);flex-shrink:0">' + valStr + '</span></div>';
+}
+function renderAnalyticsTab() {
+  var host = document.getElementById('analyticsBody'); if (!host) return;
+  var hist = _analyticsLoad();
+  if (!hist.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0;line-height:1.6">No streams recorded yet. When a stream ends, StreamFusion saves a summary here across Twitch, YouTube, Kick and TikTok. You can also make a test entry with the button below.</div><button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="_analyticsTestEntry()">Add a sample entry</button>'; return; }
+  var totHrs = 0, totMsgs = 0, totFollows = 0, totSubs = 0, totBits = 0, totRev = 0, peakSum = 0;
+  var platAgg = { tw: { msgs: 0, rev: 0, peak: 0, follows: 0 }, yt: { msgs: 0, rev: 0, peak: 0, follows: 0 }, kk: { msgs: 0, rev: 0, peak: 0, follows: 0 }, tt: { msgs: 0, rev: 0, peak: 0, follows: 0 } };
+  var byGame = {}, byDay = {};
+  hist.forEach(function (e) {
+    totHrs += (e.durMs || 0) / 3600000; totMsgs += e.msgs || 0; totFollows += e.follows || 0; totSubs += e.subs || 0; totBits += e.bits || 0; totRev += e.rev || 0; peakSum += e.peakTotal || 0;
+    _AN_PLATS.forEach(function (p) { var pd = (e.platforms || {})[p.k] || {}; platAgg[p.k].msgs += pd.msgs || 0; platAgg[p.k].rev += pd.rev || 0; platAgg[p.k].peak += pd.peak || 0; platAgg[p.k].follows += pd.follows || 0; });
+    if (e.game) { var g = byGame[e.game] || (byGame[e.game] = { streams: 0, peak: 0, follows: 0 }); g.streams++; g.peak += e.peakTotal || 0; g.follows += e.follows || 0; }
+    var d = new Date(e.at).getDay(); var dd = byDay[d] || (byDay[d] = { streams: 0, peak: 0, follows: 0 }); dd.streams++; dd.peak += e.peakTotal || 0; dd.follows += e.follows || 0;
+  });
+  var n = hist.length, avgPeak = Math.round(peakSum / n);
+  var html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+    + _anCard('streams', n)
+    + _anCard('hours', totHrs.toFixed(0))
+    + _anCard('avg viewers', avgPeak)
+    + _anCard('follows', totFollows)
+    + _anCard('subs', totSubs)
+    + _anCard('revenue', '$' + totRev.toFixed(0))
+    + '</div>';
+  // Per-platform breakdown (messages + revenue share)
+  var maxMsgs = Math.max.apply(null, _AN_PLATS.map(function (p) { return platAgg[p.k].msgs; }).concat([1]));
+  var maxRev = Math.max.apply(null, _AN_PLATS.map(function (p) { return platAgg[p.k].rev; }).concat([1]));
+  html += '<div class="sec-hd" style="margin-bottom:6px">Messages by platform</div>';
+  _AN_PLATS.forEach(function (p) { html += _anBar(p.n, platAgg[p.k].msgs, maxMsgs, p.c, platAgg[p.k].msgs.toLocaleString()); });
+  if (maxRev > 1) { html += '<div class="sec-hd" style="margin:12px 0 6px">Revenue by platform</div>'; _AN_PLATS.forEach(function (p) { html += _anBar(p.n, platAgg[p.k].rev, maxRev, p.c, '$' + platAgg[p.k].rev.toFixed(0)); }); }
+  // Best game + best day
+  var gameArr = Object.keys(byGame).map(function (k) { return { game: k, streams: byGame[k].streams, avgPeak: Math.round(byGame[k].peak / byGame[k].streams), follows: byGame[k].follows }; });
+  gameArr.sort(function (a, b) { return b.avgPeak - a.avgPeak; });
+  var dayArr = Object.keys(byDay).map(function (k) { return { day: +k, streams: byDay[k].streams, avgPeak: Math.round(byDay[k].peak / byDay[k].streams) }; });
+  dayArr.sort(function (a, b) { return b.avgPeak - a.avgPeak; });
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">';
+  if (gameArr.length) html += _anCard('best game', esc(gameArr[0].game.slice(0, 18)), gameArr[0].avgPeak + ' avg');
+  if (dayArr.length) html += _anCard('best day', _DOWFULL[dayArr[0].day].slice(0, 3), dayArr[0].avgPeak + ' avg');
+  if (hist[n - 1] && hist[n - 1].topContrib) html += _anCard('top supporter', esc(hist[n - 1].topContrib.user.slice(0, 12)), 'last stream');
+  html += '</div>';
+  // Recent sessions
+  html += '<div class="sec-hd" style="margin:6px 0 6px">Recent streams</div>';
+  html += hist.slice(-12).reverse().map(function (e) {
+    var d = new Date(e.at), dur = Math.round((e.durMs || 0) / 60000);
+    var durS = dur >= 60 ? Math.floor(dur / 60) + 'h ' + (dur % 60) + 'm' : dur + 'm';
+    return '<div style="display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;padding:7px 9px;margin-bottom:5px">'
+      + '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--txt)">' + (_DOWFULL[d.getDay()].slice(0, 3)) + ' ' + (d.getMonth() + 1) + '/' + d.getDate() + (e.game ? ' <span style="color:var(--mut);font-weight:400">· ' + esc(e.game) + '</span>' : '') + '</div>'
+      + '<div style="font-size:10px;color:var(--mut)">' + durS + ' · ' + (e.peakTotal || 0) + ' peak · ' + (e.msgs || 0) + ' msgs</div></div>'
+      + '<div style="text-align:right;font-size:10px;color:var(--mut);flex-shrink:0">+' + (e.follows || 0) + ' foll · ' + (e.subs || 0) + ' subs<br>' + (e.rev ? '$' + Number(e.rev).toFixed(0) : '') + '</div>'
+      + '</div>';
+  }).join('');
+  host.innerHTML = html;
+}
+// Dev/first-run helper so the tab isn't empty before your first real stream.
+function _analyticsTestEntry() {
+  var hist = _analyticsLoad();
+  hist.push({ at: Date.now() - 86400000, durMs: 7200000, game: 'Just Chatting', platforms: { tw: { peak: 120, msgs: 900, follows: 8, rev: 45 }, yt: { peak: 30, msgs: 200, follows: 3, rev: 12 }, kk: { peak: 10, msgs: 60, follows: 1, rev: 0 }, tt: { peak: 40, msgs: 300, follows: 5, rev: 18 } }, peakTotal: 200, msgs: 1460, follows: 17, subs: 6, bits: 1500, coins: 0, chPoints: 4, tips: 5, rev: 80, topChatter: 'sample_viewer', topContrib: { user: 'sample_viewer', amount: 25 } });
+  try { localStorage.setItem('sf_analytics', JSON.stringify(hist)); } catch (e) {}
+  renderAnalyticsTab();
 }
 function _renderGiveaway() {
   var host = document.getElementById('giveawayBox'); if (!host) return;
@@ -11340,6 +11453,7 @@ function switchSettingsTab(tab) {
   if (tab === 'schedule' && typeof renderScheduleTab === 'function') renderScheduleTab();
   if (tab === 'bot' && typeof renderBotTab === 'function') renderBotTab();
   if (tab === 'viewers' && typeof renderViewersTab === 'function') renderViewersTab();
+  if (tab === 'analytics' && typeof renderAnalyticsTab === 'function') renderAnalyticsTab();
   if (tab === 'hotkeys' && typeof _renderStreamHotkeyRows === 'function') _renderStreamHotkeyRows();
   if (tab === 'obsoverlays') renderObsOverlaysTab();
   if (tab === 'theme') renderThemeTab();
@@ -13423,6 +13537,8 @@ function endStreamSession() {
     return;
   }
   generateRecap();
+  // Persist this session's multi-platform summary for the Analytics tab.
+  try { if (typeof _analyticsAdd === 'function') _analyticsAdd(preSnap); } catch (e) {}
   // sendDiscordRecap reads from window._lastRecapData which generateRecap()
   // populates, so it must run after generateRecap.
   sendDiscordRecap();
