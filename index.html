@@ -2060,6 +2060,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
         <div class="settings-tab" data-tab="viewers" onclick="switchSettingsTab('viewers')">Viewers</div>
         <div class="settings-tab" data-tab="analytics" onclick="switchSettingsTab('analytics')">Analytics</div>
+        <div class="settings-tab" data-tab="ops" onclick="switchSettingsTab('ops')">Ops</div>
         <div class="settings-tab" data-tab="sounds" onclick="switchSettingsTab('sounds')">Sounds</div>
         <div class="settings-tab" data-tab="tts" onclick="switchSettingsTab('tts')">TTS</div>
         <div class="settings-tab" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</div>
@@ -2400,6 +2401,20 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="sec-hd">Quotes</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">In chat: <code>!quote</code> shows a random one, <code>!quote 3</code> shows #3, and a mod can <code>!quote add some text</code> or <code>!quote del 3</code>.</div>
             <div id="quoteList"></div>
+          </div>
+        </div>
+
+        <!-- ═══ OPS TAB (checklist + rundown) ═══ -->
+        <div class="settings-pane" id="pane-ops">
+          <div class="sec">
+            <div class="sec-hd">Pre-stream checklist</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Your go-live to-do list. It automatically unchecks itself each time you go live, so it is ready for the next stream.</div>
+            <div id="opsChecklist"></div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Show rundown</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Plan your stream as timed segments (Intro, main content, outro). Start the rundown and StreamFusion counts down each segment so you stay on schedule.</div>
+            <div id="opsRundown"></div>
           </div>
         </div>
 
@@ -4900,6 +4915,90 @@ function _analyticsTestEntry() {
   try { localStorage.setItem('sf_analytics', JSON.stringify(hist)); } catch (e) {}
   renderAnalyticsTab();
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Ops: a pre-stream checklist (auto-resets each go-live) and a live rundown of
+// timed segments (Intro 10m -> Game -> Outro) with a running countdown. Local
+// (sf_ops). The clock ticks via a 1s interval only while the Ops tab is open;
+// state is timestamp-based so it survives tab switches / app restart.
+// ══════════════════════════════════════════════════════════════════════════
+var _ops = null, _opsTick = null;
+function _opsDefault() { return { checklist: [], segments: [], rundown: { running: false, idx: 0, segStart: 0, totalStart: 0 } }; }
+function _opsLoad() { try { _ops = Object.assign(_opsDefault(), JSON.parse(localStorage.getItem('sf_ops') || '{}') || {}); } catch (e) { _ops = _opsDefault(); } if (!Array.isArray(_ops.checklist)) _ops.checklist = []; if (!Array.isArray(_ops.segments)) _ops.segments = []; if (!_ops.rundown) _ops.rundown = _opsDefault().rundown; }
+function _opsSave() { try { localStorage.setItem('sf_ops', JSON.stringify(_ops)); } catch (e) {} }
+// Checklist
+function opsChkAdd() { if (!_ops) _opsLoad(); _ops.checklist.push({ text: '', done: false }); _opsSave(); _renderOpsChecklist(); }
+function opsChkRemove(i) { _ops.checklist.splice(i, 1); _opsSave(); _renderOpsChecklist(); }
+function opsChkText(i, v) { if (_ops.checklist[i]) { _ops.checklist[i].text = v; _opsSave(); } }
+function opsChkToggle(i, v) { if (_ops.checklist[i]) { _ops.checklist[i].done = v; _opsSave(); } }
+function opsChkReset() { if (!_ops) _opsLoad(); _ops.checklist.forEach(function (c) { c.done = false; }); _opsSave(); if (typeof _renderOpsChecklist === 'function') _renderOpsChecklist(); }
+// Segments
+function opsSegAdd() { if (!_ops) _opsLoad(); _ops.segments.push({ name: 'Segment', minutes: 15 }); _opsSave(); _renderOpsRundown(); }
+function opsSegRemove(i) { _ops.segments.splice(i, 1); _opsSave(); _renderOpsRundown(); }
+function opsSegSet(i, f, v) { if (_ops.segments[i]) { _ops.segments[i][f] = v; _opsSave(); if (f === 'minutes') _renderOpsRundown(); } }
+function opsSegMove(i, dir) { var j = i + dir; if (j < 0 || j >= _ops.segments.length) return; var t = _ops.segments[i]; _ops.segments[i] = _ops.segments[j]; _ops.segments[j] = t; _opsSave(); _renderOpsRundown(); }
+// Rundown control
+function rundownStart() { if (!_ops.segments.length) return; _ops.rundown = { running: true, idx: 0, segStart: Date.now(), totalStart: Date.now() }; _opsSave(); _renderOpsRundown(); }
+function rundownStop() { _ops.rundown.running = false; _opsSave(); _renderOpsRundown(); }
+function rundownNext() { if (_ops.rundown.idx < _ops.segments.length - 1) { _ops.rundown.idx++; _ops.rundown.segStart = Date.now(); _opsSave(); _renderOpsRundown(); } }
+function rundownPrev() { if (_ops.rundown.idx > 0) { _ops.rundown.idx--; _ops.rundown.segStart = Date.now(); _opsSave(); _renderOpsRundown(); } }
+function rundownReset() { _ops.rundown = { running: false, idx: 0, segStart: 0, totalStart: 0 }; _opsSave(); _renderOpsRundown(); }
+function _rundownClockHtml() {
+  var r = _ops.rundown, segs = _ops.segments;
+  if (!r.running || !segs.length) return '<div style="font-size:11px;color:var(--mut)">Rundown not running. Add segments below and press Start.</div>';
+  var cur = segs[r.idx] || { name: '', minutes: 0 };
+  var segElapsed = Math.floor((Date.now() - r.segStart) / 1000);
+  var segTotal = (Number(cur.minutes) || 0) * 60;
+  var remain = segTotal - segElapsed, over = remain < 0;
+  var mmss = function (s) { s = Math.abs(s); var m = Math.floor(s / 60), ss = s % 60; return (over ? '+' : '') + m + ':' + (ss < 10 ? '0' : '') + ss; };
+  var totalEl = Math.floor((Date.now() - r.totalStart) / 1000), th = Math.floor(totalEl / 3600), tm = Math.floor((totalEl % 3600) / 60), tsec = totalEl % 60;
+  var pct = segTotal > 0 ? Math.min(100, Math.round(segElapsed / segTotal * 100)) : 0;
+  var next = segs[r.idx + 1];
+  return '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">'
+    + '<div style="font-size:14px;font-weight:800;color:var(--txt)">' + esc(cur.name || 'Segment ' + (r.idx + 1)) + '</div>'
+    + '<div style="font-size:22px;font-weight:900;color:' + (over ? 'var(--red)' : 'var(--txt)') + ';font-variant-numeric:tabular-nums">' + mmss(remain) + '</div>'
+    + '<div style="font-size:10px;color:var(--mut);margin-left:auto">total ' + th + ':' + (tm < 10 ? '0' : '') + tm + ':' + (tsec < 10 ? '0' : '') + tsec + '</div></div>'
+    + '<div style="height:8px;background:var(--surf3);border-radius:5px;overflow:hidden;margin-bottom:6px"><div style="height:100%;width:' + pct + '%;background:' + (over ? 'var(--red)' : 'var(--accent)') + '"></div></div>'
+    + (next ? '<div style="font-size:10px;color:var(--mut)">Up next: ' + esc(next.name || '') + ' (' + (Number(next.minutes) || 0) + 'm)</div>' : '<div style="font-size:10px;color:var(--mut)">Last segment.</div>');
+}
+function _tickRundown() { var el = document.getElementById('rundownClock'); if (el && _ops && _ops.rundown && _ops.rundown.running) el.innerHTML = _rundownClockHtml(); }
+function _renderOpsChecklist() {
+  var host = document.getElementById('opsChecklist'); if (!host) return; if (!_ops) _opsLoad();
+  var rows = _ops.checklist.map(function (c, i) {
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+      + '<input type="checkbox"' + (c.done ? ' checked' : '') + ' onchange="opsChkToggle(' + i + ',this.checked)">'
+      + '<input class="minput" value="' + esc(c.text || '') + '" placeholder="Checklist item" oninput="opsChkText(' + i + ',this.value)" style="flex:1;font-size:12px;padding:5px 8px;background:var(--surf2)' + (c.done ? ';text-decoration:line-through;color:var(--mut)' : '') + '">'
+      + '<button class="tbtn hk-reset" style="font-size:9px;padding:2px 7px" onclick="opsChkRemove(' + i + ')">x</button></div>';
+  }).join('');
+  host.innerHTML = rows + '<div style="display:flex;gap:6px;margin-top:6px"><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="opsChkAdd()">+ Add item</button><button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="opsChkReset()">Uncheck all</button></div>';
+}
+function _renderOpsRundown() {
+  var host = document.getElementById('opsRundown'); if (!host) return; if (!_ops) _opsLoad();
+  var r = _ops.rundown;
+  var controls = r.running
+    ? '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px" onclick="rundownPrev()">Prev</button>'
+      + '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px" onclick="rundownNext()">Next segment</button>'
+      + '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px" onclick="rundownStop()">Stop</button>'
+    : '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px" onclick="rundownStart()">Start rundown</button>'
+      + '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px" onclick="rundownReset()">Reset</button>';
+  var segRows = _ops.segments.map(function (s, i) {
+    var isCur = r.running && r.idx === i;
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;' + (isCur ? 'outline:1px solid var(--accent);border-radius:7px;padding:3px' : '') + '">'
+      + '<span style="font-size:10px;color:var(--mut);width:16px;text-align:right">' + (i + 1) + '</span>'
+      + '<input class="minput" value="' + esc(s.name || '') + '" placeholder="Segment name" oninput="opsSegSet(' + i + ',\'name\',this.value)" style="flex:1;font-size:12px;padding:5px 8px;background:var(--surf2)">'
+      + '<input class="minput" type="number" min="1" max="600" value="' + (Number(s.minutes) || 15) + '" onchange="opsSegSet(' + i + ',\'minutes\',parseInt(this.value,10)||15)" style="width:58px;font-size:12px;padding:5px 6px;background:var(--surf2)"><span style="font-size:10px;color:var(--mut)">m</span>'
+      + '<button class="tbtn" style="font-size:9px;padding:2px 6px" onclick="opsSegMove(' + i + ',-1)">&uarr;</button>'
+      + '<button class="tbtn" style="font-size:9px;padding:2px 6px" onclick="opsSegMove(' + i + ',1)">&darr;</button>'
+      + '<button class="tbtn hk-reset" style="font-size:9px;padding:2px 6px" onclick="opsSegRemove(' + i + ')">x</button></div>';
+  }).join('');
+  var planTotal = _ops.segments.reduce(function (s, x) { return s + (Number(x.minutes) || 0); }, 0);
+  host.innerHTML = '<div id="rundownClock" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px">' + _rundownClockHtml() + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + controls + '</div>'
+    + '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px;margin-bottom:6px">SEGMENTS' + (planTotal ? ' · planned ' + (planTotal >= 60 ? Math.floor(planTotal / 60) + 'h ' + (planTotal % 60) + 'm' : planTotal + 'm') : '') + '</div>'
+    + segRows
+    + '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;margin-top:4px" onclick="opsSegAdd()">+ Add segment</button>';
+}
+function renderOpsTab() { if (!_ops) _opsLoad(); _renderOpsChecklist(); _renderOpsRundown(); }
 function _renderGiveaway() {
   var host = document.getElementById('giveawayBox'); if (!host) return;
   var lvlOpts = ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (_giveaway.minLevel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join('');
@@ -11454,6 +11553,8 @@ function switchSettingsTab(tab) {
   if (tab === 'bot' && typeof renderBotTab === 'function') renderBotTab();
   if (tab === 'viewers' && typeof renderViewersTab === 'function') renderViewersTab();
   if (tab === 'analytics' && typeof renderAnalyticsTab === 'function') renderAnalyticsTab();
+  if (tab === 'ops') { if (typeof renderOpsTab === 'function') renderOpsTab(); if (!_opsTick) _opsTick = setInterval(_tickRundown, 1000); }
+  else if (typeof _opsTick !== 'undefined' && _opsTick) { clearInterval(_opsTick); _opsTick = null; }
   if (tab === 'hotkeys' && typeof _renderStreamHotkeyRows === 'function') _renderStreamHotkeyRows();
   if (tab === 'obsoverlays') renderObsOverlaysTab();
   if (tab === 'theme') renderThemeTab();
@@ -13479,6 +13580,8 @@ function startStreamSession() {
   if (typeof _discordAnnounceFireGoLive === 'function') _discordAnnounceFireGoLive();
   // Apply the matching schedule slot (title / category / tags / announcement).
   if (typeof applyScheduleForGoLive === 'function') { try { applyScheduleForGoLive(); } catch (e) {} }
+  // Fresh stream: uncheck the pre-stream checklist for next time.
+  if (typeof opsChkReset === 'function') { try { opsChkReset(); } catch (e) {} }
   addEvHistory('StreamFusion', 'Stream session started \u2014 recap will be generated when you go offline.', 'tw', false);
   if (typeof updateLiveBar === 'function') updateLiveBar();
   if (typeof sendOverlayLive === 'function') sendOverlayLive();
@@ -14694,6 +14797,7 @@ setTimeout(function() {
   _viewersLoad();
   setInterval(_viewersFlush, 15000);
   window.addEventListener('beforeunload', _viewersFlush);
+  _opsLoad();
   if (window.electronAPI && window.electronAPI.onTwitchBotStatusChanged) window.electronAPI.onTwitchBotStatusChanged(applyTwitchBotStatus);
   if (window.electronAPI && window.electronAPI.twitchBotGetStatus) { window.electronAPI.twitchBotGetStatus().then(applyTwitchBotStatus).catch(function () {}); }
   // Hydrate the pop-out chat-send hotkey from the main process (source
