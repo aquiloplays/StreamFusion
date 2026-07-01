@@ -23,6 +23,13 @@ TWITCH_REDIRECT_URI = "https://auth.aquilo.gg/twitch/callback"
 binding = "TWITCH_SESSIONS"
 id = "f54215e7c65841dc8c9da84c6662250d"
 
+# Shared Aquilo namespace — the unified streamer token VAULT lives here
+# (vault:tw:<twitchId>), so the site + loadout worker (same account) read it
+# directly and only cross-namespace consumers need /twitch/vault/token.
+[[kv_namespaces]]
+binding = "LOADOUT_BOLTS"
+id = "ffa4638187fd4c71b65f62e00b9437fa"
+
 [[routes]]
 pattern = "auth.aquilo.gg"
 custom_domain = true

@@ -102,6 +102,10 @@ export default {
     if (path === '/twitch/api')      return handleTwitchApi(request, env);
     if (path === '/twitch/logout')   return handleTwitchLogout(request, env);
     if (path === '/twitch-token')    return handleTwitchTokenProxy(request, env);
+    // Unified "Aquilo ID" — one broadcaster/bot authorization stored in the
+    // shared vault, reusable by every product.
+    if (path === '/twitch/connect')     return handleTwitchConnect(request, env);
+    if (path === '/twitch/vault/token') return handleVaultToken(request, env);
     return json({ error: 'not_found' }, 404);
   }
 };
@@ -472,6 +476,28 @@ const TWITCH_SCOPES = [
   'clips:edit',
   'user:read:email'
 ].join(' ');
+// Unified "Connect Aquilo to your channel" — the union of scopes every Aquilo
+// product needs (bot chat, subs/bits/points, EventSub reads, moderation, raids/
+// clips/broadcast control). The streamer grants once; every tool reuses it.
+const BROADCASTER_CONNECT_SCOPES = [
+  'user:read:email',
+  'user:read:chat', 'user:write:chat', 'user:bot', 'channel:bot',
+  'channel:read:subscriptions', 'bits:read',
+  'channel:read:redemptions', 'channel:manage:redemptions',
+  'moderator:read:followers', 'channel:read:hype_train',
+  'channel:read:polls', 'channel:manage:polls',
+  'channel:read:predictions', 'channel:manage:predictions',
+  'channel:read:charity', 'channel:read:ads', 'channel:moderate',
+  'moderator:manage:banned_users', 'moderator:manage:chat_messages',
+  'moderator:manage:announcements', 'moderator:read:shoutouts',
+  'moderator:read:suspicious_users',
+  'channel:manage:raids', 'clips:edit',
+  'channel:manage:broadcast', 'channel:manage:ads', 'channel:edit:commercial'
+].join(' ');
+// A separate bot account only needs to read + post chat as itself.
+const BOT_CONNECT_SCOPES = ['user:read:chat', 'user:write:chat', 'user:bot'].join(' ');
+function VAULT_KEY(twitchId) { return 'vault:tw:' + twitchId; }
+
 // Helix path prefixes the session proxy will forward. Keeps a leaked session
 // id from being a skeleton key to the whole API.
 const TWITCH_HELIX_ALLOW = [
@@ -631,6 +657,36 @@ async function handleTwitchCallback(request, env) {
     user_id: u ? u.id : '',
     display_name: u ? u.display_name : ''
   };
+  // Unified "Connect" (broadcaster/bot authorization) → persist to the shared
+  // vault keyed by Twitch id, so every product can act for this streamer. The
+  // dock/identity flows (no state.m) keep the existing session-KV behavior.
+  var mode = state && state.m;
+  if (mode === 'connect' || mode === 'bot') {
+    if (!env.LOADOUT_BOLTS || !u) {
+      return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=not_configured') } });
+    }
+    var ownerId = mode === 'bot' ? String((state && state.o) || '') : u.id;
+    if (!ownerId) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=no_owner') } });
+    var vkey = VAULT_KEY(ownerId);
+    var vraw = await env.LOADOUT_BOLTS.get(vkey);
+    var vault; try { vault = vraw ? JSON.parse(vraw) : {}; } catch (e) { vault = {}; }
+    var sub = {
+      twitchId: u.id, login: u.login, display_name: u.display_name,
+      refresh_token: tok.refresh_token || '', access_token: tok.access_token,
+      expires_at: rec.expires_at, scope: rec.scope, updatedAt: Date.now()
+    };
+    if (mode === 'bot') {
+      vault.bot = sub;
+    } else {
+      vault.twitchId = u.id; vault.login = u.login; vault.display_name = u.display_name;
+      vault.broadcaster = sub;
+      if (!vault.connectedAt) vault.connectedAt = Date.now();
+    }
+    vault.updatedAt = Date.now();
+    await env.LOADOUT_BOLTS.put(vkey, JSON.stringify(vault));
+    return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=' + (mode === 'bot' ? 'bot' : 'ok')), 'Cache-Control': 'no-store' } });
+  }
+
   await env.TWITCH_SESSIONS.put('tw:' + session, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 60 });
   return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=ok'), 'Cache-Control': 'no-store' } });
 }
@@ -701,4 +757,70 @@ async function handleTwitchTokenProxy(request, env) {
   var t = await _twitchExchange(env, params);
   if (!t) return json({ error: 'upstream_unreachable' }, 502);
   return json(t, 200);
+}
+
+// GET /twitch/connect?state=<nonce>&return=<origin>&mode=broadcaster|bot&owner=<id>
+// The unified "Connect Aquilo to your channel" (and optional bot account). Same
+// authorize dance as /twitch/login but with the full BROADCASTER/BOT scope set,
+// force_verify so the streamer can pick the account, and state.m tagged so the
+// shared callback persists to the vault instead of a dock session. `owner` (the
+// broadcaster's Twitch id) is required for bot mode and is set server-side by
+// the aquilo.gg /api/connect/start endpoint from the signed-in session.
+async function handleTwitchConnect(request, env) {
+  if (!env.TWITCH_CLIENT_ID) return json({ error: 'twitch_not_configured' }, 500);
+  var url = new URL(request.url);
+  var session = url.searchParams.get('state') || url.searchParams.get('session') || '';
+  var ret = url.searchParams.get('return') || url.searchParams.get('redirect') || '';
+  var mode = (url.searchParams.get('mode') || 'broadcaster').toLowerCase();
+  var owner = url.searchParams.get('owner') || '';
+  if (!session || session.length < 16) return json({ error: 'missing_or_short_session' }, 400);
+  if (!ret || !_twitchReturnAllowed(ret)) return json({ error: 'return_not_allowed' }, 400);
+  var isBot = mode === 'bot';
+  if (isBot && !owner) return json({ error: 'bot_mode_requires_owner' }, 400);
+  var scopes = isBot ? BOT_CONNECT_SCOPES : BROADCASTER_CONNECT_SCOPES;
+  var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
+  var state = _b64urlEncode(JSON.stringify({ s: session, r: ret, m: isBot ? 'bot' : 'connect', o: owner }));
+  var authUrl = TWITCH_OAUTH + '/authorize'
+    + '?client_id=' + encodeURIComponent(env.TWITCH_CLIENT_ID)
+    + '&redirect_uri=' + encodeURIComponent(redirectUri)
+    + '&response_type=code'
+    + '&scope=' + encodeURIComponent(scopes)
+    + '&force_verify=true'
+    + '&state=' + encodeURIComponent(state);
+  return new Response(null, { status: 302, headers: { 'Location': authUrl, 'Cache-Control': 'no-store' } });
+}
+
+// POST /twitch/vault/token { service, twitchId, role:'broadcaster'|'bot' }
+// Service-secret-guarded. Returns a FRESH broadcaster/bot access token for a
+// connected streamer (auto-refreshing via the stored refresh token). This is
+// how cross-namespace products (rotation-bot, etc.) act as the streamer without
+// running their own OAuth. Same-account consumers can read vault:tw:<id> from
+// LOADOUT_BOLTS directly, but still call this to get a refreshed access token.
+async function handleVaultToken(request, env) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400); }
+  if (!env.VAULT_SERVICE_SECRET || !body || body.service !== env.VAULT_SERVICE_SECRET) {
+    return json({ error: 'unauthorized' }, 401);
+  }
+  if (!env.LOADOUT_BOLTS) return json({ error: 'vault_not_configured' }, 500);
+  var twitchId = String(body.twitchId || '');
+  var role = body.role === 'bot' ? 'bot' : 'broadcaster';
+  if (!twitchId) return json({ error: 'missing_twitchId' }, 400);
+  var vraw = await env.LOADOUT_BOLTS.get(VAULT_KEY(twitchId));
+  if (!vraw) return json({ error: 'not_connected' }, 404);
+  var vault; try { vault = JSON.parse(vraw); } catch (e) { return json({ error: 'corrupt' }, 500); }
+  var sub = role === 'bot' ? vault.bot : vault.broadcaster;
+  if (!sub || !sub.refresh_token) return json({ error: 'role_not_connected', role: role }, 404);
+  if (!sub.access_token || !sub.expires_at || (sub.expires_at - Date.now() < 120000)) {
+    var t = await _twitchExchange(env, { grant_type: 'refresh_token', refresh_token: sub.refresh_token });
+    if (!t || !t.access_token) return json({ error: 'refresh_failed' }, 502);
+    sub.access_token = t.access_token;
+    if (t.refresh_token) sub.refresh_token = t.refresh_token;
+    sub.expires_at = Date.now() + ((t.expires_in || 3600) * 1000);
+    sub.scope = Array.isArray(t.scope) ? t.scope.join(' ') : (t.scope || sub.scope);
+    sub.updatedAt = Date.now();
+    if (role === 'bot') vault.bot = sub; else vault.broadcaster = sub;
+    await env.LOADOUT_BOLTS.put(VAULT_KEY(twitchId), JSON.stringify(vault));
+  }
+  return json({ ok: true, access_token: sub.access_token, expires_at: sub.expires_at, scope: sub.scope, login: sub.login, client_id: env.TWITCH_CLIENT_ID }, 200);
 }
