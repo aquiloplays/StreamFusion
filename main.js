@@ -222,6 +222,7 @@ function _isReservedPopoutAccel(accel) {
 // (further down) watches the corresponding XButton state and emits the
 // toggle event itself.
 let overlayHotkeyMouseButton = null; // null | 'Mouse4' | 'Mouse5'
+let overlayVisHotkeyMouseButton = null; // null | 'Mouse4' | 'Mouse5' (hide/show)
 // 1.5.1: user-configurable mouse-side-button bindings that fire hotbar
 // SB actions. Keys: 'Mouse4' / 'Mouse5'. Values: integer hotbar slot
 // index, or null to leave unbound. Keep separate from the overlay
@@ -310,8 +311,9 @@ function registerAllOverlayHotkeys() {
       });
     } catch (e) { console.error('[overlay] failed to register interact hotkey', overlayHotkeyAccel, e); }
   }
-  // Visibility toggle hotkey
-  if (overlayVisHotkeyAccel) {
+  // Visibility toggle hotkey (mouse side buttons go through the poller, same
+  // as the interact hotkey; registering them here throws a TypeError).
+  if (overlayVisHotkeyAccel && overlayVisHotkeyAccel !== 'Mouse4' && overlayVisHotkeyAccel !== 'Mouse5') {
     try {
       globalShortcut.register(overlayVisHotkeyAccel, toggleOverlayVisibility);
     } catch (e) { console.error('[overlay] failed to register vis hotkey', overlayVisHotkeyAccel, e); }
@@ -354,7 +356,14 @@ function registerOverlayHotkey(accel) {
 }
 
 function registerOverlayVisHotkey(accel) {
+  overlayVisHotkeyMouseButton = null;
   overlayVisHotkeyAccel = accel || '';
+  // Mouse buttons aren't real Electron accelerators; route via the poller.
+  if (accel === 'Mouse4' || accel === 'Mouse5') {
+    overlayVisHotkeyMouseButton = accel;
+    registerAllOverlayHotkeys();
+    return true;
+  }
   registerAllOverlayHotkeys();
   try { return accel ? globalShortcut.isRegistered(accel) : true; } catch (e) { return true; }
 }
@@ -450,6 +459,12 @@ function _dispatchMouseSideButton(btn) {
     // button as the overlay-interact hotkey.
     if (overlayHotkeyMouseButton === btn && overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.webContents.send('overlay-toggle-interact');
+    }
+    // (a2) Overlay hide/show: same poller path for the vis hotkey, which the
+    // renderer lets you bind to Mouse4/Mouse5 (registering those as Electron
+    // accelerators throws, and previously this binding silently did nothing).
+    if (overlayVisHotkeyMouseButton === btn) {
+      toggleOverlayVisibility();
     }
     // (b) Hotbar slot — fires when the user bound this button to an
     // SB action via Settings. The main renderer owns the SB websocket,
