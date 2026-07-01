@@ -2402,6 +2402,13 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">In chat: <code>!quote</code> shows a random one, <code>!quote 3</code> shows #3, and a mod can <code>!quote add some text</code> or <code>!quote del 3</code>.</div>
             <div id="quoteList"></div>
           </div>
+          <div class="sec">
+            <div class="sec-hd">Backup &amp; sync</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Your commands, automated messages, auto-mod, quotes, giveaway and schedule settings as one bundle. Export to back up or move to another device. Cloud sync with aquilo.gg lands here (your bot account sign-in stays on-device and is never exported).</div>
+            <div style="display:flex;gap:6px;margin-bottom:6px"><button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="botCfgExport()">Export</button><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="botCfgImport()">Import</button></div>
+            <textarea id="botCfgIO" placeholder="Bot config JSON appears here on Export; paste one here and press Import." rows="4" style="width:100%;font-size:10px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none;font-family:ui-monospace,monospace"></textarea>
+            <div id="botCfgStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>
+          </div>
         </div>
 
         <!-- ═══ OPS TAB (checklist + rundown) ═══ -->
@@ -4110,7 +4117,7 @@ function _schedLoad() {
   catch (e) { _schedule = _schedDefault(); }
   if (!Array.isArray(_schedule.slots)) _schedule.slots = [];
 }
-function _schedSave() { try { localStorage.setItem('sf_schedule', JSON.stringify(_schedule)); } catch (e) {} }
+function _schedSave() { try { localStorage.setItem('sf_schedule', JSON.stringify(_schedule)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function _schedNewId() { return 's' + Math.random().toString(36).slice(2, 8); }
 function _schedParseTime(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim()); if (!m) return null; var h = +m[1], mi = +m[2]; if (h > 23 || mi > 59) return null; return h * 60 + mi; }
 function _schedFmtTime(mins) { var h = Math.floor(mins / 60), m = mins % 60; var ap = h < 12 ? 'AM' : 'PM'; var h12 = h % 12 || 12; return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ap; }
@@ -4331,7 +4338,7 @@ function _autoMsgLoad() {
   // right at startup; each message then waits a full interval.
   _autoMsg.msgs.forEach(function (m) { m._lastSent = Date.now(); m._linesAtSend = _autoMsgChatCount; });
 }
-function _autoMsgSave() { try { localStorage.setItem('sf_auto_messages', JSON.stringify(_autoMsg)); } catch (e) {} }
+function _autoMsgSave() { try { localStorage.setItem('sf_auto_messages', JSON.stringify(_autoMsg)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function _autoMsgLive() { try { return (typeof _isPlatLive === 'function' && _isPlatLive('tw')) || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active); } catch (e) { return false; } }
 function _autoMsgTick() {
   if (!_autoMsg || !_autoMsg.enabled || !_autoMsg.msgs.length) return;
@@ -4420,7 +4427,7 @@ var _cmdCooldowns = {};
 var _lastBotSent = { text: '', at: 0 };
 var _CMD_LEVELS = { everyone: 0, sub: 1, vip: 2, mod: 3, broadcaster: 4 };
 function _cmdLoad() { try { _cmds = JSON.parse(localStorage.getItem('sf_commands') || '[]') || []; } catch (e) { _cmds = []; } if (!Array.isArray(_cmds)) _cmds = []; }
-function _cmdSave() { try { localStorage.setItem('sf_commands', JSON.stringify(_cmds)); } catch (e) {} }
+function _cmdSave() { try { localStorage.setItem('sf_commands', JSON.stringify(_cmds)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function _botUptime() {
   var start = S.twLiveStartedAt || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active && _streamSession.startTime) || 0;
   if (!start) return 'offline';
@@ -4561,7 +4568,7 @@ function _automodLoad() {
   try { var d = JSON.parse(localStorage.getItem('sf_automod') || '{}') || {}; _automod = _automodDefault(); _automod.enabled = !!d.enabled; if (d.permitSec != null) _automod.permitSec = d.permitSec; if (d.filters) Object.keys(_automod.filters).forEach(function (k) { if (d.filters[k]) Object.assign(_automod.filters[k], d.filters[k]); }); }
   catch (e) { _automod = _automodDefault(); }
 }
-function _automodSave() { try { localStorage.setItem('sf_automod', JSON.stringify(_automod)); } catch (e) {} }
+function _automodSave() { try { localStorage.setItem('sf_automod', JSON.stringify(_automod)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function botPermit(login) { if (!_automod) _automodLoad(); _permits[String(login || '').toLowerCase()] = Date.now() + (Number(_automod.permitSec) || 60) * 1000; }
 function maybeAutoMod(text, u, msgId) {
   if (!_automod) _automodLoad();
@@ -4612,7 +4619,7 @@ function _amAct(key, u, msgId, login) {
 // ══════════════════════════════════════════════════════════════════════════
 var _quotes = null;
 function _quotesLoad() { try { _quotes = JSON.parse(localStorage.getItem('sf_quotes') || '[]') || []; } catch (e) { _quotes = []; } if (!Array.isArray(_quotes)) _quotes = []; }
-function _quotesSave() { try { localStorage.setItem('sf_quotes', JSON.stringify(_quotes)); } catch (e) {} }
+function _quotesSave() { try { localStorage.setItem('sf_quotes', JSON.stringify(_quotes)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
 function _handleQuoteCmd(sp, u) {
   if (!_quotes) _quotesLoad();
   var sub = (sp[1] || '').toLowerCase(), lvl = _botUserLevel(u);
@@ -4711,7 +4718,59 @@ function giveawayDraw() {
   sfSendChat('🎉 Winner: @' + win.name + ' ! Congratulations!');
   _renderGiveaway();
 }
-function gwSetCfg(f, v) { _giveaway[f] = v; _gwSaveCfg(); }
+function gwSetCfg(f, v) { _giveaway[f] = v; _gwSaveCfg(); _botConfigTouch(); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Bot config bundle: one versioned object holding every chat-automation setting
+// (commands, automated messages, auto-mod, quotes, giveaway config, schedule).
+// This is the canonical payload for cloud sync with aquilo.gg AND for local
+// export/import backup. NOTE: the bot ACCOUNT tokens are NOT included here;
+// each device does its own OAuth (tokens must never leave the machine). Viewer
+// CRM + analytics are per-device and are not part of this bundle.
+// ══════════════════════════════════════════════════════════════════════════
+var SF_BOT_CFG_VERSION = 1;
+function _botConfigTouch() { try { localStorage.setItem('sf_bot_updated', String(Date.now())); } catch (e) {} }
+function _botUpdatedAt() { return Number(localStorage.getItem('sf_bot_updated') || 0) || 0; }
+function sfBotConfig() {
+  if (!_cmds) _cmdLoad(); if (!_autoMsg) _autoMsgLoad(); if (!_automod) _automodLoad(); if (!_quotes) _quotesLoad(); if (!_schedule) _schedLoad(); if (!_giveaway) { }
+  return {
+    v: SF_BOT_CFG_VERSION,
+    updatedAt: _botUpdatedAt() || Date.now(),
+    commands: _cmds || [],
+    autoMessages: { enabled: !!_autoMsg.enabled, onlyLive: !!_autoMsg.onlyLive, minLines: Number(_autoMsg.minLines) || 0, msgs: (_autoMsg.msgs || []).map(function (m) { return { id: m.id, text: m.text, intervalMin: m.intervalMin, enabled: m.enabled }; }) },
+    automod: _automod || _automodDefault(),
+    quotes: _quotes || [],
+    giveaway: { keyword: _giveaway.keyword, subLuck: _giveaway.subLuck, minLevel: _giveaway.minLevel },
+    schedule: _schedule || _schedDefault()
+  };
+}
+function applyBotConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return false;
+  try {
+    if (Array.isArray(cfg.commands)) { _cmds = cfg.commands; _cmdSave(); }
+    if (cfg.autoMessages) { if (!_autoMsg) _autoMsgLoad(); _autoMsg.enabled = !!cfg.autoMessages.enabled; _autoMsg.onlyLive = !!cfg.autoMessages.onlyLive; _autoMsg.minLines = Number(cfg.autoMessages.minLines) || 0; _autoMsg.msgs = (cfg.autoMessages.msgs || []).map(function (m) { return { id: m.id || ('s' + Math.random().toString(36).slice(2, 8)), text: m.text || '', intervalMin: Number(m.intervalMin) || 15, enabled: m.enabled !== false, _lastSent: Date.now(), _linesAtSend: _autoMsgChatCount }; }); _autoMsgSave(); }
+    if (cfg.automod) { _automod = Object.assign(_automodDefault(), cfg.automod); _automodSave(); }
+    if (Array.isArray(cfg.quotes)) { _quotes = cfg.quotes; _quotesSave(); }
+    if (cfg.giveaway) { if (!_giveaway) _gwLoadCfg(); _giveaway.keyword = cfg.giveaway.keyword || _giveaway.keyword; _giveaway.subLuck = cfg.giveaway.subLuck || 1; _giveaway.minLevel = cfg.giveaway.minLevel || 'everyone'; _gwSaveCfg(); }
+    if (cfg.schedule) { _schedule = cfg.schedule; _schedSave(); }
+    // Adopt the incoming version's timestamp so we know which side is newer.
+    try { localStorage.setItem('sf_bot_updated', String(cfg.updatedAt || Date.now())); } catch (e) {}
+    if (typeof renderBotTab === 'function') renderBotTab();
+    return true;
+  } catch (e) { console.warn('[bot-config] apply failed', e); return false; }
+}
+function botCfgExport() {
+  var ta = document.getElementById('botCfgIO'); if (!ta) return;
+  ta.value = JSON.stringify(sfBotConfig(), null, 2);
+  var st = document.getElementById('botCfgStatus'); if (st) { st.textContent = 'Exported. Copy this to back up or move to another device.'; st.style.color = 'var(--grn)'; }
+}
+function botCfgImport() {
+  var ta = document.getElementById('botCfgIO'); if (!ta) return;
+  var st = document.getElementById('botCfgStatus');
+  var obj; try { obj = JSON.parse(ta.value); } catch (e) { if (st) { st.textContent = 'That is not valid JSON.'; st.style.color = 'var(--red)'; } return; }
+  var ok = applyBotConfig(obj);
+  if (st) { st.textContent = ok ? 'Imported and applied.' : 'Import failed.'; st.style.color = ok ? 'var(--grn)' : 'var(--red)'; }
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 // Viewer CRM. Per-chatter profiles (msgs, days seen, contributed $, notes,
