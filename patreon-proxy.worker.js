@@ -566,7 +566,10 @@ function _appendHash(urlStr, hash) {
 
 // id.twitch.tv token exchange (authorization_code or refresh_token), with the
 // client_id + secret injected here so neither ever ships in a dock or binary.
-async function _twitchExchange(env, params) {
+// errBox (optional): on failure receives { where, status, body } so a caller
+// can relay Twitch's REAL rejection instead of a generic 502. Callers that
+// don't pass it keep the original null-on-failure contract untouched.
+async function _twitchExchange(env, params, errBox) {
   var form = new URLSearchParams();
   form.set('client_id', env.TWITCH_CLIENT_ID);
   form.set('client_secret', env.TWITCH_CLIENT_SECRET);
@@ -578,8 +581,18 @@ async function _twitchExchange(env, params) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString()
     });
-  } catch (e) { return null; }
-  if (!resp.ok) return null;
+  } catch (e) {
+    if (errBox) { errBox.where = 'fetch'; errBox.status = 0; errBox.body = String((e && e.message) || e); }
+    return null;
+  }
+  if (!resp.ok) {
+    if (errBox) {
+      errBox.where = 'twitch';
+      errBox.status = resp.status;
+      try { errBox.body = await resp.json(); } catch (e) { try { errBox.body = await resp.text(); } catch (e2) { errBox.body = ''; } }
+    }
+    return null;
+  }
   try { return await resp.json(); } catch (e) { return null; }
 }
 
@@ -777,8 +790,14 @@ async function handleTwitchTokenProxy(request, env) {
     if (!body.refresh_token) return json({ error: 'missing_refresh_token' }, 400);
     params.refresh_token = body.refresh_token;
   }
-  var t = await _twitchExchange(env, params);
-  if (!t) return json({ error: 'upstream_unreachable' }, 502);
+  var eb = {};
+  var t = await _twitchExchange(env, params, eb);
+  if (!t) {
+    // Relay what actually happened so the desktop app can show a real reason
+    // (and so an ops curl with a dummy code proves the pipe end-to-end).
+    if (eb.where === 'twitch') return json({ error: 'twitch_rejected', status: eb.status, twitch: eb.body }, 502);
+    return json({ error: 'upstream_unreachable', detail: eb.body || '' }, 502);
+  }
   return json(t, 200);
 }
 
