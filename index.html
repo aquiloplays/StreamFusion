@@ -2195,6 +2195,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-shoutout')" title="Fires a sample 'someone shouted you out' alert.">+ Shoutout</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(145,71,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-charity')" title="Fires a sample charity donation alert.">+ Charity</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(240,136,62,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tw-suspicious')" title="Flags a test user as suspicious; their chat messages get a warning marker.">+ Suspicious user</button>
+              <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(124,92,255,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('aq-product')" title="Fires a sample aquilo.gg product event through both bridge lanes (Streamer.bot contract + activity bus).">+ Aquilo product</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(0,242,234,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tt-gift')">+ TikTok gift</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(83,252,24,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('kk-sub')">+ Kick sub</button>
               <button class="cbtn" style="font-size:11px;padding:5px 10px;background:rgba(124,223,33,.15);border:1px solid var(--bdr);color:var(--txt);border-radius:4px" onclick="testEvent('tip')">+ Tip</button>
@@ -2245,6 +2246,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <div class="ev-group-hd" style="color:var(--ev)">Third-party extensions</div>
               <label class="frow"><span>Other integration events</span><input type="checkbox" id="ev-ext-other" onchange="saveSettings()"></label>
               <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Events from any Streamer.bot source we don't recognize (Crowd Control, custom integrations, etc.) are routed here.</div>
+            </div>
+            <div class="ev-group">
+              <div class="ev-group-hd" style="color:var(--accent)">Aquilo products</div>
+              <label class="frow"><span>Product events (scratch, deaths, PartyUp, Hangman…)</span><input type="checkbox" id="ev-aq" onchange="saveSettings()"></label>
+              <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Happenings from aquilo.gg products (activity bus + Streamer.bot packs). Connect them under Settings &rarr; Integrations.</div>
             </div>
           </div>
         </div>
@@ -2544,6 +2550,18 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
 
         <!-- ═══ INTEGRATIONS TAB ═══ -->
         <div class="settings-pane" id="pane-integrations">
+          <!-- ═══ Aquilo products (events-feed bridge) ═══ -->
+          <div class="sec">
+            <div class="sec-hd">Aquilo products</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Show happenings from aquilo.gg products in the live <strong style="color:var(--txt)">Events</strong> feed: scratch tickets, death counter, Vertibird drops, Boltbound, PvP and community check-ins via the activity bus, plus anything a Streamer.bot product pack reports. PunchCard check-ins and Jukebox song events already have their own integrations.</div>
+            <label class="frow" style="margin-bottom:6px"><span>Activity bus (live stream of product events)</span><input type="checkbox" id="aqBusOn" onchange="aqBusToggle(this.checked)"></label>
+            <div style="display:flex;gap:5px;align-items:center;margin-bottom:4px">
+              <input class="minput" id="aqBusUrlInput" placeholder="https://your-worker/activity/sse" style="font-size:10.5px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
+              <button class="cbtn" onclick="aqBusSetUrl(document.getElementById('aqBusUrlInput').value)" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:10.5px;height:24px;padding:0 10px">Save</button>
+            </div>
+            <div id="aqBusStatus" style="font-size:10px;color:var(--mut);min-height:13px;margin-bottom:4px"></div>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5">Streamer.bot product packs need no setup here: any custom event with <code>source=aquilo</code> + <code>text</code> lands in the feed automatically. Hide everything with the "Aquilo products" filter on the Events tab.</div>
+          </div>
           <div class="sec">
             <div class="sec-hd">Discord Integration</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Send a full stream recap (stats + contributor thanks) to Discord when the stream ends.</div>
@@ -5191,6 +5209,92 @@ function _renderOpsRundown() {
     + '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;margin-top:4px" onclick="opsSegAdd()">+ Add segment</button>';
 }
 function renderOpsTab() { if (!_ops) _opsLoad(); _renderOpsChecklist(); _renderOpsRundown(); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Aquilo products bridge. Two lanes land product happenings in the events
+// feed next to follows/subs/raids:
+//   1) Activity bus (SSE): the aquilo.gg worker's CORS-open /activity/sse
+//      stream that scratch tickets, Boltbound, the death counter, Vertibird
+//      drops, PvP and community check-ins already publish to. Live-only (no
+//      history), so no seen-set is needed.
+//   2) Streamer.bot custom events: any SBAE-driven product (PartyUp, Hangman,
+//      ScratchDrop packs) can raise a General.Custom with source='aquilo';
+//      see the handleSBEvent branch for the argument contract.
+// PunchCard check-ins and Jukebox/Rotation song events already have their own
+// dedicated integrations, so they are not duplicated here.
+// ══════════════════════════════════════════════════════════════════════════
+var AQ_BUS_DEFAULT = 'https://loadout-discord.aquiloplays.workers.dev/activity/sse';
+var _aqBus = { es: null, on: false, backoff: 2000, retryTimer: null };
+function _aqBusUrl() { try { return localStorage.getItem('sf_aq_bus_url') || AQ_BUS_DEFAULT; } catch (e) { return AQ_BUS_DEFAULT; } }
+function _aqBusEnabled() { try { return localStorage.getItem('sf_aq_bus_on') === '1'; } catch (e) { return false; } }
+function _aqBusStatus(msg, tone) {
+  var el = document.getElementById('aqBusStatus');
+  if (el) { el.textContent = msg || ''; el.style.color = tone === 'ok' ? 'var(--grn)' : tone === 'err' ? 'var(--red)' : 'var(--mut)'; }
+}
+// Friendly text per bus kind; unknown kinds fall back to a humanized label so
+// future products show up without an SF update.
+function _aqBusInject(ev) {
+  if (!ev || !ev.kind) return;
+  if (chk('ev-aq')) return;
+  var kind = String(ev.kind);
+  var who = ev.viewer || ev.display || ev.userName || ev.user || '';
+  var game = ev.gameName || ev.game || '';
+  var user = who || 'Aquilo', text = '', big = false;
+  if (kind === 'scratch.purchased') text = who + ' bought a scratch ticket' + (game ? ' (' + game + ')' : '') + (ev.bits ? ' for ' + ev.bits + ' bits' : '');
+  else if (kind === 'scratch.hit') { text = who + ' hit on a scratch ticket!' + (ev.body ? ' ' + ev.body : ''); big = true; }
+  else if (kind === 'scratch.tamper') { user = '⚠ Scratch'; text = 'Tamper flagged' + (who ? ' for ' + who : '') + (ev.reason ? ' (' + ev.reason + ')' : ''); }
+  else if (kind === 'scratch.refund') text = 'Scratch refund' + (who ? ' for ' + who : '') + (ev.reason ? ' (' + ev.reason + ')' : '');
+  else if (kind.indexOf('scratch.') === 0) return;   // start/scratched ticks are noise
+  else if (kind === 'death.recorded') { user = 'Deaths'; text = 'Death #' + (ev.newCount != null ? ev.newCount : '?') + (game ? ' in ' + game : ''); }
+  else if (kind === 'community.checkin') text = who + ' checked in' + (Number(ev.streak) > 1 ? ' (' + ev.streak + ' day streak)' : '');
+  else if (kind === 'streamcheckin.shown') return;   // overlay housekeeping
+  else if (kind.indexOf('vertibird') === 0) { text = 'Vertibird supply drop' + (who ? ' for ' + who : '') + '!'; big = true; }
+  else if (kind.indexOf('pvp') === 0) { text = 'PvP battle' + (who ? ': ' + who : '') + (ev.body ? ' ' + ev.body : ''); big = true; }
+  else {
+    // Generic: "cards.pack_opened" -> "Cards: pack opened"
+    var parts = kind.split('.');
+    text = (parts[0].charAt(0).toUpperCase() + parts[0].slice(1)) + (parts[1] ? ': ' + parts[1].replace(/_/g, ' ') : '')
+      + (who ? ' (' + who + ')' : '') + (game ? ' [' + game + ']' : '');
+  }
+  if (!text) return;
+  pushMsg({ plat: 'ev', isEv: true, evType: 'aquilo', big: big, user: user, text: text });
+}
+function aqBusStart() {
+  if (_aqBus.es || !_aqBusEnabled()) return;
+  var url = _aqBusUrl();
+  if (!url || !/^https:\/\//i.test(url)) { _aqBusStatus('Enter an https:// activity bus URL.', 'err'); return; }
+  try { _aqBus.es = new EventSource(url); } catch (e) { _aqBusStatus('Could not open the stream.', 'err'); return; }
+  _aqBusStatus('connecting…');
+  _aqBus.es.addEventListener('hello', function () { _aqBus.backoff = 2000; _aqBusStatus('connected · live', 'ok'); });
+  _aqBus.es.addEventListener('activity', function (m) {
+    var d; try { d = JSON.parse(m.data); } catch (e) { return; }
+    try { _aqBusInject(d); } catch (e) {}
+  });
+  _aqBus.es.onerror = function () {
+    // EventSource auto-reconnects, but a hard failure (CORS, 404) loops fast;
+    // close and retry ourselves with capped backoff.
+    try { _aqBus.es.close(); } catch (e) {}
+    _aqBus.es = null;
+    if (!_aqBusEnabled()) return;
+    _aqBusStatus('reconnecting…');
+    _aqBus.backoff = Math.min(_aqBus.backoff * 2, 30000);
+    if (_aqBus.retryTimer) clearTimeout(_aqBus.retryTimer);
+    _aqBus.retryTimer = setTimeout(aqBusStart, _aqBus.backoff);
+  };
+}
+function aqBusStop() {
+  if (_aqBus.retryTimer) { clearTimeout(_aqBus.retryTimer); _aqBus.retryTimer = null; }
+  if (_aqBus.es) { try { _aqBus.es.close(); } catch (e) {} _aqBus.es = null; }
+  _aqBusStatus('off');
+}
+function aqBusToggle(on) {
+  try { localStorage.setItem('sf_aq_bus_on', on ? '1' : '0'); } catch (e) {}
+  if (on) { _aqBus.backoff = 2000; aqBusStart(); } else aqBusStop();
+}
+function aqBusSetUrl(v) {
+  try { localStorage.setItem('sf_aq_bus_url', String(v || '').trim()); } catch (e) {}
+  if (_aqBusEnabled()) { aqBusStop(); _aqBus.backoff = 2000; aqBusStart(); }
+}
 function _renderGiveaway() {
   var host = document.getElementById('giveawayBox'); if (!host) return;
   var lvlOpts = ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (_giveaway.minLevel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join('');
@@ -5575,7 +5679,7 @@ var S = {
   }
 };
 
-var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-ext-other','ev-se-tip','hideCmd'];
+var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-ext-other','ev-se-tip','ev-aq','hideCmd'];
 var SOUND_IDS = ['snd-chat','snd-tw-follow','snd-tw-sub','snd-tw-gift','snd-tw-raid','snd-tw-cheer','snd-yt-sub','snd-yt-super','snd-tt-follow','snd-tt-gift','snd-kk-follow','snd-kk-sub','snd-ext','snd-se-tip','snd-kw'];
 
 var ttsEnabled = false;
@@ -6179,6 +6283,12 @@ function testEvent(kind) {
       break;
     case 'tw-suspicious':
       try { handleSBEvent({ source: 'Twitch', type: 'SuspiciousUser' }, { user: 'sketchy_user', status: 'active_monitoring', banEvasion: 'likely' }, true); } catch (e) {}
+      break;
+    case 'aq-product':
+      // Exercises the same General.Custom source='aquilo' contract the
+      // Streamer.bot product packs use, plus a sample activity-bus event.
+      try { handleSBEvent({ source: 'General', type: 'Custom' }, { source: 'aquilo', product: 'hangman', user: 'test_viewer', text: 'test_viewer won Hangman! The word was AQUILO.', big: true }); } catch (e) {}
+      try { if (typeof _aqBusInject === 'function') _aqBusInject({ kind: 'death.recorded', newCount: 42, gameName: 'Test Game' }); } catch (e) {}
       break;
     case 'tt-gift':
       addEvHistory('test_tiktok', 'test_tiktok sent Rose ×10 (10 coins)', 'tt', false);
@@ -10402,6 +10512,23 @@ function handleSBEvent(event, data, fromES) {
   else if (key === 'General.Custom' && data && data.source === 'sf_stream_info') {
     _siHandleResponse(data);
     return;
+  }
+  else if (key === 'General.Custom' && data && data.source === 'aquilo') {
+    // Universal adapter for aquilo.gg products driven by Streamer.bot (the
+    // PartyUp / Hangman / ScratchDrop SBAE packs, and anything future). The
+    // pack raises a custom event with these arguments and it lands in the
+    // events feed next to follows/subs/raids:
+    //   source  'aquilo'            (required; routes here)
+    //   product 'hangman'           (used as the fallback user label)
+    //   text    'Bob won hangman!'  (required; the feed line)
+    //   user    'Bob'               (optional)
+    //   plat    'tw'|'yt'|'kk'|'tt' (optional; default neutral 'ev')
+    //   big     true                (optional; larger feed card)
+    if (chk('ev-aq')) return;
+    var aqU = gu(data) || data.user || data.product || 'Aquilo';
+    var aqText = data.text || data.message || '';
+    if (!aqText) return;
+    pushMsg({ plat: data.plat || 'ev', isEv: true, evType: 'aquilo', big: !!data.big, user: aqU, text: aqText });
   }
   else if (key === 'General.Custom' && (data.name === 'PayPal' || data.name === 'PayPalDonation' || (data.source || '').toLowerCase().includes('paypal'))) {
     handleSETip(data, true);
@@ -15033,6 +15160,13 @@ setTimeout(function() {
   setInterval(_viewersFlush, 15000);
   window.addEventListener('beforeunload', _viewersFlush);
   _opsLoad();
+  // Aquilo products bridge: hydrate the Integrations controls and connect the
+  // activity bus if the streamer turned it on.
+  try {
+    var _aqOn = document.getElementById('aqBusOn'); if (_aqOn) _aqOn.checked = _aqBusEnabled();
+    var _aqU = document.getElementById('aqBusUrlInput'); if (_aqU) _aqU.value = _aqBusUrl();
+    if (_aqBusEnabled()) aqBusStart(); else _aqBusStatus('off');
+  } catch (e) {}
   if (window.electronAPI && window.electronAPI.onTwitchBotStatusChanged) window.electronAPI.onTwitchBotStatusChanged(applyTwitchBotStatus);
   if (window.electronAPI && window.electronAPI.twitchBotGetStatus) { window.electronAPI.twitchBotGetStatus().then(applyTwitchBotStatus).catch(function () {}); }
   // Hydrate the pop-out chat-send hotkey from the main process (source
