@@ -10757,18 +10757,14 @@ function handleSBEvent(event, data, fromES) {
     // Drop noisy housekeeping events that aren't user-facing actions
     if (/RewardUpdated|RewardCreated|RewardDeleted|ChannelUpdate|StreamUpdate|PollCreated|PredictionCreated/i.test(type)) return;
     // Streamer.bot's "Custom" events (General.Custom and friends) are an
-    // internal action-to-action message bus, not viewer events. SB setups and
-    // third-party integrations fire a burst of these on connect, which used to
-    // surface as "General: Custom" spam in the feed at startup. The ones SF
-    // actually consumes (sf_raid_finder, sf_stream_info, PayPal) are handled
-    // above and returned; anything else here with no real user AND no message
-    // is bus noise, so drop it. A custom event that carries a genuine user or
-    // message still shows (so intentional third-party alerts aren't lost).
-    if (/^Custom$/i.test(type)) {
-      var _cuUser = (typeof gu === 'function' ? gu(data) : '') || '';
-      var _cuMsg = data && (data.message || data.text || data.description);
-      if (!_cuUser && !_cuMsg) return;
-    }
+    // internal action-to-action message bus, not viewer events. Anything SF is
+    // meant to show arrives through an explicit contract handled above
+    // (source='aquilo', sf_raid_finder, sf_stream_info, PayPal). Everything
+    // else is bus traffic between actions (printer bot, companions, product
+    // packs) and kept showing up as "General: Custom" cards no matter what
+    // payload it carried, so unrecognized Custom events are now dropped
+    // unconditionally. 1.15.0 only dropped the content-less ones.
+    if (/^Custom$/i.test(type)) return;
     if (/viewer.?count|viewers$|streamstats|presentviewers/i.test(type)) {
       var _vcAny = data.viewers != null ? data.viewers
         : data.viewerCount != null ? data.viewerCount
