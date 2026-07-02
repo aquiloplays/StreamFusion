@@ -1359,6 +1359,15 @@ body.has-sf-notice { padding-top: 42px !important; }
 .settings-modal .settings-tabs::-webkit-scrollbar-thumb{background:var(--surf3);border-radius:3px}
 .settings-modal .settings-tab-grp{flex-basis:auto;font-size:10px;letter-spacing:1.2px;opacity:.7;padding:16px 12px 6px}
 .settings-modal .settings-tab-grp:first-child{padding-top:4px}
+/* Sidebar search */
+.settings-search{
+  flex-shrink:0;margin:2px 2px 8px;padding:8px 11px;
+  font-size:12px;color:var(--txt);
+  background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;
+  outline:none;transition:border-color .15s var(--ease-soft),box-shadow .15s var(--ease-soft);
+}
+.settings-search::placeholder{color:var(--mut);opacity:.8}
+.settings-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.16)}
 .settings-modal .settings-tab{
   display:flex;align-items:center;width:100%;min-height:34px;
   padding:8px 12px;font-size:12px;font-weight:600;line-height:1.25;
@@ -2138,6 +2147,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <button class="settings-close" onclick="closeSettingsModal()" title="Close"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
       <div class="settings-tabs" id="settingsTabs">
+        <!-- Sidebar search: filters pages by their name AND the section
+             headings / row labels inside them (index built lazily from the
+             live DOM, so runtime-injected tabs are searchable too).
+             Enter opens the first match, Esc clears. -->
+        <input class="settings-search" id="settingsSearch" type="text" placeholder="Search settings…" autocomplete="off" spellcheck="false" oninput="settingsSearchFilter(this.value)" onkeydown="settingsSearchKey(event)">
         <!-- Grouped nav: each .settings-tab-grp label starts its own row, so
              the strip reads as four scannable sections instead of a wall of
              19 wrapping tabs. Red-dot tabs keep their convention. -->
@@ -11803,6 +11817,68 @@ function clearChatFilter() {
 
 // ── UI toggles ────────────────────────────────────────────────────────────────
 function toggleSb() { toggleSettingsModal(); }
+// ── Settings search ─────────────────────────────────────────────────────────
+// Filters the sidebar to pages whose NAME or CONTENT matches. The index maps
+// data-tab -> lowercased haystack of the tab label + that pane's section
+// headings and row labels; built lazily from the live DOM so dynamically
+// injected tabs and late-rendered panes are searchable, and dropped whenever
+// the query clears so the next search re-reads fresh DOM.
+var _ssIndex = null;
+function _ssBuildIndex() {
+  _ssIndex = {};
+  document.querySelectorAll('#settingsTabs .settings-tab').forEach(function (t) {
+    var tab = t.dataset.tab;
+    if (!tab) return;
+    var txt = (t.textContent || '') + ' ';
+    var pane = document.getElementById('pane-' + tab);
+    if (pane) {
+      pane.querySelectorAll('.sec-hd, .ev-group-hd, .plbl, .frow > span:first-child').forEach(function (el) {
+        txt += (el.textContent || '') + ' ';
+      });
+    }
+    _ssIndex[tab] = txt.toLowerCase();
+  });
+}
+function settingsSearchFilter(q) {
+  q = String(q || '').trim().toLowerCase();
+  var tabs = document.getElementById('settingsTabs');
+  if (!tabs) return;
+  if (!q) {
+    tabs.querySelectorAll('.settings-tab, .settings-tab-grp').forEach(function (el) { el.style.display = ''; });
+    _ssIndex = null;
+    return;
+  }
+  if (!_ssIndex) _ssBuildIndex();
+  tabs.querySelectorAll('.settings-tab').forEach(function (t) {
+    var hay = _ssIndex[t.dataset.tab || ''] || (t.textContent || '').toLowerCase();
+    t.style.display = hay.indexOf(q) >= 0 ? '' : 'none';
+  });
+  // A group label stays visible only while it still has a visible tab below.
+  var kids = Array.prototype.slice.call(tabs.children);
+  for (var i = 0; i < kids.length; i++) {
+    if (!kids[i].classList || !kids[i].classList.contains('settings-tab-grp')) continue;
+    var any = false;
+    for (var j = i + 1; j < kids.length; j++) {
+      if (kids[j].classList.contains('settings-tab-grp')) break;
+      if (kids[j].classList.contains('settings-tab') && kids[j].style.display !== 'none') { any = true; break; }
+    }
+    kids[i].style.display = any ? '' : 'none';
+  }
+}
+function settingsSearchKey(e) {
+  if (e.key === 'Enter') {
+    var all = document.querySelectorAll('#settingsTabs .settings-tab');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].style.display !== 'none' && all[i].dataset.tab) { switchSettingsTab(all[i].dataset.tab); break; }
+    }
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    var inp = document.getElementById('settingsSearch');
+    if (inp) { inp.value = ''; settingsSearchFilter(''); }
+    e.stopPropagation();
+  }
+}
+
 // Open Settings directly on a specific tab (used by the topbar Bot chip and
 // the live-bar rundown chip). No-ops the toggle when Settings is already open.
 function openSettingsTab(tab) {
@@ -11836,7 +11912,12 @@ function toggleSettingsModal() {
     // Safe to call repeatedly — each .sec-hd is marked with data-help-injected.
     setTimeout(injectSettingsHelpIcons, 0);
   }
-  if (open) closeHelpPopover();
+  if (open) {
+    closeHelpPopover();
+    // Leave no stale filter behind: reopening shows the full sidebar.
+    var ss = document.getElementById('settingsSearch');
+    if (ss && ss.value) { ss.value = ''; settingsSearchFilter(''); }
+  }
 }
 function closeSettingsModal() {
   document.getElementById('settingsOverlay').classList.remove('show');
