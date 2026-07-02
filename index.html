@@ -1325,6 +1325,104 @@ body.has-sf-notice { padding-top: 42px !important; }
 .settings-tab.active::after{width:70%;box-shadow:0 0 8px rgba(124,92,255,.6)}
 .settings-tab:hover:not(.active)::after{width:30%;background:var(--mut)}
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Settings 2.0 (premium sidebar layout). CSS-only conversion: the modal
+   becomes a grid (header spanning both columns, grouped sidebar nav left,
+   scrolling content right), sections become cards, rows become comfortable
+   hover targets, and the old animated tab underline is repurposed as a
+   spring-animated left accent rail. No markup changes, so runtime-injected
+   tabs (e.g. Community) keep working. Placed AFTER the design-token layer
+   so these rules win its same-specificity .settings-tab::after styles.
+   ═══════════════════════════════════════════════════════════════════════ */
+.settings-overlay{background:rgba(4,6,12,.72)}
+.settings-modal{
+  display:grid;
+  grid-template-columns:200px minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr);
+  width:900px;max-width:94vw;
+  height:min(88vh,780px);max-height:88vh;
+  border-radius:14px;border-color:var(--bdr-strong);
+  box-shadow:0 32px 80px -12px rgba(0,0,0,.7),0 0 0 1px rgba(154,130,255,.05),inset 0 1px 0 rgba(255,255,255,.04);
+  overflow:hidden;
+}
+.settings-modal .settings-header{grid-column:1/-1;padding:15px 20px;background:rgba(255,255,255,.015)}
+.settings-modal .settings-header h2{font-size:16px;letter-spacing:.2px}
+.settings-modal .settings-close{width:32px;height:32px;border-radius:8px;font-size:18px}
+/* Sidebar rail */
+.settings-modal .settings-tabs{
+  grid-row:2;grid-column:1;
+  flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:2px;
+  padding:12px 10px 16px;border-bottom:none;border-right:1px solid var(--bdr);
+  background:rgba(0,0,0,.25);overflow-y:auto;overscroll-behavior:contain;
+}
+.settings-modal .settings-tabs::-webkit-scrollbar{width:6px}
+.settings-modal .settings-tabs::-webkit-scrollbar-thumb{background:var(--surf3);border-radius:3px}
+.settings-modal .settings-tab-grp{flex-basis:auto;font-size:10px;letter-spacing:1.2px;opacity:.7;padding:16px 12px 6px}
+.settings-modal .settings-tab-grp:first-child{padding-top:4px}
+.settings-modal .settings-tab{
+  display:flex;align-items:center;width:100%;min-height:34px;
+  padding:8px 12px;font-size:12px;font-weight:600;line-height:1.25;
+  color:var(--mut);border-bottom:none;border-radius:8px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.settings-modal .settings-tab:hover{color:var(--txt);background:rgba(255,255,255,.05)}
+.settings-modal .settings-tab.active{color:#fff;font-weight:700;background:var(--accent-d)}
+.settings-modal .settings-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* Repurpose the underline indicator as a left rail (keeps the spring). */
+.settings-modal .settings-tab::after{
+  left:0;right:auto;top:50%;bottom:auto;
+  width:3px;height:0;transform:translateY(-50%);
+  border-radius:0 3px 3px 0;
+  transition:height .35s var(--ease-spring),box-shadow .25s var(--ease-soft),background .2s var(--ease-soft);
+}
+.settings-modal .settings-tab.active::after{width:3px;height:18px;box-shadow:0 0 8px rgba(124,92,255,.6)}
+.settings-modal .settings-tab:hover:not(.active)::after{width:3px;height:10px;background:var(--mut)}
+/* Content column */
+.settings-modal .settings-body{grid-row:2;grid-column:2;min-width:0}
+.settings-modal .settings-body::-webkit-scrollbar{width:9px}
+.settings-modal .settings-body::-webkit-scrollbar-thumb{background:var(--surf3);border-radius:5px;border:2px solid var(--surf)}
+.settings-modal .settings-pane{padding:22px 26px 30px;max-width:780px}
+/* Sections become cards; a hair lighter than the modal so the surf2 chips
+   and inner cards panes already use stay visually distinct. */
+.settings-modal .settings-pane .sec{
+  background:rgba(255,255,255,.024);border:1px solid var(--bdr);
+  border-radius:12px;padding:16px 18px;margin-bottom:14px;
+}
+.settings-modal .settings-pane .sec:last-child{border:1px solid var(--bdr);margin-bottom:0}
+.settings-modal .settings-pane .sec .sec{background:var(--surf2)}
+.settings-modal .settings-pane .sec-hd{
+  font-size:13px;font-weight:700;color:var(--txt);
+  text-transform:none;letter-spacing:.2px;line-height:1.3;margin-bottom:10px;
+}
+/* Comfortable interactive rows */
+.settings-modal .settings-pane .frow{
+  min-height:36px;padding:7px 10px;margin-bottom:2px;gap:12px;
+  font-size:12.5px;color:var(--mut-strong);border-radius:8px;
+  transition:background .15s var(--ease-soft);
+}
+.settings-modal .settings-pane .frow:hover{background:rgba(255,255,255,.045)}
+.settings-modal .settings-pane label.frow{cursor:pointer}
+.settings-modal .settings-pane .ptog{min-height:36px;padding:7px 10px;border-radius:8px}
+.settings-modal .settings-pane .ptog:hover{background:rgba(255,255,255,.045)}
+.settings-modal .settings-pane .plbl{font-size:12.5px}
+.settings-modal .settings-pane input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.settings-modal .settings-pane input[type="range"]{accent-color:var(--accent)}
+/* Larger pill toggles */
+.settings-modal .settings-pane .tog{width:36px;height:20px;border-radius:10px}
+.settings-modal .settings-pane .tog::after{width:16px;height:16px;top:2px;left:2px}
+.settings-modal .settings-pane .tog.on::after{left:18px}
+/* Lift the ~250 inline-styled 10/11px hints one step without touching
+   markup. Scoped to settings panes; 11.5px etc. are unaffected because the
+   attribute match is the exact substring. */
+.settings-modal .settings-pane [style*="font-size:11px"]{font-size:12px!important}
+.settings-modal .settings-pane [style*="font-size:10px"]{font-size:11px!important}
+/* Narrow-window fallback: slimmer rail, same layout. */
+@media (max-width:820px){
+  .settings-modal{grid-template-columns:160px minmax(0,1fr)}
+  .settings-modal .settings-tab{font-size:11.5px;padding:8px 10px}
+  .settings-modal .settings-pane{padding:16px 16px 24px}
+}
+
 /* Settings pane fade between tabs */
 .settings-pane{opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .25s var(--ease-soft),transform .35s var(--ease-spring)}
 .settings-pane.active{opacity:1;pointer-events:auto;transform:translateY(0)}
