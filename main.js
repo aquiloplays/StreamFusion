@@ -523,7 +523,15 @@ function createWindow() {
       symbolColor: '#adadb8',
       height: 32,
     },
-    show: false, // show after ready-to-show
+    // Show IMMEDIATELY (dark shell via backgroundColor above, so no white
+    // flash). The old show-after-ready-to-show pattern meant a cold start
+    // displayed NOTHING for the seconds the 1MB renderer took to parse and
+    // paint (longer right after an update while AV rescans the exe) — the
+    // recurring "clicked SF, nothing happened, clicked again" report. The
+    // second click only appeared to work because the first launch became
+    // ready around then (log signature: a single second-instance entry per
+    // incident with mainWindow already alive).
+    show: true,
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
@@ -533,9 +541,10 @@ function createWindow() {
     try { mainWindow.setIcon(appIcon); } catch(e) {}
   }
 
-  // Show window once content is ready (avoids flash of white)
+  // Window is already visible (dark shell); once content is ready just
+  // re-apply the icon (Windows quirk) and make sure we're frontmost.
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    try { if (!mainWindow.isDestroyed()) mainWindow.show(); } catch (e) {}
     if (appIcon && !appIcon.isEmpty()) {
       try { mainWindow.setIcon(appIcon); } catch(e) {}
     }
