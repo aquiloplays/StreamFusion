@@ -141,27 +141,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // (Patreon entitlement bridges removed 2026-06-30 — Patreon is retired.)
 
   // ── Discord entitlement (parallel EA path, see discord-auth.js) ─────────
-  // Second route to EA features: if the user connects their Discord and
-  // has the Patron role in aquilo.gg, they're entitled.
-  // Useful when Patreon OAuth misses (Apple private-relay emails, new-
-  // pledge sync lag). Either path alone is enough — renderer ORs them.
-  //
-  // Public entitlement shape returned by discordGetEntitlement() + payload
-  // of `discord-entitlement-changed` event:
-  //   {
-  //     signedIn:     bool,            // a Discord token is cached
-  //     entitled:     bool,            // signedIn AND Patron role in guild
-  //     tier:         'patron' | 'none',
-  //     reason:       'entitled' | 'no_role' | 'not_in_guild'
-  //                   | 'reverify_failed' | 'offline_grace' | 'not_signed_in',
-  //     userName:     string,          // Discord global_name or username
-  //     userId:       string,          // Discord snowflake
-  //     verifiedAt:   number | null
-  //   }
-  discordBeginAuth:              ()  => ipcRenderer.invoke('discord-begin-auth'),
-  discordGetEntitlement:         ()  => ipcRenderer.invoke('discord-get-entitlement'),
-  discordSignOut:                ()  => ipcRenderer.invoke('discord-sign-out'),
-  onDiscordEntitlementChanged:   (fn) => ipcRenderer.on('discord-entitlement-changed', (e, state) => fn(state)),
+  // (Discord entitlement bridges removed with the rest of the supporter
+  // gating: every feature is available to everyone, no sign-in required.
+  // The renderer's old connect/apply callers are all `if (electronAPI.x)`
+  // guarded, so they no-op without these.)
 
   // ── Twitch account (direct Helix: Clip + future; chat/mod/stream-info stay on Streamer.bot) ──
   twitchBeginAuth:       ()   => ipcRenderer.invoke('twitch-begin-auth'),

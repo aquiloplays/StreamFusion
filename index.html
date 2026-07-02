@@ -1662,14 +1662,6 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
           <span class="wl-arrow"><svg class="ic"><use href="#i-arrow"/></svg></span>
         </a>
-        <a class="w-link patreon" href="https://www.patreon.com/cw/aquilo" target="_blank">
-          <div class="wl-left">
-            <!-- Real Patreon logomark (the curved "P" with the filled circle) -->
-            <div class="wl-icon"><svg viewBox="0 0 24 24" fill="#fff"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg></div>
-            <div><div class="wl-label">Patreon</div><div class="wl-sub">Support the creator</div></div>
-          </div>
-          <span class="wl-arrow"><svg class="ic"><use href="#i-arrow"/></svg></span>
-        </a>
       </div>
       <div class="ob-nav"><button class="ob-next" onclick="obNext()">Get Started</button></div>
     </div>
@@ -1935,7 +1927,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
   <button class="tbtn" id="clipBtn" onclick="createClipNow()" title="Create a Twitch clip (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
-  <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info \u2014 edit your title, category &amp; tags (Early Access)"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
+  <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info: edit your title, category &amp; tags"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
   <!-- Bot status chip: dot = green (running from this app with something
        enabled), orange (paused on this device), grey (idle). Click opens
        Settings > Bot. Updated by updateBotStateBtn(). -->
@@ -2054,19 +2046,9 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab-grp">SETUP</div>
         <div class="settings-tab active" data-tab="accounts" onclick="switchSettingsTab('accounts')">Accounts</div>
         <div class="settings-tab" data-tab="connections" onclick="switchSettingsTab('connections')">Connections</div>
-        <!-- Early Access (Patreon) tab retired 2026-06-30 (Patreon removed). -->
-        <div class="settings-tab tab-patreon" data-tab="earlyaccess" onclick="switchSettingsTab('earlyaccess')" style="display:none">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Early Access
-        </div>
-        <div class="settings-tab tab-patreon" data-tab="obsoverlays" onclick="switchSettingsTab('obsoverlays')">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>OBS Overlays
-        </div>
-        <div class="settings-tab tab-patreon" data-tab="theme" onclick="switchSettingsTab('theme')">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Theme
-        </div>
-        <div class="settings-tab tab-patreon" data-tab="discordea" onclick="switchSettingsTab('discordea')">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff424d;margin-right:5px;vertical-align:middle"></span>Discord+
-        </div>
+        <div class="settings-tab" data-tab="obsoverlays" onclick="switchSettingsTab('obsoverlays')">OBS Overlays</div>
+        <div class="settings-tab" data-tab="theme" onclick="switchSettingsTab('theme')">Theme</div>
+        <div class="settings-tab" data-tab="discordea" onclick="switchSettingsTab('discordea')">Discord+</div>
         <div class="settings-tab-grp">MANAGE</div>
         <div class="settings-tab" data-tab="stream" onclick="switchSettingsTab('stream')">Stream</div>
         <div class="settings-tab" data-tab="schedule" onclick="switchSettingsTab('schedule')">Schedule</div>
@@ -2581,7 +2563,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                stream-end the same message gets edited (or deleted) so your
                server doesn't accumulate stale "live" posts. -->
           <div class="sec">
-            <div class="sec-hd">Discord Live-Announce <span style="font-size:10px;font-weight:600;color:var(--accent);margin-left:4px">EARLY ACCESS</span></div>
+            <div class="sec-hd">Discord Live-Announce</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">When you go live, post "<strong style="color:var(--txt)">🔴 Live now</strong>" to the same Discord channel. When the stream ends, SF auto-edits or deletes the message so your channel stays tidy.</div>
             <label class="frow"><span>Enable live announcements</span><input type="checkbox" id="daEnabled" onchange="S.discordAnnounce.enabled=this.checked;saveSettings()"></label>
             <div style="margin-top:8px">
@@ -2627,7 +2609,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           <!-- Smart Shoutout Queue (Tier 2 EA) — settings only; the queue
                itself opens from the Shoutouts toolbar button. -->
           <div class="sec">
-            <div class="sec-hd">Smart Shoutouts <span style="font-size:10px;font-weight:600;color:var(--accent);margin-left:4px">EARLY ACCESS</span></div>
+            <div class="sec-hd">Smart Shoutouts</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">When a Twitch chatter is themselves a live streamer, SF queues them in the <strong style="color:var(--txt)">Shoutouts</strong> toolbar button for one-click <code>/shoutout</code>. Auto-fire skips the click and dispatches as soon as a fellow streamer\u2019s detected.</div>
             <label class="frow"><span>Enable smart shoutout detection</span><input type="checkbox" id="soEnabled" onchange="S.shoutout.enabled=this.checked;saveSettings()"></label>
             <label class="frow"><span>Auto-fire shoutouts (no manual click)</span><input type="checkbox" id="soAutoFire" onchange="S.shoutout.autoFire=this.checked;saveSettings()"></label>
@@ -2877,70 +2859,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
         </div>
 
-        <!-- ═══ EARLY ACCESS TAB ═══ -->
-        <div class="settings-pane" id="pane-earlyaccess">
-          <div class="sec">
-            <div class="sec-hd">Patreon &mdash; Early Access</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
-              Every StreamFusion feature is <strong style="color:var(--txt)">free for everyone</strong> &mdash; nothing is locked behind payment. Supporting on Patreon gets you <strong style="color:var(--txt)">early access</strong>: new features land for <strong style="color:var(--txt)">Tier 2</strong> and <strong style="color:var(--txt)">Tier 3</strong> supporters first, then roll out to everyone shortly after. It also helps fund development. Connecting is optional and never required to use anything.
-            </div>
-            <!-- Status card: shows current connection state. Updated live via
-                 renderEaSettings() whenever the entitlement changes. -->
-            <div id="eaStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
-              <div id="eaStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
-              <div id="eaStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Sign in with Patreon to check your tier.</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button id="eaConnectBtn" onclick="connectPatreon()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#ff424d;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-                <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg>
-                <span id="eaConnectBtnText">Connect Patreon</span>
-              </button>
-              <button id="eaSignOutBtn" onclick="disconnectPatreon()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
-            </div>
-            <div style="font-size:13px;color:var(--txt);margin-top:14px;line-height:1.5;text-align:center;padding:10px 12px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px">
-              Don&rsquo;t have a membership yet?<br>
-              <a href="https://www.patreon.com/cw/aquilo" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;color:#ff424d;text-decoration:none;font-weight:700;font-size:14px">
-                <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><circle cx="15" cy="10" r="7"/><rect x="2" y="2" width="3.5" height="20" rx="0.5"/></svg>
-                Pledge on Patreon &rarr;
-              </a>
-            </div>
-
-            <!-- ═══ Discord Connect (parallel EA path) ═══ -->
-            <!-- Second way to unlock EA. Useful when Patreon OAuth hits
-                 an edge case (Apple private-relay email, brand-new
-                 pledges in status-sync window). If the user has
-                 connected Patreon to Discord (one-click in Patreon
-                 settings), they'll already have the Tier 2 or Tier 3
-                 Patron role in aquilo.gg — checking for that role is a
-                 cleaner signal than re-hitting Patreon's API. Rendered
-                 via renderDiscordEaSettings() below. -->
-            <div style="height:1px;background:var(--bdr);margin:18px 0 14px"></div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#5865F2;flex-shrink:0"><path d="M20.3 4.4A19.8 19.8 0 0016.6 3a13.6 13.6 0 00-.6 1.2 18.4 18.4 0 00-5.4 0A13.6 13.6 0 009.9 3a19.8 19.8 0 00-3.7 1.4A20.8 20.8 0 002.5 16 20 20 0 008.6 19a14.8 14.8 0 001.2-2 13 13 0 01-1.9-.9c.2-.1.3-.3.5-.4a14.1 14.1 0 0012.2 0c.2.1.4.3.5.4a13 13 0 01-1.9.9 14.8 14.8 0 001.2 2 20 20 0 006.1-3 20.8 20.8 0 00-3.7-11.6zM8.9 13.7c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4zm6.2 0c-1.2 0-2.2-1.1-2.2-2.4 0-1.4 1-2.4 2.2-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4z"/></svg>
-              <div style="font-size:14px;font-weight:700;color:var(--txt)">Or connect Discord</div>
-            </div>
-            <div style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:10px">
-              If you&rsquo;ve already linked your Patreon to Discord, StreamFusion can verify your Tier 2/Tier 3 <strong style="color:var(--txt)">Patron role</strong> in aquilo.gg&rsquo;s server instead. Useful if you signed up for Patreon with Apple&rsquo;s private-relay email or hit a sync delay.
-            </div>
-            <div id="discordEaStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
-              <div id="discordEaStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
-              <div id="discordEaStatusSub" style="font-size:10px;color:var(--mut);line-height:1.4">Connect to check your Patron role in aquilo.gg&rsquo;s Discord.</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button id="discordEaConnectBtn" onclick="connectDiscord()" style="flex:1;min-width:140px;padding:8px 12px;border-radius:7px;border:0;background:#5865F2;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-                <svg viewBox="0 0 24 24" style="width:14px;height:14px;flex-shrink:0"><use href="#i-discord"/></svg>
-                <span id="discordEaConnectBtnText">Connect Discord</span>
-              </button>
-              <button id="discordEaSignOutBtn" onclick="disconnectDiscord()" style="padding:8px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
-            </div>
-            <div style="font-size:12px;color:var(--mut);margin-top:10px;line-height:1.5;text-align:center">
-              Not in aquilo.gg&rsquo;s Discord yet?
-              <a href="https://discord.gg/PP5evzsdxP" target="_blank" rel="noopener" style="color:#5865F2;text-decoration:none;font-weight:700">Join here</a>,
-              then link Patreon in Discord settings.
-            </div>
-
-          </div>
-        </div>
+        <!-- (Early Access tab removed: gating retired, every feature is free
+             for everyone with no Patreon or Discord supporter sign-in.) -->
 
         <!-- ═══ OBS OVERLAYS TAB ═══ -->
         <!-- Free for everyone. Browser-source overlays for OBS — chat feed,
@@ -3501,16 +3421,8 @@ function renderDiscordEaSettings() {
 // FUTURE new feature can ship to supporters first. Both applyPatreonState
 // and applyDiscordState call into this.
 function _recomputeCombinedEntitlement() {
-  var patreonOk = !!(S.patreon && S.patreon.entitled);
-  var discordOk = !!(S.discord && S.discord.entitled);
-  S.hasEarlyAccess = patreonOk || discordOk;
-  // Refresh the EA status panels so the connection state shows live.
-  // No-ops if those panes aren't yet mounted. S.hasEarlyAccess stays
-  // computed and available so FUTURE early-access features can gate on
-  // it — no current feature is gated.
-  try { renderEaOnboarding(); } catch (e) {}
-  try { renderEaSettings(); } catch (e) {}
-  try { renderDiscordEaSettings(); } catch (e) {}
+  // Gating retired: everyone has everything, always.
+  S.hasEarlyAccess = true;
 }
 
 function applyPatreonState(state) {
@@ -5516,16 +5428,11 @@ function isFeatureEarlyAccess(key) {
   var d = _featureDef(key);
   return d ? !!d.earlyAccess : true;
 }
-// Unlock = any Patreon link (free linking, any tier — per the EA policy) OR the
-// standard cross-feature EA entitlement (paid Patreon / Discord Patron role).
-function _siFeatureUnlocked() {
-  return !!(S.patreon && S.patreon.signedIn) || !!S.hasEarlyAccess;
-}
-// True when the feature is usable: not EA-gated, or the user has unlocked EA.
-function isFeatureEnabled(key) {
-  if (!isFeatureEarlyAccess(key)) return true;
-  return _siFeatureUnlocked();
-}
+// Gating retired: every feature is available to everyone, no supporter
+// account or sign-in required. These helpers stay only because call sites
+// reference them.
+function _siFeatureUnlocked() { return true; }
+function isFeatureEnabled(key) { return true; }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 var S = {
@@ -5561,7 +5468,7 @@ var S = {
   // state. _recomputeCombinedEntitlement ORs patreon.entitled with
   // discord.entitled to set hasEarlyAccess.
   discord: { signedIn: false, entitled: false, tier: 'none', reason: 'not_signed_in', userName: '', userId: '', verifiedAt: null },
-  hasEarlyAccess: false,
+  hasEarlyAccess: true,   // gating retired: permanently true
   // Theme customization (EA-only). Serialized with the rest of S so it
   // survives restarts like every other setting.
   theme: { accent: '#7c5cff', accent2: '#5bff95', bgDepth: 'default' },
@@ -7491,50 +7398,10 @@ function _siOpenGated() {
   });
 }
 
-// ── Early-access gate ─────────────────────────────────────────────────────────
-// Returns true when it rendered the gate (caller should stop); false to proceed.
-function _siRenderGate() {
-  if (isFeatureEnabled('stream-info-editor')) return false;   // unlocked or flag off
-  _siShowGate();
-  return true;
-}
-function _siShowGate() {
-  var m = document.getElementById('modal');
-  document.getElementById('overlay').classList.add('show');
-  m.innerHTML = ''
-    + '<div class="mh"><svg class="ic"><use href="#i-pencil"/></svg> Stream Info</div>'
-    + '<div class="si-ea-gate">'
-    +   '<div class="si-ea-badge">EARLY ACCESS</div>'
-    +   '<h3>Link your Patreon to unlock</h3>'
-    +   '<p>Edit your Twitch title, category &amp; tags right from StreamFusion — and save favorite presets that sync across your machines. This feature is in early access; linking your Patreon (any tier, free included) unlocks it.</p>'
-    +   '<div class="mbtns" style="justify-content:center">'
-    +     '<button class="btn-x" onclick="closeModal()">Maybe later</button>'
-    +     '<button class="btn-tw" id="si-ea-link" onclick="_siGateLinkPatreon()"><svg class="ic"><use href="#i-heart"/></svg> Link Patreon</button>'
-    +   '</div>'
-    +   '<p style="margin-top:14px;font-size:11px">Already a patron connected through Discord? <a onclick="_siGateConnectDiscord();return false" style="color:var(--accent);cursor:pointer;text-decoration:underline">Connect Discord</a> instead.</p>'
-    + '</div>';
-}
-function _siGateLinkPatreon() {
-  var b = document.getElementById('si-ea-link');
-  if (!window.electronAPI || !window.electronAPI.patreonBeginAuth) { showToast({ message: 'Patreon linking is unavailable here.', kind: 'err' }); return; }
-  if (b) { b.disabled = true; b.innerHTML = '<svg class="ic spin"><use href="#i-refresh"/></svg> Opening Patreon…'; }
-  window.electronAPI.patreonBeginAuth().then(function(state) {
-    if (state) { if (typeof applyPatreonState === 'function') applyPatreonState(state); else { S.patreon = state; } }
-    if (_siFeatureUnlocked()) { showToast({ title: 'Unlocked', message: 'Stream Info is now available.', kind: 'ok' }); _siOpenGated(); }
-    else { if (b) { b.disabled = false; b.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg> Link Patreon'; } showToast({ title: 'Patreon linked', message: 'We couldn’t confirm the link yet — try opening Stream Info again in a moment.', kind: 'warn' }); }
-  }).catch(function() {
-    if (b) { b.disabled = false; b.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg> Link Patreon'; }
-    showToast({ message: 'Patreon linking failed or was cancelled.', kind: 'err' });
-  });
-}
-function _siGateConnectDiscord() {
-  if (!window.electronAPI || !window.electronAPI.discordBeginAuth) { showToast({ message: 'Discord connect is unavailable here.', kind: 'err' }); return; }
-  window.electronAPI.discordBeginAuth().then(function(state) {
-    if (state) { if (typeof applyDiscordState === 'function') applyDiscordState(state); else { S.discord = state; } }
-    if (_siFeatureUnlocked()) { showToast({ title: 'Unlocked', message: 'Stream Info is now available.', kind: 'ok' }); _siOpenGated(); }
-    else { showToast({ title: 'Discord connected', message: 'No Patron role found in the aquilo.gg server.', kind: 'warn' }); }
-  }).catch(function() { showToast({ message: 'Discord connect failed or was cancelled.', kind: 'err' }); });
-}
+// Gating retired: the Stream Info early-access wall ("Link your Patreon to
+// unlock") is gone. The checker stays because callers reference it; it now
+// always proceeds.
+function _siRenderGate() { return false; }
 
 // ── SB action detection ───────────────────────────────────────────────────────
 // Mirror of _rfCheckActions: prefer UUID match (survives renames), fall back to

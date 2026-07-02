@@ -11,10 +11,8 @@ const { spawn } = require('child_process');
 // returns null). Patreon ↔ Discord integration assigns the Patron role
 // automatically in aquilo.gg's Discord when someone pledges — checking
 // that role is a more reliable signal than hitting Patreon's
-// /identity endpoint for edge-case accounts. Entitlement from EITHER path
-// grants EA (renderer OR's them: S.hasEarlyAccess = patreon.entitled ||
-// discord.entitled). See discord-auth.js.
-const discordAuth = require('./discord-auth');
+// (discord-auth entitlement service removed: gating retired, every feature
+// is available to everyone with no supporter sign-in.)
 
 // ── Twitch account (direct Helix: Clip + future) ────────────────────────────
 // Chat, events, mod actions and stream info all come through Streamer.bot;
@@ -1017,8 +1015,6 @@ app.whenReady().then(() => {
   // launch-time check on a small delay so the renderer has had time to
   // wire up its listeners. If the user is already signed in to either,
   // each service starts its own hourly re-verification loop.
-  discordAuth.setMainWindow(mainWindow);
-  discordAuth.registerIpcHandlers();
   twitchAuth.setMainWindow(mainWindow);
   twitchAuth.registerIpcHandlers();
 
@@ -1047,26 +1043,9 @@ app.whenReady().then(() => {
     logToFile('OBS-SERVER-ERR', 'start threw: ' + (e && e.message));
   });
 
-  // Union-of-sources entitlement gate. Either Patreon OR Discord says
-  // entitled ⇒ user is entitled. Track the last emitted state from each
-  // source and recompute the combined flag on every change. Drives:
-  //   - obs-server's gated-page flag
-  //   - auto-disconnect of the Discord bot when BOTH sources lose access
-  var _lastDiscordEntitled = false;
-  function _syncCombinedEntitlement() {
-    var entitled = _lastDiscordEntitled;
-    try { obsServer.setEntitled(entitled); } catch (e) {}
-    if (!entitled) {
-      // Neither path is entitled — drop the discord-bot Gateway connection.
-      // When either source re-activates, the renderer re-issues the
-      // connect command via its existing IPC flow.
-      try { discordBot.disconnectBot(); } catch (e) {}
-    }
-  }
-  discordAuth.onEntitlementChange(function(state) {
-    _lastDiscordEntitled = !!(state && state.entitled);
-    _syncCombinedEntitlement();
-  });
+  // Gating retired: every feature (OBS overlays included) is available to
+  // everyone. The obs-server keeps its entitled-flag API, permanently true.
+  try { obsServer.setEntitled(true); } catch (e) {}
   discordBot.setMainWindow(mainWindow);
 
   // Rotation Relay — subscribes to song events from the streamer's Rotation
@@ -1077,13 +1056,6 @@ app.whenReady().then(() => {
   try { rotationRelay.start(); }
   catch (e) { logToFile('ROTATION-RELAY', 'start threw: ' + (e && e.message)); }
 
-  setTimeout(function() {
-    discordAuth.getEntitlement().then(function(state) {
-      if (state && state.signedIn) discordAuth.startRuntimeChecks();
-    }).catch(function(e) {
-      logToFile('AUTH-ERR', 'launch discord entitlement check failed: ' + (e && e.message));
-    });
-  }, 2500);
 
   // Check for updates (non-blocking). Verbose logging through every stage
   // so 1.4.7+ installs that fail to complete leave a breadcrumb in the
@@ -1139,7 +1111,6 @@ app.on('before-quit', () => {
   isQuitting = true;
   try { globalShortcut.unregisterAll(); } catch (e) {}
   stopCtrlPoller();
-  try { discordAuth.stopRuntimeChecks(); } catch (e) {}
   try { obsServer.stopServer(); } catch (e) {}
   try { discordBot.disconnectBot(); } catch (e) {}
   try { rotationRelay.stop(); } catch (e) {}
@@ -2149,7 +2120,6 @@ ipcMain.on('install-update', () => {
   isQuitting = true;
   try { obsServer.stopServer(); }    catch (e) { logToFile('UPDATE-ERR', 'obsServer.stopServer threw: ' + (e && e.message)); }
   try { discordBot.disconnectBot(); } catch (e) { logToFile('UPDATE-ERR', 'discordBot.disconnectBot threw: ' + (e && e.message)); }
-  try { discordAuth.stopRuntimeChecks(); } catch (e) {}
   try { globalShortcut.unregisterAll(); } catch (e) {}
   // quitAndInstall is a no-op if the update isn't downloaded yet, but
   // we surface the case to the log so we can diagnose post-mortem.
