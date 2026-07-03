@@ -170,6 +170,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   obsBroadcastChat:     (data)        => ipcRenderer.send('obs-broadcast-chat',     data || {}),
   obsBroadcastAlert:    (data)        => ipcRenderer.send('obs-broadcast-alert',    data || {}),
   obsBroadcastShoutout: (data)        => ipcRenderer.send('obs-broadcast-shoutout', data || {}),
+  obsBroadcastStats:    (data)        => ipcRenderer.send('obs-broadcast-stats',    data || {}),
   // Update per-overlay config (chat/alerts/shoutout). Server remembers
   // the last config and replays it to new clients so OBS sources pick up
   // the streamer's settings even after an OBS restart.

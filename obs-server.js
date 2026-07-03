@@ -30,7 +30,10 @@ let heartbeatTimer = null;
 // Last-known state per overlay — replayed to new clients so OBS browser
 // sources render immediately on (re)connect without waiting for the next
 // live event. Covers the "streamer reloads OBS scene" case gracefully.
-let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {} };
+let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {}, viewers: {} };
+// Last stats packet, replayed to a freshly-connected viewers overlay so OBS
+// shows the current count on scene load without waiting for the next tick.
+let lastStats    = null;
 
 // Config persistence. As of 2026-06-09 the per-overlay cfg comes from the
 // aquilo.gg/sf/customize/ page (POST /api/config/<overlay>), not SF's own
@@ -38,7 +41,7 @@ let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {
 // without the streamer reopening the customizer. Path is set by main.js
 // via setConfigDir(); falls back to a sibling file next to this module
 // if running outside Electron (CI smoke tests).
-const VALID_OVERLAYS = ['chat', 'alerts', 'shoutout', 'vertical', 'ticker'];
+const VALID_OVERLAYS = ['chat', 'alerts', 'shoutout', 'vertical', 'ticker', 'viewers'];
 let configDir = __dirname;            // overridden by setConfigDir(app.getPath('userData'))
 let configWriteTimer = null;          // debounce , dragging a slider must not hammer disk
 
@@ -180,7 +183,8 @@ var OVERLAY_ROUTE_MAP = {
   '/alerts':   'alerts',
   '/shoutout': 'shoutout',
   '/vertical': 'vertical',
-  '/ticker':   'ticker'
+  '/ticker':   'ticker',
+  '/viewers':  'viewers'
 };
 
 // Very small landing page for when the streamer hits
@@ -296,7 +300,11 @@ function handleRequest(req, res) {
     // is always true — overlays are free for everyone — and is kept in
     // the payload only so existing overlay clients parse it cleanly.
     var cfg = lastConfig[overlayType] || {};
-    res.write('event: hello\ndata: ' + JSON.stringify({ entitled: true, cfg: cfg }) + '\n\n');
+    var hello = { entitled: true, cfg: cfg };
+    // The viewers overlay wants the current count on scene load, not just
+    // the next tick — replay the last stats packet in its hello.
+    if (overlayType === 'viewers' && lastStats) hello.stats = lastStats;
+    res.write('event: hello\ndata: ' + JSON.stringify(hello) + '\n\n');
 
     var client = { res: res, overlayType: overlayType };
     sseClients.add(client);
@@ -728,6 +736,15 @@ function setConfig(overlayType, cfg) {
   _persistConfigSoon();
 }
 
+// Live viewer counts for the viewers overlay. Stores the last packet for
+// replay-on-connect, then fans out to connected viewers overlays.
+//   stats = { viewers:{tw,yt,tt,kk}, total, show:{tw,yt,tt,kk} }
+function broadcastStats(stats) {
+  if (!stats) return;
+  lastStats = stats;
+  broadcast('stats', stats, 'viewers');
+}
+
 // Retained as a no-op so main.js's existing call site stays valid.
 // OBS overlays are free for everyone — there is no entitlement gate to
 // toggle. (Kept rather than removed to preserve the module's exports.)
@@ -742,6 +759,7 @@ function getUrls() {
     shoutout:    base + '/shoutout',
     vertical:    base + '/vertical',
     ticker:      base + '/ticker',
+    viewers:     base + '/viewers',
     // The renderer compares port vs defaultPort to decide whether to
     // show a "port shifted — update your OBS sources" banner. Set after
     // a successful bind so the value is always live.
@@ -757,6 +775,7 @@ module.exports = {
   startServer:      startServer,
   stopServer:       stopServer,
   broadcast:        broadcast,
+  broadcastStats:   broadcastStats,
   setConfig:        setConfig,
   setConfigDir:     setConfigDir,  // main.js calls this before startServer
   setEntitled:      setEntitled,

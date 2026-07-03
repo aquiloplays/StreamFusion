@@ -16685,6 +16685,28 @@ function sendOverlayStats() {
     ttLikes: S.ttLikes || 0,
     revenue: rev
   });
+  sendObsStats();
+}
+
+// Feed the OBS "Live viewers" browser-source overlay (aquilo.gg/sf/overlay/
+// viewers). Same per-platform viewer numbers + visibility as the pop-out,
+// plus a pre-summed total (only platforms shown AND with a live count
+// contribute). StreamFusion is the only place with TikTok viewers (via
+// TikFinity), so this cloud-unreachable count rides along here.
+function sendObsStats() {
+  if (!window.electronAPI || !window.electronAPI.obsBroadcastStats) return;
+  var sh = S.show, v = S.viewers || {};
+  var out = { tw: null, yt: null, tt: null, kk: null };
+  var total = 0;
+  ['tw', 'yt', 'tt', 'kk'].forEach(function (k) {
+    if (v[k] != null && sh[k] !== false) { out[k] = v[k]; total += Number(v[k]) || 0; }
+  });
+  window.electronAPI.obsBroadcastStats({
+    viewers: out,
+    show: { tw: sh.tw, yt: sh.yt, tt: sh.tt, kk: sh.kk },
+    total: total,
+    ts: Date.now()
+  });
 }
 function sendOverlayHype() {
   sendToOverlay({ type: 'hype', active: _htState.active, level: _htState.level, total: _htState.total, goal: _htState.goal, timer: document.getElementById('htTimer') ? document.getElementById('htTimer').textContent : '' });

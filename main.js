@@ -1143,6 +1143,9 @@ ipcMain.on('obs-broadcast-alert', function(event, data) {
 ipcMain.on('obs-broadcast-shoutout', function(event, data) {
   try { obsServer.broadcast('shoutout', data, 'shoutout'); } catch (e) {}
 });
+ipcMain.on('obs-broadcast-stats', function(event, data) {
+  try { obsServer.broadcastStats(data); } catch (e) {}
+});
 
 // ── Rotation Relay IPC ──────────────────────────────────────────────────────
 // The renderer drives lifecycle (set room key, toggle on/off) and listens for
