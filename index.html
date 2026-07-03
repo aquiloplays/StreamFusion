@@ -10377,6 +10377,7 @@ function handleSBEvent(event, data, fromES) {
     var ksn = gu(data); var ksnText = ksn + ' subscribed on Kick!';
     var _ksnAv = _resolveEvAvatar('kk', data.user || data.subscriber, ksn);
     maybeSound('snd-kk-sub', 'sub'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'sub', big: true, user: ksn, text: ksnText, avatar: _ksnAv }); setPinnedEvent(ksn, ksnText, 'kk'); S.stats.kkSubs++; S.stats.kkSubRev += 4.74; updateStreamStats(); trackContributor('kk', ksn, 4.74);
+    sfHypePush('kk', SF_HYPE_POINTS.kickSub, ksn, { kind: 'sub', ref: _kkRef(data.subscriber || data.user || data) });
     discordPostKickSub(ksn);
   } else if (key === 'Kick.GiftSub') {
     if (chk('ev-kk-gift')) return;
@@ -10385,6 +10386,7 @@ function handleSBEvent(event, data, fromES) {
     var krc = (data.recipient && (data.recipient.name || data.recipient.username || data.recipient.displayName)) || data.recipientName || '?';
     var _kgsAv = _resolveEvAvatar('kk', _kgo, kgn);
     var kgsText = kgn + ' gifted a sub to ' + krc + ' on Kick!'; maybeSound('snd-kk-sub', 'gift'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'gift', big: true, user: kgn, text: kgsText, avatar: _kgsAv }); setPinnedEvent(kgn, kgsText, 'kk'); S.stats.kkSubs++; S.stats.kkSubRev += 4.74; updateStreamStats(); trackContributor('kk', kgn, 4.74);
+    sfHypePush('kk', SF_HYPE_POINTS.kickSub, kgn, { kind: 'gift', ref: _kkRef(_kgo) });
   } else if (key === 'Kick.GiftBomb') {
     if (chk('ev-kk-gift')) return;
     var _kgbo = data.gifter || {};
@@ -10394,6 +10396,7 @@ function handleSBEvent(event, data, fromES) {
     var _kgbRecipSuffix = _kgbRecips.length ? ' \u2014 to ' + _formatRecipientList(_kgbRecips) : '';
     var _kgbAv = _resolveEvAvatar('kk', _kgbo, kgb);
     var kgbText = kgb + ' gifted ' + kgc + ' subs on Kick!' + _kgbRecipSuffix; maybeSound('snd-kk-sub', 'gift'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'gift', big: true, user: kgb, text: kgbText, avatar: _kgbAv }); setPinnedEvent(kgb, kgbText, 'kk'); var kkgbNum = parseInt(kgc) || 0; S.stats.kkSubs += kkgbNum; S.stats.kkSubRev += kkgbNum * 4.74; updateStreamStats(); trackContributor('kk', kgb, kkgbNum * 4.74);
+    if (kkgbNum > 0) sfHypePush('kk', SF_HYPE_POINTS.kickSub * kkgbNum, kgb, { kind: 'gift', ref: _kkRef(_kgbo) });
     discordPostGift(kgb, kkgbNum, 'kk');
     updateRecord('kkGift', kgb, kkgbNum);
   } else if (key === 'Kick.Raid') {
@@ -10836,7 +10839,7 @@ function handleTFEvent(d) {
     var _perGift = data.diamondCount || data.giftCost || 0;
     var _gCoins = _perGift * (data.repeatCount || 1);
     var _isMidStreak = Number(data.giftType) === 1 && (data.repeatEnd === false || data.repeatEnd === 'false' || data.repeatEnd === 0);
-    if (!_isMidStreak) { S.stats.ttCoins += _gCoins; updateStreamStats(); trackContributor('tt', user, _gCoins * 0.005); sfHypePush('tt', _gCoins * 0.05, user); }
+    if (!_isMidStreak) { S.stats.ttCoins += _gCoins; updateStreamStats(); trackContributor('tt', user, _gCoins * 0.005); sfHypePush('tt', _gCoins * SF_HYPE_POINTS.tiktokPerCoin, user, { kind: 'gift' }); }
     if (chk('ev-tt-gift')) return;
     if (_isMidStreak) return;
     var _ttGiftImg = data.giftPictureUrl || data.giftImage || data.pictureUrl || data.imageUrl || '';
@@ -16701,15 +16704,31 @@ function sendOverlayStats() {
 // bot's hype.js so all platforms score consistently.
 var _hypeUrl = '';
 try { _hypeUrl = localStorage.getItem('sf_hype_url') || ''; } catch (e) {}
-function sfHypePush(platform, points, name) {
+// opts: { kind, ref }. `ref` (kk:/yt:<id>) is the contributor's wallet identity
+// so the cloud train can pay them the all-aboard payout and let them win the
+// throne. TikTok gifters have no cloud identity, so they contribute display-
+// only (no ref) — still counted, still level the train, just not payable.
+function sfHypePush(platform, points, name, opts) {
   if (!_hypeUrl || !(points > 0)) return;
+  opts = opts || {};
+  var body = { platform: platform, points: Math.round(points), name: String(name || 'someone').slice(0, 40), kind: String(opts.kind || '').slice(0, 20) };
+  if (typeof opts.ref === 'string' && /^(tw|kk|yt):[\w-]{1,50}$/.test(opts.ref)) body.ref = opts.ref;
   try {
     fetch(_hypeUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ platform: platform, points: Math.round(points), name: String(name || 'someone').slice(0, 40) })
+      body: JSON.stringify(body)
     }).catch(function () {});
   } catch (e) {}
+}
+// SF's hype-train orange point weights mirror the bot's HYPE_POINTS so all
+// platforms score the same train consistently.
+var SF_HYPE_POINTS = { kickSub: 10, tiktokPerCoin: 0.05 };
+// Best-effort Kick wallet ref from an event payload (id shape varies by source).
+function _kkRef(o) {
+  if (!o) return null;
+  var id = o.id || o.userId || o.user_id || o.kickUserId || o.broadcaster_user_id || (o.user && (o.user.id || o.user.userId));
+  return id ? ('kk:' + String(id).replace(/[^\w-]/g, '').slice(0, 50)) : null;
 }
 
 function sendObsStats() {
