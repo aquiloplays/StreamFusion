@@ -16705,6 +16705,10 @@ function sendObsStats() {
     viewers: out,
     show: { tw: sh.tw, yt: sh.yt, tt: sh.tt, kk: sh.kk },
     total: total,
+    // Extra metrics for the goals overlay (it picks one; the viewers overlay
+    // ignores these). Follows/subs come straight from the live stat tallies.
+    follows: { tw: S.stats.follows.tw, yt: S.stats.follows.yt, kk: S.stats.follows.kk, tt: S.stats.follows.tt },
+    subs: { tw: S.stats.twSubs, kk: S.stats.kkSubs, yt: S.stats.ytMembers || 0 },
     ts: Date.now()
   });
 }

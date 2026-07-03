@@ -30,7 +30,7 @@ let heartbeatTimer = null;
 // Last-known state per overlay — replayed to new clients so OBS browser
 // sources render immediately on (re)connect without waiting for the next
 // live event. Covers the "streamer reloads OBS scene" case gracefully.
-let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {}, viewers: {} };
+let lastConfig   = { chat: {}, alerts: {}, shoutout: {}, vertical: {}, ticker: {}, viewers: {}, goals: {} };
 // Last stats packet, replayed to a freshly-connected viewers overlay so OBS
 // shows the current count on scene load without waiting for the next tick.
 let lastStats    = null;
@@ -41,7 +41,7 @@ let lastStats    = null;
 // without the streamer reopening the customizer. Path is set by main.js
 // via setConfigDir(); falls back to a sibling file next to this module
 // if running outside Electron (CI smoke tests).
-const VALID_OVERLAYS = ['chat', 'alerts', 'shoutout', 'vertical', 'ticker', 'viewers'];
+const VALID_OVERLAYS = ['chat', 'alerts', 'shoutout', 'vertical', 'ticker', 'viewers', 'goals'];
 let configDir = __dirname;            // overridden by setConfigDir(app.getPath('userData'))
 let configWriteTimer = null;          // debounce , dragging a slider must not hammer disk
 
@@ -184,7 +184,8 @@ var OVERLAY_ROUTE_MAP = {
   '/shoutout': 'shoutout',
   '/vertical': 'vertical',
   '/ticker':   'ticker',
-  '/viewers':  'viewers'
+  '/viewers':  'viewers',
+  '/goals':    'goals'
 };
 
 // Very small landing page for when the streamer hits
@@ -742,7 +743,7 @@ function setConfig(overlayType, cfg) {
 function broadcastStats(stats) {
   if (!stats) return;
   lastStats = stats;
-  broadcast('stats', stats, 'viewers');
+  broadcast('stats', stats, ['viewers', 'goals']);
 }
 
 // Retained as a no-op so main.js's existing call site stays valid.
