@@ -418,6 +418,30 @@ body.has-sf-notice { padding-top: 42px !important; }
 .char-count.warn{color:var(--org)}.char-count.over{color:var(--red)}
 .statbar{display:flex;gap:10px;align-items:center;padding:5px 12px;background:var(--surf);border-top:1px solid var(--bdr);font-size:11px;color:var(--mut);flex-shrink:0;flex-wrap:wrap}
 .statbar span{font-weight:700;color:var(--txt)}
+/* TICKER BAR (above chat + events) */
+.sf-ticker{display:flex;align-items:stretch;gap:1px;background:var(--surf2);border-bottom:1px solid var(--bdr);flex-shrink:0;font-size:11.5px;overflow:hidden}
+.sf-ticker-seg{display:flex;align-items:center;gap:6px;padding:5px 10px;min-width:0;white-space:nowrap;overflow:hidden}
+.sf-ticker-seg .ic{width:13px;height:13px;flex-shrink:0}
+.sf-ticker-ad{background:rgba(240,136,62,.12);color:var(--org,#f0883e);font-weight:700;flex-shrink:0}
+.sf-ticker-ad.live{background:rgba(240,136,62,.22);animation:sfTickPulse 1.4s ease-in-out infinite}
+.sf-ticker-ad.soon{color:#ffb347}
+@keyframes sfTickPulse{0%,100%{opacity:1}50%{opacity:.55}}
+.sf-ticker-pin{flex:1;min-width:0;color:var(--mut)}
+.sf-ticker-pin .ic{color:var(--ev)}
+.sf-ticker-pin span{overflow:hidden;text-overflow:ellipsis}
+.sf-ticker-pin b{color:var(--txt);font-weight:700}
+.sf-ticker-viewers{display:flex;align-items:center;gap:5px;padding:5px 11px;background:transparent;border:none;border-left:1px solid var(--bdr);color:var(--mut);font-size:11.5px;font-weight:700;cursor:pointer;flex-shrink:0;transition:background .15s ease,color .15s ease}
+.sf-ticker-viewers:hover{background:rgba(255,255,255,.06);color:var(--txt)}
+.sf-ticker-viewers .ic{width:14px;height:14px}
+/* Current-viewers modal list */
+.vw-list{display:flex;flex-direction:column;gap:1px;max-height:52vh;overflow-y:auto;margin-top:8px;border:1px solid var(--bdr);border-radius:8px}
+.vw-row{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px}
+.vw-row:nth-child(odd){background:rgba(255,255,255,.03)}
+.vw-row .ic{width:14px;height:14px;flex-shrink:0}
+.vw-row .vw-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt);font-weight:600}
+.vw-plat-tw{color:var(--tw)}.vw-plat-yt{color:var(--yt)}.vw-plat-tt{color:var(--tt)}.vw-plat-kk{color:var(--kk)}
+.vw-empty{padding:22px 10px;text-align:center;color:var(--mut);font-size:13px}
+.vw-search{width:100%;box-sizing:border-box;margin-top:4px;padding:8px 10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-size:13px}
 /* PIN BAR */
 .pins-bar{display:none;flex-direction:column;gap:3px;padding:5px 8px;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;max-height:140px;overflow-y:auto}
 .pins-bar.has-pins{display:flex}
@@ -2302,6 +2326,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           <div class="sec">
             <div class="sec-hd">Event Filters</div>
             <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
+            <label class="frow"><span>Ticker bar (ads + pinned event, above chat)</span><input type="checkbox" id="sfTickerOn" checked onchange="saveSettings(); sfTickerApply();"></label>
             <div class="ev-group"><div class="ev-group-hd tw">Twitch</div>
               <label class="frow"><span>Follows</span><input type="checkbox" id="ev-tw-follow" onchange="saveSettings()"></label>
               <label class="frow"><span>Subs &amp; Resubs</span><input type="checkbox" id="ev-tw-sub" onchange="saveSettings()"></label>
@@ -2311,11 +2336,13 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <label class="frow"><span>Redemptions</span><input type="checkbox" id="ev-tw-redeem" onchange="saveSettings()"></label>
               <label class="frow"><span>Timeouts &amp; Bans</span><input type="checkbox" id="ev-tw-mod" onchange="saveSettings()"></label>
               <label class="frow"><span>Announcements</span><input type="checkbox" id="ev-tw-announce" onchange="saveSettings()"></label>
+              <label class="frow"><span>User Joined <span style="opacity:.6">(first chat)</span></span><input type="checkbox" id="ev-tw-join" onchange="saveSettings()"></label>
             </div>
             <div class="ev-group"><div class="ev-group-hd yt">YouTube</div>
               <label class="frow"><span>Subscriptions</span><input type="checkbox" id="ev-yt-sub" onchange="saveSettings()"></label>
               <label class="frow"><span>Super Chats</span><input type="checkbox" id="ev-yt-super" onchange="saveSettings()"></label>
               <label class="frow"><span>Memberships</span><input type="checkbox" id="ev-yt-member" onchange="saveSettings()"></label>
+              <label class="frow"><span>User Joined <span style="opacity:.6">(first chat)</span></span><input type="checkbox" id="ev-yt-join" onchange="saveSettings()"></label>
             </div>
             <div class="ev-group"><div class="ev-group-hd tt">TikTok</div>
               <label class="frow"><span>Follows</span><input type="checkbox" id="ev-tt-follow" onchange="saveSettings()"></label>
@@ -2331,6 +2358,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <label class="frow"><span>Gift Subs</span><input type="checkbox" id="ev-kk-gift" onchange="saveSettings()"></label>
               <label class="frow"><span>Raids</span><input type="checkbox" id="ev-kk-raid" onchange="saveSettings()"></label>
               <label class="frow"><span>Channel-Point Redemptions</span><input type="checkbox" id="ev-kk-redeem" onchange="saveSettings()"></label>
+              <label class="frow"><span>User Joined <span style="opacity:.6">(first chat)</span></span><input type="checkbox" id="ev-kk-join" onchange="saveSettings()"></label>
             </div>
             <div class="ev-group">
               <div class="ev-group-hd" style="color:#7cdf21">StreamElements / Tips</div>
@@ -3269,6 +3297,19 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <aside class="sidebar closed" id="sidebar" style="width:0;display:none"></aside>
 
   <div class="chat-wrap">
+    <div class="sf-ticker" id="sfTicker" style="display:none">
+      <div class="sf-ticker-seg sf-ticker-ad" id="sfTickerAd">
+        <svg class="ic"><use href="#i-bolt"/></svg>
+        <span id="sfTickerAdText">Ads: —</span>
+      </div>
+      <div class="sf-ticker-seg sf-ticker-pin" id="sfTickerPin">
+        <svg class="ic"><use href="#i-pin"/></svg>
+        <span id="sfTickerPinText">No pinned event yet</span>
+      </div>
+      <button class="sf-ticker-viewers" id="sfTickerViewers" onclick="openViewersModal()" title="Show current viewers by name">
+        <svg class="ic"><use href="#i-eye"/></svg> <span id="sfTickerVwCount">0</span>
+      </button>
+    </div>
     <div class="chat-modes" id="chatModes"></div>
     <div class="chat-search-wrap" id="chatSearchWrap"><input class="chat-search" id="chatSearchInput" placeholder="Search chat..." oninput="filterChat()"><span class="chat-search-count" id="chatSearchCount"></span><button class="chat-search-close" onclick="toggleChatSearch()" title="Close search" aria-label="Close search">&times;</button></div>
     <div class="pins-bar" id="pinsBar"></div>
@@ -4074,6 +4115,7 @@ var _activePollId = null;  // last poll we started (for End now)
 var _activePred = null;    // { id, outcomes:[{id,title}] } for lock/resolve
 var _adTick = null;        // countdown interval for the "next ad" label
 var _adNextAt = 0;         // unix seconds of the next scheduled ad
+var _adEndsAt = 0;         // ms epoch when the current ad break ends (0 = not in a break)
 
 function _twUid() { return (S.twitch && S.twitch.userId) || ''; }
 function _twReady() { return !!(S.twitch && S.twitch.signedIn && _twUid() && window.electronAPI && window.electronAPI.twitchHelix); }
@@ -4103,6 +4145,10 @@ function renderStreamTab() {
   // twitch-status refresh doesn't fire channel/ad requests off-screen.
   var pane = document.getElementById('pane-stream');
   if (ready && pane && pane.classList.contains('active')) { siLoadChannelInfo(); adRefreshSchedule(); }
+  // The ticker bar needs the ad schedule even when the Stream pane is closed,
+  // so give it a one-shot fetch the moment Twitch becomes ready.
+  else if (ready && chk('sfTickerOn')) { try { adRefreshSchedule(); } catch (e) {} }
+  try { sfTickerRender(); } catch (e) {}
 }
 // Re-render when channel.update EventSub reports an external title/category
 // change so the editor never shows stale values.
@@ -5382,6 +5428,129 @@ async function adRun(len) {
   } catch (e) { _setStat('adStatus', 'Ad failed', true); }
 }
 
+// ── Ticker bar (ads + pinned event + viewers, above chat & events) ──
+// A slim always-visible strip: a live "next ad / ad ends in" countdown, the
+// last notable event (mirrors the Events-panel pin), and a viewers button.
+// Driven by _adNextAt / _adEndsAt (from adRefreshSchedule + the AdBreakBegin
+// EventSub handler), _sfPinned (from setPinnedEvent), and _chatterMap.
+var _sfTickerInt = null;
+var _sfTickerAdCtr = 0;
+function sfTickerApply() {
+  var on = chk('sfTickerOn');
+  var bar = document.getElementById('sfTicker');
+  if (bar) bar.style.display = on ? 'flex' : 'none';
+  if (on) {
+    if (!_sfTickerInt) _sfTickerInt = setInterval(_sfTickerTick, 1000);
+    if (_twReady()) { try { adRefreshSchedule(); } catch (e) {} }
+    sfTickerRender();
+  } else if (_sfTickerInt) {
+    clearInterval(_sfTickerInt); _sfTickerInt = null;
+  }
+}
+function _sfTickerTick() {
+  // Refresh the Helix ad schedule about every 2 min so the "next ad" countdown
+  // stays accurate even when the Ads pane is closed (skip while mid-break).
+  _sfTickerAdCtr++;
+  if (_sfTickerAdCtr >= 120) {
+    _sfTickerAdCtr = 0;
+    if (_twReady() && !(_adEndsAt && Date.now() < _adEndsAt)) { try { adRefreshSchedule(); } catch (e) {} }
+  }
+  sfTickerRender();
+}
+function _sfFmtSecs(secs) {
+  if (secs < 0) secs = 0;
+  var m = Math.floor(secs / 60), s = secs % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+function sfTickerRender() {
+  var bar = document.getElementById('sfTicker');
+  if (!bar || bar.style.display === 'none') return;
+  // Ad segment
+  var adSeg = document.getElementById('sfTickerAd');
+  var adTxt = document.getElementById('sfTickerAdText');
+  if (adSeg && adTxt) {
+    adSeg.classList.remove('live', 'soon');
+    if (_adEndsAt && Date.now() < _adEndsAt) {
+      adTxt.textContent = 'Ads end in ' + _sfFmtSecs(Math.ceil((_adEndsAt - Date.now()) / 1000));
+      adSeg.classList.add('live');
+    } else {
+      if (_adEndsAt && Date.now() >= _adEndsAt) _adEndsAt = 0;
+      if (!_twReady()) { adTxt.textContent = 'Ads: —'; }
+      else if (!_adNextAt) { adTxt.textContent = 'Ads: none scheduled'; }
+      else {
+        var secs = _adNextAt - Math.floor(Date.now() / 1000);
+        if (secs <= 0) { adTxt.textContent = 'Ads: due now'; adSeg.classList.add('soon'); }
+        else { adTxt.textContent = 'Next ad in ' + _sfFmtSecs(secs); if (secs <= 60) adSeg.classList.add('soon'); }
+      }
+    }
+  }
+  // Pinned event segment
+  var pinTxt = document.getElementById('sfTickerPinText');
+  if (pinTxt) {
+    if (_sfPinned && _sfPinned.user) pinTxt.innerHTML = '<b>' + esc(_sfPinned.user) + '</b> ' + esc(_sfPinned.text || '');
+    else pinTxt.textContent = 'No pinned event yet';
+  }
+  // Viewer count (session chatters across all platforms)
+  var vc = document.getElementById('sfTickerVwCount');
+  if (vc) vc.textContent = _chatterMap.size;
+}
+
+// ── Current-viewers list ──
+var _viewerRowsCache = [];
+var _PLAT_LABEL = { tw: 'Twitch', yt: 'YouTube', tt: 'TikTok', kk: 'Kick' };
+async function openViewersModal() {
+  var overlay = document.getElementById('overlay');
+  var m = document.getElementById('modal');
+  if (overlay) overlay.classList.add('show');
+  if (m) m.innerHTML = '<div class="mh">Current viewers</div><p class="mp">Loading chatters…</p>';
+  var rows = [], have = {};
+  _chatterMap.forEach(function (v, k) {
+    var nm = v.display || k;
+    have['' + (v.plat || '') + ':' + nm.toLowerCase()] = true;
+    rows.push({ name: nm, plat: v.plat || '' });
+  });
+  // Best-effort: merge Twitch's live chatter roster (includes lurkers who
+  // haven't spoken) when the connected token carries moderator:read:chatters.
+  // Silently skipped if the scope is absent or the call fails.
+  try {
+    if (_twReady()) {
+      var res = await _twReq('GET', 'chat/chatters', 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&moderator_id=' + encodeURIComponent(_twUid()) + '&first=1000');
+      if (_twOK(res) && res.data && res.data.data) {
+        res.data.data.forEach(function (c) {
+          var nm = c.user_name || c.user_login || '';
+          if (nm && !have['tw:' + nm.toLowerCase()]) { have['tw:' + nm.toLowerCase()] = true; rows.push({ name: nm, plat: 'tw' }); }
+        });
+      }
+    }
+  } catch (e) {}
+  rows.sort(function (a, b) { var an = (a.name || '').toLowerCase(), bn = (b.name || '').toLowerCase(); return an < bn ? -1 : an > bn ? 1 : 0; });
+  _viewerRowsCache = rows;
+  _renderViewersModal();
+}
+function _renderViewersModal() {
+  var m = document.getElementById('modal');
+  if (!m) return;
+  var n = (_viewerRowsCache || []).length;
+  m.innerHTML = '<div class="mh">Current viewers <span style="color:var(--mut);font-weight:600">(' + n + ')</span></div>'
+    + '<p class="mp">Everyone active in chat this session, across every connected platform.</p>'
+    + '<input class="vw-search" id="vwSearch" placeholder="Filter by name…" oninput="_filterViewers()">'
+    + '<div class="vw-list" id="vwList"></div>'
+    + '<div class="mbtns"><button class="btn-x" onclick="closeModal()">Close</button></div>';
+  _filterViewers();
+  var s = document.getElementById('vwSearch'); if (s) s.focus();
+}
+function _filterViewers() {
+  var list = document.getElementById('vwList');
+  if (!list) return;
+  var q = ((document.getElementById('vwSearch') || {}).value || '').toLowerCase().trim();
+  var rows = (_viewerRowsCache || []).filter(function (r) { return !q || (r.name || '').toLowerCase().indexOf(q) >= 0; });
+  if (!rows.length) { list.innerHTML = '<div class="vw-empty">' + (q ? 'No viewers match that name.' : 'No chatters yet this session.') + '</div>'; return; }
+  list.innerHTML = rows.map(function (r) {
+    var lbl = _PLAT_LABEL[r.plat] || 'Other';
+    return '<div class="vw-row"><span class="vw-name">' + esc(r.name) + '</span><span class="vw-plat-' + esc(r.plat || 'other') + '" style="font-size:11px;font-weight:700">' + esc(lbl) + '</span></div>';
+  }).join('');
+}
+
 // ── Polls ──
 async function startPollFromSF() {
   if (!_twReady()) { _setStat('pollStatus', 'Connect Twitch first', true); return; }
@@ -5698,7 +5867,7 @@ var S = {
   }
 };
 
-var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-yt-sub','ev-yt-super','ev-yt-member','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-ext-other','ev-se-tip','ev-aq','hideCmd'];
+var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-tw-join','ev-yt-sub','ev-yt-super','ev-yt-member','ev-yt-join','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-kk-join','ev-ext-other','ev-se-tip','ev-aq','hideCmd','sfTickerOn'];
 var SOUND_IDS = ['snd-chat','snd-tw-follow','snd-tw-sub','snd-tw-gift','snd-tw-raid','snd-tw-cheer','snd-yt-sub','snd-yt-super','snd-tt-follow','snd-tt-gift','snd-kk-follow','snd-kk-sub','snd-ext','snd-se-tip','snd-kw'];
 
 var ttsEnabled = false;
@@ -6492,9 +6661,12 @@ function spawnHearts(wrap, count) {
     })(i);
   }
 }
+var _sfPinned = null; // last notable event, mirrored into the ticker bar
 function setPinnedEvent(user, text, plat, giftHtml) {
   var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   var color = plat === 'tw' ? 'var(--tw)' : plat === 'kk' ? 'var(--kk)' : plat === 'tt' ? 'var(--tt)' : plat === 'yt' ? 'var(--yt)' : '#ffd700';
+  _sfPinned = { user: user, text: text, plat: plat, at: Date.now() };
+  try { sfTickerRender(); } catch (e) {}
   var el = document.getElementById('evPinned');
   el.style.borderColor = color;
   el.innerHTML = '<div class="ev-pinned-label"><svg class="ic"><use href="#i-pin"/></svg> Last Notable Event</div>'
@@ -10710,9 +10882,14 @@ function handleSBEvent(event, data, fromES) {
     var _adMin = Math.round(_adSecs / 60);
     var _adLen = _adSecs >= 60 ? (_adMin + (_adMin === 1 ? ' min' : ' mins')) : (_adSecs + 's');
     var _adWhy = data.isAutomatic ? 'Automatic ad break' : 'Ad break started';
+    // Mark when this break ends so the ticker can count down "ads over in …".
+    if (_adSecs > 0) { _adEndsAt = Date.now() + _adSecs * 1000; _adNextAt = 0; try { sfTickerRender(); } catch (e) {} }
     showBanner('i-bolt', 'AD BREAK', _adWhy + ' • ' + _adLen, null, 'org');
     pushMsg({ plat: 'tw', isEv: true, evType: 'hype', user: 'Ad Break', text: _adWhy + ' (' + _adLen + ')' });
     sendObsAlert({ eventType: 'adBreak', platform: 'tw', user: 'Ad Break', message: _adWhy, amount: _adSecs });
+    // Refresh the Helix schedule shortly after the break ends to pick up the
+    // next_ad_at for the following roll.
+    setTimeout(function () { try { adRefreshSchedule(); } catch (e) {} }, (_adSecs + 3) * 1000);
   } else if (src === 'Twitch' && /^Goal/i.test(type || '')) {
     // Silently consume Twitch channel Goal events (GoalBegin, GoalProgress,
     // GoalEnd, GoalUpdate). These fire on every follow/sub tick and aren't
@@ -10944,6 +11121,15 @@ function pushMsg(m) {
   // Track chatter display names for quick-shoutout picker
   if (m.user && !m.isEv) {
     _chatterMap.set(m.user.toLowerCase(), { display: m.user, plat: m.plat, lastSeen: Date.now() });
+  }
+  // Derived "User Joined" for Twitch / Kick / YouTube. These platforms have
+  // no real viewer-join event (only TikTok does, via TikFinity), so a viewer's
+  // FIRST chat message this session is treated as their join. Opt-in per
+  // platform via the ev-<plat>-join filters (off by default, since it can be
+  // chatty on a busy stream).
+  if (isFirstWords && m.user && (m.plat === 'tw' || m.plat === 'kk' || m.plat === 'yt') && chk('ev-' + m.plat + '-join') && !S.paused) {
+    addEvHistory(m.user, 'joined the chat', m.plat, false, null, '', m.avatar || '');
+    S.evs++; updateStatBar();
   }
 
   var el = document.createElement('div');
@@ -17343,6 +17529,7 @@ window.addEventListener('load', function() {
   document.getElementById('qsendBar').classList.toggle('hidden', !qsendVisible);
   document.getElementById('qsendBtn').classList.toggle('on', qsendVisible);
   renderBlocked(); renderKeywords(); renderQSend(); updateViewers(); updateStreamStats(); updateLiveBar();
+  try { sfTickerApply(); } catch (e) {}
   // Restore TTS settings UI
   var ttsRU = document.getElementById('ttsReadUser'); if (ttsRU) ttsRU.checked = ttsReadUser;
   var ttsRE = document.getElementById('ttsReadEmoji'); if (ttsRE) ttsRE.checked = ttsReadEmoji;
