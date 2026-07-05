@@ -67,6 +67,11 @@ on:
         description: 'Release tag to post (e.g. v1.5.0)'
         required: true
         type: string
+      repo:
+        description: 'owner/repo to pull the release from (default: streamfusion-downloads)'
+        required: false
+        type: string
+        default: 'aquiloplays/streamfusion-downloads'
 
 permissions:
   contents: read
@@ -98,15 +103,19 @@ jobs:
       - name: Post release notes via SF bot
         env:
           SF_RELEASE_POST_SECRET:    ${{ secrets.SF_RELEASE_POST_SECRET }}
+          # Releases are published on the downloads repo (electron-updater's
+          # `build.publish` target) rather than this source repo, so the
+          # poster must fetch the release notes + link from there. Without
+          # this override the script defaults to GITHUB_REPOSITORY (= this
+          # source repo, which carries only tags, no release objects) and
+          # the fetch 404s. Overridable per-run via the workflow_dispatch
+          # `repo` input below.
+          SF_RELEASE_REPO:           ${{ inputs.repo || 'aquiloplays/streamfusion-downloads' }}
           SF_BOT_SERVICE_URL:        ${{ secrets.SF_BOT_SERVICE_URL }}
           SF_RELEASE_CHANNEL_ID:     ${{ secrets.SF_RELEASE_CHANNEL_ID }}
           SF_RELEASE_PING_ROLE_ID:   ${{ secrets.SF_RELEASE_PING_ROLE_ID }}
           SF_RELEASE_EMBED_COLOR:    ${{ secrets.SF_RELEASE_EMBED_COLOR }}
           SF_GITHUB_PAT:             ${{ secrets.GITHUB_TOKEN }}
-          # GITHUB_REPOSITORY is auto-set by Actions to owner/repo of
-          # the repo the workflow runs in — script uses this to fetch
-          # the release from the correct repo (beta vs stable) without
-          # any per-repo config.
         run: |
           if [ -z "$SF_RELEASE_POST_SECRET" ]; then
             echo "::error::SF_RELEASE_POST_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions."
