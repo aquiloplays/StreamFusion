@@ -16393,8 +16393,12 @@ function printerPost(o) {
 }
 
 // Boot: restore config, push it main-side, resolve the gate, populate UI.
+// The gate re-checks a few times — S.twUserId lands from persisted settings
+// or Streamer.bot's GetBroadcaster at unpredictable times after boot.
 _printerLoadCfg();
 _printerGateCheck();
+setTimeout(_printerGateCheck, 5000);
+setTimeout(_printerGateCheck, 20000);
 setTimeout(function() { _printerSyncUi(); _printerSaveCfg(); printerRefreshList(); }, 1200);
 setInterval(printerPollStatus, 5000);
 // ── Discord+ (EA-only): live events, records, bot ─────────────────────────
