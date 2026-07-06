@@ -205,6 +205,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   obsRefreshCfgGet:     ()             => ipcRenderer.invoke('obs-refresh-cfg-get'),
   obsRefreshCfgSet:     (patch)        => ipcRenderer.invoke('obs-refresh-cfg-set', patch || {}),
 
+  // ── Receipt printer (thermal ESC/POS) ──────────────────────────────────────
+  // printerPrint takes a print-job object (see printer.js enqueue docs) and
+  // returns { queued, reason?, receiptNo? }. Config: { enabled, printerName,
+  // maxPerMinute }. The Printer settings pane drives all of these.
+  printerList:      ()      => ipcRenderer.invoke('printer-list'),
+  printerGetStatus: ()      => ipcRenderer.invoke('printer-get-status'),
+  printerSetConfig: (patch) => ipcRenderer.invoke('printer-set-config', patch || {}),
+  printerPrint:     (job)   => ipcRenderer.invoke('printer-print', job || {}),
+
   // ── Discord integration (EA-only) ────────────────────────────────────────
   // Webhook POST — fires a stylized embed to a Discord webhook URL. The
   // caller passes a full Discord webhook payload (usually { embeds: [...] }).

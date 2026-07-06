@@ -2205,6 +2205,9 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="popout" onclick="switchSettingsTab('popout')">Pop Out</div>
         <div class="settings-tab" data-tab="hotkeys" onclick="switchSettingsTab('hotkeys')">Hotkeys</div>
         <div class="settings-tab" data-tab="demo" onclick="switchSettingsTab('demo')">Demo</div>
+        <!-- Receipt printer — hidden unless the signed-in Twitch account is
+             on the feature allowlist (see _printerGateCheck). -->
+        <div class="settings-tab" data-tab="printer" id="printerTab" style="display:none" onclick="switchSettingsTab('printer')">Printer</div>
         <div class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">About</div>
       </div>
       <div class="settings-body">
@@ -3035,6 +3038,51 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <button onclick="demoFireNow('raid')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 10px;font-size:11px;cursor:pointer">Raid</button>
               <button onclick="demoFireNow('hype')" style="background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 10px;font-size:11px;cursor:pointer">Hype Train</button>
             </div>
+          </div>
+        </div>
+
+        <!-- ═══ PRINTER TAB ═══ -->
+        <!-- Thermal receipt printer (80mm ESC/POS — Rongta RP80 class).
+             Events print as styled raster receipts: bird mark, dithered
+             avatar with platform badge, gift art, recipient lists. Gated
+             to the allowlisted broadcaster account for now. -->
+        <div class="settings-pane" id="pane-printer">
+          <div class="sec">
+            <div class="sec-hd">Receipt Printer</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:8px">Prints subs, gift bombs, bits, raids, redeems, Super Chats, Kicks, and TikTok gifts as styled receipts on an 80mm thermal printer &mdash; dithered avatar, platform badge, and real gift art included. TikTok gift streaks print once, at streak end, with the total.</div>
+            <label class="frow"><span>Enable printing</span><input type="checkbox" id="prnEnabled" onchange="onPrinterCfgChange()"></label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+              <select id="prnSelect" onchange="onPrinterCfgChange()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:5px 8px;font-size:11px"><option value="">&mdash; select printer &mdash;</option></select>
+              <button class="tbtn" onclick="printerRefreshList()" style="font-size:11px;font-weight:700;padding:5px 10px">Refresh</button>
+              <button class="tbtn" onclick="printerTestPrint()" style="font-size:11px;font-weight:700;padding:5px 10px">Test print</button>
+            </div>
+            <div id="prnStatus" style="font-size:10px;color:var(--mut);margin-top:6px;line-height:1.4">&mdash;</div>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">EVENTS</div>
+            <label class="frow"><span>Subs &amp; resubs <span style="color:var(--mut);font-weight:400">(+ YouTube members)</span></span><input type="checkbox" id="prnEvSub" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Gift subs &amp; gift bombs</span><input type="checkbox" id="prnEvGift" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Bits</span><input type="checkbox" id="prnEvCheer" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Kicks / Kick tips</span><input type="checkbox" id="prnEvKicks" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Super Chats &amp; Stickers</span><input type="checkbox" id="prnEvSuper" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>TikTok gifts</span><input type="checkbox" id="prnEvTtGift" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Raids</span><input type="checkbox" id="prnEvRaid" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Channel point redeems</span><input type="checkbox" id="prnEvRedeem" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Follows <span style="color:var(--mut);font-weight:400">(paper-hungry &mdash; off by default)</span></span><input type="checkbox" id="prnEvFollow" onchange="onPrinterCfgChange()"></label>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PLATFORMS</div>
+            <label class="frow"><span style="color:var(--tw)">Twitch</span><input type="checkbox" id="prnPlatTw" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span style="color:var(--kk)">Kick</span><input type="checkbox" id="prnPlatKk" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span style="color:var(--yt)">YouTube</span><input type="checkbox" id="prnPlatYt" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span style="color:var(--tt)">TikTok</span><input type="checkbox" id="prnPlatTt" checked onchange="onPrinterCfgChange()"></label>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">MINIMUMS</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Events below these values don't print (they still alert normally).</div>
+            <label class="frow"><span>Min bits</span><input type="number" id="prnMinBits" value="100" min="0" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Min TikTok coins</span><input type="number" id="prnMinCoins" value="100" min="0" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Min Kick tip ($)</span><input type="number" id="prnMinKick" value="1" min="0" step="0.5" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Min Super Chat ($)</span><input type="number" id="prnMinSuper" value="0" min="0" step="0.5" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Min raid viewers</span><input type="number" id="prnMinRaid" value="2" min="0" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Max receipts / minute <span style="color:var(--mut);font-weight:400">(overflow prints one digest)</span></span><input type="number" id="prnMaxPerMin" value="6" min="1" max="30" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
           </div>
         </div>
 
@@ -10491,6 +10539,7 @@ function handleSBEvent(event, data, fromES) {
     if (chk('ev-tw-follow')) return;
     var fn = gu(data); maybeSound('snd-tw-follow', 'follow'); pushMsg({ plat: 'tw', isEv: true, evType: 'follow', user: fn, text: fn + ' just followed!', avatar: _resolveEvAvatar('tw', data.user || data.follower, fn) }); S.stats.follows.tw++; updateStreamStats();
     discordPostFollow(fn, 'tw');
+    printerPost({ kind: 'follow', plat: 'tw', user: fn, avatar: _resolveEvAvatar('tw', data.user || data.follower, fn), actionText: 'just followed' });
   } else if (key === 'Twitch.Sub' || key === 'Twitch.Subscribe' || key === 'Twitch.Subscription') {
     if (chk('ev-tw-sub')) return;
     var sn = gu(data); var _subTierRaw = data.subTier || data.tier || data.sub_tier; var _subTierNm = _tierName(_subTierRaw);
@@ -10501,6 +10550,7 @@ function handleSBEvent(event, data, fromES) {
     pushMsg({ plat: 'tw', isEv: true, evType: 'sub', big: true, user: sn, text: snText, evMessage: _subMsg, avatar: _subAv });
     setPinnedEvent(sn, snText, 'tw'); S.stats.twSubs++; S.stats.twSubRev += twSubRevenue(_subTierRaw); updateStreamStats(); trackContributor('tw', sn, twSubRevenue(_subTierRaw));
     discordPostSub(sn, 'tw', _subTierNm, false);
+    printerPost({ kind: 'sub', plat: 'tw', user: sn, avatar: _subAv, tier: _subTierNm, message: _subMsg });
   } else if (key === 'Twitch.ReSub' || key === 'Twitch.Resub' || key === 'Twitch.ReSubscribe') {
     if (chk('ev-tw-sub')) return;
     var rn = gu(data); var _resubMonths = data.cumulativeMonths || data.cumMonths || data.months || data.totalMonths || '?';
@@ -10514,6 +10564,7 @@ function handleSBEvent(event, data, fromES) {
     pushMsg({ plat: 'tw', isEv: true, evType: 'sub', big: true, user: rn, text: rnText, evMessage: _resubMsg, avatar: _resubAv });
     setPinnedEvent(rn, rnText, 'tw'); S.stats.twSubs++; S.stats.twSubRev += twSubRevenue(_resubTierRaw); updateStreamStats(); trackContributor('tw', rn, twSubRevenue(_resubTierRaw));
     discordPostSub(rn, 'tw', _resubTierNm, true, _resubMonths);
+    printerPost({ kind: 'resub', plat: 'tw', user: rn, avatar: _resubAv, tier: _resubTierNm, months: _resubMonths, message: _resubMsg });
   } else if (key === 'Twitch.GiftSub' || key === 'Twitch.SubGift' || key === 'Twitch.GiftSubscription') {
     if (chk('ev-tw-gift')) return;
     var _gs = data.gifter || {};
@@ -10522,6 +10573,7 @@ function handleSBEvent(event, data, fromES) {
     var rc = _gr.display_name || _gr.displayName || _gr.name || _gr.login || _gr.username || _gr.userName || data.recipientName || data.recipientDisplayName || data.recipient_display_name || data.recipient_name || '?';
     var _giftAv = _resolveEvAvatar('tw', _gs, gn);
     var gnText = gn + ' gifted a sub to ' + rc + '!'; playGiftSubSound(1); showBanner('i-party', gn + ' gifted a sub!', 'to ' + rc, null, 'tw'); fireBurstConfetti('tw'); pushMsg({ plat: 'tw', isEv: true, evType: 'gift', big: true, user: gn, text: gnText, avatar: _giftAv }); setPinnedEvent(gn, gnText, 'tw'); S.stats.twSubs++; S.stats.twSubRev += twSubRevenue(data.tier || data.subTier); updateStreamStats(); trackContributor('tw', gn, twSubRevenue(data.tier || data.subTier));
+    printerPost({ kind: 'gift1', plat: 'tw', user: gn, avatar: _giftAv, recipient: rc });
   } else if (key === 'Twitch.GiftBomb' || key === 'Twitch.MassGift' || key === 'Twitch.CommunitySubGift' || key === 'Twitch.MassSubGift') {
     if (chk('ev-tw-gift')) return;
     var _gbs = data.gifter || {};
@@ -10533,6 +10585,7 @@ function handleSBEvent(event, data, fromES) {
     var gbText = gb + ' gifted ' + gc + ' subs!' + _bombRecipSuffix; playGiftSubSound(gc); showBanner('i-party', gb + ' gifted ' + gc + ' subs!', 'on Twitch', null, 'tw'); fireBurstConfetti('tw'); pushMsg({ plat: 'tw', isEv: true, evType: 'gift', big: true, user: gb, text: gbText, avatar: _bombAv }); setPinnedEvent(gb, gbText, 'tw'); var gbNum = parseInt(gc) || 0; S.stats.twSubs += gbNum; S.stats.twSubRev += gbNum * twSubRevenue(data.tier || data.subTier); updateStreamStats(); trackContributor('tw', gb, gbNum * twSubRevenue(data.tier || data.subTier));
     discordPostGift(gb, gbNum, 'tw');
     updateRecord('twGift', gb, gbNum);
+    printerPost({ kind: 'bomb', plat: 'tw', user: gb, avatar: _bombAv, count: gbNum || gc, recipients: _bombRecips });
   } else if (key === 'Twitch.Cheer' || key === 'Twitch.Bits') {
     if (chk('ev-tw-cheer')) return;
     var cn = gu(data); var _cbits = Number(data.bits || data.amount || 0);
@@ -10546,6 +10599,7 @@ function handleSBEvent(event, data, fromES) {
     if (_cbits >= 500) setPinnedEvent(cn, cnText, 'tw'); S.stats.bits += _cbits; updateStreamStats(); trackContributor('tw', cn, _cbits * 0.01);
     discordPostCheer(cn, _cbits, 'tw');
     updateRecord('cheer', cn, _cbits);
+    printerPost({ kind: 'cheer', plat: 'tw', user: cn, avatar: _cheerAv, bits: _cbits, message: _cheerMsg });
   } else if (key === 'Twitch.Raid' || key === 'Twitch.Raided' || key === 'Twitch.IncomingRaid' || key === 'Twitch.RaidReceived' || key === 'Twitch.OnRaid') {
     if (chk('ev-tw-raid')) return;
     // Raider info arrives in three shapes across SB versions:
@@ -10572,6 +10626,7 @@ function handleSBEvent(event, data, fromES) {
       : '?';
     var _raidAv = _resolveEvAvatar('tw', _rdr, rn2);
     var raidText = rn2 + ' raided with ' + rc2 + ' viewers!'; maybeSound('snd-tw-raid', 'raid'); triggerRaid(rn2, rc2, 'tw'); pushMsg({ plat: 'tw', isEv: true, evType: 'raid', user: rn2, text: raidText, avatar: _raidAv }); setPinnedEvent(rn2, raidText, 'tw');
+    printerPost({ kind: 'raid', plat: 'tw', user: rn2, avatar: _raidAv, viewers: rc2 });
   } else if (key === 'Twitch.RewardRedemption' || key === 'Twitch.ChannelPointRedemption' || key === 'Twitch.ChannelPointsRedemption' || key === 'Twitch.Reward.Redemption' || key === 'Twitch.PointsRedemption' || key === 'Twitch.RewardRedeemed' || key === 'Twitch.ChannelRewardRedemption') {
     if (chk('ev-tw-redeem')) return;
     var ren = gu(data);
@@ -10623,6 +10678,7 @@ function handleSBEvent(event, data, fromES) {
     // carries the redeemer + reward title; the alerts banner ignores it (no
     // EVENT_META entry) so this never floods the banner.
     sendObsAlert({ eventType: 'channelPoints', platform: 'tw', user: ren, rewardName: (rtitle && rtitle !== '?') ? rtitle : '', message: _redeemMsg || '' });
+    printerPost({ kind: 'redeem', plat: 'tw', user: ren, avatar: _resolveEvAvatar('tw', data.user || data.redeemer, ren), reward: (rtitle && rtitle !== '?') ? rtitle : 'reward', cost: rcost, message: _redeemMsg });
   } else if (key === 'Twitch.UserBanned' || key === 'Twitch.Ban') {
     if (chk('ev-tw-mod')) return;
     var _bt = data.targetUser || data.target || {};
@@ -10669,6 +10725,7 @@ function handleSBEvent(event, data, fromES) {
     var yn = _ytSubSrc.displayName || _ytSubSrc.display_name || _ytSubSrc.name || _ytSubSrc.channelName || _ytSubSrc.userName || _ytSubSrc.username || _ytSubSrc.login || gu(data);
     var _ynAv = _resolveEvAvatar('yt', _ytSubSrc, yn);
     maybeSound('snd-yt-sub', 'follow'); pushMsg({ plat: 'yt', isEv: true, evType: 'sub', user: yn, text: yn + ' subscribed on YouTube!', avatar: _ynAv }); S.stats.follows.yt++; updateStreamStats();
+    printerPost({ kind: 'follow', plat: 'yt', user: yn, avatar: _ynAv, actionText: 'subscribed on youtube' });
   } else if (key === 'YouTube.SuperChat') {
     if (chk('ev-yt-super')) return;
     var yn2 = gu(data); var _scMsg = _extractUserMessage(data) || data.message || ''; var _scAmt = data.amount || data.value || '?';
@@ -10676,12 +10733,14 @@ function handleSBEvent(event, data, fromES) {
     maybeSound('snd-yt-super', 'super'); fireBurstConfetti('yt');
     pushMsg({ plat: 'yt', isEv: true, evType: 'super', big: true, user: yn2, text: yn2 + ' Super Chat: ' + _scAmt + (_scMsg ? ' — "' + _scMsg + '"' : ''), evMessage: _scMsg, avatar: _scAv });
     trackContributor('yt', yn2, parseFloat(data.amount) || 0);
+    printerPost({ kind: 'super', plat: 'yt', user: yn2, avatar: _scAv, amountText: String(_scAmt), message: _scMsg });
   } else if (key === 'YouTube.SuperSticker') {
     if (chk('ev-yt-super')) return;
     var yn3 = gu(data); var _ssAmt = data.amount || data.value || '?';
     var _ssAv = _resolveEvAvatar('yt', data.user || data.author, yn3);
     maybeSound('snd-yt-super', 'super'); fireBurstConfetti('yt');
     pushMsg({ plat: 'yt', isEv: true, evType: 'super', big: true, user: yn3, text: yn3 + ' sent a Super Sticker: ' + _ssAmt + '!', avatar: _ssAv });
+    printerPost({ kind: 'super', plat: 'yt', user: yn3, avatar: _ssAv, amountText: String(_ssAmt), actionText: 'sent a super sticker' });
   } else if (key === 'YouTube.MembershipGift') {
     if (chk('ev-yt-member')) return;
     var yn4 = gu(data); var _mgAmt = data.amount || data.giftCount || '?';
@@ -10691,6 +10750,7 @@ function handleSBEvent(event, data, fromES) {
     maybeSound('snd-yt-sub', 'gift'); fireBurstConfetti('yt');
     pushMsg({ plat: 'yt', isEv: true, evType: 'member', big: true, user: yn4, text: yn4 + ' gifted ' + _mgAmt + ' memberships!' + _mgRecipSuffix, avatar: _mgAv });
     trackContributor('yt', yn4, parseInt(data.amount) || 0);
+    printerPost({ kind: 'bomb', plat: 'yt', user: yn4, avatar: _mgAv, count: _mgAmt, recipients: _mgRecips, bannerText: 'GIFT MEMBERSHIPS ×' + _mgAmt });
   } else if (key === 'YouTube.NewSponsor' || key === 'YouTube.Membership' || key === 'YouTube.Member' || key === 'YouTube.NewMember' || key === 'YouTube.FirstSponsor' || key === 'YouTube.FirstMember' || key === 'YouTube.Sponsor' || key === 'YouTube.ChannelMember' || key === 'YouTube.NewChannelMember' || key === 'YouTube.SponsorshipReturning' || key === 'YouTube.ReturningSponsor') {
     if (chk('ev-yt-member')) return;
     var _ytMemSrc = data.user || data.member || data.sponsor || data.author || data.channelMember || {};
@@ -10699,6 +10759,7 @@ function handleSBEvent(event, data, fromES) {
     var _memTier = data.memberLevelName || data.levelName || data.tierName || data.sponsorLevel || '';
     maybeSound('snd-yt-sub', 'sub'); fireBurstConfetti('yt');
     pushMsg({ plat: 'yt', isEv: true, evType: 'member', big: true, user: yn5, text: yn5 + ' became a YouTube Member' + (_memTier ? ' (' + _memTier + ')' : '') + '!', avatar: _nsAv });
+    printerPost({ kind: 'member', plat: 'yt', user: yn5, avatar: _nsAv, actionText: 'became a member' + (_memTier ? ' · ' + _memTier : '') });
   } else if (key === 'YouTube.MemberMilestone' || key === 'YouTube.MembershipMilestone' || key === 'YouTube.SponsorMilestone') {
     if (chk('ev-yt-member')) return;
     var _ytMilSrc = data.user || data.member || data.sponsor || data.author || {};
@@ -10709,6 +10770,7 @@ function handleSBEvent(event, data, fromES) {
     var _milMsg = _extractUserMessage(data) || '';
     maybeSound('snd-yt-sub', 'sub'); fireBurstConfetti('yt');
     pushMsg({ plat: 'yt', isEv: true, evType: 'member', big: true, user: yn6, text: yn6 + ' just renewed their membership! (' + _milMonths + ' months' + (_milTier ? ', ' + _milTier : '') + ')', evMessage: _milMsg, avatar: _milAv });
+    printerPost({ kind: 'member', plat: 'yt', user: yn6, avatar: _milAv, actionText: 'renewed · ' + _milMonths + ' months' + (_milTier ? ' · ' + _milTier : ''), message: _milMsg });
   } else if (key === 'YouTube.GiftMembershipReceived' || key === 'YouTube.MembershipGiftReceived' || key === 'YouTube.SponsorGiftReceived') {
     if (chk('ev-yt-member')) return;
     var _ytGrSrc = data.user || data.recipient || data.member || {};
@@ -10731,6 +10793,7 @@ function handleSBEvent(event, data, fromES) {
     var kfn = gu(data);
     var _kfnAv = _resolveEvAvatar('kk', data.user || data.follower, kfn);
     maybeSound('snd-kk-follow', 'follow'); pushMsg({ plat: 'kk', isEv: true, evType: 'follow', user: kfn, text: kfn + ' followed on Kick!', avatar: _kfnAv }); S.stats.follows.kk++; updateStreamStats();
+    printerPost({ kind: 'follow', plat: 'kk', user: kfn, avatar: _kfnAv, actionText: 'followed on kick' });
   } else if (key === 'Kick.Sub') {
     if (chk('ev-kk-sub')) return;
     var ksn = gu(data); var ksnText = ksn + ' subscribed on Kick!';
@@ -10738,6 +10801,7 @@ function handleSBEvent(event, data, fromES) {
     maybeSound('snd-kk-sub', 'sub'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'sub', big: true, user: ksn, text: ksnText, avatar: _ksnAv }); setPinnedEvent(ksn, ksnText, 'kk'); S.stats.kkSubs++; S.stats.kkSubRev += 4.74; updateStreamStats(); trackContributor('kk', ksn, 4.74);
     sfHypePush('kk', SF_HYPE_POINTS.kickSub, ksn, { kind: 'sub', ref: _kkRef(data.subscriber || data.user || data) });
     discordPostKickSub(ksn);
+    printerPost({ kind: 'sub', plat: 'kk', user: ksn, avatar: _ksnAv, actionText: 'subscribed on kick' });
   } else if (key === 'Kick.GiftSub') {
     if (chk('ev-kk-gift')) return;
     var _kgo = data.gifter || {};
@@ -10746,6 +10810,7 @@ function handleSBEvent(event, data, fromES) {
     var _kgsAv = _resolveEvAvatar('kk', _kgo, kgn);
     var kgsText = kgn + ' gifted a sub to ' + krc + ' on Kick!'; maybeSound('snd-kk-sub', 'gift'); fireBurstConfetti('kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'gift', big: true, user: kgn, text: kgsText, avatar: _kgsAv }); setPinnedEvent(kgn, kgsText, 'kk'); S.stats.kkSubs++; S.stats.kkSubRev += 4.74; updateStreamStats(); trackContributor('kk', kgn, 4.74);
     sfHypePush('kk', SF_HYPE_POINTS.kickSub, kgn, { kind: 'gift', ref: _kkRef(_kgo) });
+    printerPost({ kind: 'gift1', plat: 'kk', user: kgn, avatar: _kgsAv, recipient: krc });
   } else if (key === 'Kick.GiftBomb') {
     if (chk('ev-kk-gift')) return;
     var _kgbo = data.gifter || {};
@@ -10758,12 +10823,14 @@ function handleSBEvent(event, data, fromES) {
     if (kkgbNum > 0) sfHypePush('kk', SF_HYPE_POINTS.kickSub * kkgbNum, kgb, { kind: 'gift', ref: _kkRef(_kgbo) });
     discordPostGift(kgb, kkgbNum, 'kk');
     updateRecord('kkGift', kgb, kkgbNum);
+    printerPost({ kind: 'bomb', plat: 'kk', user: kgb, avatar: _kgbAv, count: kkgbNum || kgc, recipients: _kgbRecips });
   } else if (key === 'Kick.Raid') {
     if (chk('ev-kk-raid')) return;
     var krn = gu(data);
     var krc2 = data.viewerCount || data.viewers || data.raiderCount || '?';
     var _krnAv = _resolveEvAvatar('kk', data.raider || data.fromUser || data.user, krn);
     var krnText = krn + ' raided from Kick with ' + krc2 + ' viewers!'; triggerRaid(krn, krc2, 'kk'); pushMsg({ plat: 'kk', isEv: true, evType: 'raid', user: krn, text: krnText, avatar: _krnAv }); setPinnedEvent(krn, krnText, 'kk');
+    printerPost({ kind: 'raid', plat: 'kk', user: krn, avatar: _krnAv, viewers: krc2 });
   } else if (key === 'Kick.PresentViewers') {
     var kvc = data.viewers != null ? data.viewers : data.viewerCount != null ? data.viewerCount : null;
     if (kvc != null) { S.viewers.kk = kvc; S.kkViewersFetched = true; _lastViewerUpdate.kk = Date.now(); updateViewers(); sendOverlayStats(); }
@@ -10787,6 +10854,7 @@ function handleSBEvent(event, data, fromES) {
     var _kredeemMsg = _extractUserMessage(data);
     pushMsg({ plat: 'kk', isEv: true, evType: 'redeem', user: kren, text: kren + ' redeemed: ' + krtitle + (krcost ? ' (' + krcost.toLocaleString() + ' pts)' : ''), evMessage: _kredeemMsg, avatar: _resolveEvAvatar('kk', data.user || data.redeemer, kren) });
     sendObsAlert({ eventType: 'channelPoints', platform: 'kk', user: kren, rewardName: (krtitle && krtitle !== '?') ? krtitle : '', message: _kredeemMsg || '' });
+    printerPost({ kind: 'redeem', plat: 'kk', user: kren, avatar: _resolveEvAvatar('kk', data.user || data.redeemer, kren), reward: (krtitle && krtitle !== '?') ? krtitle : 'reward', cost: krcost, message: _kredeemMsg });
   } else if (key === 'Kick.Kick' || key === 'Kick.Donation' || key === 'Kick.Tip') {
     var kkipUser = gu(data); var kkipAmt = Number(data.amount || data.value || 0);
     S.stats.kicks++; S.stats.kkSubRev += kkipAmt * 0.95; updateStreamStats();
@@ -10794,6 +10862,7 @@ function handleSBEvent(event, data, fromES) {
     var _kkipAv = _resolveEvAvatar('kk', data.user || data.donor, kkipUser);
     fireBurstConfetti('kk');
     pushMsg({ plat: 'kk', isEv: true, big: true, user: kkipUser, text: kkipText, avatar: _kkipAv }); setPinnedEvent(kkipUser, kkipText, 'kk');
+    printerPost({ kind: 'kicks', plat: 'kk', user: kkipUser, avatar: _kkipAv, usd: kkipAmt });
   } else if (key === 'StreamElements.Donation' || key === 'StreamElements.Tip' || key === 'SE.Tip' || key === 'SE.Donation' || key === 'StreamElements.Latest') {
     handleSETip(data, false);
   }
@@ -11233,9 +11302,10 @@ function handleTFEvent(d) {
     // threshold (default 500 coins). discordPostTtGift no-ops below
     // threshold, so we can safely call unconditionally.
     try { discordPostTtGift(user, data.giftName || 'Gift', _gCoins, _ttGiftImg); } catch (e) {}
+    printerPost({ kind: 'ttgift', plat: 'tt', user: user, avatar: _ttAvatar, coins: _gCoins, count: data.repeatCount || 1, giftName: data.giftName || '', giftImage: _ttGiftImg });
   }
-  else if (ev === 'follow') { if (chk('ev-tt-follow')) return; maybeSound('snd-tt-follow', 'follow'); pushMsg({ plat: 'tt', isEv: true, evType: 'follow', user: user, text: user + ' followed on TikTok!', avatar: _ttAvatar }); S.stats.follows.tt++; updateStreamStats(); }
-  else if (ev === 'subscribe' || ev === 'subscription') { if (chk('ev-tt-sub')) return; pushMsg({ plat: 'tt', isEv: true, evType: 'sub', user: user, text: user + ' subscribed on TikTok!', avatar: _ttAvatar }); }
+  else if (ev === 'follow') { if (chk('ev-tt-follow')) return; maybeSound('snd-tt-follow', 'follow'); pushMsg({ plat: 'tt', isEv: true, evType: 'follow', user: user, text: user + ' followed on TikTok!', avatar: _ttAvatar }); S.stats.follows.tt++; updateStreamStats(); printerPost({ kind: 'follow', plat: 'tt', user: user, avatar: _ttAvatar, actionText: 'followed on tiktok' }); }
+  else if (ev === 'subscribe' || ev === 'subscription') { if (chk('ev-tt-sub')) return; pushMsg({ plat: 'tt', isEv: true, evType: 'sub', user: user, text: user + ' subscribed on TikTok!', avatar: _ttAvatar }); printerPost({ kind: 'sub', plat: 'tt', user: user, avatar: _ttAvatar, actionText: 'subscribed on tiktok' }); }
   else if (ev === 'like') { if (data.totalLikeCount !== undefined) updateLikeCounter(data.totalLikeCount); if (chk('ev-tt-like')) return; if (data.totalLikeCount && data.totalLikeCount % 100 === 0) pushMsg({ plat: 'tt', isEv: true, evType: 'like', user: 'Stream', text: data.totalLikeCount.toLocaleString() + ' total likes!' }); }
   else if (ev === 'member' || ev === 'join') { if (chk('ev-tt-join')) return; pushMsg({ plat: 'tt', isEv: true, evType: 'join', user: user, text: user + ' joined the TikTok stream!', avatar: _ttAvatar }); }
   else if (ev === 'share') { if (chk('ev-tt-share')) return; pushMsg({ plat: 'tt', isEv: true, evType: 'share', user: user, text: user + ' shared the stream!', avatar: _ttAvatar }); }
@@ -16079,6 +16149,254 @@ function sendObsAlert(obj) {
   trailLog('overlay', { type: ev, user: obj.user || '', bits: obj.amount != null ? obj.amount : null });
   window.electronAPI.obsBroadcastAlert(payload);
 }
+
+// ── Receipt printer (thermal ESC/POS) ──────────────────────────────────────
+// Event sites call printerPost() with structured fields (same placement
+// pattern as discordPost*). This module owns the gate, per-event filters,
+// thresholds and the digest receipt for rate-limited overflow; rendering,
+// dithering and spooling live main-side in printer.js.
+var PRINTER_ALLOWLIST = ['991099623'];   // Twitch user ids that see the feature
+var printerCfg = {
+  enabled: false, printerName: '', maxPerMinute: 6,
+  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, follow: false },
+  plats: { tw: true, kk: true, yt: true, tt: true },
+  min: { bits: 100, coins: 100, kick: 1, super: 0, raid: 2 }
+};
+var _printerGate = false;
+var _printerSkipped = {};                // kind → count while rate-limited
+var _printerDigestTimer = null;
+
+function _printerGateCheck() {
+  var apply = function(ok) {
+    var was = _printerGate;
+    _printerGate = !!ok;
+    var tab = document.getElementById('printerTab');
+    if (tab) tab.style.display = _printerGate ? '' : 'none';
+    // The gate resolves async — re-push the effective enabled flag to the
+    // main process once it opens (the boot-time push ran gate-closed).
+    if (_printerGate && !was) _printerSaveCfg();
+  };
+  if (PRINTER_ALLOWLIST.indexOf(String(S.twUserId || '')) !== -1) return apply(true);
+  if (window.electronAPI && window.electronAPI.twitchGetStatus) {
+    window.electronAPI.twitchGetStatus().then(function(st) {
+      apply(st && st.signedIn && PRINTER_ALLOWLIST.indexOf(String(st.userId || '')) !== -1);
+    }).catch(function() { apply(false); });
+  } else apply(false);
+}
+
+function _printerSaveCfg() {
+  try { localStorage.setItem('sf_printer_cfg', JSON.stringify(printerCfg)); } catch (e) {}
+  if (window.electronAPI && window.electronAPI.printerSetConfig) {
+    window.electronAPI.printerSetConfig({
+      enabled: printerCfg.enabled && _printerGate,
+      printerName: printerCfg.printerName,
+      maxPerMinute: printerCfg.maxPerMinute
+    }).then(_printerShowStatus).catch(function() {});
+  }
+}
+
+function _printerLoadCfg() {
+  try {
+    var d = JSON.parse(localStorage.getItem('sf_printer_cfg') || 'null');
+    if (d && typeof d === 'object') {
+      printerCfg.enabled = !!d.enabled;
+      if (typeof d.printerName === 'string') printerCfg.printerName = d.printerName;
+      if (typeof d.maxPerMinute === 'number') printerCfg.maxPerMinute = d.maxPerMinute;
+      if (d.ev) Object.assign(printerCfg.ev, d.ev);
+      if (d.plats) Object.assign(printerCfg.plats, d.plats);
+      if (d.min) Object.assign(printerCfg.min, d.min);
+    }
+  } catch (e) {}
+}
+
+function _prnEl(id) { return document.getElementById(id); }
+function _printerSyncUi() {
+  if (!_prnEl('prnEnabled')) return;
+  _prnEl('prnEnabled').checked = printerCfg.enabled;
+  _prnEl('prnEvSub').checked = printerCfg.ev.sub;      _prnEl('prnEvGift').checked = printerCfg.ev.gift;
+  _prnEl('prnEvCheer').checked = printerCfg.ev.cheer;  _prnEl('prnEvKicks').checked = printerCfg.ev.kicks;
+  _prnEl('prnEvSuper').checked = printerCfg.ev.super;  _prnEl('prnEvTtGift').checked = printerCfg.ev.ttgift;
+  _prnEl('prnEvRaid').checked = printerCfg.ev.raid;    _prnEl('prnEvRedeem').checked = printerCfg.ev.redeem;
+  _prnEl('prnEvFollow').checked = printerCfg.ev.follow;
+  _prnEl('prnPlatTw').checked = printerCfg.plats.tw;   _prnEl('prnPlatKk').checked = printerCfg.plats.kk;
+  _prnEl('prnPlatYt').checked = printerCfg.plats.yt;   _prnEl('prnPlatTt').checked = printerCfg.plats.tt;
+  _prnEl('prnMinBits').value = printerCfg.min.bits;    _prnEl('prnMinCoins').value = printerCfg.min.coins;
+  _prnEl('prnMinKick').value = printerCfg.min.kick;    _prnEl('prnMinSuper').value = printerCfg.min.super;
+  _prnEl('prnMinRaid').value = printerCfg.min.raid;    _prnEl('prnMaxPerMin').value = printerCfg.maxPerMinute;
+}
+
+function onPrinterCfgChange() {
+  if (!_prnEl('prnEnabled')) return;
+  printerCfg.enabled = _prnEl('prnEnabled').checked;
+  printerCfg.printerName = _prnEl('prnSelect').value || printerCfg.printerName;
+  printerCfg.ev = {
+    sub: _prnEl('prnEvSub').checked,   gift: _prnEl('prnEvGift').checked,
+    cheer: _prnEl('prnEvCheer').checked, kicks: _prnEl('prnEvKicks').checked,
+    super: _prnEl('prnEvSuper').checked, ttgift: _prnEl('prnEvTtGift').checked,
+    raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked,
+    follow: _prnEl('prnEvFollow').checked
+  };
+  printerCfg.plats = {
+    tw: _prnEl('prnPlatTw').checked, kk: _prnEl('prnPlatKk').checked,
+    yt: _prnEl('prnPlatYt').checked, tt: _prnEl('prnPlatTt').checked
+  };
+  printerCfg.min = {
+    bits: Number(_prnEl('prnMinBits').value) || 0,
+    coins: Number(_prnEl('prnMinCoins').value) || 0,
+    kick: Number(_prnEl('prnMinKick').value) || 0,
+    super: Number(_prnEl('prnMinSuper').value) || 0,
+    raid: Number(_prnEl('prnMinRaid').value) || 0
+  };
+  printerCfg.maxPerMinute = Math.max(1, Number(_prnEl('prnMaxPerMin').value) || 6);
+  _printerSaveCfg();
+}
+
+function printerRefreshList() {
+  if (!window.electronAPI || !window.electronAPI.printerList) return;
+  window.electronAPI.printerList().then(function(names) {
+    var sel = _prnEl('prnSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">&mdash; select printer &mdash;</option>';
+    (names || []).forEach(function(n) {
+      var o = document.createElement('option');
+      o.value = n; o.textContent = n;
+      if (n === printerCfg.printerName) o.selected = true;
+      sel.appendChild(o);
+    });
+  }).catch(function() {});
+}
+
+function _printerShowStatus(st) {
+  var el = _prnEl('prnStatus');
+  if (!el || !st) return;
+  var bits = [];
+  bits.push(st.printerName ? ('Printer: ' + st.printerName) : 'No printer selected');
+  bits.push(st.enabled ? 'enabled' : 'disabled');
+  if (st.queued) bits.push(st.queued + ' queued');
+  if (st.lastOk === true) bits.push('last print OK');
+  if (st.lastOk === false) bits.push('last print FAILED: ' + (st.lastError || '?'));
+  if (st.receiptCounter) bits.push('#' + st.receiptCounter + ' lifetime');
+  el.textContent = bits.join(' · ');
+}
+
+function printerPollStatus() {
+  var pane = document.getElementById('pane-printer');
+  if (!pane || !pane.classList.contains('active')) return;
+  if (window.electronAPI && window.electronAPI.printerGetStatus) {
+    window.electronAPI.printerGetStatus().then(_printerShowStatus).catch(function() {});
+  }
+}
+
+function printerTestPrint() {
+  onPrinterCfgChange();
+  _printerSend({
+    platform: 'tw',
+    user: S.twLogin || 'aquilo',
+    action: 'test print · everything works',
+    avatarUrl: null,
+    banner: 'TEST PRINT',
+    message: 'if you can read this, the printer pipeline is happy. go stream.',
+    isTest: true
+  });
+  setTimeout(printerPollStatus, 1500);
+}
+
+function _printerSend(job) {
+  if (!window.electronAPI || !window.electronAPI.printerPrint) return;
+  window.electronAPI.printerPrint(job).then(function(r) {
+    if (r && !r.queued && r.reason === 'rate' && job._kind) {
+      _printerSkipped[job._kind] = (_printerSkipped[job._kind] || 0) + 1;
+      _printerScheduleDigest();
+    }
+  }).catch(function() {});
+}
+
+// When the per-minute cap trips, collapse everything skipped into ONE
+// digest receipt once the window frees up instead of jamming the printer.
+function _printerScheduleDigest() {
+  if (_printerDigestTimer) return;
+  _printerDigestTimer = setTimeout(function() {
+    _printerDigestTimer = null;
+    var rows = [];
+    for (var k in _printerSkipped) rows.push({ label: k, value: '× ' + _printerSkipped[k] });
+    _printerSkipped = {};
+    if (!rows.length) return;
+    _printerSend({ platform: 'sys', banner: 'BUSY! MISSED THESE', rows: rows, action: 'rate limit overflow' });
+  }, 70000);
+}
+
+// The tap. o: { kind, plat, user, avatar, tier, months, message, count,
+// recipients, recipient, bits, coins, usd, amountText, giftName, giftImage,
+// viewers, reward, cost, actionText, bannerText }
+function printerPost(o) {
+  try {
+    if (!_printerGate || !printerCfg.enabled || !o) return;
+    if (!printerCfg.plats[o.plat]) return;
+    var evKey = { sub: 'sub', resub: 'sub', member: 'sub', gift1: 'gift', bomb: 'gift',
+                  cheer: 'cheer', kicks: 'kicks', super: 'super', ttgift: 'ttgift',
+                  raid: 'raid', redeem: 'redeem', follow: 'follow' }[o.kind];
+    if (!evKey || printerCfg.ev[evKey] === false) return;
+
+    var job = { platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null, _kind: evKey };
+    if (o.kind === 'sub') {
+      job.action = o.actionText || ('subscribed' + (o.tier ? ' · ' + o.tier : ''));
+      job.message = o.message || '';
+    } else if (o.kind === 'resub') {
+      job.action = 'resubscribed · ' + o.months + ' months' + (o.tier ? ' · ' + o.tier : '');
+      job.message = o.message || '';
+    } else if (o.kind === 'member') {
+      job.action = o.actionText || 'became a member';
+      job.message = o.message || '';
+    } else if (o.kind === 'gift1') {
+      job.action = 'gifted a sub to ' + (o.recipient || 'someone');
+    } else if (o.kind === 'bomb') {
+      var n = parseInt(o.count) || 0;
+      job.action = 'gifted ' + (n || o.count) + ' subs to the community';
+      job.banner = o.bannerText || ('GIFT BOMB ×' + (n || o.count));
+      job.recipients = (o.recipients || []).slice(0, 9);
+      if ((o.recipients || []).length > 9) job.recipients.push('+ ' + (o.recipients.length - 9) + ' more');
+    } else if (o.kind === 'cheer') {
+      var b = Number(o.bits) || 0;
+      if (b < printerCfg.min.bits) return;
+      job.action = 'cheered'; job.bigNum = b.toLocaleString(); job.bigNumLabel = 'bits';
+      job.message = o.message || '';
+    } else if (o.kind === 'kicks') {
+      var u = Number(o.usd) || 0;
+      if (u < printerCfg.min.kick) return;
+      job.action = 'sent a kick tip'; job.bigNum = '$' + u.toFixed(2); job.bigNumLabel = 'kick';
+    } else if (o.kind === 'super') {
+      var amt = parseFloat(String(o.amountText || '').replace(/[^0-9.]/g, ''));
+      if (!isNaN(amt) && amt < printerCfg.min.super) return;
+      job.action = o.actionText || 'sent a super chat';
+      job.banner = String(o.amountText || 'SUPER CHAT');
+      job.message = o.message || '';
+    } else if (o.kind === 'ttgift') {
+      var c = Number(o.coins) || 0;
+      if (c < printerCfg.min.coins) return;
+      job.action = 'sent a gift streak';
+      job.giftIconUrl = o.giftImage || null;
+      job.giftLabel = (o.giftName || 'Gift') + ((o.count || 1) > 1 ? ' ×' + o.count : '');
+      job.bigNum = c.toLocaleString(); job.bigNumLabel = 'coins';
+    } else if (o.kind === 'raid') {
+      var v = parseInt(o.viewers) || 0;
+      if (v && v < printerCfg.min.raid) return;
+      job.action = 'is raiding'; job.bigNum = v ? v.toLocaleString() : String(o.viewers); job.bigNumLabel = 'viewers';
+    } else if (o.kind === 'redeem') {
+      job.action = 'redeemed' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : '');
+      job.banner = String(o.reward || 'REWARD');
+      job.message = o.message || '';
+    } else if (o.kind === 'follow') {
+      job.action = o.actionText || 'followed';
+    }
+    _printerSend(job);
+  } catch (e) {}
+}
+
+// Boot: restore config, push it main-side, resolve the gate, populate UI.
+_printerLoadCfg();
+_printerGateCheck();
+setTimeout(function() { _printerSyncUi(); _printerSaveCfg(); printerRefreshList(); }, 1200);
+setInterval(printerPollStatus, 5000);
 // ── Discord+ (EA-only): live events, records, bot ─────────────────────────
 // Expanded Discord integration that goes beyond the free-tier stream recap:
 //   - Stylized embeds fired on individual events (follow/sub/cheer/gift/hype)

@@ -35,6 +35,12 @@ const obsServer = require('./obs-server');
 const discordBot = require('./discord-bot');
 const rotationRelay = require('./rotation-relay-client');
 
+// ── Thermal receipt printer ─────────────────────────────────────────────────
+// Prints stream events as styled raster receipts on an 80mm ESC/POS printer.
+// The renderer taps its normalized event pipeline (same spot that feeds OBS
+// alerts) and forwards jobs; rendering/dithering/spooling live in printer.js.
+const printer = require('./printer');
+
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
   try { return path.join(app.getPath('userData'), 'streamfusion-crash.log'); }
@@ -1051,6 +1057,9 @@ app.whenReady().then(() => {
   // Gating retired: every feature (OBS overlays included) is available to
   // everyone. The obs-server keeps its entitled-flag API, permanently true.
   try { obsServer.setEntitled(true); } catch (e) {}
+  // Let local companion surfaces (SF OBS dock) submit receipt print jobs
+  // through the obs-server's POST /api/print endpoint.
+  try { obsServer.setPrintHandler(function(job) { return printer.enqueue(job); }); } catch (e) {}
   discordBot.setMainWindow(mainWindow);
 
   // Rotation Relay — subscribes to song events from the streamer's Rotation
@@ -1060,6 +1069,11 @@ app.whenReady().then(() => {
   rotationRelay.setMainWindow(mainWindow);
   try { rotationRelay.start(); }
   catch (e) { logToFile('ROTATION-RELAY', 'start threw: ' + (e && e.message)); }
+
+  // Receipt printer — loads persisted config (printer name, rate limit).
+  // Inert until the renderer's Printer pane enables it.
+  try { printer.init({ log: function(msg) { logToFile('PRINTER', msg); } }); }
+  catch (e) { logToFile('PRINTER', 'init threw: ' + (e && e.message)); }
 
 
   // Check for updates (non-blocking). Verbose logging through every stage
@@ -1119,6 +1133,7 @@ app.on('before-quit', () => {
   try { obsServer.stopServer(); } catch (e) {}
   try { discordBot.disconnectBot(); } catch (e) {}
   try { rotationRelay.stop(); } catch (e) {}
+  try { printer.stop(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
@@ -1150,6 +1165,23 @@ ipcMain.on('obs-broadcast-shoutout', function(event, data) {
 });
 ipcMain.on('obs-broadcast-stats', function(event, data) {
   try { obsServer.broadcastStats(data); } catch (e) {}
+});
+
+// ── Receipt printer IPC ─────────────────────────────────────────────────────
+// The renderer owns the event tap + per-event filters; main owns rendering,
+// dithering, the queue and the raw spool to the Windows printer.
+ipcMain.handle('printer-list', function() {
+  try { return printer.listPrinters(); } catch (e) { return []; }
+});
+ipcMain.handle('printer-get-status', function() {
+  try { return printer.getStatus(); } catch (e) { return { enabled: false }; }
+});
+ipcMain.handle('printer-set-config', function(event, patch) {
+  try { return printer.setConfig(patch || {}); } catch (e) { return { enabled: false }; }
+});
+ipcMain.handle('printer-print', function(event, job) {
+  try { return printer.enqueue(job || {}); }
+  catch (e) { return { queued: false, reason: (e && e.message) || 'error' }; }
 });
 
 // ── Rotation Relay IPC ──────────────────────────────────────────────────────

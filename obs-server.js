@@ -481,6 +481,36 @@ function handleRequest(req, res) {
     return;
   }
 
+  // ── POST /api/print ──────────────────────────────────────────────────────
+  // Receipt printer job submission for companion surfaces on this machine
+  // (the SF OBS dock, local tooling). Origin-gated like the other
+  // state-changing endpoints; the handler is injected by main.js
+  // (printer.enqueue) so this module keeps working outside Electron, and
+  // it enforces the enabled flag + rate limit itself. Responds
+  // { queued, reason?, receiptNo? }.
+  if (p === '/api/print' && req.method === 'POST') {
+    if (!_originAllowed(req.headers['origin'])) {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': _acao(req) });
+      res.end(JSON.stringify({ error: 'origin not allowed' }));
+      return;
+    }
+    var prChunks = [];
+    req.on('data', function(d) {
+      prChunks.push(d);
+      if (prChunks.reduce(function(n, b) { return n + b.length; }, 0) > 65536) { req.destroy(); }
+    });
+    req.on('end', function() {
+      var body = {};
+      try { body = JSON.parse(Buffer.concat(prChunks).toString('utf-8') || '{}'); } catch (e) {}
+      var result;
+      try { result = printHandler ? printHandler(body) : { queued: false, reason: 'printer unavailable' }; }
+      catch (e) { result = { queued: false, reason: 'printer error' }; }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(result));
+    });
+    return;
+  }
+
   if (p === '/api/integrations/control' && req.method === 'POST') {
     // Cross-origin POST control endpoint. Mostly used by SF's own renderer
     // (via the obs-integration-control IPC) but exposed over HTTP too so
@@ -584,7 +614,7 @@ function handleRequest(req, res) {
   // products and the aquilo.gg/sf/customize/ page hit these from a
   // different origin so the browser sends a preflight for any POST with
   // Content-Type: application/json.
-  if ((p.indexOf('/api/integrations') === 0 || p.indexOf('/api/config') === 0) && req.method === 'OPTIONS') {
+  if ((p.indexOf('/api/integrations') === 0 || p.indexOf('/api/config') === 0 || p === '/api/print') && req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin':  '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -751,6 +781,11 @@ function broadcastStats(stats) {
 // toggle. (Kept rather than removed to preserve the module's exports.)
 function setEntitled(/* v */) {}
 
+// Receipt printer job handler, injected by main.js (printer.enqueue).
+// Kept as an injection point so this module has no Electron dependency.
+var printHandler = null;
+function setPrintHandler(fn) { printHandler = (typeof fn === 'function') ? fn : null; }
+
 function getUrls() {
   var base = 'http://' + BIND_HOST + ':' + serverPort;
   return {
@@ -780,6 +815,7 @@ module.exports = {
   setConfig:        setConfig,
   setConfigDir:     setConfigDir,  // main.js calls this before startServer
   setEntitled:      setEntitled,
+  setPrintHandler:  setPrintHandler,
   getUrls:          getUrls,
   isRunning:        isRunning,
   connectedClients: connectedClients,
