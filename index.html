@@ -3067,6 +3067,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>TikTok gifts</span><input type="checkbox" id="prnEvTtGift" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Raids</span><input type="checkbox" id="prnEvRaid" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Channel point redeems</span><input type="checkbox" id="prnEvRedeem" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Hype train <span style="color:var(--mut);font-weight:400">(start / level up / end)</span></span><input type="checkbox" id="prnEvHype" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Jukebox songs <span style="color:var(--mut);font-weight:400">(order-up stub per track)</span></span><input type="checkbox" id="prnEvSongs" checked onchange="onPrinterCfgChange()"></label>
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">FOLLOWS <span style="font-weight:400;letter-spacing:0">(paper-hungry &mdash; off by default)</span></div>
             <label class="frow"><span style="color:var(--tw)">Twitch follows</span><input type="checkbox" id="prnFollowTw" onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span style="color:var(--kk)">Kick follows</span><input type="checkbox" id="prnFollowKk" onchange="onPrinterCfgChange()"></label>
@@ -3087,6 +3089,15 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Min Super Chat ($)</span><input type="number" id="prnMinSuper" value="0" min="0" step="0.5" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Min raid viewers</span><input type="number" id="prnMinRaid" value="2" min="0" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Max receipts / minute <span style="color:var(--mut);font-weight:400">(overflow prints one digest)</span></span><input type="number" id="prnMaxPerMin" value="6" min="1" max="30" style="width:80px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PRINT MY NOTE</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Create a channel-point reward with this exact name (Twitch or Kick, &ldquo;require viewer text&rdquo; on). The viewer's note prints big &mdash; profanity-scrubbed &mdash; even when regular redeems are toggled off.</div>
+            <label class="frow"><span>Print viewer notes</span><input type="checkbox" id="prnEvNote" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Reward name</span><input type="text" id="prnNoteReward" value="Print My Note" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SHIFT TICKET</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
+            <button class="tbtn" onclick="printerShiftTicket()" style="font-size:11px;font-weight:700;padding:5px 10px">Print tonight's shift ticket</button>
           </div>
         </div>
 
@@ -10960,6 +10971,7 @@ function handleSBEvent(event, data, fromES) {
     // the feed sees the train without flooding. The alerts banner ignores this
     // type (no EVENT_META entry).
     sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: data.level || 1, phase: 'start' });
+    printerPost({ kind: 'hype', plat: 'tw', phase: 'start', level: data.level || 1 });
   } else if (key === 'Twitch.HypeTrainUpdate' || key === 'Twitch.HypeTrainProgress') {
     var _preHypeLvl = _htState.level || 0;
     updateHypeTrainProgress(data);
@@ -10982,6 +10994,7 @@ function handleSBEvent(event, data, fromES) {
       var _hc = data.lastContribution || data.last_contribution || (data.topContributions && data.topContributions[0]) || null;
       var _hcUser = (_hc && (_hc.userName || _hc.user_name || _hc.displayName || _hc.display_name || _hc.name || (_hc.user && (_hc.user.display_name || _hc.user.name)))) || '';
       sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: _hcUser || 'Hype Train', level: _hlvl, phase: 'levelup' });
+      printerPost({ kind: 'hype', plat: 'tw', phase: 'levelup', level: _hlvl, contributor: _hcUser });
     }
   // ── Twitch Polls ──────────────────────────────────────────────────────────
   } else if (key === 'Twitch.PollCreated' || key === 'Twitch.Poll.Created') {
@@ -11132,6 +11145,7 @@ function handleSBEvent(event, data, fromES) {
     endHypeTrain();
     pushMsg({ plat: 'tw', isEv: true, evType: 'hype', user: 'Hype Train', text: 'Hype Train ended! Level ' + _htState.level });
     sendObsAlert({ eventType: 'hypeTrain', platform: 'tw', user: 'Hype Train', level: _htState.level, phase: 'end' });
+    printerPost({ kind: 'hype', plat: 'tw', phase: 'end', level: _htState.level });
   } else if (key === 'Twitch.HypeTrainConductorUpdate') {
     updateHypeTrainProgress(data);
   } else if (key === 'Twitch.AdBreakBegin') {
@@ -16162,7 +16176,8 @@ function sendObsAlert(obj) {
 var PRINTER_ALLOWLIST = ['991099623'];   // Twitch user ids that see the feature
 var printerCfg = {
   enabled: false, printerName: '', maxPerMinute: 6,
-  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true },
+  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true },
+  noteReward: 'Print My Note',
   follows: { tw: false, kk: false, yt: false, tt: false },
   plats: { tw: true, kk: true, yt: true, tt: true },
   min: { bits: 100, coins: 100, kick: 1, super: 0, raid: 2 }
@@ -16208,6 +16223,7 @@ function _printerLoadCfg() {
       if (typeof d.printerName === 'string') printerCfg.printerName = d.printerName;
       if (typeof d.maxPerMinute === 'number') printerCfg.maxPerMinute = d.maxPerMinute;
       if (d.ev) Object.assign(printerCfg.ev, d.ev);
+      if (typeof d.noteReward === 'string') printerCfg.noteReward = d.noteReward;
       if (d.follows) Object.assign(printerCfg.follows, d.follows);
       // Migrate the pre-1.20.3 single follow toggle to per-platform.
       else if (d.ev && d.ev.follow === true) printerCfg.follows = { tw: true, kk: true, yt: true, tt: true };
@@ -16225,6 +16241,8 @@ function _printerSyncUi() {
   _prnEl('prnEvCheer').checked = printerCfg.ev.cheer;  _prnEl('prnEvKicks').checked = printerCfg.ev.kicks;
   _prnEl('prnEvSuper').checked = printerCfg.ev.super;  _prnEl('prnEvTtGift').checked = printerCfg.ev.ttgift;
   _prnEl('prnEvRaid').checked = printerCfg.ev.raid;    _prnEl('prnEvRedeem').checked = printerCfg.ev.redeem;
+  _prnEl('prnEvHype').checked = printerCfg.ev.hype;    _prnEl('prnEvSongs').checked = printerCfg.ev.songs;
+  _prnEl('prnEvNote').checked = printerCfg.ev.note;    _prnEl('prnNoteReward').value = printerCfg.noteReward;
   _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
   _prnEl('prnFollowYt').checked = printerCfg.follows.yt; _prnEl('prnFollowTt').checked = printerCfg.follows.tt;
   _prnEl('prnPlatTw').checked = printerCfg.plats.tw;   _prnEl('prnPlatKk').checked = printerCfg.plats.kk;
@@ -16242,8 +16260,11 @@ function onPrinterCfgChange() {
     sub: _prnEl('prnEvSub').checked,   gift: _prnEl('prnEvGift').checked,
     cheer: _prnEl('prnEvCheer').checked, kicks: _prnEl('prnEvKicks').checked,
     super: _prnEl('prnEvSuper').checked, ttgift: _prnEl('prnEvTtGift').checked,
-    raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked
+    raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked,
+    hype: _prnEl('prnEvHype').checked,   songs: _prnEl('prnEvSongs').checked,
+    note: _prnEl('prnEvNote').checked
   };
+  printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
   printerCfg.follows = {
     tw: _prnEl('prnFollowTw').checked, kk: _prnEl('prnFollowKk').checked,
     yt: _prnEl('prnFollowYt').checked, tt: _prnEl('prnFollowTt').checked
@@ -16299,6 +16320,34 @@ function printerPollStatus() {
   }
 }
 
+// Clock-in ticket: date + tonight's scheduled show/hours (aquilo.gg
+// schedule API) + current Twitch category. Manual button, prints as a
+// test-class job so it works even while event printing is disabled.
+function printerShiftTicket() {
+  onPrinterCfgChange();
+  var send = function(rows) {
+    _printerSend({
+      platform: 'sys', banner: 'CLOCK IN', action: 'shift ticket',
+      rows: rows, footer: 'have a good stream <3', isTest: true
+    });
+    setTimeout(printerPollStatus, 1500);
+  };
+  var d = new Date();
+  var rows = [{ label: 'date', value: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }];
+  fetch('https://aquilo.gg/api/schedule').then(function(r) { return r.json(); }).then(function(j) {
+    var days = (j && j.schedule && j.schedule.days) || [];
+    var ent = null;
+    for (var i = 0; i < days.length; i++) { if (days[i] && days[i].dow === d.getDay()) { ent = days[i]; break; } }
+    if (ent && ent.label) rows.push({ label: 'show', value: String(ent.label).slice(0, 22) });
+    if (ent && ent.startLocal) rows.push({ label: 'hours', value: ent.startLocal + ' – ' + (ent.endLocal || '?') + ' ET' });
+    if (S.twGame) rows.push({ label: 'category', value: String(S.twGame).slice(0, 22) });
+    send(rows);
+  }).catch(function() {
+    if (S.twGame) rows.push({ label: 'category', value: String(S.twGame).slice(0, 22) });
+    send(rows);
+  });
+}
+
 function printerTestPrint() {
   onPrinterCfgChange();
   _printerSend({
@@ -16343,10 +16392,32 @@ function _printerScheduleDigest() {
 function printerPost(o) {
   try {
     if (!_printerGate || !printerCfg.enabled || !o) return;
-    if (!printerCfg.plats[o.plat]) return;
+    if (o.plat !== 'sys' && !printerCfg.plats[o.plat]) return;
+
+    // "Print my note": a redeem whose reward name matches the configured
+    // reward prints as a note receipt — governed by its own toggle, NOT the
+    // general redeems toggle, and always profanity-scrubbed before paper.
+    if (o.kind === 'redeem') {
+      var _nr = String(printerCfg.noteReward || '').trim().toLowerCase();
+      if (_nr && String(o.reward || '').trim().toLowerCase() === _nr) {
+        if (printerCfg.ev.note === false) return;
+        var noteTxt = String(o.message || '').slice(0, 300);
+        try { if (typeof _profanityRegex !== 'undefined' && noteTxt) noteTxt = noteTxt.replace(_profanityRegex, function(mm) { return '*'.repeat(mm.length); }); } catch (e) {}
+        if (!noteTxt.replace(/[\s*]/g, '')) return;   // empty or fully-scrubbed → skip
+        _printerSend({
+          platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null, _kind: 'note',
+          banner: String(o.reward),
+          action: 'left you a note' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
+          message: noteTxt
+        });
+        return;
+      }
+    }
+
     var evKey = { sub: 'sub', resub: 'sub', member: 'sub', gift1: 'gift', bomb: 'gift',
                   cheer: 'cheer', kicks: 'kicks', super: 'super', ttgift: 'ttgift',
-                  raid: 'raid', redeem: 'redeem', follow: 'follow' }[o.kind];
+                  raid: 'raid', redeem: 'redeem', follow: 'follow',
+                  hype: 'hype', song: 'songs' }[o.kind];
     if (!evKey) return;
     if (evKey === 'follow') { if (!printerCfg.follows[o.plat]) return; }
     else if (printerCfg.ev[evKey] === false) return;
@@ -16401,6 +16472,20 @@ function printerPost(o) {
       job.message = o.message || '';
     } else if (o.kind === 'follow') {
       job.action = o.actionText || 'followed';
+    } else if (o.kind === 'hype') {
+      // Rung receipts stay short: no avatar row, just badge + banner + line.
+      job.user = '';
+      job.avatarUrl = null;
+      job.banner = 'HYPE TRAIN · LV ' + (o.level || 1);
+      job.action = o.phase === 'start' ? 'all aboard'
+                 : o.phase === 'end' ? 'train complete · reached lv ' + (o.level || 1)
+                 : (o.contributor ? o.contributor + ' boosted the train' : 'level up');
+    } else if (o.kind === 'song') {
+      job.user = o.requester || '';
+      job.action = o.requester ? 'requested a song' : 'now playing';
+      job.banner = 'ORDER UP';
+      job.giftIconUrl = o.art || null;
+      job.message = String(o.title || 'Unknown') + (o.artist ? ' — ' + o.artist : '');
     }
     _printerSend(job);
   } catch (e) {}
@@ -17113,6 +17198,7 @@ if (window.electronAPI && window.electronAPI.onRotationEvent) {
       isPinned = true;
       oneLine  = '♪ Now playing: ' + (d.title || 'Unknown') + (d.artist ? ' — ' + d.artist : '') + (_isReal(d.requestedBy) ? '  · req @' + d.requestedBy : '');
       _lastNowPlayingTs = ev.ts || Date.now();
+      printerPost({ kind: 'song', plat: 'sys', requester: (_isReal(d.requestedBy) ? d.requestedBy : ''), title: d.title || 'Unknown', artist: d.artist || '', art: d.art || '' });
       // Live-update the now-playing bar so it flips immediately on track
       // change without waiting for the next integration heartbeat.
       try { if (typeof _npApplyRotationEvent === 'function') _npApplyRotationEvent(d); } catch (e) {}

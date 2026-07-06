@@ -86,6 +86,7 @@ function drawAvatar(x, img, user, cy) {
   }
   x.beginPath(); x.arc(cx, cy, r + 2, 0, 7);
   x.lineWidth = 4; x.strokeStyle = '#000'; x.stroke();
+  x.fillStyle = '#000';   // initials branch leaves '#fff' — reset for callers
 }
 
 // Draws the job, returns the y coordinate just below the last element.
@@ -117,6 +118,7 @@ async function drawJob(x, job) {
     y += 14;
     const h = 64;
     const text = String(job.banner).toUpperCase();
+    x.fillStyle = '#000';
     x.fillRect(0, y, W, h);
     x.fillStyle = '#fff';
     try { x.letterSpacing = '4px'; } catch (e) {}
