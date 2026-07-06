@@ -2356,6 +2356,23 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             </div>
           </div>
           <div class="sec">
+            <div class="sec-hd">Reminders</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Pop a reminder into the events panel — with its own sound — on a schedule. Trigger it by how long you've been live (<strong>run time</strong>) or at a set <strong>clock time</strong>. Great for "stretch", "hydrate", "shout out socials", or "raid soon". Run-time reminders only fire while you're live.</div>
+            <div id="remList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+              <input id="remText" type="text" maxlength="120" placeholder="Reminder message" style="flex:1;min-width:150px;padding:7px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);font-size:12px">
+              <select id="remKind" onchange="remKindChanged()" style="padding:7px 8px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);font-size:12px">
+                <option value="runEvery">Every … of run time</option>
+                <option value="runAt">At … into stream</option>
+                <option value="clock">At a clock time</option>
+              </select>
+              <input id="remMinutes" type="number" min="1" max="1440" value="30" title="minutes" style="width:66px;padding:7px 8px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);font-size:12px">
+              <span id="remMinLbl" style="font-size:11px;color:var(--mut)">min</span>
+              <input id="remTime" type="time" value="21:00" style="display:none;padding:6px 8px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);font-size:12px">
+              <button onclick="remAdd()" style="padding:7px 12px;border-radius:7px;border:0;background:var(--accent);color:#fff;font-size:12px;font-weight:700;cursor:pointer">Add</button>
+            </div>
+          </div>
+          <div class="sec">
             <div class="sec-hd">Event Filters</div>
             <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
             <label class="frow"><span>Ticker bar (ads + pinned event, above chat)</span><input type="checkbox" id="sfTickerOn" checked onchange="saveSettings(); sfTickerApply();"></label>
@@ -3917,6 +3934,85 @@ function pfSaveTikTok() {
     if (tt) { var el = document.getElementById('pfTikTokInput'); if (el) el.value = '@' + tt; var s = document.getElementById('pfStatus-tiktok'); if (s) { s.textContent = 'Saved — gifts/events from @' + tt + ' are matched to you.'; s.style.color = '#53fc18'; } }
   } catch (e) {}
 })();
+
+// ── Reminders — scheduled pop-ups in the events panel with their own sound ──
+// Fire through showBanner (so they land wherever events do) + playSound. Two
+// trigger styles: run time (elapsed since you went live) or a clock time.
+var _reminders = [];
+function _loadReminders() { try { var r = JSON.parse(localStorage.getItem('sf_reminders') || '[]'); _reminders = Array.isArray(r) ? r : []; } catch (e) { _reminders = []; } }
+function _saveReminders() { try { localStorage.setItem('sf_reminders', JSON.stringify(_reminders.map(function(r){ return { id:r.id, text:r.text, kind:r.kind, minutes:r.minutes, time:r.time, enabled:r.enabled }; }))); } catch (e) {} }
+function _remRunStart() { try { return (typeof S !== 'undefined' && S && S.twLiveStartedAt) || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active && _streamSession.startTime) || 0; } catch (e) { return 0; } }
+function remKindChanged() {
+  var kEl = document.getElementById('remKind'); if (!kEl) return;
+  var clock = kEl.value === 'clock';
+  var mm = document.getElementById('remMinutes'), ml = document.getElementById('remMinLbl'), tm = document.getElementById('remTime');
+  if (mm) mm.style.display = clock ? 'none' : '';
+  if (ml) ml.style.display = clock ? 'none' : '';
+  if (tm) tm.style.display = clock ? '' : 'none';
+}
+function _remDesc(r) {
+  if (r.kind === 'clock') return 'at ' + (r.time || '00:00');
+  if (r.kind === 'runAt') return 'at ' + (r.minutes || 0) + ' min into stream';
+  return 'every ' + (r.minutes || 30) + ' min of run time';
+}
+function renderReminders() {
+  var el = document.getElementById('remList'); if (!el) return;
+  if (!_reminders.length) { el.innerHTML = '<div style="font-size:11px;color:var(--mut);font-style:italic">No reminders yet.</div>'; return; }
+  el.innerHTML = _reminders.map(function(r) {
+    return '<div style="display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px">'
+      + '<input type="checkbox" ' + (r.enabled ? 'checked' : '') + ' onchange="remToggle(\'' + r.id + '\',this.checked)" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">'
+      + '<div style="min-width:0;flex:1"><div style="font-size:12px;color:var(--txt);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.text || '') + '</div>'
+      + '<div style="font-size:10px;color:var(--mut)">' + esc(_remDesc(r)) + '</div></div>'
+      + '<button onclick="remTest(\'' + r.id + '\')" title="Preview now" style="padding:5px 8px;border-radius:6px;border:1px solid var(--bdr);background:var(--surf);color:var(--mut);font-size:10px;cursor:pointer">Test</button>'
+      + '<button onclick="remRemove(\'' + r.id + '\')" title="Remove" style="padding:5px 8px;border-radius:6px;border:1px solid var(--bdr);background:var(--surf);color:#ff6a6a;font-size:10px;cursor:pointer">&times;</button>'
+      + '</div>';
+  }).join('');
+}
+function remAdd() {
+  var text = ((document.getElementById('remText') || {}).value || '').trim();
+  if (!text) return;
+  var kind = (document.getElementById('remKind') || {}).value || 'runEvery';
+  var minutes = Math.max(1, Math.min(1440, parseInt((document.getElementById('remMinutes') || {}).value, 10) || 30));
+  var time = (document.getElementById('remTime') || {}).value || '21:00';
+  _reminders.push({ id: 'r' + Date.now() + Math.floor(Math.random() * 1000), text: text, kind: kind, minutes: minutes, time: time, enabled: true });
+  _saveReminders(); renderReminders();
+  var t = document.getElementById('remText'); if (t) t.value = '';
+}
+function remRemove(id) { _reminders = _reminders.filter(function(r){ return r.id !== id; }); _saveReminders(); renderReminders(); }
+function remToggle(id, on) { var r = _reminders.filter(function(x){ return x.id === id; })[0]; if (r) { r.enabled = !!on; _saveReminders(); } }
+function _fireReminder(r) {
+  try { showBanner('i-bell', r.text || 'Reminder', 'Reminder', null, ''); } catch (e) {}
+  try { playSound('reminder'); } catch (e) {}
+}
+function remTest(id) { var r = _reminders.filter(function(x){ return x.id === id; })[0]; if (r) _fireReminder(r); }
+var _remSessStart = -1;
+function _tickReminders() {
+  var start = _remRunStart();
+  // A new (or ended) live session resets the run-time trackers.
+  if (start !== _remSessStart) { _remSessStart = start; _reminders.forEach(function(r){ r._bucket = 0; r._firedRun = false; }); }
+  var live = !!start;
+  var runMs = start ? (Date.now() - start) : 0;
+  var now = new Date();
+  _reminders.forEach(function(r) {
+    if (!r.enabled) return;
+    if (r.kind === 'runEvery') {
+      if (!live) return;
+      var m = Math.max(1, r.minutes || 30);
+      var bucket = Math.floor(runMs / 60000 / m);
+      if (bucket > 0 && r._bucket !== bucket) { r._bucket = bucket; _fireReminder(r); }
+    } else if (r.kind === 'runAt') {
+      if (!live) return;
+      if (runMs >= Math.max(0, r.minutes || 0) * 60000 && !r._firedRun) { r._firedRun = true; _fireReminder(r); }
+    } else if (r.kind === 'clock') {
+      var p = (r.time || '').split(':'); var th = parseInt(p[0], 10), tmn = parseInt(p[1], 10);
+      if (now.getHours() === th && now.getMinutes() === tmn) {
+        var dayKey = now.toDateString();
+        if (r._clockDay !== dayKey) { r._clockDay = dayKey; _fireReminder(r); }
+      }
+    }
+  });
+}
+(function initReminders() { _loadReminders(); try { renderReminders(); } catch (e) {} try { remKindChanged(); } catch (e) {} setInterval(_tickReminders, 10000); })();
 
 // ── Twitch EventSub (native events straight from Twitch via the OAuth token) ──
 // Runs the EventSub WebSocket in the renderer; subscriptions are POSTed through
@@ -6366,7 +6462,7 @@ var _sndTypeToCustomKey = {
   chat: 'chat', follow: 'follow', sub: 'sub', gift: 'gift', raid: 'raid',
   cheer: 'cheer', super: 'super', keyword: 'keyword',
   'yt-sub': 'yt-sub', 'tt-follow': 'tt-follow', 'tt-gift': 'tt-gift',
-  'kk-follow': 'kk-follow', 'kk-sub': 'kk-sub', ext: 'ext', tip: 'tip'
+  'kk-follow': 'kk-follow', 'kk-sub': 'kk-sub', ext: 'ext', tip: 'tip', reminder: 'reminder'
 };
 
 function playSound(type) {
@@ -6385,6 +6481,7 @@ function playSound(type) {
   else if (type === 'super')   { playTone(400, 'triangle', 0.12, v); playTone(600, 'triangle', 0.12, v, 0.12); playTone(800, 'triangle', 0.35, v, 0.24); }
   else if (type === 'keyword') { playTone(880, 'sine', 0.07, v); playTone(1100, 'sine', 0.22, v, 0.08); }
   else if (type === 'tip' || type === 'ext') { playTone(523, 'triangle', 0.12, v); playTone(659, 'triangle', 0.12, v, 0.1); playTone(784, 'triangle', 0.3, v, 0.2); }
+  else if (type === 'reminder') { playTone(880, 'sine', 0.14, v); playTone(1174, 'sine', 0.16, v, 0.14); playTone(1568, 'sine', 0.3, v, 0.28); }
 }
 _loadCustomSounds();
 
