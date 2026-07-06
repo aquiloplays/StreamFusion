@@ -2245,6 +2245,38 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:10px;color:var(--mut);margin-top:2px;line-height:1.5">Subs, bits, follows, raids, redeems, hype trains &amp; ad breaks straight from Twitch via your OAuth, so SF doesn't lean on Streamer.bot for events. Deduped if SB is also connected. Needs a Twitch reconnect to grant the event scopes. <span id="eventsubStatus" style="color:var(--accent)"></span></div>
           </div>
           <div class="sec">
+            <div class="sec-hd">Sign in with browser</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:10px">
+              Log into <strong style="color:var(--txt)">Kick</strong> and <strong style="color:var(--txt)">YouTube</strong> through your browser — you're probably already signed in there, so it's one click. A tab opens on aquilo.gg; approve, then come back. <strong style="color:var(--txt)">TikTok</strong> has no login API, so just enter your @username and gifts/events get matched to you.
+            </div>
+            <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div style="min-width:0"><div style="font-size:12px;font-weight:700;color:var(--kk)">Kick</div><div id="pfStatus-kick" style="font-size:10px;color:var(--mut);line-height:1.4">Not connected</div></div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button id="pfBtn-kick" onclick="pfConnect('kick')" style="padding:7px 11px;border-radius:7px;border:0;background:#53fc18;color:#0a0a0a;font-size:11px;font-weight:700;cursor:pointer">Connect Kick</button>
+                  <button id="pfOut-kick" onclick="pfSignOut('kick')" style="padding:7px 11px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div style="min-width:0"><div style="font-size:12px;font-weight:700;color:#ff4d4d">YouTube</div><div id="pfStatus-youtube" style="font-size:10px;color:var(--mut);line-height:1.4">Not connected</div></div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button id="pfBtn-youtube" onclick="pfConnect('youtube')" style="padding:7px 11px;border-radius:7px;border:0;background:#ff0000;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Connect YouTube</button>
+                  <button id="pfOut-youtube" onclick="pfSignOut('youtube')" style="padding:7px 11px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+              <div style="font-size:12px;font-weight:700;color:#ff2e63;margin-bottom:5px">TikTok</div>
+              <div style="display:flex;gap:6px">
+                <input id="pfTikTokInput" type="text" placeholder="@username" spellcheck="false" style="flex:1;min-width:0;padding:7px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);font-size:11px">
+                <button onclick="pfSaveTikTok()" style="padding:7px 11px;border-radius:7px;border:0;background:#ff2e63;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Save</button>
+              </div>
+              <div id="pfStatus-tiktok" style="font-size:10px;color:var(--mut);line-height:1.4;margin-top:5px">No username set — gifts/events won't be matched to you.</div>
+            </div>
+          </div>
+          <div class="sec">
             <div class="sec-hd" style="color:var(--kk)">Kick</div>
             <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:5px">Enter your Kick channel slug to poll live viewer counts.</div>
             <div style="display:flex;gap:5px;align-items:center">
@@ -3835,6 +3867,55 @@ function renderTwitchSettings() {
       }
     }).catch(function() {});
   }
+})();
+
+// ── Multi-platform browser sign-in (Kick / YouTube) + TikTok username ────────
+// Opens the streamer's default browser to the aquilo.gg broker and polls for
+// the token (browser-auth.js in main). TikTok has no OAuth, so it's a local
+// username that feeds gift/event attribution.
+function pfApplyStatus(platform, st) {
+  var s = document.getElementById('pfStatus-' + platform);
+  var btn = document.getElementById('pfBtn-' + platform);
+  var out = document.getElementById('pfOut-' + platform);
+  var on = !!(st && st.signedIn);
+  if (s) { s.textContent = on ? ('Connected as @' + (st.login || st.displayName || 'you')) : 'Not connected'; s.style.color = on ? '#53fc18' : 'var(--mut)'; }
+  if (btn) { btn.style.display = on ? 'none' : ''; btn.disabled = false; btn.textContent = 'Connect ' + (platform === 'kick' ? 'Kick' : 'YouTube'); }
+  if (out) out.style.display = on ? '' : 'none';
+}
+async function pfConnect(platform) {
+  if (!window.electronAPI || !window.electronAPI.platformBeginAuth) return;
+  var btn = document.getElementById('pfBtn-' + platform);
+  var s = document.getElementById('pfStatus-' + platform);
+  if (btn) { btn.disabled = true; btn.textContent = 'Waiting for browser…'; }
+  if (s) { s.textContent = 'A tab opened in your browser — approve there, then come back.'; s.style.color = 'var(--mut)'; }
+  try { pfApplyStatus(platform, await window.electronAPI.platformBeginAuth(platform, 'broadcaster')); }
+  catch (e) { if (s) { s.textContent = (e && e.message) || 'Sign-in failed.'; s.style.color = '#ff6a6a'; } if (btn) { btn.disabled = false; btn.textContent = 'Connect ' + (platform === 'kick' ? 'Kick' : 'YouTube'); } }
+}
+async function pfSignOut(platform) {
+  if (!window.electronAPI || !window.electronAPI.platformSignOut) return;
+  pfApplyStatus(platform, await window.electronAPI.platformSignOut(platform));
+}
+function pfSaveTikTok() {
+  var el = document.getElementById('pfTikTokInput');
+  var s = document.getElementById('pfStatus-tiktok');
+  var v = ((el && el.value) || '').trim().replace(/^@+/, '').toLowerCase();
+  try { if (v) localStorage.setItem('sf_tiktok_username', v); else localStorage.removeItem('sf_tiktok_username'); } catch (e) {}
+  if (el) el.value = v ? ('@' + v) : '';
+  if (s) { s.textContent = v ? ('Saved — gifts/events from @' + v + ' are matched to you.') : "No username set — gifts/events won't be matched to you."; s.style.color = v ? '#53fc18' : 'var(--mut)'; }
+}
+(function initPlatforms() {
+  if (window.electronAPI && window.electronAPI.onPlatformStatusChanged) {
+    window.electronAPI.onPlatformStatusChanged(function(d) { if (d && d.platform) pfApplyStatus(d.platform, d.status); });
+  }
+  ['kick', 'youtube'].forEach(function(p) {
+    if (window.electronAPI && window.electronAPI.platformGetStatus) {
+      window.electronAPI.platformGetStatus(p, 'broadcaster').then(function(st) { pfApplyStatus(p, st); }).catch(function() {});
+    }
+  });
+  try {
+    var tt = localStorage.getItem('sf_tiktok_username');
+    if (tt) { var el = document.getElementById('pfTikTokInput'); if (el) el.value = '@' + tt; var s = document.getElementById('pfStatus-tiktok'); if (s) { s.textContent = 'Saved — gifts/events from @' + tt + ' are matched to you.'; s.style.color = '#53fc18'; } }
+  } catch (e) {}
 })();
 
 // ── Twitch EventSub (native events straight from Twitch via the OAuth token) ──

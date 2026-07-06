@@ -106,6 +106,25 @@ export default {
     // shared vault, reusable by every product.
     if (path === '/twitch/connect')     return handleTwitchConnect(request, env);
     if (path === '/twitch/vault/token') return handleVaultToken(request, env);
+    // Kick + YouTube channel/bot connect + vault (mirror the Twitch flow,
+    // parameterized by PLATFORM_CFG). Dark until the platform's client id is set.
+    if (path === '/kick/connect')        return handlePlatformConnect(request, env, PLATFORM_CFG.kick);
+    if (path === '/kick/callback')       return handlePlatformCallback(request, env, PLATFORM_CFG.kick);
+    if (path === '/kick/vault/token')    return handlePlatformVaultToken(request, env, PLATFORM_CFG.kick);
+    if (path === '/youtube/connect')     return handlePlatformConnect(request, env, PLATFORM_CFG.youtube);
+    if (path === '/youtube/callback')    return handlePlatformCallback(request, env, PLATFORM_CFG.youtube);
+    if (path === '/youtube/vault/token') return handlePlatformVaultToken(request, env, PLATFORM_CFG.youtube);
+    // Desktop app (StreamFusion) browser sign-in for twitch/kick/youtube — opens
+    // the system browser, polls for the token (see the /desktop handlers).
+    if (path === '/desktop/login')       return handleDesktopLogin(request, env);
+    if (path === '/desktop/token')       return handleDesktopToken(request, env);
+    // Which connect platforms are configured (booleans only — no secrets). The
+    // site /connect UI reads this to show a platform's cards only when ready.
+    if (path === '/connect/platforms') return json({
+      twitch: !!env.TWITCH_CLIENT_ID,
+      kick: !!PLATFORM_CFG.kick.clientId(env),
+      youtube: !!PLATFORM_CFG.youtube.clientId(env)
+    }, 200);
     return json({ error: 'not_found' }, 404);
   }
 };
@@ -674,6 +693,9 @@ async function handleTwitchCallback(request, env) {
   var state; try { state = JSON.parse(_b64urlDecode(url.searchParams.get('state') || '')); } catch (e) { state = null; }
   var ret = (state && state.r) || '';
   var session = (state && state.s) || '';
+  // Desktop app (StreamFusion) sign-in reuses this callback via a d:1 marker —
+  // it has no return/owner, so branch out before the vault-flow checks below.
+  if (state && state.d === 1) return _desktopCallback(env, _desktopCfg(env, 'twitch'), code, session, err);
   if (!ret || !_twitchReturnAllowed(ret) || !session) return json({ error: 'bad_state' }, 400);
   if (err || !code) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=error') } });
   if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET || !env.TWITCH_SESSIONS) {
@@ -703,6 +725,14 @@ async function handleTwitchCallback(request, env) {
     }
     var ownerId = mode === 'bot' ? String((state && state.o) || '') : u.id;
     if (!ownerId) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=no_owner') } });
+    // Bot mode attaches to the broadcaster's vault (state.o). That id rode
+    // through the provider in the state, so re-verify its owner signature —
+    // otherwise a streamer could swap `o` and plant their bot in another's
+    // vault. (Broadcaster mode keys by u.id from the freshly-authorized token,
+    // so it needs no owner check.)
+    if (mode === 'bot' && !(await verifyOwnerSig(env, ownerId, String((state && state.os) || '')))) {
+      return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=owner') } });
+    }
     var vkey = VAULT_KEY(ownerId);
     var vraw = await env.LOADOUT_BOLTS.get(vkey);
     var vault; try { vault = vraw ? JSON.parse(vraw) : {}; } catch (e) { vault = {}; }
@@ -720,6 +750,16 @@ async function handleTwitchCallback(request, env) {
     }
     vault.updatedAt = Date.now();
     await env.LOADOUT_BOLTS.put(vkey, JSON.stringify(vault));
+    // Merged sign-in (mint=1, broadcaster only): ALSO persist the identity
+    // session under the caller's nonce, so aquilo.gg's /api/twitch/link/finish
+    // can mint the aq_link login from this SAME consent via /twitch/me — one
+    // Twitch prompt instead of two. Guarded to mode==='connect' + state.x so a
+    // bot connect can never seed a session, and keyed by u.id (this vault write
+    // is broadcaster mode → rec is the account that just authorized), so it
+    // cannot seed a session for anyone else.
+    if (mode === 'connect' && state && state.x === 1) {
+      await env.TWITCH_SESSIONS.put('tw:' + session, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 60 });
+    }
     return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=' + (mode === 'bot' ? 'bot' : 'ok')), 'Cache-Control': 'no-store' } });
   }
 
@@ -830,7 +870,17 @@ async function handleTwitchConnect(request, env) {
   }
   var scopes = isBot ? BOT_CONNECT_SCOPES : BROADCASTER_CONNECT_SCOPES;
   var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
-  var state = _b64urlEncode(JSON.stringify({ s: session, r: ret, m: isBot ? 'bot' : 'connect', o: owner }));
+  // `os` = the owner signature, carried IN the state so the callback can
+  // re-verify it (the state round-trips through the provider and is otherwise
+  // tamperable — without this a malicious streamer could swap `o` to poison
+  // another streamer's vault/back-pointer).
+  // mint=1 (broadcaster only): tag the state so the shared callback ALSO writes
+  // an identity session under this nonce — letting ONE broadcaster consent
+  // double as the streamer's aquilo.gg sign-in, collapsing sign-in + authorize
+  // into a single Twitch prompt. Never honored for bot mode (see callback).
+  var stateObj = { s: session, r: ret, m: isBot ? 'bot' : 'connect', o: owner, os: osig };
+  if (url.searchParams.get('mint') === '1' && !isBot) stateObj.x = 1;
+  var state = _b64urlEncode(JSON.stringify(stateObj));
   var authUrl = TWITCH_OAUTH + '/authorize'
     + '?client_id=' + encodeURIComponent(env.TWITCH_CLIENT_ID)
     + '&redirect_uri=' + encodeURIComponent(redirectUri)
@@ -874,4 +924,366 @@ async function handleVaultToken(request, env) {
     await env.LOADOUT_BOLTS.put(VAULT_KEY(twitchId), JSON.stringify(vault));
   }
   return json({ ok: true, access_token: sub.access_token, expires_at: sub.expires_at, scope: sub.scope, login: sub.login, client_id: env.TWITCH_CLIENT_ID }, 200);
+}
+
+// ── Kick + YouTube channel/bot connect + vault (Aquilo ID, multi-platform) ──
+//
+// Generic mirror of the Twitch connect/callback/vault-token flow, parameterized
+// by PLATFORM_CFG. Reuses the SAME security primitives (verifyOwnerSig binds an
+// authorization to the broadcaster's Twitch id via CONNECT_OWNER_SECRET;
+// _twitchReturnAllowed, _b64urlEncode/Decode, _appendHash). Vault value shape is
+// identical to vault:tw:<id> (broadcaster/bot sub-objects) so consumers read it
+// the same way; only the KV prefix, OAuth endpoints, scopes, PKCE (Kick) and
+// offline-consent (YouTube) differ.
+//
+// Identity note: unlike Twitch (owner == the vault key), these platforms key the
+// vault by the PLATFORM id but the site authorizes by the streamer's TWITCH id.
+// So BOTH modes require an osig-signed `owner` (Twitch id); broadcaster-connect
+// writes a link:tw2<platform>:<twitchId> → platformId back-pointer, and
+// bot-connect resolves the broadcaster's platform vault through it.
+//
+// DARK by default: handlers early-return *_not_configured until the platform's
+// client id + secret are set on the broker.
+var PLATFORM_CFG = {
+  kick: {
+    key: 'kick',
+    authUrl: 'https://id.kick.com/oauth/authorize',
+    tokenUrl: 'https://id.kick.com/oauth/token',
+    vaultKey: function (id) { return 'vault:kick:' + id; },
+    clientId: function (env) { return env.KICK_CONNECT_CLIENT_ID || env.KICK_CLIENT_ID; },
+    clientSecret: function (env) { return env.KICK_CONNECT_CLIENT_SECRET || env.KICK_CLIENT_SECRET; },
+    redirect: function (env) { return env.KICK_CONNECT_REDIRECT_URI || 'https://auth.aquilo.gg/kick/callback'; },
+    broadcasterScopes: 'user:read channel:read channel:write chat:write events:subscribe',
+    botScopes: 'user:read chat:write',
+    pkce: true,
+    offline: false,
+    identity: async function (env, accessToken) {
+      var resp;
+      try { resp = await fetch('https://api.kick.com/public/v1/users', { headers: { 'Authorization': 'Bearer ' + accessToken, 'Accept': 'application/json' } }); }
+      catch (e) { return null; }
+      if (!resp.ok) return null;
+      var j; try { j = await resp.json(); } catch (e) { return null; }
+      var d = Array.isArray(j && j.data) ? j.data[0] : ((j && j.data) || j);
+      if (!d) return null;
+      var id = String(d.user_id != null ? d.user_id : (d.id != null ? d.id : ''));
+      if (!id) return null;
+      var name = String(d.name || d.username || d.slug || '');
+      return { id: id, login: name, display_name: name };
+    }
+  },
+  youtube: {
+    key: 'youtube',
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    vaultKey: function (id) { return 'vault:yt:' + id; },
+    clientId: function (env) { return env.YOUTUBE_CONNECT_CLIENT_ID || env.YOUTUBE_CLIENT_ID; },
+    clientSecret: function (env) { return env.YOUTUBE_CONNECT_CLIENT_SECRET || env.YOUTUBE_CLIENT_SECRET; },
+    redirect: function (env) { return env.YOUTUBE_CONNECT_REDIRECT_URI || 'https://auth.aquilo.gg/youtube/callback'; },
+    broadcasterScopes: 'openid https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
+    botScopes: 'openid https://www.googleapis.com/auth/youtube.force-ssl',
+    pkce: false,
+    offline: true,
+    identity: async function (env, accessToken) {
+      var resp;
+      try { resp = await fetch('https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true', { headers: { 'Authorization': 'Bearer ' + accessToken, 'Accept': 'application/json' } }); }
+      catch (e) { return null; }
+      if (!resp.ok) return null;
+      var j; try { j = await resp.json(); } catch (e) { return null; }
+      var it = j && Array.isArray(j.items) ? j.items[0] : null;
+      if (!it || !it.id) return null;
+      var sn = it.snippet || {};
+      return { id: String(it.id), login: String(sn.customUrl || it.id), display_name: String(sn.title || 'YouTube channel') };
+    }
+  }
+};
+
+function _pkceVerifier() {
+  var bytes = new Uint8Array(48);
+  crypto.getRandomValues(bytes);
+  var bin = ''; for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function _pkceChallenge(verifier) {
+  var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  var b = new Uint8Array(digest);
+  var bin = ''; for (var i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function _oauthTokenExchange(env, cfg, params, errBox) {
+  var form = new URLSearchParams();
+  form.set('client_id', cfg.clientId(env));
+  form.set('client_secret', cfg.clientSecret(env));
+  Object.keys(params).forEach(function (k) { if (params[k] != null) form.set(k, params[k]); });
+  var resp;
+  try {
+    resp = await fetch(cfg.tokenUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' }, body: form.toString() });
+  } catch (e) { if (errBox) { errBox.where = 'fetch'; errBox.body = String((e && e.message) || e); } return null; }
+  if (!resp.ok) {
+    if (errBox) { errBox.where = cfg.key; errBox.status = resp.status; try { errBox.body = await resp.json(); } catch (e) { try { errBox.body = await resp.text(); } catch (e2) { errBox.body = ''; } } }
+    return null;
+  }
+  try { return await resp.json(); } catch (e) { return null; }
+}
+
+async function handlePlatformConnect(request, env, cfg) {
+  if (!cfg.clientId(env)) return json({ error: cfg.key + '_not_configured' }, 500);
+  var url = new URL(request.url);
+  var session = url.searchParams.get('state') || url.searchParams.get('session') || '';
+  var ret = url.searchParams.get('return') || url.searchParams.get('redirect') || '';
+  var mode = (url.searchParams.get('mode') || 'broadcaster').toLowerCase();
+  var owner = url.searchParams.get('owner') || '';
+  var osig = url.searchParams.get('osig') || '';
+  if (!session || session.length < 16) return json({ error: 'missing_or_short_session' }, 400);
+  if (!ret || !_twitchReturnAllowed(ret)) return json({ error: 'return_not_allowed' }, 400);
+  // owner = the broadcaster's Twitch id, signed by the site from the session.
+  // Required for BOTH modes here (unlike Twitch) so the tw2<platform> back-
+  // pointer that links a streamer to their platform vault is authorized.
+  if (!owner) return json({ error: 'owner_required' }, 400);
+  if (!(await verifyOwnerSig(env, owner, osig))) return json({ error: 'owner_not_authorized' }, 403);
+  var isBot = mode === 'bot';
+  var scopes = isBot ? cfg.botScopes : cfg.broadcasterScopes;
+  var extra = '';
+  if (cfg.pkce) {
+    var verifier = _pkceVerifier();
+    var challenge = await _pkceChallenge(verifier);
+    // Verifier stays server-side (never in the state that round-trips through
+    // the provider), keyed by the session nonce with a short TTL.
+    if (env.LOADOUT_BOLTS) await env.LOADOUT_BOLTS.put('pkce:' + cfg.key + ':' + session, verifier, { expirationTtl: 600 });
+    extra += '&code_challenge=' + encodeURIComponent(challenge) + '&code_challenge_method=S256';
+  }
+  if (cfg.offline) extra += '&access_type=offline&prompt=consent';
+  // `os` = the owner signature, carried IN the state so the callback can
+  // re-verify it (the state round-trips through the provider and is otherwise
+  // tamperable — without this a malicious streamer could swap `o` to poison
+  // another streamer's vault/back-pointer).
+  var state = _b64urlEncode(JSON.stringify({ s: session, r: ret, m: isBot ? 'bot' : 'connect', o: owner, os: osig }));
+  var authUrl = cfg.authUrl
+    + '?client_id=' + encodeURIComponent(cfg.clientId(env))
+    + '&redirect_uri=' + encodeURIComponent(cfg.redirect(env))
+    + '&response_type=code'
+    + '&scope=' + encodeURIComponent(scopes)
+    + '&state=' + encodeURIComponent(state)
+    + extra;
+  return new Response(null, { status: 302, headers: { 'Location': authUrl, 'Cache-Control': 'no-store' } });
+}
+
+async function handlePlatformCallback(request, env, cfg) {
+  var url = new URL(request.url);
+  var err = url.searchParams.get('error');
+  var code = url.searchParams.get('code');
+  var state; try { state = JSON.parse(_b64urlDecode(url.searchParams.get('state') || '')); } catch (e) { state = null; }
+  var ret = (state && state.r) || '';
+  var session = (state && state.s) || '';
+  var mode = (state && state.m) || '';
+  var twitchOwner = String((state && state.o) || '');
+  var osig = String((state && state.os) || '');
+  // Desktop app (StreamFusion) sign-in reuses this callback via a d:1 marker —
+  // no vault/owner, so branch out before the connect-flow checks below.
+  if (state && state.d === 1) return _desktopCallback(env, cfg, code, session, err);
+  if (!ret || !_twitchReturnAllowed(ret) || !session || !twitchOwner || (mode !== 'connect' && mode !== 'bot')) return json({ error: 'bad_state' }, 400);
+  // Re-verify the owner signature carried in the state — the state round-trips
+  // through the provider, so `o` (twitchOwner) is untrusted until this passes.
+  // Without it a streamer could tamper `o` to write into another's vault/pointer.
+  if (!(await verifyOwnerSig(env, twitchOwner, osig))) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=owner') } });
+  if (err || !code) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, cfg.key + '=error') } });
+  if (!cfg.clientId(env) || !cfg.clientSecret(env) || !env.LOADOUT_BOLTS) {
+    return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=not_configured') } });
+  }
+  var params = { grant_type: 'authorization_code', code: code, redirect_uri: cfg.redirect(env) };
+  if (cfg.pkce) {
+    var verifier = await env.LOADOUT_BOLTS.get('pkce:' + cfg.key + ':' + session);
+    if (!verifier) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=pkce') } });
+    params.code_verifier = verifier;
+    await env.LOADOUT_BOLTS.delete('pkce:' + cfg.key + ':' + session);
+  }
+  var tok = await _oauthTokenExchange(env, cfg, params, {});
+  if (!tok || !tok.access_token) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=exchange') } });
+  // A vault we can't refresh is useless — require a refresh token at connect.
+  if (!tok.refresh_token) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=no_refresh') } });
+  var who = await cfg.identity(env, tok.access_token);
+  if (!who || !who.id) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=identity') } });
+
+  // Which platform vault does this write to? Broadcaster: the authorized
+  // account itself. Bot: the broadcaster's channel, resolved via the back-
+  // pointer written at channel-connect time (so a bot can't be attached before
+  // the channel is connected).
+  var vaultId;
+  if (mode === 'bot') {
+    vaultId = await env.LOADOUT_BOLTS.get('link:tw2' + cfg.key + ':' + twitchOwner);
+    if (!vaultId) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=error&reason=connect_channel_first') } });
+  } else {
+    vaultId = who.id;
+  }
+  var vkey = cfg.vaultKey(vaultId);
+  var vraw = await env.LOADOUT_BOLTS.get(vkey);
+  var vault; try { vault = vraw ? JSON.parse(vraw) : {}; } catch (e) { vault = {}; }
+  var sub = {
+    platformId: who.id, login: who.login, display_name: who.display_name,
+    refresh_token: tok.refresh_token, access_token: tok.access_token,
+    expires_at: Date.now() + ((tok.expires_in || 3600) * 1000),
+    scope: Array.isArray(tok.scope) ? tok.scope.join(' ') : (tok.scope || ''), updatedAt: Date.now()
+  };
+  if (mode === 'bot') {
+    vault.bot = sub;
+  } else {
+    vault.platformId = who.id; vault.login = who.login; vault.display_name = who.display_name;
+    vault.twitchOwner = twitchOwner;
+    vault.broadcaster = sub;
+    if (!vault.connectedAt) vault.connectedAt = Date.now();
+    // Authorize the site to find this vault by the streamer's Twitch id.
+    await env.LOADOUT_BOLTS.put('link:tw2' + cfg.key + ':' + twitchOwner, who.id);
+  }
+  vault.updatedAt = Date.now();
+  await env.LOADOUT_BOLTS.put(vkey, JSON.stringify(vault));
+
+  return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'connected=' + cfg.key + '-' + (mode === 'bot' ? 'bot' : 'ok')), 'Cache-Control': 'no-store' } });
+}
+
+// ── Desktop app sign-in (StreamFusion) — browser + poll ──────────────────────
+// A native app can't safely hold a client secret, so instead of an in-app login
+// the app opens the system browser (where the streamer is already logged in) to
+// /desktop/login, we run the OAuth here (secret stays server-side) reusing the
+// SAME provider callbacks as the vault connect (via a d:1 state marker — so NO
+// new redirect URIs to register), stash the token keyed by the app's nonce, and
+// the app polls /desktop/token to collect it. The poll is bound to a PKCE
+// verifier the app keeps private, so a nonce leaking through the browser URL /
+// history can't lift the token. Works identically for twitch/kick/youtube.
+function _desktopCfg(env, platform) {
+  if (platform === 'kick') return PLATFORM_CFG.kick;
+  if (platform === 'youtube') return PLATFORM_CFG.youtube;
+  if (platform === 'twitch') return {
+    key: 'twitch',
+    authUrl: TWITCH_OAUTH + '/authorize',
+    tokenUrl: TWITCH_OAUTH + '/token',
+    clientId: function (e) { return e.TWITCH_CLIENT_ID; },
+    clientSecret: function (e) { return e.TWITCH_CLIENT_SECRET; },
+    redirect: function (e) { return e.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT; },
+    broadcasterScopes: BROADCASTER_CONNECT_SCOPES,
+    botScopes: BOT_CONNECT_SCOPES,
+    pkce: false, offline: false,
+    identity: async function (e, token) {
+      var meRes = await _twitchHelix(e, token, 'GET', 'users', '', null);
+      var u = meRes && meRes.data && meRes.data.data && meRes.data.data[0];
+      return u ? { id: String(u.id), login: u.login, display_name: u.display_name } : null;
+    }
+  };
+  return null;
+}
+
+// GET /desktop/login?platform=&session=<nonce>&challenge=<S256>&mode=broadcaster|bot
+async function handleDesktopLogin(request, env) {
+  var url = new URL(request.url);
+  var platform = (url.searchParams.get('platform') || '').toLowerCase();
+  var session = url.searchParams.get('session') || '';
+  var challenge = url.searchParams.get('challenge') || '';
+  var mode = (url.searchParams.get('mode') || 'broadcaster').toLowerCase() === 'bot' ? 'bot' : 'broadcaster';
+  var cfg = _desktopCfg(env, platform);
+  if (!cfg) return json({ error: 'bad_platform' }, 400);
+  if (!cfg.clientId(env)) return json({ error: platform + '_not_configured' }, 503);
+  if (!session || session.length < 16) return json({ error: 'missing_or_short_session' }, 400);
+  if (!challenge || challenge.length < 20) return json({ error: 'missing_challenge' }, 400);
+  if (!env.LOADOUT_BOLTS) return json({ error: 'not_configured' }, 503);
+  var extra = '', pv = '';
+  if (cfg.pkce) { pv = _pkceVerifier(); extra += '&code_challenge=' + encodeURIComponent(await _pkceChallenge(pv)) + '&code_challenge_method=S256'; }
+  if (cfg.offline) extra += '&access_type=offline&prompt=consent';
+  // App's challenge + the provider PKCE verifier stay server-side, keyed by the
+  // nonce (never in the state that round-trips through the provider).
+  await env.LOADOUT_BOLTS.put('desktop:sess:' + session, JSON.stringify({ p: platform, m: mode, ch: challenge, pv: pv }), { expirationTtl: 600 });
+  var scopes = mode === 'bot' ? cfg.botScopes : cfg.broadcasterScopes;
+  var state = _b64urlEncode(JSON.stringify({ s: session, p: platform, m: mode, d: 1 }));
+  var authUrl = cfg.authUrl
+    + '?client_id=' + encodeURIComponent(cfg.clientId(env))
+    + '&redirect_uri=' + encodeURIComponent(cfg.redirect(env))
+    + '&response_type=code&scope=' + encodeURIComponent(scopes)
+    + '&state=' + encodeURIComponent(state) + extra;
+  return new Response(null, { status: 302, headers: { 'Location': authUrl, 'Cache-Control': 'no-store' } });
+}
+
+// Shared callback for the d:1 desktop flow (called from handleTwitch/PlatformCallback).
+async function _desktopCallback(env, cfg, code, session, err) {
+  var sessRaw = env.LOADOUT_BOLTS ? await env.LOADOUT_BOLTS.get('desktop:sess:' + session) : null;
+  var sess; try { sess = sessRaw ? JSON.parse(sessRaw) : null; } catch (e) { sess = null; }
+  if (!sess) return _desktopHtml('This sign-in link expired. Start again in StreamFusion.', false);
+  var fail = async function (reason, msg) {
+    await env.LOADOUT_BOLTS.put('desktop:tok:' + session, JSON.stringify({ error: reason, ch: sess.ch }), { expirationTtl: 600 });
+    await env.LOADOUT_BOLTS.delete('desktop:sess:' + session);
+    return _desktopHtml(msg, false);
+  };
+  if (err || !code) return fail('denied', 'Sign-in was cancelled. You can close this tab.');
+  var params = { grant_type: 'authorization_code', code: code, redirect_uri: cfg.redirect(env) };
+  if (cfg.pkce && sess.pv) params.code_verifier = sess.pv;
+  var tok = await _oauthTokenExchange(env, cfg, params, {});
+  if (!tok || !tok.access_token) return fail('exchange', 'Sign-in failed at the token step. Try again in StreamFusion.');
+  var who = null; try { who = await cfg.identity(env, tok.access_token); } catch (e) {}
+  await env.LOADOUT_BOLTS.put('desktop:tok:' + session, JSON.stringify({
+    ok: true, platform: cfg.key,
+    access_token: tok.access_token,
+    refresh_token: tok.refresh_token || null,
+    expires_at: tok.expires_in ? (Date.now() + tok.expires_in * 1000) : null,
+    scope: Array.isArray(tok.scope) ? tok.scope.join(' ') : (tok.scope || ''),
+    identity: who, ch: sess.ch
+  }), { expirationTtl: 600 });
+  await env.LOADOUT_BOLTS.delete('desktop:sess:' + session);
+  return _desktopHtml('Signed in to ' + cfg.key + '. Return to StreamFusion — you can close this tab.', true);
+}
+
+// GET /desktop/token?session=<nonce>&verifier=<the app's private PKCE verifier>
+async function handleDesktopToken(request, env) {
+  var url = new URL(request.url);
+  var session = url.searchParams.get('session') || '';
+  var verifier = url.searchParams.get('verifier') || '';
+  if (!session || !verifier) return json({ error: 'bad_request' }, 400);
+  if (!env.LOADOUT_BOLTS) return json({ error: 'not_configured' }, 503);
+  var raw = await env.LOADOUT_BOLTS.get('desktop:tok:' + session);
+  if (!raw) return json({ pending: true }, 200);      // not finished yet (or expired)
+  var rec; try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+  if (!rec) return json({ pending: true }, 200);
+  // Bind retrieval to the app's private verifier — the nonce alone (visible in
+  // the browser URL) must not be enough to lift the token.
+  if ((await _pkceChallenge(verifier)) !== rec.ch) return json({ error: 'verifier_mismatch' }, 403);
+  await env.LOADOUT_BOLTS.delete('desktop:tok:' + session);   // single use
+  if (rec.error) return json({ error: rec.error }, 200);
+  return json({ ok: true, platform: rec.platform, access_token: rec.access_token, refresh_token: rec.refresh_token, expires_at: rec.expires_at, scope: rec.scope, identity: rec.identity }, 200);
+}
+
+function _desktopHtml(msg, ok) {
+  var color = ok ? '#5bff95' : '#ff8a8a';
+  var mark = ok ? '✓' : '✕';
+  var body = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StreamFusion</title>'
+    + '<div style="font-family:system-ui,-apple-system,sans-serif;background:#0e0f13;color:#e7e9ee;min-height:100vh;display:grid;place-items:center;margin:0">'
+    + '<div style="text-align:center;padding:32px 24px;max-width:440px">'
+    + '<div style="font-size:46px;line-height:1;margin-bottom:12px;color:' + color + '">' + mark + '</div>'
+    + '<div style="font-size:16px;line-height:1.55">' + msg + '</div></div></div>';
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+}
+
+// POST /<platform>/vault/token { service, id|twitchId, role:'broadcaster'|'bot' }
+async function handlePlatformVaultToken(request, env, cfg) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400); }
+  if (!env.VAULT_SERVICE_SECRET || !body || body.service !== env.VAULT_SERVICE_SECRET) return json({ error: 'unauthorized' }, 401);
+  if (!cfg.clientId(env)) return json({ error: cfg.key + '_not_configured' }, 500);
+  if (!env.LOADOUT_BOLTS) return json({ error: 'vault_not_configured' }, 500);
+  var role = body.role === 'bot' ? 'bot' : 'broadcaster';
+  var vaultId = String(body.id || body[cfg.key + 'Id'] || '');
+  if (!vaultId && body.twitchId) vaultId = (await env.LOADOUT_BOLTS.get('link:tw2' + cfg.key + ':' + String(body.twitchId))) || '';
+  if (!vaultId) return json({ error: 'missing_id' }, 400);
+  var vraw = await env.LOADOUT_BOLTS.get(cfg.vaultKey(vaultId));
+  if (!vraw) return json({ error: 'not_connected' }, 404);
+  var vault; try { vault = JSON.parse(vraw); } catch (e) { return json({ error: 'corrupt' }, 500); }
+  var sub = role === 'bot' ? vault.bot : vault.broadcaster;
+  if (!sub || !sub.refresh_token) return json({ error: 'role_not_connected', role: role }, 404);
+  if (!sub.access_token || !sub.expires_at || (sub.expires_at - Date.now() < 120000)) {
+    var t = await _oauthTokenExchange(env, cfg, { grant_type: 'refresh_token', refresh_token: sub.refresh_token }, {});
+    if (!t || !t.access_token) return json({ error: 'refresh_failed' }, 502);
+    sub.access_token = t.access_token;
+    if (t.refresh_token) sub.refresh_token = t.refresh_token;
+    sub.expires_at = Date.now() + ((t.expires_in || 3600) * 1000);
+    sub.scope = Array.isArray(t.scope) ? t.scope.join(' ') : (t.scope || sub.scope);
+    sub.updatedAt = Date.now();
+    if (role === 'bot') vault.bot = sub; else vault.broadcaster = sub;
+    await env.LOADOUT_BOLTS.put(cfg.vaultKey(vaultId), JSON.stringify(vault));
+  }
+  return json({ ok: true, access_token: sub.access_token, expires_at: sub.expires_at, scope: sub.scope, login: sub.login, client_id: cfg.clientId(env) }, 200);
 }

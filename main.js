@@ -19,6 +19,7 @@ const { spawn } = require('child_process');
 // this connects the broadcaster's OWN Twitch app for the few things SB
 // doesn't expose (today: the Clip button). See twitch-auth.js.
 const twitchAuth = require('./twitch-auth');
+const browserAuth = require('./browser-auth');
 
 // ── OBS overlay server (EA-only) ────────────────────────────────────────────
 // Local HTTP + SSE server that powers browser-source overlays (chat feed,
@@ -1017,6 +1018,10 @@ app.whenReady().then(() => {
   // each service starts its own hourly re-verification loop.
   twitchAuth.setMainWindow(mainWindow);
   twitchAuth.registerIpcHandlers();
+  // Multi-platform browser sign-in (Kick / YouTube / Twitch) — opens the
+  // system browser + polls the aquilo.gg broker for the token.
+  browserAuth.setMainWindow(mainWindow);
+  browserAuth.registerIpcHandlers();
 
   // OBS overlay server comes up alongside the main window. It always
   // listens (so the streamer can bookmark the URLs without worrying about

@@ -160,6 +160,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   twitchBotSendChat:        (p)  => ipcRenderer.invoke('twitch-bot-send-chat', p || {}),
   onTwitchBotStatusChanged: (fn) => ipcRenderer.on('twitch-bot-status-changed', (e, status) => fn(status)),
 
+  // ── Multi-platform browser sign-in (Kick / YouTube / Twitch) ───────────────
+  // Opens the streamer's default browser to the aquilo.gg broker and polls for
+  // the token — they're usually already logged in there. platform: 'kick' |
+  // 'youtube' | 'twitch'; role: 'broadcaster' (default) | 'bot'.
+  platformBeginAuth:  (platform, role) => ipcRenderer.invoke('platform-begin-auth', { platform, role }),
+  platformGetStatus:  (platform, role) => ipcRenderer.invoke('platform-get-status', { platform, role }),
+  platformSignOut:    (platform, role) => ipcRenderer.invoke('platform-sign-out', { platform, role }),
+  onPlatformStatusChanged: (fn) => ipcRenderer.on('platform-status-changed', (e, d) => fn(d)),
+
   // ── OBS overlays (EA-only — broadcasts are no-ops until entitled) ───────
   // Renderer-side fan-out: anything the main app learns (chat msg, event,
   // shoutout click) goes to the OBS overlay server, which forwards to
