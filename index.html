@@ -3067,7 +3067,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>TikTok gifts</span><input type="checkbox" id="prnEvTtGift" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Raids</span><input type="checkbox" id="prnEvRaid" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Channel point redeems</span><input type="checkbox" id="prnEvRedeem" checked onchange="onPrinterCfgChange()"></label>
-            <label class="frow"><span>Follows <span style="color:var(--mut);font-weight:400">(paper-hungry &mdash; off by default)</span></span><input type="checkbox" id="prnEvFollow" onchange="onPrinterCfgChange()"></label>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">FOLLOWS <span style="font-weight:400;letter-spacing:0">(paper-hungry &mdash; off by default)</span></div>
+            <label class="frow"><span style="color:var(--tw)">Twitch follows</span><input type="checkbox" id="prnFollowTw" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span style="color:var(--kk)">Kick follows</span><input type="checkbox" id="prnFollowKk" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span style="color:var(--yt)">YouTube subscribers <span style="color:var(--mut);font-weight:400">(free subs, not members)</span></span><input type="checkbox" id="prnFollowYt" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span style="color:var(--tt)">TikTok follows</span><input type="checkbox" id="prnFollowTt" onchange="onPrinterCfgChange()"></label>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PLATFORMS</div>
             <label class="frow"><span style="color:var(--tw)">Twitch</span><input type="checkbox" id="prnPlatTw" checked onchange="onPrinterCfgChange()"></label>
@@ -16158,7 +16162,8 @@ function sendObsAlert(obj) {
 var PRINTER_ALLOWLIST = ['991099623'];   // Twitch user ids that see the feature
 var printerCfg = {
   enabled: false, printerName: '', maxPerMinute: 6,
-  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, follow: false },
+  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true },
+  follows: { tw: false, kk: false, yt: false, tt: false },
   plats: { tw: true, kk: true, yt: true, tt: true },
   min: { bits: 100, coins: 100, kick: 1, super: 0, raid: 2 }
 };
@@ -16203,6 +16208,9 @@ function _printerLoadCfg() {
       if (typeof d.printerName === 'string') printerCfg.printerName = d.printerName;
       if (typeof d.maxPerMinute === 'number') printerCfg.maxPerMinute = d.maxPerMinute;
       if (d.ev) Object.assign(printerCfg.ev, d.ev);
+      if (d.follows) Object.assign(printerCfg.follows, d.follows);
+      // Migrate the pre-1.20.3 single follow toggle to per-platform.
+      else if (d.ev && d.ev.follow === true) printerCfg.follows = { tw: true, kk: true, yt: true, tt: true };
       if (d.plats) Object.assign(printerCfg.plats, d.plats);
       if (d.min) Object.assign(printerCfg.min, d.min);
     }
@@ -16217,7 +16225,8 @@ function _printerSyncUi() {
   _prnEl('prnEvCheer').checked = printerCfg.ev.cheer;  _prnEl('prnEvKicks').checked = printerCfg.ev.kicks;
   _prnEl('prnEvSuper').checked = printerCfg.ev.super;  _prnEl('prnEvTtGift').checked = printerCfg.ev.ttgift;
   _prnEl('prnEvRaid').checked = printerCfg.ev.raid;    _prnEl('prnEvRedeem').checked = printerCfg.ev.redeem;
-  _prnEl('prnEvFollow').checked = printerCfg.ev.follow;
+  _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
+  _prnEl('prnFollowYt').checked = printerCfg.follows.yt; _prnEl('prnFollowTt').checked = printerCfg.follows.tt;
   _prnEl('prnPlatTw').checked = printerCfg.plats.tw;   _prnEl('prnPlatKk').checked = printerCfg.plats.kk;
   _prnEl('prnPlatYt').checked = printerCfg.plats.yt;   _prnEl('prnPlatTt').checked = printerCfg.plats.tt;
   _prnEl('prnMinBits').value = printerCfg.min.bits;    _prnEl('prnMinCoins').value = printerCfg.min.coins;
@@ -16233,8 +16242,11 @@ function onPrinterCfgChange() {
     sub: _prnEl('prnEvSub').checked,   gift: _prnEl('prnEvGift').checked,
     cheer: _prnEl('prnEvCheer').checked, kicks: _prnEl('prnEvKicks').checked,
     super: _prnEl('prnEvSuper').checked, ttgift: _prnEl('prnEvTtGift').checked,
-    raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked,
-    follow: _prnEl('prnEvFollow').checked
+    raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked
+  };
+  printerCfg.follows = {
+    tw: _prnEl('prnFollowTw').checked, kk: _prnEl('prnFollowKk').checked,
+    yt: _prnEl('prnFollowYt').checked, tt: _prnEl('prnFollowTt').checked
   };
   printerCfg.plats = {
     tw: _prnEl('prnPlatTw').checked, kk: _prnEl('prnPlatKk').checked,
@@ -16335,7 +16347,9 @@ function printerPost(o) {
     var evKey = { sub: 'sub', resub: 'sub', member: 'sub', gift1: 'gift', bomb: 'gift',
                   cheer: 'cheer', kicks: 'kicks', super: 'super', ttgift: 'ttgift',
                   raid: 'raid', redeem: 'redeem', follow: 'follow' }[o.kind];
-    if (!evKey || printerCfg.ev[evKey] === false) return;
+    if (!evKey) return;
+    if (evKey === 'follow') { if (!printerCfg.follows[o.plat]) return; }
+    else if (printerCfg.ev[evKey] === false) return;
 
     var job = { platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null, _kind: evKey };
     if (o.kind === 'sub') {
