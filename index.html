@@ -1925,7 +1925,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
       <div class="ob-nav">
         <button class="ob-back" onclick="obBack()">Back</button>
         <button class="ob-skip" onclick="obNext()">Skip for now</button>
-        <button class="ob-next" onclick="window.open('https://www.twitch.tv/prodigalttv/subscribe','_blank');obNext()" style="background:#9146FF;border-color:#9146FF;display:flex;align-items:center;gap:6px">
+        <button class="ob-next" onclick="obSubscribe()" style="background:#9146FF;border-color:#9146FF;display:flex;align-items:center;gap:6px">
           <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
           Subscribe on Twitch
         </button>
@@ -3459,6 +3459,15 @@ function obGo(pg) {
 }
 function obNext() { if (_obPage < _obTotal - 1) obGo(_obPage + 1); }
 function obBack() { if (_obPage > 0) obGo(_obPage - 1); }
+// Aquilo's CURRENT Twitch channel URL, resolved from the permanent
+// broadcaster id so a username rename never strands the support link.
+// The hardcoded slug is only the fallback if the resolver is offline.
+var _aquiloTwitchUrl = 'https://www.twitch.tv/prodigalttv';
+fetch('https://loadout-discord.aquiloplays.workers.dev/api/twitch/login')
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (d) { if (d && d.login) _aquiloTwitchUrl = 'https://www.twitch.tv/' + String(d.login); })
+  .catch(function () {});
+function obSubscribe() { window.open(_aquiloTwitchUrl + '/subscribe', '_blank'); obNext(); }
 // Universal close for the onboarding overlay. Used by the top-right X and
 // reachable from anywhere — handy when the streamer just clicked "Made by
 // aquilo" to peek at credits and doesn't want to click through the whole
