@@ -27,6 +27,10 @@ let recent = [];            // timestamps of recent prints (rate limit window)
 let lastResult = { ok: null, at: 0, error: '' };
 let receiptCounter = 0;
 let logFn = function () {};
+let notifyFn = null;        // paper-state changes → main.js → renderer banner
+let paperState = 'unknown'; // 'ok' | 'low' | 'out' | 'offline' | 'unknown'
+let paperTimer = null;
+let paperWarned = false;    // one FEED ME receipt per low-paper episode
 
 function cfgPath() { return path.join(app.getPath('userData'), 'printer-config.json'); }
 
@@ -46,7 +50,60 @@ function saveConfig() {
 
 function init(opts) {
   if (opts && opts.log) logFn = opts.log;
+  if (opts && opts.notify) notifyFn = opts.notify;
   loadConfig();
+  startPaperWatch();
+}
+
+// ── Paper watch ──────────────────────────────────────────────────────────────
+// Best-effort roll monitoring through the Windows driver (Win32_Printer.
+// DetectedErrorState: 3 = low paper, 4 = no paper). Receipt-printer drivers
+// vary in what they report — when the driver stays silent the state simply
+// remains 'ok'/'unknown' and this feature is inert. On the first 'low' of an
+// episode we also print one FEED ME receipt so the warning is physical.
+function startPaperWatch() {
+  if (paperTimer) return;
+  paperTimer = setInterval(pollPaper, 90000);
+  setTimeout(pollPaper, 6000);
+}
+
+function pollPaper() {
+  if (!cfg.printerName || !cfg.enabled) { paperState = 'unknown'; return; }
+  try {
+    const nameEsc = cfg.printerName.replace(/'/g, "''");
+    const ps = spawn('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command',
+       "Get-CimInstance Win32_Printer -Filter \"Name='" + nameEsc + "'\" | Select-Object DetectedErrorState,PrinterStatus,WorkOffline | ConvertTo-Json -Compress"],
+      { windowsHide: true });
+    let out = '';
+    ps.stdout.on('data', function (d) { out += d.toString(); });
+    ps.on('close', function () {
+      let next = 'ok';
+      try {
+        const j = JSON.parse(out.trim() || 'null');
+        if (!j) next = 'unknown';
+        else if (j.WorkOffline === true) next = 'offline';
+        else if (Number(j.DetectedErrorState) === 4) next = 'out';
+        else if (Number(j.DetectedErrorState) === 3) next = 'low';
+      } catch (e) { next = 'unknown'; }
+      const prev = paperState;
+      paperState = next;
+      if (next !== prev && (next === 'low' || next === 'out' || next === 'offline' || prev === 'low' || prev === 'out' || prev === 'offline')) {
+        logFn('paper state: ' + prev + ' -> ' + next);
+        try { if (notifyFn) notifyFn(next); } catch (e) {}
+      }
+      if (next === 'low' && !paperWarned) {
+        paperWarned = true;
+        enqueue({
+          platform: 'sys', banner: 'FEED ME', isTest: true,
+          action: 'paper is running low',
+          message: 'swap the roll before the next gift bomb'
+        });
+      }
+      if (next === 'ok') paperWarned = false;
+    });
+    ps.on('error', function () {});
+  } catch (e) {}
 }
 
 function setConfig(patch) {
@@ -69,7 +126,8 @@ function getStatus() {
     lastOk: lastResult.ok,
     lastError: lastResult.error,
     lastAt: lastResult.at,
-    receiptCounter: receiptCounter
+    receiptCounter: receiptCounter,
+    paper: paperState
   };
 }
 
@@ -318,6 +376,7 @@ function pump() {
 function stop() {
   try { if (renderWin && !renderWin.isDestroyed()) renderWin.destroy(); } catch (e) {}
   renderWin = null;
+  if (paperTimer) { clearInterval(paperTimer); paperTimer = null; }
 }
 
 module.exports = {

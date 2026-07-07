@@ -16322,6 +16322,7 @@ function _printerShowStatus(st) {
   if (st.queued) bits.push(st.queued + ' queued');
   if (st.lastOk === true) bits.push('last print OK');
   if (st.lastOk === false) bits.push('last print FAILED: ' + (st.lastError || '?'));
+  if (st.paper && st.paper !== 'unknown') bits.push('paper: ' + st.paper);
   if (st.receiptCounter) bits.push('#' + st.receiptCounter + ' lifetime');
   el.textContent = bits.join(' · ');
 }
@@ -16443,6 +16444,15 @@ function printerPost(o) {
     } else if (o.kind === 'resub') {
       job.action = 'resubscribed · ' + o.months + ' months' + (o.tier ? ' · ' + o.tier : '');
       job.message = o.message || '';
+      // Milestone years upgrade to an anniversary certificate: banner +
+      // the year count huge. Fires on exact 12-month multiples.
+      var _annMo = parseInt(o.months) || 0;
+      if (_annMo >= 12 && _annMo % 12 === 0) {
+        var _annYr = _annMo / 12;
+        job.banner = 'HAPPY ANNIVERSARY';
+        job.bigNum = _annYr;
+        job.bigNumLabel = _annYr === 1 ? 'year subscribed' : 'years subscribed';
+      }
     } else if (o.kind === 'member') {
       job.action = o.actionText || 'became a member';
       job.message = o.message || '';
@@ -16515,6 +16525,19 @@ function printerPost(o) {
     }
     _printerSend(job);
   } catch (e) {}
+}
+
+// Paper-state alerts from the driver watch: surface low/out/offline (and
+// the recovery) as a chat-panel system row so it's visible from anywhere,
+// not just the Printer settings pane.
+if (window.electronAPI && window.electronAPI.onPrinterPaper) {
+  window.electronAPI.onPrinterPaper(function(state) {
+    var msg = state === 'low' ? 'Receipt printer: paper LOW — swap the roll soon.'
+            : state === 'out' ? 'Receipt printer: OUT OF PAPER.'
+            : state === 'offline' ? 'Receipt printer: offline.'
+            : state === 'ok' ? 'Receipt printer: back to normal.' : '';
+    if (msg) try { sysMsg('tw', msg); } catch (e) {}
+  });
 }
 
 // Boot: restore config, push it main-side, resolve the gate, populate UI.

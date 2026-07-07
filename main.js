@@ -1072,7 +1072,16 @@ app.whenReady().then(() => {
 
   // Receipt printer — loads persisted config (printer name, rate limit).
   // Inert until the renderer's Printer pane enables it.
-  try { printer.init({ log: function(msg) { logToFile('PRINTER', msg); } }); }
+  try {
+    printer.init({
+      log: function(msg) { logToFile('PRINTER', msg); },
+      notify: function(paperState) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('printer-paper', paperState);
+        }
+      }
+    });
+  }
   catch (e) { logToFile('PRINTER', 'init threw: ' + (e && e.message)); }
 
 

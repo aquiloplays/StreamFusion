@@ -210,6 +210,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // returns { queued, reason?, receiptNo? }. Config: { enabled, printerName,
   // maxPerMinute }. The Printer settings pane drives all of these.
   printerList:      ()      => ipcRenderer.invoke('printer-list'),
+  // Paper-state changes ('ok'|'low'|'out'|'offline') from the driver watch.
+  onPrinterPaper:   (fn)    => ipcRenderer.on('printer-paper', (e, state) => fn(state)),
   printerGetStatus: ()      => ipcRenderer.invoke('printer-get-status'),
   printerSetConfig: (patch) => ipcRenderer.invoke('printer-set-config', patch || {}),
   printerPrint:     (job)   => ipcRenderer.invoke('printer-print', job || {}),
