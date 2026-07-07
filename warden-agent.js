@@ -15,6 +15,32 @@ const fs = require('fs');
 
 const WORKER = 'loadout-discord.aquiloplays.workers.dev';
 
+// Command spec — MUST match discord-bot/warden-obs.js on the worker.
+const MEDIA_ACTIONS = ['play', 'pause', 'restart', 'stop', 'next', 'previous'];
+const MOVE_TARGETS = ['topleft', 'topright', 'bottomleft', 'bottomright', 'center', 'reset'];
+// TriggerMediaInputAction enum values, keyed by our short verb.
+const MEDIA_ENUM = {
+  play: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PLAY',
+  pause: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PAUSE',
+  restart: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART',
+  stop: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP',
+  next: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_NEXT',
+  previous: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PREVIOUS',
+};
+// Margin from the canvas edge when snapping a source to a corner (px).
+const MOVE_MARGIN = 16;
+// Remembered pre-move transforms so `reset` can restore a source's original
+// spot. Keyed by "scene::source"; in-memory (cleared on SF restart), which is
+// fine — reset is a convenience, not a guarantee.
+const _moveOriginals = new Map();
+
+function _parseDb(s) {
+  if (!/^-?\d{1,3}(\.\d+)?$/.test(String(s))) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n > 0 || n < -100) return null;
+  return n;
+}
+
 let cfg = { enabled: false, streamerId: '', key: '', obs: { port: 4455, password: '' }, caps: null };
 let ws = null;
 let stopped = true;
@@ -144,13 +170,23 @@ function replyResult(cmdId, action, ok, error) {
 function handleObsCmd(frame) {
   const action = String(frame.action || '');
   const arg = String(frame.arg || '');
+  const arg2 = String(frame.arg2 || '');
   const caps = cfg.caps || {};
-  // Local re-check mirrors the server allowlist (defense in depth).
+  // Local re-check mirrors the server allowlist (defense in depth). Kept in
+  // lockstep with discord-bot/warden-obs.js isObsCommandAllowed.
+  const inList = function (l, v) { return Array.isArray(l) && l.indexOf(v) !== -1; };
   const allowed =
     (action === 'brbPanic' && caps.brbPanic) ||
-    (action === 'sceneSwitch' && (caps.scenes || []).indexOf(arg) !== -1) ||
-    (action === 'sourceToggle' && (caps.sources || []).indexOf(arg) !== -1) ||
-    (action === 'muteMic' && (caps.mics || []).indexOf(arg) !== -1);
+    (action === 'sceneSwitch' && inList(caps.scenes, arg)) ||
+    (action === 'sourceToggle' && inList(caps.sources, arg)) ||
+    (action === 'muteMic' && inList(caps.mics, arg)) ||
+    (action === 'saveReplay' && caps.replay === true) ||
+    (action === 'filterToggle' && !!arg && !!arg2 && inList(caps.filters, arg + '::' + arg2)) ||
+    (action === 'setVolume' && inList(caps.volumes, arg) && _parseDb(arg2) !== null) ||
+    (action === 'mediaControl' && inList(caps.media, arg) && MEDIA_ACTIONS.indexOf(arg2) !== -1) ||
+    (action === 'refreshBrowser' && inList(caps.browsers, arg)) ||
+    (action === 'fireHotkey' && inList(caps.hotkeys, arg)) ||
+    (action === 'moveSource' && inList(caps.movable, arg) && MOVE_TARGETS.indexOf(arg2) !== -1);
   if (!allowed) { replyResult(frame.cmdId, action, false, 'not-allowed'); return; }
 
   obsRun(function (obs, done) {
@@ -171,24 +207,108 @@ function handleObsCmd(frame) {
         })();
       });
     } else if (action === 'sourceToggle') {
-      // Toggle a source's visibility in the current program scene.
-      obs.req('GetCurrentProgramScene', {}, function (ok, d) {
-        const sceneName = d && (d.currentProgramSceneName || d.sceneName);
-        if (!ok || !sceneName) { done(false); return; }
-        obs.req('GetSceneItemId', { sceneName, sourceName: arg }, function (ok2, d2) {
-          if (!ok2 || !d2 || d2.sceneItemId == null) { done(false); return; }
-          const id = d2.sceneItemId;
-          obs.req('GetSceneItemEnabled', { sceneName, sceneItemId: id }, function (ok3, d3) {
-            if (!ok3) { done(false); return; }
-            obs.req('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: !(d3 && d3.sceneItemEnabled) }, function (ok4) { done(ok4); });
-          });
+      _withSceneItem(obs, arg, function (sceneName, id) {
+        if (id == null) { done(false); return; }
+        obs.req('GetSceneItemEnabled', { sceneName, sceneItemId: id }, function (ok3, d3) {
+          if (!ok3) { done(false); return; }
+          obs.req('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: !(d3 && d3.sceneItemEnabled) }, function (ok4) { done(ok4); });
         });
       });
+    } else if (action === 'saveReplay') {
+      // Requires the replay buffer to be running; OBS errors otherwise and we
+      // surface that so the mod knows to ask the streamer to start it.
+      obs.req('SaveReplayBuffer', {}, function (ok) { done(ok); });
+    } else if (action === 'filterToggle') {
+      obs.req('GetSourceFilter', { sourceName: arg, filterName: arg2 }, function (ok, d) {
+        if (!ok) { done(false); return; }
+        obs.req('SetSourceFilterEnabled', {
+          sourceName: arg, filterName: arg2, filterEnabled: !(d && d.filterEnabled),
+        }, function (ok2) { done(ok2); });
+      });
+    } else if (action === 'setVolume') {
+      const db = _parseDb(arg2);
+      if (db === null) { done(false); return; }
+      obs.req('SetInputVolume', { inputName: arg, inputVolumeDb: db }, function (ok) { done(ok); });
+    } else if (action === 'mediaControl') {
+      const mediaAction = MEDIA_ENUM[arg2];
+      if (!mediaAction) { done(false); return; }
+      obs.req('TriggerMediaInputAction', { inputName: arg, mediaAction }, function (ok) { done(ok); });
+    } else if (action === 'refreshBrowser') {
+      // The documented way to hard-refresh a browser source's cache.
+      obs.req('PressInputPropertiesButton', { inputName: arg, propertyName: 'refreshnocache' }, function (ok) { done(ok); });
+    } else if (action === 'fireHotkey') {
+      obs.req('TriggerHotkeyByName', { hotkeyName: arg }, function (ok) { done(ok); });
+    } else if (action === 'moveSource') {
+      _moveSource(obs, arg, arg2, done);
     } else {
       done(false);
     }
   }, function (ok, err) {
     replyResult(frame.cmdId, action, ok, err);
+  });
+}
+
+// Resolve a source/group name to its scene-item id in the CURRENT program
+// scene, then hand (sceneName, sceneItemId) to cb. cb gets (sceneName, null)
+// when the source isn't in the current scene.
+function _withSceneItem(obs, sourceName, cb) {
+  obs.req('GetCurrentProgramScene', {}, function (ok, d) {
+    const sceneName = d && (d.currentProgramSceneName || d.sceneName);
+    if (!ok || !sceneName) { cb(null, null); return; }
+    obs.req('GetSceneItemId', { sceneName, sourceName }, function (ok2, d2) {
+      if (!ok2 || !d2 || d2.sceneItemId == null) { cb(sceneName, null); return; }
+      cb(sceneName, d2.sceneItemId);
+    });
+  });
+}
+
+// Snap a source/group to a preset spot in the current program scene, or
+// `reset` it to where it sat before the first move this session. Forces
+// top-left position alignment so the corner math is deterministic.
+function _moveSource(obs, sourceName, target, done) {
+  _withSceneItem(obs, sourceName, function (sceneName, id) {
+    if (id == null) { done(false); return; }
+    const key = sceneName + '::' + sourceName;
+    obs.req('GetSceneItemTransform', { sceneName, sceneItemId: id }, function (okT, dT) {
+      if (!okT || !dT || !dT.sceneItemTransform) { done(false); return; }
+      const tf = dT.sceneItemTransform;
+      if (target === 'reset') {
+        const orig = _moveOriginals.get(key);
+        if (!orig) { done(true); return; } // never moved → nothing to undo
+        obs.req('SetSceneItemTransform', {
+          sceneName, sceneItemId: id,
+          sceneItemTransform: { positionX: orig.positionX, positionY: orig.positionY, alignment: orig.alignment },
+        }, function (ok) { done(ok); });
+        return;
+      }
+      // Remember the original spot once, so reset is honest even after several
+      // moves.
+      if (!_moveOriginals.has(key)) {
+        _moveOriginals.set(key, {
+          positionX: tf.positionX, positionY: tf.positionY,
+          alignment: (typeof tf.alignment === 'number' ? tf.alignment : 5),
+        });
+      }
+      obs.req('GetVideoSettings', {}, function (okV, dV) {
+        if (!okV || !dV) { done(false); return; }
+        const baseW = dV.baseWidth, baseH = dV.baseHeight;
+        const w = tf.width || 0, h = tf.height || 0; // rendered (post-scale) size
+        const M = MOVE_MARGIN;
+        let x = M, y = M;
+        if (target === 'topleft') { x = M; y = M; }
+        else if (target === 'topright') { x = baseW - w - M; y = M; }
+        else if (target === 'bottomleft') { x = M; y = baseH - h - M; }
+        else if (target === 'bottomright') { x = baseW - w - M; y = baseH - h - M; }
+        else if (target === 'center') { x = (baseW - w) / 2; y = (baseH - h) / 2; }
+        else { done(false); return; }
+        // alignment 5 = top-left (OBS_ALIGN_LEFT|OBS_ALIGN_TOP), so positionX/Y
+        // is the item's top-left corner — matching the math above.
+        obs.req('SetSceneItemTransform', {
+          sceneName, sceneItemId: id,
+          sceneItemTransform: { positionX: Math.round(x), positionY: Math.round(y), alignment: 5 },
+        }, function (ok) { done(ok); });
+      });
+    });
   });
 }
 
@@ -248,21 +368,43 @@ function obsRun(body, after) {
   });
 }
 
-// List OBS scenes / inputs so the streamer can build the allowlist in the
-// pane. Returns via cb({ scenes:[], sources:[], mics:[] }).
+// List OBS scenes / inputs / groups / hotkeys / per-source filters so the
+// streamer can build every allowlist in the pane. Returns via cb({ scenes,
+// sources, mics, media, browsers, hotkeys, groups, filters }). filters is a
+// flat list of { source, filter } pairs. Best-effort: any sub-probe that
+// fails just leaves its list empty.
 function probeObs(cb) {
-  const out = { scenes: [], sources: [], mics: [] };
+  const out = { scenes: [], sources: [], mics: [], media: [], browsers: [], hotkeys: [], groups: [], filters: [] };
   obsRun(function (obs, done) {
     obs.req('GetSceneList', {}, function (ok, d) {
       if (ok && d && Array.isArray(d.scenes)) out.scenes = d.scenes.map(function (s) { return s.sceneName; });
       obs.req('GetInputList', {}, function (ok2, d2) {
         const inputs = (ok2 && d2 && d2.inputs) || [];
         out.sources = inputs.map(function (i) { return i.inputName; });
-        out.mics = inputs.filter(function (i) {
-          const k = String(i.inputKind || '');
-          return /audio|wasapi|coreaudio|pulse|mic/i.test(k);
-        }).map(function (i) { return i.inputName; });
-        done(true);
+        const kindOf = function (i) { return String(i.inputKind || i.unversionedInputKind || ''); };
+        out.mics = inputs.filter(function (i) { return /audio|wasapi|coreaudio|pulse|mic/i.test(kindOf(i)); }).map(function (i) { return i.inputName; });
+        out.media = inputs.filter(function (i) { return /ffmpeg_source|vlc_source|media/i.test(kindOf(i)); }).map(function (i) { return i.inputName; });
+        out.browsers = inputs.filter(function (i) { return /browser_source/i.test(kindOf(i)); }).map(function (i) { return i.inputName; });
+        // Hotkeys (for TriggerHotkeyByName) and groups (movable targets).
+        obs.req('GetHotkeyList', {}, function (okH, dH) {
+          if (okH && dH && Array.isArray(dH.hotkeys)) out.hotkeys = dH.hotkeys;
+          obs.req('GetGroupList', {}, function (okG, dG) {
+            if (okG && dG && Array.isArray(dG.groups)) out.groups = dG.groups;
+            // Per-source + per-scene filters → "source::filter" candidates.
+            // Bounded so a huge collection can't stall the scan.
+            const targets = out.scenes.concat(out.sources).slice(0, 80);
+            let i = 0;
+            (function nextFilter() {
+              if (i >= targets.length) { done(true); return; }
+              const name = targets[i++];
+              obs.req('GetSourceFilterList', { sourceName: name }, function (okF, dF) {
+                const fl = (okF && dF && Array.isArray(dF.filters)) ? dF.filters : [];
+                fl.forEach(function (f) { out.filters.push({ source: name, filter: f.filterName }); });
+                nextFilter();
+              });
+            })();
+          });
+        });
       });
     });
   }, function () { cb(out); });

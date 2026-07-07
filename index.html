@@ -3001,12 +3001,25 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               </div>
               <label class="frow"><span>&ldquo;BRB panic&rdquo; button <span style="color:var(--mut);font-weight:400">(mods can hit it)</span></span><input type="checkbox" id="wdnBrb" onchange="onWardenCfgChange()"></label>
               <label class="frow"><span>BRB scene</span><select id="wdnBrbScene" onchange="onWardenCfgChange()" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:4px 6px;font-size:11px"><option value="">— scan first —</option></select></label>
-              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY SWITCH TO</div>
+              <label class="frow"><span>&ldquo;Clip that&rdquo; — save replay buffer <span style="color:var(--mut);font-weight:400">(needs the buffer running)</span></span><input type="checkbox" id="wdnReplay" onchange="onWardenCfgChange()"></label>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY SWITCH TO (SCENES)</div>
               <div id="wdnScenes" style="display:flex;flex-wrap:wrap;gap:4px"></div>
               <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY TOGGLE (SOURCES)</div>
               <div id="wdnSources" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY MOVE (CAMERAS / GROUPS)</div>
+              <div id="wdnMovable" style="display:flex;flex-wrap:wrap;gap:4px"></div>
               <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY MUTE (MICS)</div>
               <div id="wdnMics" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY ADJUST VOLUME (INPUTS)</div>
+              <div id="wdnVolumes" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY CONTROL (MEDIA SOURCES)</div>
+              <div id="wdnMedia" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY REFRESH (BROWSER SOURCES)</div>
+              <div id="wdnBrowsers" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY TOGGLE (FILTERS)</div>
+              <div id="wdnFilters" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY FIRE (HOTKEYS)</div>
+              <div id="wdnHotkeys" style="display:flex;flex-wrap:wrap;gap:4px"></div>
             </div>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DISCORD MIRROR</div>
@@ -6273,9 +6286,9 @@ function renderQSend() {
 function quickSend(idx) {
   var q = quickMessages[idx]; if (!q) return;
   var connected = { tw: S.sbConnected, yt: S.sbConnected, tt: S.tfConnected, kk: S.sbConnected };
-  var hasSelected = ['tw','yt','tt'].some(function(p) { return SEND_PLATS[p] && connected[p]; });
+  var hasSelected = ['tw','yt','tt','kk'].some(function(p) { return SEND_PLATS[p] && connected[p]; });
   var targets = hasSelected
-    ? ['tw','yt','tt'].filter(function(p) { return SEND_PLATS[p] && connected[p]; })
+    ? ['tw','yt','tt','kk'].filter(function(p) { return SEND_PLATS[p] && connected[p]; })
     : ['tw','yt','tt','kk'].filter(function(p) { return connected[p]; });
   targets.forEach(function(p) {
     if (p === 'tw' && S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN)
@@ -15822,8 +15835,8 @@ setInterval(printerPollStatus, 5000);
 // the streamer allowlists here. Streamer id + machine key are shared with
 // the printer's gallery uploader.
 var WARDEN_PLAT = { kk: 'kick', yt: 'youtube', tt: 'tiktok' };
-var wardenCfg = { relay: false, obs: false, brbPanic: false, brbScene: '', scenes: [], sources: [], mics: [] };
-var _wdnProbe = { scenes: [], sources: [], mics: [] };
+var wardenCfg = { relay: false, obs: false, brbPanic: false, brbScene: '', replay: false, scenes: [], sources: [], mics: [], movable: [], volumes: [], media: [], browsers: [], filters: [], hotkeys: [] };
+var _wdnProbe = { scenes: [], sources: [], mics: [], media: [], browsers: [], hotkeys: [], groups: [], filters: [] };
 
 function _wdnEl(id) { return document.getElementById(id); }
 
@@ -15848,7 +15861,10 @@ function _wardenPushAgent() {
       enabled: wardenCfg.obs,
       brbPanic: wardenCfg.brbPanic,
       brbScene: wardenCfg.brbScene,
-      scenes: wardenCfg.scenes, sources: wardenCfg.sources, mics: wardenCfg.mics
+      replay: wardenCfg.replay,
+      scenes: wardenCfg.scenes, sources: wardenCfg.sources, mics: wardenCfg.mics,
+      movable: wardenCfg.movable, volumes: wardenCfg.volumes, media: wardenCfg.media,
+      browsers: wardenCfg.browsers, filters: wardenCfg.filters, hotkeys: wardenCfg.hotkeys
     };
     window.electronAPI.wardenAgentConfig({
       enabled: wardenCfg.relay || wardenCfg.obs,
@@ -15866,6 +15882,7 @@ function _wardenSyncUi() {
   _wdnEl('wdnObs').checked = wardenCfg.obs;
   _wdnEl('wdnObsBox').style.display = wardenCfg.obs ? '' : 'none';
   _wdnEl('wdnBrb').checked = wardenCfg.brbPanic;
+  if (_wdnEl('wdnReplay')) _wdnEl('wdnReplay').checked = wardenCfg.replay;
   _wardenRenderPicks();
 }
 
@@ -15886,6 +15903,8 @@ function _wardenRenderPicks() {
   var mics = _wdnProbe.mics.length ? _wdnProbe.mics : wardenCfg.mics;
   sc.innerHTML = ''; so.innerHTML = ''; mi.innerHTML = '';
   var mk = function(box, list, arrName) {
+    if (!box) return;
+    box.innerHTML = '';
     (list || []).forEach(function(name) {
       _chip(box, name, wardenCfg[arrName].indexOf(name) !== -1, function() {
         var i = wardenCfg[arrName].indexOf(name);
@@ -15896,6 +15915,31 @@ function _wardenRenderPicks() {
     if (!list || !list.length) box.innerHTML = '<span style="font-size:10px;color:var(--mut)">scan OBS to populate</span>';
   };
   mk(sc, scenes, 'scenes'); mk(so, sources, 'sources'); mk(mi, mics, 'mics');
+  // New allowlists. Movable = sources + groups; volume = any input (reuse the
+  // source list). Media / browsers / hotkeys come straight off the probe.
+  var groups = _wdnProbe.groups || [];
+  mk(_wdnEl('wdnMovable'), sources.concat(groups), 'movable');
+  mk(_wdnEl('wdnVolumes'), sources, 'volumes');
+  mk(_wdnEl('wdnMedia'), _wdnProbe.media.length ? _wdnProbe.media : wardenCfg.media, 'media');
+  mk(_wdnEl('wdnBrowsers'), _wdnProbe.browsers.length ? _wdnProbe.browsers : wardenCfg.browsers, 'browsers');
+  mk(_wdnEl('wdnHotkeys'), _wdnProbe.hotkeys.length ? _wdnProbe.hotkeys : wardenCfg.hotkeys, 'hotkeys');
+  // Filters are "source::filter" entries; show a readable "source ▸ filter".
+  var fbox = _wdnEl('wdnFilters');
+  if (fbox) {
+    fbox.innerHTML = '';
+    var flist = (_wdnProbe.filters && _wdnProbe.filters.length)
+      ? _wdnProbe.filters.map(function(f) { return f.source + '::' + f.filter; })
+      : (wardenCfg.filters || []);
+    flist.forEach(function(entry) {
+      var label = entry.replace('::', ' ▸ ');
+      _chip(fbox, label, wardenCfg.filters.indexOf(entry) !== -1, function() {
+        var i = wardenCfg.filters.indexOf(entry);
+        if (i === -1) wardenCfg.filters.push(entry); else wardenCfg.filters.splice(i, 1);
+        onWardenCfgChange();
+      });
+    });
+    if (!flist.length) fbox.innerHTML = '<span style="font-size:10px;color:var(--mut)">scan OBS to populate</span>';
+  }
   // BRB scene dropdown.
   var sel = _wdnEl('wdnBrbScene');
   if (sel && _wdnProbe.scenes.length) {
@@ -15913,6 +15957,7 @@ function onWardenCfgChange() {
   wardenCfg.relay = _wdnEl('wdnRelay').checked;
   wardenCfg.obs = _wdnEl('wdnObs').checked;
   wardenCfg.brbPanic = _wdnEl('wdnBrb').checked;
+  if (_wdnEl('wdnReplay')) wardenCfg.replay = _wdnEl('wdnReplay').checked;
   wardenCfg.brbScene = _wdnEl('wdnBrbScene').value || wardenCfg.brbScene;
   _wdnEl('wdnObsBox').style.display = wardenCfg.obs ? '' : 'none';
   _wardenSaveLocal();
