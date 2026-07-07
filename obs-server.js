@@ -177,7 +177,7 @@ function pushControl(clientId, command, args) {
 // Local fs.readFileSync of obs-overlays/*.html is gone. The folder
 // itself was emptied in the same change; a MIGRATED.md remains for
 // anyone landing in that dir from a stale clone.
-var HOSTED_OVERLAY_BASE = 'https://aquilo.gg/sf/overlay/';
+var HOSTED_OVERLAY_BASE = 'https://widget.aquilo.gg/sf/overlay/';
 var OVERLAY_ROUTE_MAP = {
   '/chat':     'chat',
   '/alerts':   'alerts',
@@ -219,8 +219,8 @@ function landingPage() {
          '.legacy{font-size:10px;color:#64748b;margin-top:6px}' +
          'p.hint{font-size:11px;color:#94a3b8;margin-top:18px;line-height:1.6}</style></head>' +
          '<body><h1>StreamFusion , OBS Browser Source Overlays</h1>' +
-         '<p class="sub">The overlay HTML is hosted at <a href="' + HOSTED_OVERLAY_BASE + '" target="_blank">aquilo.gg/sf/overlay</a> ' +
-         'so design changes ship without a new StreamFusion release. Paste the aquilo.gg URL into OBS → Sources → + → Browser Source. ' +
+         '<p class="sub">The overlay HTML is hosted at <a href="' + HOSTED_OVERLAY_BASE + '" target="_blank">widget.aquilo.gg/sf/overlay</a> ' +
+         'so design changes ship without a new StreamFusion release. Paste the widget.aquilo.gg URL into OBS → Sources → + → Browser Source. ' +
          'StreamFusion (this app) still drives the chat + events; the hosted page just renders them.</p>' +
          '<ul>' + listHtml + '</ul>' +
          '<p class="hint">Both forms need StreamFusion running. Set the browser source width/height in OBS as needed , overlays are transparent-backed.</p></body></html>';

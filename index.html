@@ -11776,7 +11776,7 @@ function renderObsOverlaysTab() {
     window.electronAPI.obsGetStatus().then(function(s) {
       if (!s) return;
       var setVal = function(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
-      var BASE = 'https://aquilo.gg/sf/overlay/';
+      var BASE = 'https://widget.aquilo.gg/sf/overlay/';
       setVal('obsUrlChat',     BASE + 'chat/');
       setVal('obsUrlAlerts',   BASE + 'alerts/');
       setVal('obsUrlShoutout', BASE + 'shoutout/');
