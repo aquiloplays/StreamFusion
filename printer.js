@@ -81,7 +81,7 @@ function fetchMeme(job, cb) {
   const fin = function () { if (!done) { done = true; cb(); } };
   try {
     if (!job.memeQuery) return fin();
-    const req = https.get('https://loadout-discord.aquiloplays.workers.dev/api/punchcard/gif?q=' +
+    const req = https.get('https://loadout-discord.aquiloplays.workers.dev/api/printflair/meme?q=' +
       encodeURIComponent(String(job.memeQuery).slice(0, 60)),
       { timeout: 5000 }, function (res) {
         let out = '';
@@ -89,8 +89,8 @@ function fetchMeme(job, cb) {
         res.on('end', function () {
           try {
             const j = JSON.parse(out);
-            const g = j && j.gifs && j.gifs[0];
-            if (g && g.preview) return fetchDataUrl(g.preview, function (d) { job.bigImageData = d; fin(); });
+            const m = j && j.meme;
+            if (m && m.url) return fetchDataUrl(m.url, function (d) { job.bigImageData = d; fin(); });
           } catch (e) {}
           fin();
         });
