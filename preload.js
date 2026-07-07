@@ -153,13 +153,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   twitchCreateClip:      ()   => ipcRenderer.invoke('twitch-create-clip'),
   twitchHelix:           (p)  => ipcRenderer.invoke('twitch-helix', p || {}),
   onTwitchStatusChanged: (fn) => ipcRenderer.on('twitch-status-changed', (e, status) => fn(status)),
-  // Optional bot account (second Twitch login) for automated messages / bot.
-  twitchBotBeginAuth:       ()   => ipcRenderer.invoke('twitch-bot-begin-auth'),
-  twitchBotGetStatus:       ()   => ipcRenderer.invoke('twitch-bot-get-status'),
-  twitchBotSignOut:         ()   => ipcRenderer.invoke('twitch-bot-sign-out'),
-  twitchBotSendChat:        (p)  => ipcRenderer.invoke('twitch-bot-send-chat', p || {}),
-  onTwitchBotStatusChanged: (fn) => ipcRenderer.on('twitch-bot-status-changed', (e, status) => fn(status)),
-
   // ── Multi-platform browser sign-in (Kick / YouTube / Twitch) ───────────────
   // Opens the streamer's default browser to the aquilo.gg broker and polls for
   // the token — they're usually already logged in there. platform: 'kick' |
@@ -247,9 +240,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   favoritesGet: (twitchId)                       => ipcRenderer.invoke('favorites-get', twitchId),
   favoritesPut: (twitchId, favorites, updatedAt) => ipcRenderer.invoke('favorites-put', { twitchId: twitchId, favorites: favorites, updatedAt: updatedAt }),
-  // Bot-config cloud sync (same worker + Twitch-token auth as favorites).
-  botConfigGet: (twitchId)                    => ipcRenderer.invoke('bot-config-get', twitchId),
-  botConfigPut: (twitchId, config, updatedAt) => ipcRenderer.invoke('bot-config-put', { twitchId: twitchId, config: config, updatedAt: updatedAt }),
 
   // Stream Info quick-swap global hotkeys. Map: { open, fav1..fav5 }. Returns
   // { ok, registered, failed, conflicted }. Main fires open-stream-info /

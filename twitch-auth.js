@@ -322,24 +322,6 @@ function getStatus(role) { return publicStatus(readState(role)); }
 
 async function signOut(role) { clearState(role); const pub = publicStatus(null); emitStatus(pub, role); return pub; }
 
-// Send a chat message to `broadcasterId` AS the connected bot account (native
-// Helix Send Chat Message). Requires the bot token (user:write:chat + user:bot)
-// and the broadcaster having granted channel:bot (or the bot being a mod).
-async function sendBotChat(broadcasterId, message) {
-  const bs = readState('bot');
-  if (!bs || !bs.access_token || !bs.user_id) return { ok: false, error: 'bot_not_connected' };
-  if (!broadcasterId || !message) return { ok: false, error: 'missing_args' };
-  try {
-    const res = await helix('POST', 'chat/messages', '', { broadcaster_id: String(broadcasterId), sender_id: String(bs.user_id), message: String(message).slice(0, 500) }, 'bot');
-    if (res.status >= 200 && res.status < 300) {
-      const d = res.data && res.data.data && res.data.data[0];
-      if (d && d.is_sent === false) return { ok: false, error: (d.drop_reason && (d.drop_reason.message || d.drop_reason.code)) || 'message dropped' };
-      return { ok: true };
-    }
-    return { ok: false, error: (res.data && (res.data.message || res.data.error)) || ('HTTP ' + res.status) };
-  } catch (e) { return { ok: false, error: e.message || String(e) }; }
-}
-
 // Create a clip on the broadcaster's own channel. Returns
 // { ok, id?, editUrl?, error? }. Twitch requires the channel to be LIVE.
 async function createClip() {
@@ -367,17 +349,8 @@ function registerIpcHandlers() {
   ipcMain.handle('twitch-get-status', async function () { return getStatus(); });
   ipcMain.handle('twitch-sign-out',   async function () { return signOut(); });
   ipcMain.handle('twitch-create-clip', async function () { return createClip(); });
-  // ── Optional bot account (second login, chat-send only) ──
-  ipcMain.handle('twitch-bot-begin-auth', async function () {
-    try { return await beginAuth('bot'); }
-    catch (err) { return { signedIn: false, login: '', displayName: '', userId: '', error: err.message || String(err) }; }
-  });
-  ipcMain.handle('twitch-bot-get-status', async function () { return getStatus('bot'); });
-  ipcMain.handle('twitch-bot-sign-out',   async function () { return signOut('bot'); });
-  ipcMain.handle('twitch-bot-send-chat',  async function (event, payload) {
-    const p = payload || {};
-    return await sendBotChat(p.broadcasterId, p.message);
-  });
+  // (The optional bot-account IPC surface was removed with the in-app bot —
+  // automated chat now lives in the cloud Aquilo Bot.)
   // Generic Helix passthrough for future direct-Helix features. Returns
   // { status, data }. The renderer only needs this for things SB can't do.
   ipcMain.handle('twitch-helix', async function (event, payload) {

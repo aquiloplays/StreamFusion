@@ -2059,10 +2059,6 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
   <button class="tbtn" id="clipBtn" onclick="createClipNow()" title="Create a Twitch clip (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
   <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info: edit your title, category &amp; tags"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
-  <!-- Bot status chip: dot = green (running from this app with something
-       enabled), orange (paused on this device), grey (idle). Click opens
-       Settings > Bot. Updated by updateBotStateBtn(). -->
-  <button class="tbtn" id="botStateBtn" onclick="openSettingsTab('bot')" title="Bot"><span id="botStateDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#666;margin-right:5px;vertical-align:middle"></span>Bot</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
@@ -2187,7 +2183,6 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="discordea" onclick="switchSettingsTab('discordea')">Discord+</div>
         <div class="settings-tab-grp">MANAGE</div>
         <div class="settings-tab" data-tab="stream" onclick="switchSettingsTab('stream')">Stream</div>
-        <div class="settings-tab" data-tab="schedule" onclick="switchSettingsTab('schedule')">Schedule</div>
         <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
         <div class="settings-tab" data-tab="viewers" onclick="switchSettingsTab('viewers')">Viewers</div>
         <div class="settings-tab" data-tab="analytics" onclick="switchSettingsTab('analytics')">Analytics</div>
@@ -2523,89 +2518,27 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
         </div>
 
-        <!-- ═══ SCHEDULE TAB (go-live auto-updates) ═══ -->
-        <!-- Recurring weekly slots that auto-apply title/category/tags + post a
-             go-live announcement when SF detects the stream going live. Drives
-             Twitch via the same Helix connection as the Stream tab. -->
-        <div class="settings-pane" id="pane-schedule">
-          <div class="sec" id="schedNeedsTwitch" style="display:none">
-            <div class="sec-hd">Schedule</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">Connect your Twitch account to set up a go-live schedule. When you go live, StreamFusion will auto-apply the title, category and tags for the slot that matches, and post your go-live announcement.</div>
-            <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 14px;border-radius:7px" onclick="switchSettingsTab('accounts')">Go to Accounts to connect</button>
-          </div>
-          <div id="schedBody" style="display:none">
-            <div class="sec">
-              <div class="sec-hd">Go-live auto-updates</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Define your weekly slots below. When you go live, the slot matching the current day and time is applied to your Twitch channel automatically.</div>
-              <div id="schedGlobals"></div>
-              <div id="schedNextLine" style="font-size:11px;margin-top:8px;padding:8px 10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;line-height:1.4"></div>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="schedRunAutomationNow()" title="Apply the currently-matching slot right now, as if you just went live.">Run go-live automation now</button>
-                <span id="schedRunNowStatus" style="font-size:10px;color:var(--mut)"></span>
-              </div>
-            </div>
-            <div class="sec">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-                <div class="sec-hd" style="margin:0">Slots</div>
-                <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="schedAddSlot()">+ Add slot</button>
-              </div>
-              <div id="schedSlots"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ═══ BOT TAB (automated messages + bot account) ═══ -->
+        <!-- ═══ BOT TAB — the bot moved to the cloud (migration pointer) ═══ -->
         <div class="settings-pane" id="pane-bot">
           <div class="sec">
-            <div class="sec-hd">Bot account</div>
-            <div id="botAcctCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px"></div>
-            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">Tip: create a second free Twitch account for your bot, make it a moderator of your channel, then connect it here. Requires reconnecting your main Twitch account once so it can authorize the bot to post.</div>
-            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:6px">No Streamer.bot? Turn on <strong style="color:var(--txt)">Pull Twitch events directly (EventSub)</strong> on the Accounts tab and StreamFusion reads chat natively, so commands and auto-mod work with nothing else installed.</div>
-          </div>
-          <div class="sec">
-            <div class="sec-hd">Automated messages</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Post recurring messages to chat on a timer (socials, commands reminder, follow prompt, etc.). Each message waits its interval AND the minimum chat lines below, so it never talks to an empty room.</div>
-            <div id="autoMsgGlobals"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0 8px">
-              <div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px">MESSAGES</div>
-              <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="autoMsgAdd()">+ Add message</button>
+            <div class="sec-hd">The bot moved to the cloud</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:8px">
+              StreamFusion's chat bot — custom commands, counters, automated messages, auto-moderation, quotes, giveaways — and the go-live Schedule now run as the <b>Aquilo Bot</b>: the same features plus an economy, minigames and multi-platform chat (Twitch, Kick, YouTube), hosted in the cloud so nothing depends on this app being open. One bot, one place, no double-posting.
             </div>
-            <div id="autoMsgList"></div>
-          </div>
-          <div class="sec">
-            <div class="sec-hd">Chat commands</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:6px">Viewers type a <code>!command</code> and the bot replies. Set who can use it and a cooldown. Turn on <strong style="color:var(--txt)">Counter</strong> for things like <code>!deaths</code> where mods can do <code>!deaths +</code> / <code>-</code> / <code>set 5</code> / <code>reset</code>.</div>
-            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:8px">Variables: <code>{user}</code> chatter, <code>{touser}</code> first word after the command, <code>{args}</code> everything after, <code>{count}</code> counter value, <code>{game}</code>, <code>{uptime}</code>, <code>{channel}</code>, <code>{random:a|b|c}</code>.</div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-              <div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px">COMMANDS</div>
-              <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="cmdAdd()">+ Add command</button>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:8px">
+              <b>Move your setup (one time):</b><br>
+              1. Click <b>Copy my bot config</b> below — your on-device settings are packaged (and never deleted from this PC).<br>
+              2. Open <b>aquilo.gg/bot</b> → connect Twitch → “Migrate from StreamFusion” → paste → Import.<br>
+              3. Manage counters at <b>aquilo.gg/counters</b>; live bump buttons are in the <b>Aquilo Dock</b> OBS panel.
             </div>
-            <div id="cmdList"></div>
-          </div>
-          <div class="sec">
-            <div class="sec-hd">Auto-moderation</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Automatically delete (and optionally time out) messages that break your rules. Deletes run through your Twitch connection or Streamer.bot.</div>
-            <div id="automodGlobals"></div>
-            <div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.4px;margin:10px 0 6px">FILTERS</div>
-            <div id="automodFilters"></div>
-          </div>
-          <div class="sec">
-            <div class="sec-hd">Giveaway</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Run a keyword giveaway: start it, viewers type the keyword to enter, then draw a weighted-random winner. Subs can get extra tickets.</div>
-            <div id="giveawayBox"></div>
-          </div>
-          <div class="sec">
-            <div class="sec-hd">Quotes</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">In chat: <code>!quote</code> shows a random one, <code>!quote 3</code> shows #3, and a mod can <code>!quote add some text</code> or <code>!quote del 3</code>.</div>
-            <div id="quoteList"></div>
-          </div>
-          <div class="sec">
-            <div class="sec-hd">Backup &amp; sync</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Your commands, automated messages, auto-mod, quotes, giveaway and schedule settings as one bundle. Export to back up or move to another device. Cloud sync with aquilo.gg lands here (your bot account sign-in stays on-device and is never exported).</div>
-            <div style="display:flex;gap:6px;margin-bottom:6px"><button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="botCfgExport()">Export</button><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="botCfgImport()">Import</button></div>
-            <textarea id="botCfgIO" placeholder="Bot config JSON appears here on Export; paste one here and press Import." rows="4" style="width:100%;font-size:10px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none;font-family:ui-monospace,monospace"></textarea>
-            <div id="botCfgStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>
-            <div id="botCfgSyncLine" style="font-size:10px;color:var(--mut);margin-top:2px;min-height:12px"></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+              <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="sfMigrationCopy()">Copy my bot config</button>
+              <a class="cbtn" href="https://aquilo.gg/bot/" target="_blank" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none">Open Aquilo Bot</a>
+              <a class="cbtn" href="https://aquilo.gg/counters/" target="_blank" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none">Counters</a>
+              <a class="cbtn" href="https://aquilo.gg/dock/panel/" target="_blank" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none">Aquilo Dock</a>
+            </div>
+            <textarea id="botMigIO" readonly placeholder="Your old bot config appears here after Copy." rows="4" style="width:100%;font-size:10px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none;font-family:ui-monospace,monospace"></textarea>
+            <div id="botMigStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>
           </div>
         </div>
 
@@ -3852,13 +3785,6 @@ function applyTwitchStatus(st) {
   if (typeof _esSyncFromStatus === 'function') _esSyncFromStatus();
   // Keep the Stream control surface's connect-gate in sync live.
   try { if (typeof renderStreamTab === 'function') renderStreamTab(); } catch (e) {}
-  // First Twitch connect this session: reconcile bot config with aquilo.gg.
-  try {
-    if (S.twitch && S.twitch.signedIn && typeof _botCfgSync !== 'undefined' && !_botCfgSync.didInit) {
-      _botCfgSync.didInit = true;
-      setTimeout(function () { try { botConfigCloudSync(); } catch (e) {} }, 1500);
-    }
-  } catch (e) {}
 }
 
 // ── Dedicated Twitch sign-in screen ──────────────────────────────────────────
@@ -4494,759 +4420,40 @@ async function siApplyChannelInfo() {
   var r = await _twApplyChannelInfo(opts);
   _setStat('siInfoStatus', r.ok ? 'Stream updated ✓' : ('Update failed: ' + r.error), !r.ok);
 }
-// Post the go-live chat announcement: Streamer.bot /announce if connected,
-// else native Twitch Helix (needs moderator:manage:announcements).
-async function _sfAnnounce(text) {
-  text = String(text || '').trim();
-  if (!text) return;
-  if (S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) { announceOnTwitch(text); return; }
-  if (_twReady()) {
-    try { await _twReq('POST', 'chat/announcements', 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&moderator_id=' + encodeURIComponent(_twUid()), { message: text.slice(0, 500) }); } catch (e) {}
-  }
-}
-
 // ══════════════════════════════════════════════════════════════════════════
-// Go-live schedule. Streamers define recurring weekly slots (day(s) + time)
-// each carrying a title, category, tags and a go-live chat announcement. When
-// SF detects go-live (accurate stream.online EventSub, or the viewer-based
-// monitor as a fallback), the slot matching "now" is auto-applied to Twitch
-// and the announcement posts. Persisted in localStorage (sf_schedule).
+// Bot migration. The in-app bot (commands/counters/auto-messages/auto-mod/
+// quotes/giveaways) and the go-live Schedule moved to the cloud Aquilo Bot
+// (aquilo.gg/bot, executed by the rotation-bot worker). This exporter
+// packages the old on-device config as the v1 bundle the dashboard's
+// "Migrate from StreamFusion" card imports. localStorage is left intact.
 // ══════════════════════════════════════════════════════════════════════════
-var _schedule = null;
-var _DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-function _schedDefault() { return { enabled: false, autoApply: true, autoAnnounce: true, windowMin: 120, slots: [] }; }
-function _schedLoad() {
-  try { _schedule = Object.assign(_schedDefault(), JSON.parse(localStorage.getItem('sf_schedule') || '{}') || {}); }
-  catch (e) { _schedule = _schedDefault(); }
-  if (!Array.isArray(_schedule.slots)) _schedule.slots = [];
+function sfMigrationExport() {
+  function j(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return (v == null) ? d : v; } catch (e) { return d; } }
+  var am = j('sf_auto_messages', {}) || {};
+  var gw = j('sf_giveaway_cfg', {}) || {};
+  return {
+    v: 1,
+    updatedAt: Number(localStorage.getItem('sf_bot_updated') || 0) || Date.now(),
+    commands: j('sf_commands', []),
+    autoMessages: { enabled: !!am.enabled, onlyLive: am.onlyLive !== false, minLines: Number(am.minLines) || 0, msgs: am.msgs || [] },
+    automod: j('sf_automod', {}),
+    quotes: j('sf_quotes', []),
+    giveaway: { keyword: gw.keyword, subLuck: gw.subLuck, minLevel: gw.minLevel },
+    schedule: j('sf_schedule', {})
+  };
 }
-function _schedSave() { try { localStorage.setItem('sf_schedule', JSON.stringify(_schedule)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
-function _schedNewId() { return 's' + Math.random().toString(36).slice(2, 8); }
-function _schedParseTime(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim()); if (!m) return null; var h = +m[1], mi = +m[2]; if (h > 23 || mi > 59) return null; return h * 60 + mi; }
-function _schedFmtTime(mins) { var h = Math.floor(mins / 60), m = mins % 60; var ap = h < 12 ? 'AM' : 'PM'; var h12 = h % 12 || 12; return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ap; }
-function _schedTags(slot) { return slot && slot.tags ? String(slot.tags).split(',').map(function (x) { return x.trim(); }).filter(Boolean) : []; }
-function _schedFill(tpl, slot) { var lit = function (v) { return function () { return v; }; }; return String(tpl || '').replace(/\{title\}/g, lit(slot.title || '')).replace(/\{game\}/g, lit(slot.gameName || '')).replace(/\{label\}/g, lit(slot.label || '')); }
-// Best slot for "now": scheduled today, within the match window (started up to
-// windowMin ago, or up to 30 min early), nearest to now wins.
-function _schedMatchNow() {
-  if (!_schedule || !_schedule.enabled || !_schedule.slots.length) return null;
-  var now = new Date(), dow = now.getDay(), mins = now.getHours() * 60 + now.getMinutes();
-  var win = Math.max(15, Number(_schedule.windowMin) || 120);
-  var best = null, bestScore = Infinity;
-  _schedule.slots.forEach(function (s) {
-    if (!s || s.disabled) return;
-    if (Array.isArray(s.days) && s.days.length && s.days.indexOf(dow) === -1) return;
-    var t = _schedParseTime(s.time); if (t == null) return;
-    var delta = mins - t;
-    if (delta < -30 || delta > win) return;
-    if (Math.abs(delta) < bestScore) { bestScore = Math.abs(delta); best = s; }
-  });
-  return best;
-}
-// The upcoming slot (next 7 days) for the "Next up" preview.
-function _schedNextUpcoming() {
-  if (!_schedule || !_schedule.slots.length) return null;
-  var now = new Date(), nowMin = now.getDay() * 1440 + now.getHours() * 60 + now.getMinutes();
-  var best = null, bestIn = Infinity;
-  _schedule.slots.forEach(function (s) {
-    if (!s || s.disabled) return;
-    var t = _schedParseTime(s.time); if (t == null) return;
-    var days = (Array.isArray(s.days) && s.days.length) ? s.days : [0, 1, 2, 3, 4, 5, 6];
-    days.forEach(function (d) {
-      var slotMin = d * 1440 + t;
-      var inMin = slotMin - nowMin; if (inMin < 0) inMin += 10080;  // wrap a week
-      if (inMin < bestIn) { bestIn = inMin; best = { slot: s, inMin: inMin, day: d }; }
+function sfMigrationCopy() {
+  var st = document.getElementById('botMigStatus');
+  try {
+    var txt = JSON.stringify(sfMigrationExport(), null, 2);
+    var ta = document.getElementById('botMigIO');
+    if (ta) ta.value = txt;
+    navigator.clipboard.writeText(txt).then(function () {
+      if (st) { st.textContent = 'Copied — paste it into aquilo.gg/bot → “Migrate from StreamFusion”.'; st.style.color = 'var(--grn)'; }
+    }, function () {
+      if (st) { st.textContent = 'Config is in the box — copy it manually.'; st.style.color = 'var(--accent)'; }
     });
-  });
-  return best;
-}
-// Auto-apply on go-live (called from startStreamSession, once per session).
-async function applyScheduleForGoLive() {
-  if (!_schedule) _schedLoad();
-  if (!_schedule || !_schedule.enabled) return;
-  var slot = _schedMatchNow();
-  if (!slot) return;
-  if (_schedule.autoApply) {
-    var r = await _twApplyChannelInfo({ title: slot.title, gameId: slot.gameId, gameName: slot.gameName, tags: _schedTags(slot) });
-    addEvHistory('StreamFusion', r.ok ? ('Schedule applied on go-live: "' + (slot.label || slot.title || 'slot') + '"') : ('Schedule apply failed: ' + r.error), 'tw', false);
-  }
-  if (_schedule.autoAnnounce && slot.announce) { _sfAnnounce(_schedFill(slot.announce, slot)); }
-}
-
-// ── Schedule tab UI ──
-function schedSetGlobal(field, val) { if (!_schedule) _schedLoad(); _schedule[field] = val; _schedSave(); _renderScheduleNextLine(); }
-function schedAddSlot() { if (!_schedule) _schedLoad(); _schedule.slots.push({ id: _schedNewId(), label: '', days: [], time: '19:00', title: '', gameId: '', gameName: '', tags: '', announce: '' }); _schedSave(); _renderScheduleTab(); }
-function schedRemoveSlot(idx) { _schedule.slots.splice(idx, 1); _schedSave(); _renderScheduleTab(); }
-function schedSetField(idx, field, val) { if (!_schedule.slots[idx]) return; _schedule.slots[idx][field] = val; _schedSave(); _renderScheduleNextLine(); }
-function schedToggleDay(idx, d) { var s = _schedule.slots[idx]; if (!s) return; s.days = s.days || []; var i = s.days.indexOf(d); if (i >= 0) s.days.splice(i, 1); else s.days.push(d); s.days.sort(); _schedSave(); _renderScheduleTab(); }
-function _schedSetStatus(idx, msg, isErr) { var el = document.getElementById('schedStatus-' + idx); if (el) { el.textContent = msg || ''; el.style.color = isErr ? 'var(--red)' : 'var(--grn)'; } }
-async function schedApplyNow(idx) {
-  var s = _schedule.slots[idx]; if (!s) return;
-  if (!_twReady()) { _schedSetStatus(idx, 'Connect Twitch first', true); return; }
-  _schedSetStatus(idx, 'applying…');
-  var r = await _twApplyChannelInfo({ title: s.title, gameId: s.gameId, gameName: s.gameName, tags: _schedTags(s) });
-  _schedSetStatus(idx, r.ok ? 'Applied to your channel ✓' : ('Failed: ' + r.error), !r.ok);
-}
-async function schedRunAutomationNow() {
-  var el = document.getElementById('schedRunNowStatus');
-  var slot = _schedMatchNow();
-  if (!slot) { if (el) { el.style.color = 'var(--mut)'; el.textContent = 'No slot matches the current day/time window.'; } return; }
-  if (el) { el.style.color = 'var(--accent)'; el.textContent = 'Running "' + (slot.label || slot.title || 'slot') + '"…'; }
-  await applyScheduleForGoLive();
-  if (el) { el.style.color = 'var(--grn)'; el.textContent = 'Ran go-live automation for "' + (slot.label || slot.title || 'slot') + '".'; }
-}
-var _schedCatTimer = null;
-function schedCatSearch(idx, q) {
-  q = (q || '').trim();
-  var box = document.getElementById('schedCatRes-' + idx);
-  if (_schedCatTimer) clearTimeout(_schedCatTimer);
-  if (!q) { if (box) box.style.display = 'none'; return; }
-  _schedCatTimer = setTimeout(async function () {
-    if (!box) return;
-    if (!_twReady()) { box.innerHTML = '<div style="padding:6px 8px;font-size:10px;color:var(--mut)">Connect Twitch to search categories</div>'; box.style.display = ''; return; }
-    try {
-      var res = await _twReq('GET', 'search/categories', 'query=' + encodeURIComponent(q) + '&first=6');
-      var items = (res.data && res.data.data) || [];
-      box.innerHTML = items.length ? items.map(function (g) {
-        var nm = esc(g.name || '').replace(/"/g, '&quot;');
-        return '<div data-idx="' + idx + '" data-id="' + esc(g.id) + '" data-name="' + nm + '" onclick="schedPickCatEl(this)" onmouseenter="this.style.background=\'var(--surf2)\'" onmouseleave="this.style.background=\'\'" style="padding:5px 8px;cursor:pointer;font-size:11px">' + esc(g.name) + '</div>';
-      }).join('') : '<div style="padding:6px 8px;font-size:10px;color:var(--mut)">No matches</div>';
-      box.style.display = '';
-    } catch (e) {}
-  }, 280);
-}
-function schedPickCatEl(el) {
-  var idx = +el.getAttribute('data-idx'), s = _schedule.slots[idx];
-  if (!s) return;
-  s.gameId = el.getAttribute('data-id'); s.gameName = el.getAttribute('data-name') || '';
-  _schedSave();
-  var box = document.getElementById('schedCatRes-' + idx); if (box) box.style.display = 'none';
-  _renderScheduleTab();
-}
-function schedClearCat(idx) { var s = _schedule.slots[idx]; if (!s) return; s.gameId = ''; s.gameName = ''; _schedSave(); _renderScheduleTab(); }
-function _renderScheduleNextLine() {
-  var el = document.getElementById('schedNextLine'); if (!el) return;
-  if (!_schedule || !_schedule.enabled) { el.textContent = 'Auto-updates are off.'; el.style.color = 'var(--mut)'; return; }
-  var nx = _schedNextUpcoming();
-  if (!nx) { el.textContent = 'No slots yet. Add one below.'; el.style.color = 'var(--mut)'; return; }
-  var h = Math.floor(nx.inMin / 60), m = nx.inMin % 60;
-  var when = h >= 24 ? (Math.floor(h / 24) + 'd ' + (h % 24) + 'h') : (h > 0 ? (h + 'h ' + m + 'm') : (m + 'm'));
-  var s = nx.slot;
-  el.style.color = 'var(--accent)';
-  el.innerHTML = 'Next up in ' + when + ': <strong>' + esc(s.label || s.title || 'Untitled') + '</strong> on ' + _DOW[nx.day] + ' ' + _schedFmtTime(_schedParseTime(s.time) || 0) + (s.gameName ? ' · ' + esc(s.gameName) : '');
-}
-function _renderScheduleTab() {
-  if (!_schedule) _schedLoad();
-  var g = document.getElementById('schedGlobals');
-  if (g) {
-    var chk = function (on) { return on ? ' checked' : ''; };
-    g.innerHTML =
-      '<label class="frow"><span>Enable schedule auto-updates</span><input type="checkbox"' + chk(_schedule.enabled) + ' onchange="schedSetGlobal(\'enabled\',this.checked)"></label>'
-      + '<label class="frow"><span>Apply title / category on go-live</span><input type="checkbox"' + chk(_schedule.autoApply) + ' onchange="schedSetGlobal(\'autoApply\',this.checked)"></label>'
-      + '<label class="frow"><span>Post go-live chat announcement</span><input type="checkbox"' + chk(_schedule.autoAnnounce) + ' onchange="schedSetGlobal(\'autoAnnounce\',this.checked)"></label>'
-      + '<div class="frow" style="gap:6px"><label style="font-size:11px">Match window after start (min)</label><input class="minput" type="number" min="15" max="360" value="' + (Number(_schedule.windowMin) || 120) + '" onchange="schedSetGlobal(\'windowMin\',parseInt(this.value,10)||120)" style="width:80px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>';
-  }
-  _renderScheduleNextLine();
-  var host = document.getElementById('schedSlots');
-  if (!host) return;
-  if (!_schedule.slots.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">No slots yet. Click "Add slot" to build your week.</div>'; return; }
-  host.innerHTML = _schedule.slots.map(function (s, idx) {
-    var dayBtns = _DOW.map(function (d, di) {
-      var on = Array.isArray(s.days) && s.days.indexOf(di) >= 0;
-      return '<button onclick="schedToggleDay(' + idx + ',' + di + ')" style="font-size:10px;font-weight:700;padding:3px 6px;border-radius:5px;cursor:pointer;border:1px solid var(--bdr);background:' + (on ? 'var(--accent);color:#fff' : 'var(--surf2);color:var(--mut)') + '">' + d + '</button>';
-    }).join('');
-    return '<div class="sec" style="background:var(--surf2);margin-bottom:10px">'
-      + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
-      +   '<input class="minput" value="' + esc(s.label || '') + '" placeholder="Slot name (e.g. Monday Variety)" oninput="schedSetField(' + idx + ',\'label\',this.value)" style="flex:1;font-size:12px;font-weight:700;padding:6px 8px;background:var(--surf3)">'
-      +   '<button class="tbtn hk-reset" onclick="schedRemoveSlot(' + idx + ')" title="Delete slot">Delete</button>'
-      + '</div>'
-      + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + dayBtns + '<span style="font-size:10px;color:var(--mut);align-self:center;margin-left:4px">(none = every day)</span></div>'
-      + '<div class="frow" style="gap:6px;margin-bottom:6px"><label style="font-size:11px">Start time</label><input class="minput" type="time" value="' + esc(s.time || '19:00') + '" onchange="schedSetField(' + idx + ',\'time\',this.value)" style="width:110px;font-size:12px;padding:4px 6px;background:var(--surf3)"></div>'
-      + '<input class="minput" value="' + esc(s.title || '') + '" maxlength="140" placeholder="Stream title" oninput="schedSetField(' + idx + ',\'title\',this.value)" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);margin-bottom:6px">'
-      + '<div style="position:relative;margin-bottom:6px">'
-      +   '<input class="minput" placeholder="Search category/game..." oninput="schedCatSearch(' + idx + ',this.value)" autocomplete="off" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3)">'
-      +   '<div id="schedCatRes-' + idx + '" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:0 0 8px 8px;max-height:180px;overflow:auto"></div>'
-      + '</div>'
-      + '<div style="font-size:11px;color:var(--mut);margin-bottom:6px">' + (s.gameName ? ('Category: <strong style="color:var(--txt)">' + esc(s.gameName) + '</strong> <button class="tbtn" style="font-size:9px;padding:1px 6px" onclick="schedClearCat(' + idx + ')">clear</button>') : 'No category set') + '</div>'
-      + '<input class="minput" value="' + esc(s.tags || '') + '" placeholder="Tags (comma separated, optional)" oninput="schedSetField(' + idx + ',\'tags\',this.value)" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);margin-bottom:6px">'
-      + '<textarea placeholder="Go-live announcement message (optional). {title} {game} {label} are filled in." oninput="schedSetField(' + idx + ',\'announce\',this.value)" rows="2" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(s.announce || '') + '</textarea>'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="schedApplyNow(' + idx + ')">Apply now</button><span id="schedStatus-' + idx + '" style="font-size:10px;color:var(--accent)"></span></div>'
-      + '</div>';
-  }).join('');
-}
-function renderScheduleTab() {
-  var ready = _twReady();
-  var need = document.getElementById('schedNeedsTwitch');
-  var body = document.getElementById('schedBody');
-  if (need) need.style.display = ready ? 'none' : '';
-  if (body) body.style.display = ready ? '' : 'none';
-  if (ready) _renderScheduleTab();
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// Bot: unified chat send + automated (timed) messages. Sending posts as, in
-// priority order: (1) the connected bot account, (2) the broadcaster's own
-// Twitch account, (3) Streamer.bot. So streamers can run their OWN bot account
-// (not a shared StreamFusion identity) and it still works with no bot / no SB.
-// ══════════════════════════════════════════════════════════════════════════
-async function sfSendChat(text) {
-  text = String(text || '').trim();
-  if (!text) return { ok: false, error: 'empty' };
-  text = text.slice(0, 500);
-  // Remember our own output so command detection never re-triggers on it.
-  _lastBotSent = { text: text, at: Date.now() };
-  // 1) Dedicated bot account (posts under the bot's name).
-  if (S.twitchBot && S.twitchBot.signedIn && _twUid() && window.electronAPI && window.electronAPI.twitchBotSendChat) {
-    try { var rb = await window.electronAPI.twitchBotSendChat({ broadcasterId: _twUid(), message: text }); if (rb && rb.ok) return { ok: true, via: 'bot' }; } catch (e) {}
-  }
-  // 2) Broadcaster's own Twitch account (native Helix Send Chat Message).
-  if (_twReady()) {
-    try {
-      var res = await _twReq('POST', 'chat/messages', '', { broadcaster_id: _twUid(), sender_id: _twUid(), message: text });
-      if (_twOK(res)) { var d = res.data && res.data.data && res.data.data[0]; if (!(d && d.is_sent === false)) return { ok: true, via: 'broadcaster' }; }
-    } catch (e) {}
-  }
-  // 3) Streamer.bot (uses whatever bot account SB is configured with).
-  if (S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) {
-    try { S.sbWS.send(JSON.stringify({ request: 'SendMessage', id: 'sf-auto', platform: 'twitch', message: text, bot: true, internal: false })); return { ok: true, via: 'sb' }; } catch (e) {}
-  }
-  return { ok: false, error: 'no send path (connect Twitch or Streamer.bot)' };
-}
-
-// ── Bot account (optional second Twitch login) ──
-function applyTwitchBotStatus(st) {
-  S.twitchBot = st || { signedIn: false };
-  if (typeof renderBotTab === 'function') { try { renderBotTab(); } catch (e) {} }
-}
-function connectBotAccount() {
-  if (!window.electronAPI || !window.electronAPI.twitchBotBeginAuth) return;
-  var el = document.getElementById('botAcctStatus'); if (el) { el.textContent = 'Opening Twitch sign-in… pick your BOT account.'; el.style.color = 'var(--accent)'; }
-  window.electronAPI.twitchBotBeginAuth().then(applyTwitchBotStatus).catch(function () {});
-}
-function disconnectBotAccount() {
-  if (!window.electronAPI || !window.electronAPI.twitchBotSignOut) return;
-  window.electronAPI.twitchBotSignOut().then(applyTwitchBotStatus).catch(function () {});
-}
-
-// ── Local bot executor switch ──
-// Whether THIS StreamFusion instance runs the bot (replies to commands, fires
-// automated messages, enforces auto-mod, accepts giveaway entries). Turn it
-// off when the aquilo.gg cloud bot is handling your channel so the two never
-// double-post. Per-device on purpose (localStorage sf_bot_run_local, default
-// on): it is about where execution happens, so it is NOT part of the synced
-// bot-config bundle.
-var _botRunLocal = true;
-function botSetRunLocal(v) {
-  _botRunLocal = !!v;
-  try { localStorage.setItem('sf_bot_run_local', _botRunLocal ? '1' : '0'); } catch (e) {}
-  if (typeof renderBotTab === 'function') { try { renderBotTab(); } catch (e) {} }
-  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
-}
-
-// ── Automated messages engine ──
-var _autoMsg = null;
-var _autoMsgChatCount = 0;   // viewer chat lines seen this session (gate)
-var _autoMsgTimer = null;
-function _autoMsgDefault() { return { enabled: false, onlyLive: true, minLines: 5, msgs: [] }; }
-function _autoMsgLoad() {
-  try { _autoMsg = Object.assign(_autoMsgDefault(), JSON.parse(localStorage.getItem('sf_auto_messages') || '{}') || {}); }
-  catch (e) { _autoMsg = _autoMsgDefault(); }
-  if (!Array.isArray(_autoMsg.msgs)) _autoMsg.msgs = [];
-  // Reset per-message timers on load so a stale lastSent doesn't fire a burst
-  // right at startup; each message then waits a full interval.
-  _autoMsg.msgs.forEach(function (m) { m._lastSent = Date.now(); m._linesAtSend = _autoMsgChatCount; });
-}
-function _autoMsgSave() { try { localStorage.setItem('sf_auto_messages', JSON.stringify(_autoMsg)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
-function _autoMsgLive() { try { return (typeof _isPlatLive === 'function' && _isPlatLive('tw')) || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active); } catch (e) { return false; } }
-function _autoMsgTick() {
-  if (!_botRunLocal) return;
-  if (!_autoMsg || !_autoMsg.enabled || !_autoMsg.msgs.length) return;
-  if (_autoMsg.onlyLive && !_autoMsgLive()) return;
-  var now = Date.now(), minL = Number(_autoMsg.minLines) || 0;
-  var due = null;
-  for (var i = 0; i < _autoMsg.msgs.length; i++) {
-    var m = _autoMsg.msgs[i];
-    if (!m || !m.enabled || !m.text) continue;
-    if (now - (m._lastSent || 0) < Math.max(1, Number(m.intervalMin) || 15) * 60000) continue;
-    if ((_autoMsgChatCount - (m._linesAtSend || 0)) < minL) continue;
-    // Most-overdue wins so nothing starves; only one send per tick.
-    if (!due || (m._lastSent || 0) < (due._lastSent || 0)) due = m;
-  }
-  if (due) { due._lastSent = now; due._linesAtSend = _autoMsgChatCount; _autoMsgSave(); sfSendChat(due.text); }
-}
-function _autoMsgStart() { if (_autoMsgTimer) return; _autoMsgTimer = setInterval(_autoMsgTick, 20000); }
-// UI
-function autoMsgSetGlobal(field, val) { if (!_autoMsg) _autoMsgLoad(); _autoMsg[field] = val; _autoMsgSave(); }
-function autoMsgAdd() { if (!_autoMsg) _autoMsgLoad(); _autoMsg.msgs.push({ id: 's' + Math.random().toString(36).slice(2, 8), text: '', intervalMin: 15, enabled: true, _lastSent: Date.now(), _linesAtSend: _autoMsgChatCount }); _autoMsgSave(); _renderAutoMsgs(); }
-function autoMsgRemove(idx) { _autoMsg.msgs.splice(idx, 1); _autoMsgSave(); _renderAutoMsgs(); }
-function autoMsgSetField(idx, field, val) { if (!_autoMsg.msgs[idx]) return; _autoMsg.msgs[idx][field] = val; _autoMsgSave(); }
-async function autoMsgSendNow(idx) {
-  var m = _autoMsg.msgs[idx]; if (!m || !m.text) return;
-  var el = document.getElementById('autoMsgStatus-' + idx); if (el) { el.textContent = 'sending…'; el.style.color = 'var(--accent)'; }
-  var r = await sfSendChat(m.text);
-  m._lastSent = Date.now(); m._linesAtSend = _autoMsgChatCount; _autoMsgSave();
-  if (el) { el.textContent = r.ok ? ('Sent (as ' + (r.via === 'bot' ? 'bot' : r.via === 'broadcaster' ? 'you' : 'Streamer.bot') + ') ✓') : ('Failed: ' + r.error); el.style.color = r.ok ? 'var(--grn)' : 'var(--red)'; }
-}
-function _renderAutoMsgs() {
-  var host = document.getElementById('autoMsgList'); if (!host) return;
-  if (!_autoMsg) _autoMsgLoad();
-  if (!_autoMsg.msgs.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">No automated messages yet. Click "Add message".</div>'; return; }
-  host.innerHTML = _autoMsg.msgs.map(function (m, idx) {
-    return '<div class="sec" style="background:var(--surf2);margin-bottom:8px">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-      +   '<label class="frow" style="flex:0 0 auto;gap:6px;margin:0"><span style="font-size:11px">On</span><input type="checkbox"' + (m.enabled ? ' checked' : '') + ' onchange="autoMsgSetField(' + idx + ',\'enabled\',this.checked)"></label>'
-      +   '<label style="font-size:11px;color:var(--mut)">Every</label><input class="minput" type="number" min="1" max="1440" value="' + (Number(m.intervalMin) || 15) + '" onchange="autoMsgSetField(' + idx + ',\'intervalMin\',parseInt(this.value,10)||15)" style="width:64px;font-size:12px;padding:4px 6px;background:var(--surf3)"><span style="font-size:11px;color:var(--mut)">min</span>'
-      +   '<button class="tbtn hk-reset" style="margin-left:auto" onclick="autoMsgRemove(' + idx + ')">Delete</button>'
-      + '</div>'
-      + '<textarea placeholder="Message text (e.g. Follow so you don\'t miss the next stream!)" oninput="autoMsgSetField(' + idx + ',\'text\',this.value)" rows="2" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(m.text || '') + '</textarea>'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:5px 11px;border-radius:6px" onclick="autoMsgSendNow(' + idx + ')">Send now</button><span id="autoMsgStatus-' + idx + '" style="font-size:10px"></span></div>'
-      + '</div>';
-  }).join('');
-}
-function renderBotTab() {
-  if (!_autoMsg) _autoMsgLoad();
-  // Bot account card
-  var ac = document.getElementById('botAcctCard');
-  if (ac) {
-    var b = S.twitchBot || {};
-    if (b.signedIn) {
-      ac.innerHTML = '<div style="font-size:12px;color:var(--txt);font-weight:700;margin-bottom:2px">Bot account: ' + esc(b.displayName || b.login || 'connected') + '</div>'
-        + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">Automated messages and bot replies post as this account.</div>'
-        + '<button class="cbtn" style="background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="disconnectBotAccount()">Disconnect bot</button>';
-    } else {
-      ac.innerHTML = '<div style="font-size:12px;color:var(--txt);font-weight:700;margin-bottom:2px">No bot account connected</div>'
-        + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">Optional. Connect a separate Twitch account (your own bot) so messages post under its name. Without one, messages post from your own channel account (or Streamer.bot if connected).</div>'
-        + '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="connectBotAccount()">Connect bot account</button><div id="botAcctStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>';
-    }
-    // Executor switch: shown in both states. Off = this device is view/edit
-    // only (for when the aquilo.gg cloud bot is running your channel).
-    ac.innerHTML += '<div style="border-top:1px solid var(--bdr);margin-top:10px;padding-top:8px">'
-      + '<label class="frow" style="margin:0"><span>Run the bot from this app</span><input type="checkbox"' + (_botRunLocal ? ' checked' : '') + ' onchange="botSetRunLocal(this.checked)"></label>'
-      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:3px">' + (_botRunLocal
-          ? 'This PC replies to commands, sends automated messages, and enforces auto-mod. Turn off if the aquilo.gg cloud bot runs your channel, so they never double-post.'
-          : '<strong style="color:#f0883e">Paused on this device.</strong> Settings still sync; nothing posts or filters from here.') + '</div></div>';
-  }
-  // Global automated-message settings
-  var g = document.getElementById('autoMsgGlobals');
-  if (g) {
-    var chk = function (on) { return on ? ' checked' : ''; };
-    g.innerHTML =
-      '<label class="frow"><span>Enable automated messages</span><input type="checkbox"' + chk(_autoMsg.enabled) + ' onchange="autoMsgSetGlobal(\'enabled\',this.checked)"></label>'
-      + '<label class="frow"><span>Only send while live</span><input type="checkbox"' + chk(_autoMsg.onlyLive) + ' onchange="autoMsgSetGlobal(\'onlyLive\',this.checked)"></label>'
-      + '<div class="frow" style="gap:6px"><label style="font-size:11px">Minimum chat lines between sends</label><input class="minput" type="number" min="0" max="200" value="' + (Number(_autoMsg.minLines) || 0) + '" onchange="autoMsgSetGlobal(\'minLines\',parseInt(this.value,10)||0)" style="width:70px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>';
-  }
-  _renderAutoMsgs();
-  if (typeof _renderCommands === 'function') _renderCommands();
-  if (typeof _renderAutomod === 'function') _renderAutomod();
-  if (typeof _renderQuotes === 'function') _renderQuotes();
-  if (typeof _renderGiveaway === 'function') _renderGiveaway();
-  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// Custom chat commands. Viewers type !trigger; the bot fills variables and
-// replies via sfSendChat, honoring per-command cooldown + permission level.
-// Counter commands (!deaths) support mod-only +/-/set/reset. Loop-safe: the
-// bot never processes its own last-sent line or messages from the bot account.
-// ══════════════════════════════════════════════════════════════════════════
-var _cmds = null;
-var _cmdCooldowns = {};
-var _lastBotSent = { text: '', at: 0 };
-var _CMD_LEVELS = { everyone: 0, sub: 1, vip: 2, mod: 3, broadcaster: 4 };
-function _cmdLoad() { try { _cmds = JSON.parse(localStorage.getItem('sf_commands') || '[]') || []; } catch (e) { _cmds = []; } if (!Array.isArray(_cmds)) _cmds = []; }
-function _cmdSave() { try { localStorage.setItem('sf_commands', JSON.stringify(_cmds)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
-function _botUptime() {
-  var start = S.twLiveStartedAt || (typeof _streamSession !== 'undefined' && _streamSession && _streamSession.active && _streamSession.startTime) || 0;
-  if (!start) return 'offline';
-  var s = Math.floor((Date.now() - start) / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
-}
-function _fillCmdVars(tpl, ctx) {
-  // Function-form replacements throughout: viewer-controlled values ({args},
-  // {touser}) may contain "$&"-style sequences that string replacements would
-  // expand into match text. Functions return values verbatim.
-  var lit = function (v) { return function () { return v; }; };
-  return String(tpl || '')
-    .replace(/\{user\}/gi, lit(ctx.user || ''))
-    .replace(/\{touser\}/gi, lit(ctx.arg1 || ctx.user || ''))
-    .replace(/\{args\}/gi, lit(ctx.args || ''))
-    .replace(/\{count\}/gi, lit(ctx.count != null ? String(ctx.count) : ''))
-    .replace(/\{channel\}/gi, lit(S.twLogin || ''))
-    .replace(/\{game\}/gi, lit(S.twGame || ''))
-    .replace(/\{uptime\}/gi, lit(_botUptime()))
-    .replace(/\{random:([^}]+)\}/gi, function (_m, list) { var a = list.split('|'); return a[Math.floor(Math.random() * a.length)] || ''; });
-}
-function _botUserLevel(u) {
-  u = u || {};
-  var badges = (u.badges || []).map(function (b) { return ((b && (b.name || b.type)) || '').toLowerCase(); });
-  var has = function (n) { return badges.some(function (x) { return x.indexOf(n) >= 0; }); };
-  var login = (u.login || u.name || u.displayName || '').toLowerCase();
-  if (u.role === 4 || u.isBroadcaster || has('broadcaster') || has('owner') || (S.twLogin && login === String(S.twLogin).toLowerCase())) return 4;
-  if (u.role === 3 || u.isModerator || u.isMod || has('moderator')) return 3;
-  if (u.role === 2 || u.isVip || has('vip')) return 2;
-  if (u.subscribed || u.isSubscribed || u.isSubscriber || has('subscriber') || has('founder')) return 1;
-  return 0;
-}
-function maybeFireCommand(text, u, plat) {
-  if (!_botRunLocal) return;
-  if (!_cmds) _cmdLoad();
-  text = String(text || '').trim();
-  if (text.charAt(0) !== '!') return;
-  // Loop guard: ignore our own last-sent line and the bot account's messages.
-  if (_lastBotSent.text && text === _lastBotSent.text && (Date.now() - _lastBotSent.at) < 6000) return;
-  var login = ((u && (u.login || u.name || u.displayName)) || '').toLowerCase();
-  if (S.twitchBot && S.twitchBot.signedIn && S.twitchBot.login && login === String(S.twitchBot.login).toLowerCase()) return;
-  var sp = text.split(/\s+/);
-  var trig = sp[0].toLowerCase();
-  // Built-in commands (take precedence over custom ones).
-  if (trig === '!permit' && _botUserLevel(u) >= 3 && sp[1]) {
-    var pu = sp[1].replace(/^@/, '');
-    botPermit(pu);
-    sfSendChat('@' + pu + ' you can post one link.');
-    return;
-  }
-  if (trig === '!quote') { _handleQuoteCmd(sp, u); return; }
-  var cmd = null;
-  for (var i = 0; i < _cmds.length; i++) {
-    var c = _cmds[i]; if (!c || !c.enabled) continue;
-    var trigs = [String(c.trigger || '').toLowerCase()].concat(String(c.aliases || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean));
-    if (trigs.indexOf(trig) >= 0) { cmd = c; break; }
-  }
-  if (!cmd) return;
-  if (_botUserLevel(u) < (_CMD_LEVELS[cmd.minLevel] || 0)) return;
-  var now = Date.now(), cd = Math.max(0, Number(cmd.cooldownSec) || 0) * 1000;
-  if (cd && _cmdCooldowns[cmd.id] && (now - _cmdCooldowns[cmd.id]) < cd) return;
-  var lvl = _botUserLevel(u);
-  var ctx = { user: u.displayName || u.name || u.login || '', arg1: sp[1] || '', args: sp.slice(1).join(' '), count: null };
-  if (cmd.isCounter) {
-    var op = (sp[1] || '').toLowerCase();
-    if (lvl >= 3 && (op === '+' || op === '+1' || op === 'add')) cmd.count = (Number(cmd.count) || 0) + 1;
-    else if (lvl >= 3 && (op === '-' || op === '-1' || op === 'sub')) cmd.count = (Number(cmd.count) || 0) - 1;
-    else if (lvl >= 3 && op === 'set') cmd.count = parseInt(sp[2], 10) || 0;
-    else if (lvl >= 3 && op === 'reset') cmd.count = 0;
-    ctx.count = Number(cmd.count) || 0;
-    _cmdSave();
-  }
-  _cmdCooldowns[cmd.id] = now;
-  var out = _fillCmdVars(cmd.response, ctx);
-  if (out.trim()) sfSendChat(out);
-}
-// Commands UI
-function cmdAdd() { if (!_cmds) _cmdLoad(); _cmds.push({ id: 'c' + Math.random().toString(36).slice(2, 8), trigger: '!newcmd', aliases: '', response: '', cooldownSec: 5, minLevel: 'everyone', enabled: true, isCounter: false, count: 0 }); _cmdSave(); _renderCommands(); }
-function cmdRemove(i) { _cmds.splice(i, 1); _cmdSave(); _renderCommands(); }
-function cmdSet(i, f, v) { if (!_cmds[i]) return; _cmds[i][f] = v; _cmdSave(); if (f === 'isCounter') _renderCommands(); }
-function cmdTest(i) {
-  var c = _cmds[i]; if (!c) return;
-  var out = _fillCmdVars(c.response, { user: S.twLogin || 'you', arg1: '', args: '', count: c.isCounter ? (Number(c.count) || 0) : null });
-  var el = document.getElementById('cmdStatus-' + i);
-  if (!out.trim()) { if (el) { el.textContent = 'Empty response'; el.style.color = 'var(--red)'; } return; }
-  sfSendChat(out).then(function (r) { if (el) { el.textContent = r.ok ? 'Sent ✓' : ('Failed: ' + r.error); el.style.color = r.ok ? 'var(--grn)' : 'var(--red)'; } });
-}
-function _renderCommands() {
-  var host = document.getElementById('cmdList'); if (!host) return;
-  if (!_cmds) _cmdLoad();
-  if (!_cmds.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:8px 0">No commands yet. Click "Add command". Try trigger <code>!socials</code> with a response, or a counter like <code>!deaths</code> using <code>{count}</code>.</div>'; return; }
-  var levelOpts = function (sel) { return ['everyone', 'sub', 'vip', 'mod', 'broadcaster'].map(function (l) { return '<option value="' + l + '"' + (sel === l ? ' selected' : '') + '>' + l + '</option>'; }).join(''); };
-  host.innerHTML = _cmds.map(function (c, i) {
-    return '<div class="sec" style="background:var(--surf2);margin-bottom:8px">'
-      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
-      +   '<label class="frow" style="flex:0 0 auto;gap:6px;margin:0"><span style="font-size:11px">On</span><input type="checkbox"' + (c.enabled ? ' checked' : '') + ' onchange="cmdSet(' + i + ',\'enabled\',this.checked)"></label>'
-      +   '<input class="minput" value="' + esc(c.trigger || '') + '" placeholder="!command" oninput="cmdSet(' + i + ',\'trigger\',this.value)" style="flex:1;min-width:80px;font-size:12px;font-weight:700;padding:5px 8px;background:var(--surf3);font-family:ui-monospace,monospace">'
-      +   '<button class="tbtn hk-reset" onclick="cmdRemove(' + i + ')">Delete</button>'
-      + '</div>'
-      + '<textarea placeholder="Response (use {user} {touser} {count} {game} {uptime} {args})" oninput="cmdSet(' + i + ',\'response\',this.value)" rows="2" style="width:100%;font-size:12px;padding:6px 8px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none">' + esc(c.response || '') + '</textarea>'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">'
-      +   '<label style="font-size:10px;color:var(--mut)">Who</label><select onchange="cmdSet(' + i + ',\'minLevel\',this.value)" style="font-size:11px;padding:3px 6px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:5px">' + levelOpts(c.minLevel || 'everyone') + '</select>'
-      +   '<label style="font-size:10px;color:var(--mut)">Cooldown</label><input class="minput" type="number" min="0" max="3600" value="' + (Number(c.cooldownSec) || 0) + '" onchange="cmdSet(' + i + ',\'cooldownSec\',parseInt(this.value,10)||0)" style="width:56px;font-size:11px;padding:3px 6px;background:var(--surf3)"><span style="font-size:10px;color:var(--mut)">s</span>'
-      +   '<label class="frow" style="gap:5px;margin:0"><span style="font-size:10px;color:var(--mut)">Counter</span><input type="checkbox"' + (c.isCounter ? ' checked' : '') + ' onchange="cmdSet(' + i + ',\'isCounter\',this.checked)" title="Enables mod-only + / - / set / reset and the {count} variable"></label>'
-      +   (c.isCounter ? '<span style="font-size:10px;color:var(--mut)">count: <strong style="color:var(--txt)">' + (Number(c.count) || 0) + '</strong></span>' : '')
-      +   '<button class="cbtn" style="margin-left:auto;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px" onclick="cmdTest(' + i + ')">Test</button>'
-      +   '<span id="cmdStatus-' + i + '" style="font-size:10px"></span>'
-      + '</div>'
-      + '</div>';
-  }).join('');
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// Auto-moderation. Per-filter toggles act via the native modAction() path
-// (delete + optional timeout). Mods/broadcaster are always exempt; each filter
-// also has an exempt level. `!permit <user>` (mod) grants a short link pass.
-// ══════════════════════════════════════════════════════════════════════════
-var _automod = null;
-var _permits = {};   // login -> link-permit expiry ts
-var _AM_FILTERS = [
-  { key: 'links', label: 'Block links' },
-  { key: 'caps', label: 'Excessive caps' },
-  { key: 'symbols', label: 'Symbol / special-char spam' },
-  { key: 'length', label: 'Very long messages' },
-  { key: 'repeat', label: 'Repeated characters' },
-  { key: 'words', label: 'Blocked words / phrases' }
-];
-function _automodDefault() {
-  return {
-    enabled: false, permitSec: 60,
-    filters: {
-      links: { on: false, timeout: 0, exempt: 'sub', warn: '{user}, please ask before posting links.' },
-      caps: { on: false, timeout: 0, exempt: 'vip', warn: '' },
-      symbols: { on: false, timeout: 0, exempt: 'vip', warn: '' },
-      length: { on: false, timeout: 0, exempt: 'vip', warn: '' },
-      repeat: { on: false, timeout: 0, exempt: 'vip', warn: '' },
-      words: { on: false, timeout: 600, exempt: 'mod', warn: '', list: '' }
-    }
-  };
-}
-function _automodLoad() {
-  try { var d = JSON.parse(localStorage.getItem('sf_automod') || '{}') || {}; _automod = _automodDefault(); _automod.enabled = !!d.enabled; if (d.permitSec != null) _automod.permitSec = d.permitSec; if (d.filters) Object.keys(_automod.filters).forEach(function (k) { if (d.filters[k]) Object.assign(_automod.filters[k], d.filters[k]); }); }
-  catch (e) { _automod = _automodDefault(); }
-}
-function _automodSave() { try { localStorage.setItem('sf_automod', JSON.stringify(_automod)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
-function botPermit(login) { if (!_automod) _automodLoad(); _permits[String(login || '').toLowerCase()] = Date.now() + (Number(_automod.permitSec) || 60) * 1000; }
-function maybeAutoMod(text, u, msgId) {
-  if (!_botRunLocal) return false;
-  if (!_automod) _automodLoad();
-  if (!_automod || !_automod.enabled) return false;
-  var lvl = _botUserLevel(u);
-  if (lvl >= 3) return false;   // mods + broadcaster never filtered
-  var login = (u.login || u.name || u.displayName || '').toLowerCase();
-  var f = _automod.filters, ex = function (flt) { return lvl < (_CMD_LEVELS[flt.exempt] || 0); };
-  // Links
-  if (f.links.on && ex(f.links)) {
-    var permitted = _permits[login] && Date.now() < _permits[login];
-    if (!permitted && /(https?:\/\/|www\.[a-z0-9-]+\.|\b[a-z0-9-]{2,}\.(com|net|org|tv|gg|io|co|link|xyz|me|ly|live|stream|shop|store|info|biz)\b)/i.test(text)) return _amAct('links', u, msgId, login);
-  }
-  // Caps %
-  if (f.caps.on && ex(f.caps)) {
-    var letters = text.replace(/[^a-zA-Z]/g, '');
-    if (letters.length >= 12 && ((text.match(/[A-Z]/g) || []).length / letters.length) * 100 >= 70) return _amAct('caps', u, msgId, login);
-  }
-  // Symbol ratio
-  if (f.symbols.on && ex(f.symbols)) {
-    if (text.length >= 8 && ((text.match(/[^a-zA-Z0-9\s]/g) || []).length / text.length) * 100 >= 60) return _amAct('symbols', u, msgId, login);
-  }
-  // Length
-  if (f.length.on && ex(f.length) && text.length > 400) return _amAct('length', u, msgId, login);
-  // Repeated chars
-  if (f.repeat.on && ex(f.repeat) && /(.)\1{9,}/.test(text)) return _amAct('repeat', u, msgId, login);
-  // Blocked words
-  if (f.words.on && ex(f.words)) {
-    var low = text.toLowerCase(), list = String(f.words.list || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
-    for (var i = 0; i < list.length; i++) { if (list[i] && low.indexOf(list[i]) >= 0) return _amAct('words', u, msgId, login); }
-  }
-  return false;
-}
-function _amAct(key, u, msgId, login) {
-  var flt = _automod.filters[key];
-  try {
-    if (msgId && typeof modAction === 'function') modAction('delete', login, 0, msgId);
-    if ((Number(flt.timeout) || 0) > 0 && typeof modAction === 'function') modAction('timeout', login, Number(flt.timeout), '');
-  } catch (e) {}
-  if (flt.warn && flt.warn.trim()) sfSendChat(_fillCmdVars(flt.warn, { user: u.displayName || u.name || login }));
-  try { addEvHistory('AutoMod', 'Filtered ' + (u.displayName || login) + ' · ' + key + (Number(flt.timeout) > 0 ? ' (' + flt.timeout + 's)' : ''), 'tw', false); } catch (e) {}
-  return true;
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// Quotes. Chat-driven: !quote (random), !quote N, !quote add <text> (mod),
-// !quote del N (mod). Also a light list UI in the Bot tab.
-// ══════════════════════════════════════════════════════════════════════════
-var _quotes = null;
-function _quotesLoad() { try { _quotes = JSON.parse(localStorage.getItem('sf_quotes') || '[]') || []; } catch (e) { _quotes = []; } if (!Array.isArray(_quotes)) _quotes = []; }
-function _quotesSave() { try { localStorage.setItem('sf_quotes', JSON.stringify(_quotes)); } catch (e) {} if (typeof _botConfigTouch === 'function') _botConfigTouch(); }
-function _handleQuoteCmd(sp, u) {
-  if (!_quotes) _quotesLoad();
-  var sub = (sp[1] || '').toLowerCase(), lvl = _botUserLevel(u);
-  if (sub === 'add') {
-    if (lvl < 3) return;
-    var t = sp.slice(2).join(' ').trim(); if (!t) return;
-    _quotes.push({ text: t.slice(0, 300), by: u.displayName || u.name || '', game: S.twGame || '', at: Date.now() });
-    _quotesSave(); if (typeof _renderQuotes === 'function') _renderQuotes();
-    sfSendChat('Quote #' + _quotes.length + ' added.'); return;
-  }
-  if (sub === 'del' || sub === 'remove') {
-    if (lvl < 3) return;
-    var n = parseInt(sp[2], 10);
-    if (n >= 1 && n <= _quotes.length) { _quotes.splice(n - 1, 1); _quotesSave(); if (typeof _renderQuotes === 'function') _renderQuotes(); sfSendChat('Quote #' + n + ' removed.'); }
-    return;
-  }
-  if (!_quotes.length) { sfSendChat('No quotes yet.'); return; }
-  var asNum = parseInt(sp[1], 10), idx = (asNum >= 1 && asNum <= _quotes.length) ? asNum - 1 : Math.floor(Math.random() * _quotes.length);
-  var q = _quotes[idx];
-  sfSendChat('#' + (idx + 1) + ': "' + q.text + '"' + (q.game ? ' [' + q.game + ']' : ''));
-}
-function quoteRemove(i) { _quotes.splice(i, 1); _quotesSave(); _renderQuotes(); }
-function _renderQuotes() {
-  var host = document.getElementById('quoteList'); if (!host) return;
-  if (!_quotes) _quotesLoad();
-  if (!_quotes.length) { host.innerHTML = '<div style="font-size:11px;color:var(--mut);padding:6px 0">No quotes yet. In chat, a mod can add one with <code>!quote add your text here</code>.</div>'; return; }
-  host.innerHTML = _quotes.map(function (q, i) {
-    return '<div style="display:flex;gap:8px;align-items:center;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:6px 8px;margin-bottom:5px">'
-      + '<span style="font-size:10px;color:var(--mut);font-weight:700">#' + (i + 1) + '</span>'
-      + '<span style="flex:1;font-size:11px;color:var(--txt)">' + esc(q.text) + (q.game ? ' <span style="color:var(--mut)">[' + esc(q.game) + ']</span>' : '') + '</span>'
-      + '<button class="tbtn hk-reset" style="font-size:9px;padding:2px 7px" onclick="quoteRemove(' + i + ')">x</button>'
-      + '</div>';
-  }).join('');
-}
-function _renderAutomod() {
-  var g = document.getElementById('automodGlobals');
-  if (g) {
-    if (!_automod) _automodLoad();
-    g.innerHTML = '<label class="frow"><span>Enable auto-moderation</span><input type="checkbox"' + (_automod.enabled ? ' checked' : '') + ' onchange="automodSetGlobal(\'enabled\',this.checked)"></label>'
-      + '<div class="frow" style="gap:6px"><label style="font-size:11px">!permit lasts</label><input class="minput" type="number" min="10" max="600" value="' + (Number(_automod.permitSec) || 60) + '" onchange="automodSetGlobal(\'permitSec\',parseInt(this.value,10)||60)" style="width:70px;font-size:12px;padding:5px 8px;background:var(--surf2)"><span style="font-size:11px;color:var(--mut)">sec</span></div>'
-      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:4px">Mods and you are always exempt. "Exempt" sets who else is immune. Timeout of 0 just deletes the message.</div>';
-  }
-  var host = document.getElementById('automodFilters'); if (!host) return;
-  var lvlSel = function (sel) { return ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (sel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join(''); };
-  host.innerHTML = _AM_FILTERS.map(function (ff) {
-    var f = _automod.filters[ff.key];
-    return '<div class="sec" style="background:var(--surf2);margin-bottom:7px">'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-      +   '<label class="frow" style="flex:1 1 auto;gap:6px;margin:0;min-width:150px"><input type="checkbox"' + (f.on ? ' checked' : '') + ' onchange="automodSetFilter(\'' + ff.key + '\',\'on\',this.checked)"><span style="font-size:12px;font-weight:700">' + ff.label + '</span></label>'
-      +   '<label style="font-size:10px;color:var(--mut)">Timeout</label><input class="minput" type="number" min="0" max="86400" value="' + (Number(f.timeout) || 0) + '" onchange="automodSetFilter(\'' + ff.key + '\',\'timeout\',parseInt(this.value,10)||0)" style="width:64px;font-size:11px;padding:3px 6px;background:var(--surf3)"><span style="font-size:10px;color:var(--mut)">s</span>'
-      +   '<label style="font-size:10px;color:var(--mut)">Exempt</label><select onchange="automodSetFilter(\'' + ff.key + '\',\'exempt\',this.value)" style="font-size:11px;padding:3px 6px;background:var(--surf3);color:var(--txt);border:1px solid var(--bdr);border-radius:5px">' + lvlSel(f.exempt || 'sub') + '</select>'
-      + '</div>'
-      + (ff.key === 'words' ? '<input class="minput" value="' + esc(f.list || '') + '" placeholder="banned words / phrases, comma separated" oninput="automodSetFilter(\'words\',\'list\',this.value)" style="width:100%;font-size:11px;padding:5px 8px;background:var(--surf3);margin-top:6px">' : '')
-      + '<input class="minput" value="' + esc(f.warn || '') + '" placeholder="Optional chat warning ({user})" oninput="automodSetFilter(\'' + ff.key + '\',\'warn\',this.value)" style="width:100%;font-size:11px;padding:5px 8px;background:var(--surf3);margin-top:6px">'
-      + '</div>';
-  }).join('');
-}
-function automodSetGlobal(f, v) { if (!_automod) _automodLoad(); _automod[f] = v; _automodSave(); }
-function automodSetFilter(key, f, v) { if (!_automod) _automodLoad(); if (!_automod.filters[key]) return; _automod.filters[key][f] = v; _automodSave(); }
-
-// ══════════════════════════════════════════════════════════════════════════
-// Giveaways. Keyword entry from chat; subs can get extra tickets. Draw a
-// weighted-random winner and announce it. Ephemeral (not persisted); the
-// config (keyword / sub-luck / who) is saved so it's remembered next time.
-// ══════════════════════════════════════════════════════════════════════════
-var _giveaway = { active: false, keyword: '!enter', entries: {}, subLuck: 1, minLevel: 'everyone', lastWinner: '' };
-function _gwLoadCfg() { try { var d = JSON.parse(localStorage.getItem('sf_giveaway_cfg') || '{}') || {}; if (d.keyword) _giveaway.keyword = d.keyword; if (d.subLuck != null) _giveaway.subLuck = d.subLuck; if (d.minLevel) _giveaway.minLevel = d.minLevel; } catch (e) {} }
-function _gwSaveCfg() { try { localStorage.setItem('sf_giveaway_cfg', JSON.stringify({ keyword: _giveaway.keyword, subLuck: _giveaway.subLuck, minLevel: _giveaway.minLevel })); } catch (e) {} }
-function _gwEntryCount() { return Object.keys(_giveaway.entries).length; }
-function maybeGiveawayEntry(text, u) {
-  if (!_botRunLocal || !_giveaway.active) return;
-  if (String(text || '').trim().toLowerCase() !== String(_giveaway.keyword || '').trim().toLowerCase()) return;
-  if (_botUserLevel(u) < (_CMD_LEVELS[_giveaway.minLevel] || 0)) return;
-  var login = (u.login || u.name || u.displayName || '').toLowerCase();
-  if (!login || _giveaway.entries[login]) return;
-  var tickets = 1;
-  if (_botUserLevel(u) >= 1) tickets = Math.max(1, Number(_giveaway.subLuck) || 1);   // sub+ luck
-  _giveaway.entries[login] = { name: u.displayName || u.name || login, tickets: tickets };
-  var el = document.getElementById('gwEntryCount'); if (el) el.textContent = _gwEntryCount() + ' entered';
-}
-function giveawayStart() {
-  _giveaway.active = true; _giveaway.entries = {}; _giveaway.lastWinner = '';
-  _gwSaveCfg();
-  sfSendChat('🎉 Giveaway is OPEN! Type ' + _giveaway.keyword + ' to enter.');
-  _renderGiveaway();
-}
-function giveawayStop() { _giveaway.active = false; _renderGiveaway(); }
-function giveawayDraw() {
-  var pool = [];
-  Object.keys(_giveaway.entries).forEach(function (login) { var e = _giveaway.entries[login]; for (var i = 0; i < (Number(e.tickets) || 1); i++) pool.push(e); });
-  if (!pool.length) { var s = document.getElementById('gwStatus'); if (s) { s.textContent = 'No entries yet.'; s.style.color = 'var(--mut)'; } return; }
-  var win = pool[Math.floor(Math.random() * pool.length)];
-  _giveaway.lastWinner = win.name;
-  // Remove the winner so a re-draw picks someone else.
-  Object.keys(_giveaway.entries).forEach(function (login) { if (_giveaway.entries[login] === win) delete _giveaway.entries[login]; });
-  sfSendChat('🎉 Winner: @' + win.name + ' ! Congratulations!');
-  _renderGiveaway();
-}
-function gwSetCfg(f, v) { _giveaway[f] = v; _gwSaveCfg(); _botConfigTouch(); }
-
-// ══════════════════════════════════════════════════════════════════════════
-// Bot config bundle: one versioned object holding every chat-automation setting
-// (commands, automated messages, auto-mod, quotes, giveaway config, schedule).
-// This is the canonical payload for cloud sync with aquilo.gg AND for local
-// export/import backup. NOTE: the bot ACCOUNT tokens are NOT included here;
-// each device does its own OAuth (tokens must never leave the machine). Viewer
-// CRM + analytics are per-device and are not part of this bundle.
-// ══════════════════════════════════════════════════════════════════════════
-var SF_BOT_CFG_VERSION = 1;
-function _botConfigTouch() {
-  try { localStorage.setItem('sf_bot_updated', String(Date.now())); } catch (e) {}
-  if (typeof _botCfgSchedulePush === 'function') { try { _botCfgSchedulePush(); } catch (e) {} }
-  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
-}
-function _botUpdatedAt() { return Number(localStorage.getItem('sf_bot_updated') || 0) || 0; }
-function sfBotConfig() {
-  if (!_cmds) _cmdLoad(); if (!_autoMsg) _autoMsgLoad(); if (!_automod) _automodLoad(); if (!_quotes) _quotesLoad(); if (!_schedule) _schedLoad(); if (!_giveaway) { }
-  return {
-    v: SF_BOT_CFG_VERSION,
-    updatedAt: _botUpdatedAt() || Date.now(),
-    commands: _cmds || [],
-    autoMessages: { enabled: !!_autoMsg.enabled, onlyLive: !!_autoMsg.onlyLive, minLines: Number(_autoMsg.minLines) || 0, msgs: (_autoMsg.msgs || []).map(function (m) { return { id: m.id, text: m.text, intervalMin: m.intervalMin, enabled: m.enabled }; }) },
-    automod: _automod || _automodDefault(),
-    quotes: _quotes || [],
-    giveaway: { keyword: _giveaway.keyword, subLuck: _giveaway.subLuck, minLevel: _giveaway.minLevel },
-    schedule: _schedule || _schedDefault()
-  };
-}
-function applyBotConfig(cfg) {
-  if (!cfg || typeof cfg !== 'object') return false;
-  try {
-    if (Array.isArray(cfg.commands)) { _cmds = cfg.commands; _cmdSave(); }
-    if (cfg.autoMessages) { if (!_autoMsg) _autoMsgLoad(); _autoMsg.enabled = !!cfg.autoMessages.enabled; _autoMsg.onlyLive = !!cfg.autoMessages.onlyLive; _autoMsg.minLines = Number(cfg.autoMessages.minLines) || 0; _autoMsg.msgs = (cfg.autoMessages.msgs || []).map(function (m) { return { id: m.id || ('s' + Math.random().toString(36).slice(2, 8)), text: m.text || '', intervalMin: Number(m.intervalMin) || 15, enabled: m.enabled !== false, _lastSent: Date.now(), _linesAtSend: _autoMsgChatCount }; }); _autoMsgSave(); }
-    if (cfg.automod) { _automod = Object.assign(_automodDefault(), cfg.automod); _automodSave(); }
-    if (Array.isArray(cfg.quotes)) { _quotes = cfg.quotes; _quotesSave(); }
-    if (cfg.giveaway) { if (!_giveaway) _gwLoadCfg(); _giveaway.keyword = cfg.giveaway.keyword || _giveaway.keyword; _giveaway.subLuck = cfg.giveaway.subLuck || 1; _giveaway.minLevel = cfg.giveaway.minLevel || 'everyone'; _gwSaveCfg(); }
-    if (cfg.schedule) { _schedule = cfg.schedule; _schedSave(); }
-    // Adopt the incoming version's timestamp so we know which side is newer.
-    try { localStorage.setItem('sf_bot_updated', String(cfg.updatedAt || Date.now())); } catch (e) {}
-    if (typeof renderBotTab === 'function') renderBotTab();
-    return true;
-  } catch (e) { console.warn('[bot-config] apply failed', e); return false; }
-}
-function botCfgExport() {
-  var ta = document.getElementById('botCfgIO'); if (!ta) return;
-  ta.value = JSON.stringify(sfBotConfig(), null, 2);
-  var st = document.getElementById('botCfgStatus'); if (st) { st.textContent = 'Exported. Copy this to back up or move to another device.'; st.style.color = 'var(--grn)'; }
-}
-function botCfgImport() {
-  var ta = document.getElementById('botCfgIO'); if (!ta) return;
-  var st = document.getElementById('botCfgStatus');
-  var obj; try { obj = JSON.parse(ta.value); } catch (e) { if (st) { st.textContent = 'That is not valid JSON.'; st.style.color = 'var(--red)'; } return; }
-  var ok = applyBotConfig(obj);
-  if (st) { st.textContent = ok ? 'Imported and applied.' : 'Import failed.'; st.style.color = ok ? 'var(--grn)' : 'var(--red)'; }
-}
-
-// ── Cloud sync (aquilo.gg /bot-config, same worker + auth as favorites) ──
-// Pull on Twitch connect: newer cloud config is applied here; newer local
-// config is pushed up. After that, any local edit debounce-pushes. The web UI
-// at aquilo.gg edits the same bundle, so changes made there arrive on the
-// next launch/connect (and vice versa). Last-write-wins via updatedAt.
-var _botCfgSync = { didInit: false, applying: false, pushTimer: null };
-function _botCfgSyncLine(msg, tone) {
-  var el = document.getElementById('botCfgSyncLine');
-  if (el) { el.textContent = msg || ''; el.style.color = tone === 'err' ? 'var(--red)' : tone === 'ok' ? 'var(--grn)' : 'var(--mut)'; }
-}
-async function botConfigCloudSync() {
-  if (!window.electronAPI || !window.electronAPI.botConfigGet) return;
-  try {
-    var res = await window.electronAPI.botConfigGet(_twUid() || 'default');
-    if (!res || !res.ok) { _botCfgSyncLine(res && res.localOnly ? 'Sync: connect Twitch to enable.' : 'Sync: offline (local settings in use).'); return; }
-    var localAt = _botUpdatedAt();
-    if (res.config && (res.updatedAt || 0) > localAt) {
-      _botCfgSync.applying = true;
-      try { applyBotConfig(res.config); } finally { _botCfgSync.applying = false; }
-      _botCfgSyncLine('Sync: pulled newer settings from aquilo.gg.', 'ok');
-    } else if (localAt > (res.updatedAt || 0)) {
-      _botCfgPushNow();
-    } else {
-      _botCfgSyncLine('Sync: up to date with aquilo.gg.', 'ok');
-    }
-  } catch (e) { /* non-fatal */ }
-}
-async function _botCfgPushNow() {
-  if (!window.electronAPI || !window.electronAPI.botConfigPut) return;
-  try {
-    var cfg = sfBotConfig();
-    var res = await window.electronAPI.botConfigPut(_twUid() || 'default', cfg, cfg.updatedAt);
-    _botCfgSyncLine(res && res.ok ? 'Sync: pushed to aquilo.gg.' : 'Sync: offline (will retry on next change).', res && res.ok ? 'ok' : '');
-  } catch (e) { /* non-fatal */ }
-}
-function _botCfgSchedulePush() {
-  if (_botCfgSync.applying) return;   // cloud-applied config must not echo back
-  if (_botCfgSync.pushTimer) clearTimeout(_botCfgSync.pushTimer);
-  _botCfgSync.pushTimer = setTimeout(function () { _botCfgSync.pushTimer = null; _botCfgPushNow(); }, 5000);
+  } catch (e) { if (st) { st.textContent = 'Export failed: ' + e.message; st.style.color = 'var(--red)'; } }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -5629,26 +4836,6 @@ function aqBusToggle(on) {
 function aqBusSetUrl(v) {
   try { localStorage.setItem('sf_aq_bus_url', String(v || '').trim()); } catch (e) {}
   if (_aqBusEnabled()) { aqBusStop(); _aqBus.backoff = 2000; aqBusStart(); }
-}
-function _renderGiveaway() {
-  var host = document.getElementById('giveawayBox'); if (!host) return;
-  var lvlOpts = ['everyone', 'sub', 'vip'].map(function (l) { return '<option value="' + l + '"' + (_giveaway.minLevel === l ? ' selected' : '') + '>' + l + '+</option>'; }).join('');
-  host.innerHTML =
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
-    + '<label style="font-size:11px;color:var(--mut)">Keyword</label><input class="minput" value="' + esc(_giveaway.keyword) + '" oninput="gwSetCfg(\'keyword\',this.value)" style="width:110px;font-size:12px;padding:5px 8px;background:var(--surf2);font-family:ui-monospace,monospace"' + (_giveaway.active ? ' disabled' : '') + '>'
-    + '<label style="font-size:11px;color:var(--mut)">Sub tickets</label><input class="minput" type="number" min="1" max="10" value="' + (Number(_giveaway.subLuck) || 1) + '" onchange="gwSetCfg(\'subLuck\',parseInt(this.value,10)||1)" style="width:56px;font-size:12px;padding:5px 8px;background:var(--surf2)">'
-    + '<label style="font-size:11px;color:var(--mut)">Who</label><select onchange="gwSetCfg(\'minLevel\',this.value)" style="font-size:11px;padding:4px 6px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px">' + lvlOpts + '</select>'
-    + '</div>'
-    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
-    + (_giveaway.active
-        ? '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayStop()">Close entries</button>'
-          + '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayDraw()">Draw winner</button>'
-          + '<span id="gwEntryCount" style="font-size:11px;color:var(--accent);font-weight:700">' + _gwEntryCount() + ' entered</span>'
-        : '<button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayStart()">Start giveaway</button>'
-          + (_gwEntryCount() ? '<button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px" onclick="giveawayDraw()">Draw from last</button>' : ''))
-    + '<span id="gwStatus" style="font-size:10px;color:var(--mut)"></span>'
-    + '</div>'
-    + (_giveaway.lastWinner ? '<div style="font-size:12px;margin-top:8px;color:var(--txt)">Last winner: <strong style="color:var(--grn)">' + esc(_giveaway.lastWinner) + '</strong></div>' : '');
 }
 
 // ── Ads ──
@@ -10255,6 +9442,7 @@ function onDemoSpeedChange(v) {
   if (el) el.textContent = String(_demoSpeed);
 }
 
+var _kkViewerPoll = null;
 function startKickViewerPoll() {
   clearInterval(_kkViewerPoll); _kkViewerPoll = null;
   if (!window.electronAPI || !window.electronAPI.fetchKickViewers) return;
@@ -10569,12 +9757,6 @@ function handleSBEvent(event, data, fromES) {
     pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', login: _twLoginKey, html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg });
     // Viewer CRM: track this chatter (msgs / days seen / last seen).
     if (_twLoginKey && typeof _viewerTrackMsg === 'function') { try { _viewerTrackMsg(_twLoginKey, u.displayName || u.name || _twLoginKey); } catch (e) {} }
-    // Bot: auto-moderation runs on every message; if it acts, skip commands.
-    var _modActed = false;
-    if (typeof maybeAutoMod === 'function') { try { _modActed = maybeAutoMod(rawText, u, msgId); } catch (e) {} }
-    if (!_modActed && typeof maybeGiveawayEntry === 'function') { try { maybeGiveawayEntry(rawText, u); } catch (e) {} }
-    // Custom chat commands (bot). Runs on the raw text with the chatter's role.
-    if (!_modActed && rawText && rawText.charAt(0) === '!' && typeof maybeFireCommand === 'function') { try { maybeFireCommand(rawText, u, 'tw'); } catch (e) {} }
   } else if (key === 'Twitch.AnnouncementMessage' || key === 'Twitch.Announcement' || key === 'Twitch.ChatMessageAnnouncement' || key === 'Twitch.AnnouncementSent') {
     if (chk('ev-tw-announce')) return;
     var _annUser = gu(data) || 'Announcement';
@@ -11375,9 +10557,6 @@ function pushMsg(m) {
   if (m && m.plat && _lastChatActivity[m.plat] != null) {
     _lastChatActivity[m.plat] = Date.now();
   }
-  // Count real viewer chat lines for the automated-message "min chat lines"
-  // gate (don't count events, system messages, or the bot's own output).
-  if (!m.isEv && m.user) { _autoMsgChatCount++; }
   // Events go to the events panel only, not the chat feed
   if (m.isEv) {
     if (S.paused) { trailLog('paused', { type: m.evType || 'event', user: m.user || '' }); return; }
@@ -12380,22 +11559,6 @@ function openSettingsTab(tab) {
   if (ov && !ov.classList.contains('show')) toggleSettingsModal();
   switchSettingsTab(tab);
 }
-// Topbar Bot chip dot: orange = paused on this device, green = running with
-// at least one thing enabled (auto-messages, auto-mod, or any command),
-// grey = idle / nothing configured yet.
-function updateBotStateBtn() {
-  var d = document.getElementById('botStateDot');
-  if (!d) return;
-  var active = false;
-  try { active = !!(_botRunLocal && ((_autoMsg && _autoMsg.enabled) || (_automod && _automod.enabled) || (_cmds && _cmds.length))); } catch (e) {}
-  var paused = false;
-  try { paused = !_botRunLocal; } catch (e) {}
-  d.style.background = paused ? '#f0883e' : (active ? 'var(--grn, #5bff95)' : '#666');
-  var b = document.getElementById('botStateBtn');
-  if (b) b.title = paused ? 'Bot paused on this device (settings still sync). Click to manage.'
-    : active ? 'Bot running from this app. Click to manage.'
-    : 'Bot idle: nothing enabled yet. Click to set up commands and automated messages.';
-}
 function toggleSettingsModal() {
   var ov = document.getElementById('settingsOverlay');
   var open = ov.classList.contains('show');
@@ -12427,8 +11590,6 @@ function switchSettingsTab(tab) {
   // boot or when the user clicks a different settings section.
   if (tab === 'stream') renderStreamTab();
   else if (typeof _adTick !== 'undefined' && _adTick) { clearInterval(_adTick); _adTick = null; }
-  if (tab === 'schedule' && typeof renderScheduleTab === 'function') renderScheduleTab();
-  if (tab === 'bot' && typeof renderBotTab === 'function') renderBotTab();
   if (tab === 'viewers' && typeof renderViewersTab === 'function') renderViewersTab();
   if (tab === 'analytics' && typeof renderAnalyticsTab === 'function') renderAnalyticsTab();
   if (tab === 'ops') { if (typeof renderOpsTab === 'function') renderOpsTab(); if (!_opsTick) _opsTick = setInterval(_tickRundown, 1000); }
@@ -14456,8 +13617,6 @@ function startStreamSession() {
   // Discord announcement.
   if (typeof _shoutoutResetSession === 'function') _shoutoutResetSession();
   if (typeof _discordAnnounceFireGoLive === 'function') _discordAnnounceFireGoLive();
-  // Apply the matching schedule slot (title / category / tags / announcement).
-  if (typeof applyScheduleForGoLive === 'function') { try { applyScheduleForGoLive(); } catch (e) {} }
   // Fresh stream: uncheck the pre-stream checklist for next time.
   if (typeof opsChkReset === 'function') { try { opsChkReset(); } catch (e) {} }
   addEvHistory('StreamFusion', 'Stream session started \u2014 recap will be generated when you go offline.', 'tw', false);
@@ -15677,19 +14836,6 @@ setTimeout(function() {
   // Register the saved stream control-action hotkeys globally on boot.
   _loadStreamHotkeys();
   syncStreamHotkeys();
-  // Load the go-live schedule so auto-apply works even if the tab is never
-  // opened this session.
-  _schedLoad();
-  // Automated messages: load + start the timer engine so they fire without
-  // opening the Bot tab. Hydrate bot-account status + listen for changes.
-  _autoMsgLoad();
-  _autoMsgStart();
-  _cmdLoad();
-  _automodLoad();
-  _quotesLoad();
-  _gwLoadCfg();
-  try { _botRunLocal = localStorage.getItem('sf_bot_run_local') !== '0'; } catch (e) {}
-  if (typeof updateBotStateBtn === 'function') { try { updateBotStateBtn(); } catch (e) {} }
   // Viewer CRM: load + flush to localStorage every 15s (writes are throttled
   // so per-message tracking doesn't hammer disk) and once more on unload.
   _viewersLoad();
@@ -15703,8 +14849,6 @@ setTimeout(function() {
     var _aqU = document.getElementById('aqBusUrlInput'); if (_aqU) _aqU.value = _aqBusUrl();
     if (_aqBusEnabled()) aqBusStart(); else _aqBusStatus('off');
   } catch (e) {}
-  if (window.electronAPI && window.electronAPI.onTwitchBotStatusChanged) window.electronAPI.onTwitchBotStatusChanged(applyTwitchBotStatus);
-  if (window.electronAPI && window.electronAPI.twitchBotGetStatus) { window.electronAPI.twitchBotGetStatus().then(applyTwitchBotStatus).catch(function () {}); }
   // Hydrate the pop-out chat-send hotkey from the main process (source
   // of truth, persisted to popout-send-hotkey.json). Don't push it back
   // since main already loaded it on startup.
