@@ -52,7 +52,8 @@ function fetchFlair(job, cb) {
   } catch (e) { fin(); }
 }
 function applyFlair(job, d) {
-  if (d && (d.icon || d.tagline || d.frame || d.shape || d.nameStyle)) {
+  if (d && (d.icon || d.tagline || d.frame || d.shape || d.nameStyle || d.emoteUrl)) {
+    job.flairEmoteUrl = (typeof d.emoteUrl === 'string' && d.emoteUrl.indexOf('https://static-cdn.jtvnw.net/emoticons/v2/') === 0) ? d.emoteUrl : '';
     job.flairIcon = String(d.icon || '');
     job.flairTag = String(d.tagline || '').slice(0, 40);
     job.flairFrame = ['double', 'dashed', 'zigzag', 'dots'].indexOf(d.frame) !== -1 ? d.frame : '';
@@ -452,6 +453,8 @@ function pump() {
       job.avatarData = avatarData;
       job.giftIconData = giftData;
       fetchFlair(job, function () {
+      fetchDataUrl(job.flairEmoteUrl, function (emoteData) {
+      job.flairEmoteData = emoteData;
       renderReceipt(job).then(function (r) {
         return spool(buildEscpos(r.rasterB64, r.widthBytes, r.height)).then(function () { return r; });
       }).then(function (r) {
@@ -459,6 +462,7 @@ function pump() {
         finish(true);
       }).catch(function (e) {
         finish(false, (e && e.message) || 'print failed');
+      });
       });
       });
     });

@@ -366,10 +366,19 @@ async function drawJob(x, job) {
     } else {
       x.fillText(job.user, W / 2, y);
     }
-    if (job.flairIcon) {
+    const emImg = job.flairEmoteData ? await loadImg(job.flairEmoteData) : null;
+    if (emImg || job.flairIcon) {
       const fx = Math.min(nw / 2 + (job.flairName === 'pill' ? 46 : 32), W / 2 - 20);
-      drawFlair(x, job.flairIcon, W / 2 - fx, y - s * 0.32, 13);
-      drawFlair(x, job.flairIcon, W / 2 + fx, y - s * 0.32, 13);
+      if (emImg) {
+        // Viewer's own emote as the stamp — contrast-boosted like gift art.
+        x.save(); x.filter = 'grayscale(1) contrast(1.8) brightness(0.9)';
+        x.drawImage(emImg, W / 2 - fx - 16, y - s * 0.32 - 16, 32, 32);
+        x.drawImage(emImg, W / 2 + fx - 16, y - s * 0.32 - 16, 32, 32);
+        x.filter = 'none'; x.restore();
+      } else {
+        drawFlair(x, job.flairIcon, W / 2 - fx, y - s * 0.32, 13);
+        drawFlair(x, job.flairIcon, W / 2 + fx, y - s * 0.32, 13);
+      }
       x.fillStyle = '#000';
     }
     y += 10;
