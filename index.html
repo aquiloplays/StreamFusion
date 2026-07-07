@@ -2183,7 +2183,6 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <div class="settings-tab" data-tab="discordea" onclick="switchSettingsTab('discordea')">Discord+</div>
         <div class="settings-tab-grp">MANAGE</div>
         <div class="settings-tab" data-tab="stream" onclick="switchSettingsTab('stream')">Stream</div>
-        <div class="settings-tab" data-tab="bot" onclick="switchSettingsTab('bot')">Bot</div>
         <div class="settings-tab" data-tab="viewers" onclick="switchSettingsTab('viewers')">Viewers</div>
         <div class="settings-tab" data-tab="analytics" onclick="switchSettingsTab('analytics')">Analytics</div>
         <div class="settings-tab" data-tab="ops" onclick="switchSettingsTab('ops')">Ops</div>
@@ -2455,28 +2454,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             </div>
           </div>
         </div>
-        <div class="settings-pane" id="pane-bot">
-          <div class="sec">
-            <div class="sec-hd">The bot moved to the cloud</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:8px">
-              StreamFusion's chat bot — custom commands, counters, automated messages, auto-moderation, quotes, giveaways — and the go-live Schedule now run as the <b>Aquilo Bot</b>: the same features plus an economy, minigames and multi-platform chat (Twitch, Kick, YouTube), hosted in the cloud so nothing depends on this app being open. One bot, one place, no double-posting.
-            </div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:8px">
-              <b>Move your setup (one time):</b><br>
-              1. Click <b>Copy my bot config</b> below — your on-device settings are packaged (and never deleted from this PC).<br>
-              2. Open <b>aquilo.gg/bot</b> → connect Twitch → “Migrate from StreamFusion” → paste → Import.<br>
-              3. Manage counters at <b>aquilo.gg/counters</b>; live bump buttons are in the <b>Aquilo Dock</b> OBS panel.
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-              <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px" onclick="sfMigrationCopy()">Copy my bot config</button>
-              <a class="cbtn" href="https://aquilo.gg/bot/" target="_blank" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none">Open Aquilo Bot</a>
-              <a class="cbtn" href="https://aquilo.gg/counters/" target="_blank" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none">Counters</a>
-              <a class="cbtn" href="https://aquilo.gg/dock/panel/" target="_blank" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none">Aquilo Dock</a>
-            </div>
-            <textarea id="botMigIO" readonly placeholder="Your old bot config appears here after Copy." rows="4" style="width:100%;font-size:10px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none;font-family:ui-monospace,monospace"></textarea>
-            <div id="botMigStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:12px"></div>
-          </div>
-        </div>
+        <!-- bot migration pane removed — the in-app bot + Schedule moved to the cloud Aquilo Bot; migration tooling retired -->
 
         <!-- ═══ OPS TAB (checklist + rundown) ═══ -->
         <div class="settings-pane" id="pane-ops">
@@ -4405,34 +4383,8 @@ async function siApplyChannelInfo() {
 // packages the old on-device config as the v1 bundle the dashboard's
 // "Migrate from StreamFusion" card imports. localStorage is left intact.
 // ══════════════════════════════════════════════════════════════════════════
-function sfMigrationExport() {
-  function j(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return (v == null) ? d : v; } catch (e) { return d; } }
-  var am = j('sf_auto_messages', {}) || {};
-  var gw = j('sf_giveaway_cfg', {}) || {};
-  return {
-    v: 1,
-    updatedAt: Number(localStorage.getItem('sf_bot_updated') || 0) || Date.now(),
-    commands: j('sf_commands', []),
-    autoMessages: { enabled: !!am.enabled, onlyLive: am.onlyLive !== false, minLines: Number(am.minLines) || 0, msgs: am.msgs || [] },
-    automod: j('sf_automod', {}),
-    quotes: j('sf_quotes', []),
-    giveaway: { keyword: gw.keyword, subLuck: gw.subLuck, minLevel: gw.minLevel },
-    schedule: j('sf_schedule', {})
-  };
-}
-function sfMigrationCopy() {
-  var st = document.getElementById('botMigStatus');
-  try {
-    var txt = JSON.stringify(sfMigrationExport(), null, 2);
-    var ta = document.getElementById('botMigIO');
-    if (ta) ta.value = txt;
-    navigator.clipboard.writeText(txt).then(function () {
-      if (st) { st.textContent = 'Copied — paste it into aquilo.gg/bot → “Migrate from StreamFusion”.'; st.style.color = 'var(--grn)'; }
-    }, function () {
-      if (st) { st.textContent = 'Config is in the box — copy it manually.'; st.style.color = 'var(--accent)'; }
-    });
-  } catch (e) { if (st) { st.textContent = 'Export failed: ' + e.message; st.style.color = 'var(--red)'; } }
-}
+// bot-config migration exporter removed — migration tooling retired
+// (the in-app bot moved to the cloud Aquilo Bot; nothing to migrate here).
 
 // ══════════════════════════════════════════════════════════════════════════
 // Viewer CRM. Per-chatter profiles (msgs, days seen, contributed $, notes,
