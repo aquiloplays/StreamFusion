@@ -40,6 +40,7 @@ const rotationRelay = require('./rotation-relay-client');
 // The renderer taps its normalized event pipeline (same spot that feeds OBS
 // alerts) and forwards jobs; rendering/dithering/spooling live in printer.js.
 const printer = require('./printer');
+const wardenAgent = require('./warden-agent');
 
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
@@ -1084,6 +1085,12 @@ app.whenReady().then(() => {
   }
   catch (e) { logToFile('PRINTER', 'init threw: ' + (e && e.message)); }
 
+  // Warden machine agent — relays non-Twitch chat + executes allowlisted
+  // OBS commands mods trigger from the Warden console. Inert until the
+  // renderer's Warden pane enables it.
+  try { wardenAgent.init({ log: function(msg) { logToFile('WARDEN-AGENT', msg); } }); }
+  catch (e) { logToFile('WARDEN-AGENT', 'init threw: ' + (e && e.message)); }
+
 
   // Check for updates (non-blocking). Verbose logging through every stage
   // so 1.4.7+ installs that fail to complete leave a breadcrumb in the
@@ -1143,6 +1150,7 @@ app.on('before-quit', () => {
   try { discordBot.disconnectBot(); } catch (e) {}
   try { rotationRelay.stop(); } catch (e) {}
   try { printer.stop(); } catch (e) {}
+  try { wardenAgent.stop(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────
@@ -1191,6 +1199,26 @@ ipcMain.handle('printer-set-config', function(event, patch) {
 ipcMain.handle('printer-print', function(event, job) {
   try { return printer.enqueue(job || {}); }
   catch (e) { return { queued: false, reason: (e && e.message) || 'error' }; }
+});
+
+// ── Warden agent IPC ─────────────────────────────────────────────────────────
+// The renderer configures the agent (enable, streamer id, machine key, OBS
+// connection, capability allowlist), pushes relayed chat, and probes OBS to
+// build the allowlist. All OBS execution + room I/O lives in warden-agent.js.
+ipcMain.handle('warden-agent-config', function(event, patch) {
+  try { return wardenAgent.setConfig(patch || {}); } catch (e) { return { enabled: false }; }
+});
+ipcMain.handle('warden-agent-status', function() {
+  try { return wardenAgent.getStatus(); } catch (e) { return { enabled: false }; }
+});
+ipcMain.handle('warden-agent-probe-obs', function() {
+  return new Promise(function(resolve) {
+    try { wardenAgent.probeObs(function(r) { resolve(r || { scenes: [], sources: [], mics: [] }); }); }
+    catch (e) { resolve({ scenes: [], sources: [], mics: [] }); }
+  });
+});
+ipcMain.on('warden-agent-chat', function(event, msg) {
+  try { wardenAgent.relayChat(msg || {}); } catch (e) {}
 });
 
 // ── Rotation Relay IPC ──────────────────────────────────────────────────────

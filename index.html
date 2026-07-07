@@ -2990,6 +2990,25 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <button class="tbtn" onclick="printerDoodleQueue()" style="font-size:11px;font-weight:700;padding:5px 10px">Refresh queue</button>
             <div id="prnDoodles" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">WARDEN BRIDGE</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Connect this machine to your <a href="https://aquilo.gg/warden" target="_blank" style="color:#8b7bff">Warden</a> mod console. Relay lets mods see Kick / YouTube / TikTok chat in the unified feed; OBS control lets mods trigger the scenes and actions you allow below.</div>
+            <label class="frow"><span>Relay non-Twitch chat to Warden</span><input type="checkbox" id="wdnRelay" onchange="onWardenCfgChange()"></label>
+            <label class="frow"><span>Allow mod OBS control</span><input type="checkbox" id="wdnObs" onchange="onWardenCfgChange()"></label>
+            <div id="wdnObsBox" style="display:none;margin-top:6px">
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+                <button class="tbtn" onclick="wardenProbeObs()" style="font-size:11px;font-weight:700;padding:5px 10px">Scan OBS</button>
+                <span id="wdnObsStatus" style="font-size:10px;color:var(--mut)">Scan to list your scenes and sources.</span>
+              </div>
+              <label class="frow"><span>&ldquo;BRB panic&rdquo; button <span style="color:var(--mut);font-weight:400">(mods can hit it)</span></span><input type="checkbox" id="wdnBrb" onchange="onWardenCfgChange()"></label>
+              <label class="frow"><span>BRB scene</span><select id="wdnBrbScene" onchange="onWardenCfgChange()" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:4px 6px;font-size:11px"><option value="">— scan first —</option></select></label>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY SWITCH TO</div>
+              <div id="wdnScenes" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY TOGGLE (SOURCES)</div>
+              <div id="wdnSources" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+              <div style="font-size:10px;font-weight:700;color:var(--mut);padding:6px 0 2px;letter-spacing:.4px">MODS MAY MUTE (MICS)</div>
+              <div id="wdnMics" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+            </div>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DISCORD MIRROR</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Every real receipt also posts its image to this webhook (test prints and system tickets stay local). Clear the field to disable.</div>
             <label class="frow"><span>Webhook URL</span><input type="password" id="prnDiscordWebhook" placeholder="https://discord.com/api/webhooks/…" style="width:230px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
@@ -10503,6 +10522,17 @@ function pushMsg(m) {
   if (m && m.plat && _lastChatActivity[m.plat] != null) {
     _lastChatActivity[m.plat] = Date.now();
   }
+  // Warden relay: forward non-Twitch chat lines to the mod console's
+  // unified feed (Twitch has its own native EventSub ingest). One tap here
+  // covers Kick/YouTube/TikTok; gated on the pane toggle.
+  if (wardenCfg.relay && !m.isEv && m.user && m.plat && WARDEN_PLAT[m.plat]) {
+    try {
+      window.electronAPI.wardenAgentChat({
+        platform: WARDEN_PLAT[m.plat], user: m.user,
+        text: m.text || '', color: m.color || ''
+      });
+    } catch (e) {}
+  }
   // Events go to the events panel only, not the chat feed
   if (m.isEv) {
     if (S.paused) { trailLog('paused', { type: m.evType || 'event', user: m.user || '' }); return; }
@@ -15785,6 +15815,126 @@ setTimeout(_printerGateCheck, 5000);
 setTimeout(_printerGateCheck, 20000);
 setTimeout(function() { _printerSyncUi(); _printerSaveCfg(); printerRefreshList(); }, 1200);
 setInterval(printerPollStatus, 5000);
+
+// ── Warden bridge (chat relay + OBS control) ───────────────────────────────
+// This machine acts as Warden's on-machine agent. Relay forwards non-Twitch
+// chat to the mod console; OBS control lets mods trigger the scenes/actions
+// the streamer allowlists here. Streamer id + machine key are shared with
+// the printer's gallery uploader.
+var WARDEN_PLAT = { kk: 'kick', yt: 'youtube', tt: 'tiktok' };
+var wardenCfg = { relay: false, obs: false, brbPanic: false, brbScene: '', scenes: [], sources: [], mics: [] };
+var _wdnProbe = { scenes: [], sources: [], mics: [] };
+
+function _wdnEl(id) { return document.getElementById(id); }
+
+function _wardenLoad() {
+  try {
+    var d = JSON.parse(localStorage.getItem('sf_warden_cfg') || 'null');
+    if (d && typeof d === 'object') Object.assign(wardenCfg, d);
+  } catch (e) {}
+}
+
+function _wardenSaveLocal() {
+  try { localStorage.setItem('sf_warden_cfg', JSON.stringify(wardenCfg)); } catch (e) {}
+}
+
+// Push the effective config to the main-process agent. Needs the streamer's
+// Twitch id + the machine key (same key the gallery uploader uses).
+function _wardenPushAgent() {
+  if (!window.electronAPI || !window.electronAPI.wardenAgentConfig) return;
+  window.electronAPI.printerGetStatus().then(function(st) {
+    var key = (st && st.galleryKey) || '';
+    var caps = {
+      enabled: wardenCfg.obs,
+      brbPanic: wardenCfg.brbPanic,
+      brbScene: wardenCfg.brbScene,
+      scenes: wardenCfg.scenes, sources: wardenCfg.sources, mics: wardenCfg.mics
+    };
+    window.electronAPI.wardenAgentConfig({
+      enabled: wardenCfg.relay || wardenCfg.obs,
+      streamerId: String(S.twitch && S.twitch.userId || S.twUserId || ''),
+      key: key,
+      obs: { port: 4455, password: (S.obsRefresh && S.obsRefresh.password) || '' },
+      caps: caps
+    });
+  }).catch(function() {});
+}
+
+function _wardenSyncUi() {
+  if (!_wdnEl('wdnRelay')) return;
+  _wdnEl('wdnRelay').checked = wardenCfg.relay;
+  _wdnEl('wdnObs').checked = wardenCfg.obs;
+  _wdnEl('wdnObsBox').style.display = wardenCfg.obs ? '' : 'none';
+  _wdnEl('wdnBrb').checked = wardenCfg.brbPanic;
+  _wardenRenderPicks();
+}
+
+function _chip(box, label, on, onToggle) {
+  var b = document.createElement('button');
+  b.className = 'tbtn';
+  b.textContent = (on ? '✓ ' : '') + label;
+  b.style.cssText = 'font-size:11px;padding:3px 9px;' + (on ? 'border-color:#8b7bff;color:#8b7bff' : '');
+  b.onclick = onToggle;
+  box.appendChild(b);
+}
+
+function _wardenRenderPicks() {
+  var sc = _wdnEl('wdnScenes'), so = _wdnEl('wdnSources'), mi = _wdnEl('wdnMics');
+  if (!sc) return;
+  var scenes = _wdnProbe.scenes.length ? _wdnProbe.scenes : wardenCfg.scenes;
+  var sources = _wdnProbe.sources.length ? _wdnProbe.sources : wardenCfg.sources;
+  var mics = _wdnProbe.mics.length ? _wdnProbe.mics : wardenCfg.mics;
+  sc.innerHTML = ''; so.innerHTML = ''; mi.innerHTML = '';
+  var mk = function(box, list, arrName) {
+    (list || []).forEach(function(name) {
+      _chip(box, name, wardenCfg[arrName].indexOf(name) !== -1, function() {
+        var i = wardenCfg[arrName].indexOf(name);
+        if (i === -1) wardenCfg[arrName].push(name); else wardenCfg[arrName].splice(i, 1);
+        onWardenCfgChange();
+      });
+    });
+    if (!list || !list.length) box.innerHTML = '<span style="font-size:10px;color:var(--mut)">scan OBS to populate</span>';
+  };
+  mk(sc, scenes, 'scenes'); mk(so, sources, 'sources'); mk(mi, mics, 'mics');
+  // BRB scene dropdown.
+  var sel = _wdnEl('wdnBrbScene');
+  if (sel && _wdnProbe.scenes.length) {
+    sel.innerHTML = '<option value="">— none —</option>';
+    _wdnProbe.scenes.forEach(function(s) {
+      var o = document.createElement('option'); o.value = s; o.textContent = s;
+      if (s === wardenCfg.brbScene) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+}
+
+function onWardenCfgChange() {
+  if (!_wdnEl('wdnRelay')) return;
+  wardenCfg.relay = _wdnEl('wdnRelay').checked;
+  wardenCfg.obs = _wdnEl('wdnObs').checked;
+  wardenCfg.brbPanic = _wdnEl('wdnBrb').checked;
+  wardenCfg.brbScene = _wdnEl('wdnBrbScene').value || wardenCfg.brbScene;
+  _wdnEl('wdnObsBox').style.display = wardenCfg.obs ? '' : 'none';
+  _wardenSaveLocal();
+  _wardenPushAgent();
+}
+
+function wardenProbeObs() {
+  var st = _wdnEl('wdnObsStatus');
+  if (st) st.textContent = 'scanning…';
+  if (!window.electronAPI || !window.electronAPI.wardenAgentProbeObs) return;
+  window.electronAPI.wardenAgentProbeObs().then(function(r) {
+    _wdnProbe = r || { scenes: [], sources: [], mics: [] };
+    if (st) st.textContent = _wdnProbe.scenes.length
+      ? (_wdnProbe.scenes.length + ' scenes, ' + _wdnProbe.sources.length + ' sources')
+      : 'OBS not detected — is it running with the WebSocket server on?';
+    _wardenRenderPicks();
+  }).catch(function() { if (st) st.textContent = 'scan failed'; });
+}
+
+_wardenLoad();
+setTimeout(function() { _wardenSyncUi(); _wardenPushAgent(); }, 1500);
+
 // ── Discord+ (EA-only): live events, records, bot ─────────────────────────
 // Expanded Discord integration that goes beyond the free-tier stream recap:
 //   - Stylized embeds fired on individual events (follow/sub/cheer/gift/hype)

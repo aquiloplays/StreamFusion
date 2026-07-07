@@ -202,6 +202,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // printerPrint takes a print-job object (see printer.js enqueue docs) and
   // returns { queued, reason?, receiptNo? }. Config: { enabled, printerName,
   // maxPerMinute }. The Printer settings pane drives all of these.
+  // ── Warden machine agent (chat relay + OBS control) ────────────────────────
+  wardenAgentConfig:  (patch) => ipcRenderer.invoke('warden-agent-config', patch || {}),
+  wardenAgentStatus:  ()      => ipcRenderer.invoke('warden-agent-status'),
+  wardenAgentProbeObs:()      => ipcRenderer.invoke('warden-agent-probe-obs'),
+  wardenAgentChat:    (msg)   => ipcRenderer.send('warden-agent-chat', msg || {}),
+
   printerList:      ()      => ipcRenderer.invoke('printer-list'),
   // Paper-state changes ('ok'|'low'|'out'|'offline') from the driver watch.
   onPrinterPaper:   (fn)    => ipcRenderer.on('printer-paper', (e, state) => fn(state)),
