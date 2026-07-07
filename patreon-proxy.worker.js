@@ -111,6 +111,9 @@ export default {
     if (path === '/kick/connect')        return handlePlatformConnect(request, env, PLATFORM_CFG.kick);
     if (path === '/kick/callback')       return handlePlatformCallback(request, env, PLATFORM_CFG.kick);
     if (path === '/kick/vault/token')    return handlePlatformVaultToken(request, env, PLATFORM_CFG.kick);
+    if (path === '/kick/reward/ensure')  return handleKickRewardEnsure(request, env);
+    if (path === '/kick/reward/delete')  return handleKickRewardDelete(request, env);
+    if (path === '/kick/reward/list')    return handleKickRewardList(request, env);
     if (path === '/youtube/connect')     return handlePlatformConnect(request, env, PLATFORM_CFG.youtube);
     if (path === '/youtube/callback')    return handlePlatformCallback(request, env, PLATFORM_CFG.youtube);
     if (path === '/youtube/vault/token') return handlePlatformVaultToken(request, env, PLATFORM_CFG.youtube);
@@ -953,7 +956,7 @@ var PLATFORM_CFG = {
     clientId: function (env) { return env.KICK_CONNECT_CLIENT_ID || env.KICK_CLIENT_ID; },
     clientSecret: function (env) { return env.KICK_CONNECT_CLIENT_SECRET || env.KICK_CLIENT_SECRET; },
     redirect: function (env) { return env.KICK_CONNECT_REDIRECT_URI || 'https://auth.aquilo.gg/kick/callback'; },
-    broadcasterScopes: 'user:read channel:read channel:write chat:write events:subscribe',
+    broadcasterScopes: 'user:read channel:read channel:write chat:write events:subscribe channel:rewards:read channel:rewards:write',
     botScopes: 'user:read chat:write',
     pkce: true,
     offline: false,
@@ -1024,6 +1027,103 @@ async function _oauthTokenExchange(env, cfg, params, errBox) {
     return null;
   }
   try { return await resp.json(); } catch (e) { return null; }
+}
+
+// ── Kick channel-point rewards (shared by every product's customizer) ─────────
+// A streamer connects Kick once on /connect; any product's worker can then call
+// /kick/reward/ensure (service-secret-guarded) to CREATE (or reuse) a reward on
+// that channel using the vault broadcaster token, and /kick/reward/delete to
+// remove one. Centralized here so the Kick client secret + the reward API stay
+// server-side and each product just proxies its customizer's button.
+async function _vaultBroadcasterToken(env, cfg, twitchId, id) {
+  if (!env.LOADOUT_BOLTS) return { error: 'vault_not_configured', status: 500 };
+  var vaultId = String(id || '');
+  if (!vaultId && twitchId) vaultId = (await env.LOADOUT_BOLTS.get('link:tw2' + cfg.key + ':' + String(twitchId))) || '';
+  if (!vaultId) return { error: 'missing_id', status: 400 };
+  var vraw = await env.LOADOUT_BOLTS.get(cfg.vaultKey(vaultId));
+  if (!vraw) return { error: 'not_connected', status: 404 };
+  var vault; try { vault = JSON.parse(vraw); } catch (e) { return { error: 'corrupt', status: 500 }; }
+  var sub = vault.broadcaster;
+  if (!sub || !sub.refresh_token) return { error: 'role_not_connected', status: 404 };
+  if (!sub.access_token || !sub.expires_at || (sub.expires_at - Date.now() < 120000)) {
+    var t = await _oauthTokenExchange(env, cfg, { grant_type: 'refresh_token', refresh_token: sub.refresh_token }, {});
+    if (!t || !t.access_token) return { error: 'refresh_failed', status: 502 };
+    sub.access_token = t.access_token;
+    if (t.refresh_token) sub.refresh_token = t.refresh_token;
+    sub.expires_at = Date.now() + ((t.expires_in || 3600) * 1000);
+    sub.scope = Array.isArray(t.scope) ? t.scope.join(' ') : (t.scope || sub.scope);
+    vault.broadcaster = sub;
+    await env.LOADOUT_BOLTS.put(cfg.vaultKey(vaultId), JSON.stringify(vault));
+  }
+  return { token: sub.access_token, vaultId: vaultId, scope: sub.scope };
+}
+async function _kickApi(token, method, path, body) {
+  try {
+    var r = await fetch('https://api.kick.com/public/v1' + path, {
+      method: method,
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!r.ok) return { _error: true, status: r.status };
+    return await r.json().catch(function () { return {}; });
+  } catch (e) { return { _error: true, status: 0 }; }
+}
+// POST /kick/reward/ensure { service, twitchId|id, title, cost, prompt } → creates
+// or reuses a same-titled reward. Returns { ok, status, rewardId, title, kickId }.
+async function handleKickRewardEnsure(request, env) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400); }
+  if (!env.VAULT_SERVICE_SECRET || !body || body.service !== env.VAULT_SERVICE_SECRET) return json({ error: 'unauthorized' }, 401);
+  var cfg = PLATFORM_CFG.kick;
+  if (!cfg.clientId(env)) return json({ error: 'kick_not_configured' }, 503);
+  var got = await _vaultBroadcasterToken(env, cfg, body.twitchId, body.id);
+  if (got.error) return json({ error: got.error }, got.status || 400);
+  var title = String(body.title || '').trim().slice(0, 50);
+  if (!title) return json({ error: 'missing_title' }, 400);
+  var cost = Math.max(1, Math.min(1000000, Number(body.cost) || 100));
+  var prompt = String(body.prompt || '').slice(0, 200);
+  var list = await _kickApi(got.token, 'GET', '/channels/rewards', null);
+  var rows = Array.isArray(list && list.data) ? list.data : [];
+  var reward = rows.find(function (r) { return String((r && r.title) || '').trim().toLowerCase() === title.toLowerCase(); });
+  var status = 'linked';
+  if (!reward) {
+    var made = await _kickApi(got.token, 'POST', '/channels/rewards', {
+      title: title, cost: cost, description: prompt || 'Redeem on Kick', is_user_input_required: !!body.userInput, background_color: '#53fc18',
+    });
+    reward = (made && made.data) ? made.data : made;
+    if (!reward || reward._error || reward.id == null) return json({ error: 'create_failed', detail: (made && made.status) || null }, 502);
+    status = 'created';
+  }
+  return json({ ok: true, status: status, rewardId: String(reward.id), title: reward.title || title, kickId: got.vaultId }, 200);
+}
+// POST /kick/reward/delete { service, twitchId|id, rewardId }
+async function handleKickRewardDelete(request, env) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400); }
+  if (!env.VAULT_SERVICE_SECRET || !body || body.service !== env.VAULT_SERVICE_SECRET) return json({ error: 'unauthorized' }, 401);
+  var cfg = PLATFORM_CFG.kick;
+  var got = await _vaultBroadcasterToken(env, cfg, body.twitchId, body.id);
+  if (got.error) return json({ error: got.error }, got.status || 400);
+  var rid = String(body.rewardId || '');
+  if (!rid) return json({ error: 'missing_reward' }, 400);
+  await _kickApi(got.token, 'DELETE', '/channels/rewards/' + encodeURIComponent(rid), null);
+  return json({ ok: true }, 200);
+}
+// POST /kick/reward/list { service, twitchId|id } → the streamer's Kick rewards,
+// so a product's customizer can offer "pick an existing reward" instead of
+// creating one. Returns { ok, rewards:[{id,title,cost}] }.
+async function handleKickRewardList(request, env) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  var body; try { body = await request.json(); } catch (e) { return json({ error: 'invalid_json' }, 400); }
+  if (!env.VAULT_SERVICE_SECRET || !body || body.service !== env.VAULT_SERVICE_SECRET) return json({ error: 'unauthorized' }, 401);
+  var cfg = PLATFORM_CFG.kick;
+  var got = await _vaultBroadcasterToken(env, cfg, body.twitchId, body.id);
+  if (got.error) return json({ error: got.error }, got.status || 400);
+  var list = await _kickApi(got.token, 'GET', '/channels/rewards', null);
+  var rows = Array.isArray(list && list.data) ? list.data : [];
+  return json({ ok: true, rewards: rows.map(function (r) {
+    return { id: String((r && r.id != null) ? r.id : ''), title: (r && r.title) || '', cost: (r && r.cost) || 0 };
+  }) }, 200);
 }
 
 async function handlePlatformConnect(request, env, cfg) {
