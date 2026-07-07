@@ -3028,6 +3028,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Print viewer notes</span><input type="checkbox" id="prnEvNote" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Reward name</span><input type="text" id="prnNoteReward" value="Print My Note" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PRINT A MEME</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Channel-point reward: the viewer's text becomes a meme search &mdash; the top Giphy result (pg-13) prints big and dithered. Query is profanity-scrubbed first.</div>
+            <label class="frow"><span>Print memes</span><input type="checkbox" id="prnEvMeme" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Reward name</span><input type="text" id="prnMemeReward" value="Print a Meme" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SHIFT TICKET</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
             <button class="tbtn" onclick="printerShiftTicket()" style="font-size:11px;font-weight:700;padding:5px 10px">Print tonight's shift ticket</button>
@@ -15350,8 +15355,9 @@ function sendObsAlert(obj) {
 var PRINTER_ALLOWLIST = ['991099623'];   // Twitch user ids that see the feature
 var printerCfg = {
   enabled: false, printerName: '', maxPerMinute: 6,
-  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true },
+  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true, meme: true },
   noteReward: 'Print My Note',
+  memeReward: 'Print a Meme',
   theme: 'auto',
   flair: true,
   follows: { tw: false, kk: false, yt: false, tt: false },
@@ -15409,6 +15415,7 @@ function _printerLoadCfg() {
       if (typeof d.maxPerMinute === 'number') printerCfg.maxPerMinute = d.maxPerMinute;
       if (d.ev) Object.assign(printerCfg.ev, d.ev);
       if (typeof d.noteReward === 'string') printerCfg.noteReward = d.noteReward;
+      if (typeof d.memeReward === 'string') printerCfg.memeReward = d.memeReward;
       if (typeof d.theme === 'string') printerCfg.theme = d.theme;
       if (typeof d.flair === 'boolean') printerCfg.flair = d.flair;
       if (d.follows) Object.assign(printerCfg.follows, d.follows);
@@ -15430,6 +15437,7 @@ function _printerSyncUi() {
   _prnEl('prnEvRaid').checked = printerCfg.ev.raid;    _prnEl('prnEvRedeem').checked = printerCfg.ev.redeem;
   _prnEl('prnEvHype').checked = printerCfg.ev.hype;    _prnEl('prnEvSongs').checked = printerCfg.ev.songs;
   _prnEl('prnEvNote').checked = printerCfg.ev.note;    _prnEl('prnNoteReward').value = printerCfg.noteReward;
+  _prnEl('prnEvMeme').checked = printerCfg.ev.meme;    _prnEl('prnMemeReward').value = printerCfg.memeReward;
   _prnEl('prnTheme').value = printerCfg.theme;
   _prnEl('prnFlair').checked = printerCfg.flair;
   _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
@@ -15451,9 +15459,10 @@ function onPrinterCfgChange() {
     super: _prnEl('prnEvSuper').checked, ttgift: _prnEl('prnEvTtGift').checked,
     raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked,
     hype: _prnEl('prnEvHype').checked,   songs: _prnEl('prnEvSongs').checked,
-    note: _prnEl('prnEvNote').checked
+    note: _prnEl('prnEvNote').checked,   meme: _prnEl('prnEvMeme').checked
   };
   printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
+  printerCfg.memeReward = _prnEl('prnMemeReward').value || 'Print a Meme';
   printerCfg.theme = _prnEl('prnTheme').value || 'auto';
   printerCfg.flair = _prnEl('prnFlair').checked;
   var _wh = _prnEl('prnDiscordWebhook');
@@ -15609,6 +15618,23 @@ function printerPost(o) {
           banner: String(o.reward),
           action: 'left you a note' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
           message: noteTxt
+        });
+        return;
+      }
+      // "Print a Meme": redeem text = Giphy search; the image is resolved
+      // main-side (printer.js) and printed big. Own toggle, like notes.
+      var _mr = String(printerCfg.memeReward || '').trim().toLowerCase();
+      if (_mr && String(o.reward || '').trim().toLowerCase() === _mr) {
+        if (printerCfg.ev.meme === false) return;
+        var memeQ = String(o.message || '').slice(0, 60);
+        try { if (typeof _profanityRegex !== 'undefined' && memeQ) memeQ = memeQ.replace(_profanityRegex, ''); } catch (e) {}
+        memeQ = memeQ.replace(/\s+/g, ' ').trim();
+        if (!memeQ) return;
+        _printerSend({
+          platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null, _kind: 'meme',
+          banner: 'MEME', memeQuery: memeQ,
+          action: 'redeemed a meme print' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
+          message: memeQ
         });
         return;
       }

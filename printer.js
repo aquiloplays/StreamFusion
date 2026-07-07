@@ -51,6 +51,35 @@ function fetchFlair(job, cb) {
     req.on('error', fin);
   } catch (e) { fin(); }
 }
+// ── Meme prints ──────────────────────────────────────────────────────────────
+// "Print a Meme" redeems carry memeQuery: resolve the top result via the
+// loadout worker's cached Giphy proxy (pg-13 rated) and print its first
+// frame big. Any failure prints the receipt without an image.
+function fetchMeme(job, cb) {
+  let done = false;
+  const fin = function () { if (!done) { done = true; cb(); } };
+  try {
+    if (!job.memeQuery) return fin();
+    const req = https.get('https://loadout-discord.aquiloplays.workers.dev/api/punchcard/gif?q=' +
+      encodeURIComponent(String(job.memeQuery).slice(0, 60)),
+      { timeout: 5000 }, function (res) {
+        let out = '';
+        res.on('data', function (c) { out += c; if (out.length > 65536) { try { req.destroy(); } catch (e) {} } });
+        res.on('end', function () {
+          try {
+            const j = JSON.parse(out);
+            const g = j && j.gifs && j.gifs[0];
+            if (g && g.preview) return fetchDataUrl(g.preview, function (d) { job.bigImageData = d; fin(); });
+          } catch (e) {}
+          fin();
+        });
+        res.on('error', fin);
+      });
+    req.on('timeout', function () { try { req.destroy(); } catch (e) {} fin(); });
+    req.on('error', fin);
+  } catch (e) { fin(); }
+}
+
 function applyFlair(job, d) {
   if (d && (d.icon || d.tagline || d.frame || d.shape || d.nameStyle || d.emoteUrl)) {
     job.flairEmoteUrl = (typeof d.emoteUrl === 'string' && d.emoteUrl.indexOf('https://static-cdn.jtvnw.net/emoticons/v2/') === 0) ? d.emoteUrl : '';
@@ -455,6 +484,7 @@ function pump() {
       fetchFlair(job, function () {
       fetchDataUrl(job.flairEmoteUrl, function (emoteData) {
       job.flairEmoteData = emoteData;
+      fetchMeme(job, function () {
       renderReceipt(job).then(function (r) {
         return spool(buildEscpos(r.rasterB64, r.widthBytes, r.height)).then(function () { return r; });
       }).then(function (r) {
@@ -462,6 +492,7 @@ function pump() {
         finish(true);
       }).catch(function (e) {
         finish(false, (e && e.message) || 'print failed');
+      });
       });
       });
       });

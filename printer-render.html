@@ -235,6 +235,32 @@ function drawFlair(x, name, cx, cy, s) {
     x.fillStyle = '#fff';
     x.beginPath(); x.arc(cx + s * 0.5, cy - s * 0.15, s * 0.85, 0, 7); x.fill();
     x.fillStyle = '#000';
+  } else if (name === 'pumpkin') {
+    x.beginPath(); x.ellipse(cx, cy + s * 0.1, s, s * 0.75, 0, 0, 7); x.fill();
+    x.fillRect(cx - 2, cy - s * 0.95, 4, s * 0.42);
+    x.strokeStyle = '#fff'; x.lineWidth = 1.5;
+    x.beginPath(); x.ellipse(cx, cy + s * 0.1, s * 0.45, s * 0.72, 0, 0, 7); x.stroke();
+    x.strokeStyle = '#000';
+  } else if (name === 'snowman') {
+    x.lineWidth = 2.5; x.strokeStyle = '#000';
+    x.beginPath(); x.arc(cx, cy + s * 0.35, s * 0.6, 0, 7); x.stroke();
+    x.beginPath(); x.arc(cx, cy - s * 0.45, s * 0.42, 0, 7); x.stroke();
+    x.fillRect(cx - s * 0.35, cy - s * 0.95, s * 0.7, 2.5);
+    x.fillRect(cx - s * 0.2, cy - s * 1.28, s * 0.4, s * 0.34);
+  } else if (name === 'rose') {
+    x.lineWidth = 2.5; x.strokeStyle = '#000';
+    x.beginPath(); x.arc(cx, cy - s * 0.25, s * 0.55, 0, 5.2); x.stroke();
+    x.beginPath(); x.arc(cx, cy - s * 0.25, s * 0.28, 1, 5.8); x.stroke();
+    x.beginPath(); x.moveTo(cx, cy + s * 0.3); x.lineTo(cx, cy + s); x.stroke();
+    x.beginPath(); x.ellipse(cx - s * 0.35, cy + s * 0.6, s * 0.3, s * 0.14, -0.6, 0, 7); x.fill();
+  } else if (name === 'firework') {
+    x.lineWidth = 2; x.strokeStyle = '#000';
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI * i / 4;
+      x.beginPath(); x.moveTo(cx + Math.cos(a) * s * 0.3, cy + Math.sin(a) * s * 0.3);
+      x.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s); x.stroke();
+      x.beginPath(); x.arc(cx + Math.cos(a) * s * 1.18, cy + Math.sin(a) * s * 1.18, 1.6, 0, 7); x.fill();
+    }
   }
 }
 
@@ -404,6 +430,19 @@ async function drawJob(x, job) {
     try { x.letterSpacing = '0px'; } catch (e) {}
     x.fillStyle = '#000';
     y += h + 10;
+  }
+
+  // Big image (meme prints): full-width dithered frame with a border.
+  const big = await loadImg(job.bigImageData);
+  if (big && big.width) {
+    y += 14;
+    const bw = 460, bh = Math.max(60, Math.min(420, Math.round(bw * big.height / big.width)));
+    x.save(); x.filter = 'grayscale(1) contrast(1.6)';
+    x.drawImage(big, (W - bw) / 2, y, bw, bh);
+    x.filter = 'none'; x.restore();
+    x.lineWidth = 3; x.strokeStyle = '#000';
+    x.strokeRect((W - bw) / 2 + 1.5, y + 1.5, bw - 3, bh - 3);
+    y += bh + 8;
   }
 
   const gift = await loadImg(job.giftIconData);
