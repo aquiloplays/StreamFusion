@@ -18,7 +18,7 @@ const https = require('https');
 const http = require('http');
 const { spawn } = require('child_process');
 
-let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '', theme: 'auto', flair: true };
+let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '', theme: 'auto', flair: true, galleryKey: '' };
 
 // ── Viewer flair ─────────────────────────────────────────────────────────────
 // Viewers customize their receipts at aquilo.gg/printflair (icon + tagline,
@@ -51,6 +51,27 @@ function fetchFlair(job, cb) {
     req.on('error', fin);
   } catch (e) { fin(); }
 }
+// ── Receipt gallery ──────────────────────────────────────────────────────────
+// Fire-and-forget mirror of each real receipt PNG to the aquilo.gg wall
+// (worker /api/printflair/receipt, shared-key header). galleryKey lives in
+// printer-config.json only (seeded, no UI); unset = feature off.
+function sendGallery(pngB64, job) {
+  if (!cfg.galleryKey || !pngB64 || pngB64.length > 500000) return;
+  try {
+    const body = JSON.stringify({ no: job._receiptNo || 0, kind: job._kind || '', user: job.user || '', png: pngB64 });
+    const req = https.request('https://loadout-discord.aquiloplays.workers.dev/api/printflair/receipt', {
+      method: 'POST', timeout: 10000,
+      headers: { 'content-type': 'application/json', 'x-aquilo-print-key': cfg.galleryKey, 'content-length': Buffer.byteLength(body) }
+    }, function (res) {
+      if (res.statusCode >= 400) logFn('gallery HTTP ' + res.statusCode);
+      res.resume();
+    });
+    req.on('error', function (e) { logFn('gallery: ' + (e && e.message)); });
+    req.on('timeout', function () { try { req.destroy(); } catch (e) {} });
+    req.end(body);
+  } catch (e) {}
+}
+
 // ── Meme prints ──────────────────────────────────────────────────────────────
 // "Print a Meme" redeems carry memeQuery: resolve the top result via the
 // loadout worker's cached Giphy proxy (pg-13 rated) and print its first
@@ -488,7 +509,7 @@ function pump() {
       renderReceipt(job).then(function (r) {
         return spool(buildEscpos(r.rasterB64, r.widthBytes, r.height)).then(function () { return r; });
       }).then(function (r) {
-        if (!job.isTest) sendDiscord(r.pngB64, job);
+        if (!job.isTest) { sendDiscord(r.pngB64, job); sendGallery(r.pngB64, job); }
         finish(true);
       }).catch(function (e) {
         finish(false, (e && e.message) || 'print failed');
