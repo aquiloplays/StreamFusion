@@ -18,7 +18,15 @@ const https = require('https');
 const http = require('http');
 const { spawn } = require('child_process');
 
-let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '' };
+let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '', theme: 'auto' };
+
+// 'auto' follows the meteorological calendar; 'off' prints plain.
+function resolveTheme() {
+  if (cfg.theme === 'off') return '';
+  if (cfg.theme && cfg.theme !== 'auto') return cfg.theme;
+  const m = new Date().getMonth();
+  return m <= 1 || m === 11 ? 'winter' : m <= 4 ? 'spring' : m <= 7 ? 'summer' : 'autumn';
+}
 let queue = [];
 let printing = false;
 let renderWin = null;
@@ -112,6 +120,7 @@ function setConfig(patch) {
     if (typeof patch.printerName === 'string') cfg.printerName = patch.printerName;
     if (typeof patch.maxPerMinute === 'number' && patch.maxPerMinute > 0) cfg.maxPerMinute = patch.maxPerMinute;
     if (typeof patch.discordWebhook === 'string') cfg.discordWebhook = patch.discordWebhook.trim();
+    if (typeof patch.theme === 'string' && ['auto', 'off', 'spring', 'summer', 'autumn', 'winter'].indexOf(patch.theme) !== -1) cfg.theme = patch.theme;
     saveConfig();
   }
   return getStatus();
@@ -129,7 +138,8 @@ function getStatus() {
     lastAt: lastResult.at,
     receiptCounter: receiptCounter,
     paper: paperState,
-    discordWebhook: cfg.discordWebhook || ''
+    discordWebhook: cfg.discordWebhook || '',
+    theme: cfg.theme || 'auto'
   };
 }
 
@@ -376,6 +386,7 @@ function enqueue(job) {
   receiptCounter++;
   saveConfig();
   job._receiptNo = receiptCounter;
+  if (job.theme === undefined) job.theme = resolveTheme();
   if (!job.isTest) recent.push(Date.now());
   queue.push(job);
   pump();

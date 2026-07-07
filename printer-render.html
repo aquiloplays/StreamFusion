@@ -25,6 +25,82 @@ const PICON = {
 };
 const PLAT_NAME = { tw: 'twitch', kk: 'kick', yt: 'youtube', tt: 'tiktok', sys: '' };
 
+// ── Seasonal themes ──────────────────────────────────────────────────────────
+// Decoration layers only — receipt content is untouched. `top` draws in the
+// first ~56 dots (content shifts down to clear it); `foot` draws small flanks
+// at the footer baseline so themed receipts stay exactly as short. The job's
+// `theme` field is resolved main-side (printer.js) from the pane setting.
+function _sd(n) { const v = Math.sin(n * 127.1) * 43758.5453; return v - Math.floor(v); }
+function _leaf(x, cx, cy, s, rot) {
+  x.save(); x.translate(cx, cy); x.rotate(rot || 0);
+  x.beginPath(); x.moveTo(0, -s); x.quadraticCurveTo(s * 0.9, 0, 0, s);
+  x.quadraticCurveTo(-s * 0.9, 0, 0, -s); x.fill(); x.restore();
+}
+function _snow(x, cx, cy, r) {
+  x.lineWidth = 2.5; x.strokeStyle = '#000'; x.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI * i / 3, dx = Math.cos(a), dy = Math.sin(a);
+    x.moveTo(cx, cy); x.lineTo(cx + dx * r, cy + dy * r);
+    x.moveTo(cx + dx * r * 0.55 - dy * r * 0.22, cy + dy * r * 0.55 + dx * r * 0.22); x.lineTo(cx + dx * r * 0.75, cy + dy * r * 0.75);
+    x.moveTo(cx + dx * r * 0.55 + dy * r * 0.22, cy + dy * r * 0.55 - dx * r * 0.22); x.lineTo(cx + dx * r * 0.75, cy + dy * r * 0.75);
+  }
+  x.stroke();
+}
+function _sprout(x, cx, cy, s) {
+  x.lineWidth = 3.5; x.strokeStyle = '#000';
+  x.beginPath(); x.moveTo(cx, cy + s); x.quadraticCurveTo(cx, cy, cx, cy - s * 0.3); x.stroke();
+  _leaf(x, cx - s * 0.45, cy - s * 0.4, s * 0.5, -0.9);
+  _leaf(x, cx + s * 0.45, cy - s * 0.4, s * 0.5, 0.9);
+}
+function _sun(x, cx, cy, r) {
+  x.lineWidth = 4; x.strokeStyle = '#000';
+  x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
+  for (let i = 0; i < 12; i++) {
+    const a = Math.PI * i / 6;
+    x.beginPath(); x.moveTo(cx + Math.cos(a) * (r + 6), cy + Math.sin(a) * (r + 6));
+    x.lineTo(cx + Math.cos(a) * (r + 15), cy + Math.sin(a) * (r + 15)); x.stroke();
+  }
+}
+function _waveRow(x, y) {
+  x.lineWidth = 3; x.strokeStyle = '#000'; x.beginPath();
+  for (let i = 0; i < 10; i++) { x.moveTo(i * 64, y); x.quadraticCurveTo(i * 64 + 32, y - 14, i * 64 + 64, y); }
+  x.stroke();
+}
+const THEMES = {
+  spring: {
+    top: function (x) { for (let i = 0; i < 7; i++) _sprout(x, 45 + i * 82, 26, 15); },
+    foot: function (x, fy) { _sprout(x, 68, fy - 16, 12); _sprout(x, 508, fy - 16, 12); }
+  },
+  summer: {
+    top: function (x) { _waveRow(x, 22); _waveRow(x, 38); _sun(x, 62, 96, 19); },
+    foot: function (x, fy) {
+      x.lineWidth = 3; x.strokeStyle = '#000';
+      [50, 478].forEach(function (sx) {
+        x.beginPath(); x.moveTo(sx, fy - 6); x.quadraticCurveTo(sx + 12, fy - 16, sx + 24, fy - 6);
+        x.quadraticCurveTo(sx + 36, fy + 4, sx + 48, fy - 6); x.stroke();
+      });
+    }
+  },
+  autumn: {
+    top: function (x) {
+      for (let i = 0; i < 8; i++) _leaf(x, 30 + _sd(i) * 516, 14 + _sd(i + 5) * 34, 9 + _sd(i + 2) * 6, _sd(i) * 3);
+      _leaf(x, 46, 108, 13, 0.5); _leaf(x, 530, 102, 13, -0.4);
+    },
+    foot: function (x, fy) { _leaf(x, 66, fy - 8, 11, 0.9); _leaf(x, 510, fy - 8, 11, -0.7); }
+  },
+  winter: {
+    top: function (x) {
+      x.fillStyle = '#000'; x.fillRect(0, 0, W, 8);
+      for (let i = 0; i < 12; i++) {
+        const ix = 14 + i * 48;
+        x.beginPath(); x.moveTo(ix, 8); x.lineTo(ix + 9, 8); x.lineTo(ix + 4.5, 8 + 12 + _sd(i) * 20); x.closePath(); x.fill();
+      }
+      _snow(x, 48, 100, 13); _snow(x, 528, 94, 12);
+    },
+    foot: function (x, fy) { _snow(x, 66, fy - 7, 11); _snow(x, 510, fy - 7, 12); }
+  }
+};
+
 let birdImg = null;
 function loadImg(src) {
   return new Promise(function (resolve) {
@@ -94,6 +170,9 @@ async function drawJob(x, job) {
   x.fillStyle = '#000'; x.textAlign = 'center';
   const MAXW = 520;
   let y = 24;
+
+  const th = THEMES[job.theme] || null;
+  if (th) { th.top(x); x.fillStyle = '#000'; x.strokeStyle = '#000'; y = 62; }
 
   if (!birdImg) birdImg = await loadImg(BIRD);
   if (birdImg) { x.drawImage(birdImg, W / 2 - 55, y, 110, 80); y += 80 + 38; }
@@ -200,6 +279,7 @@ async function drawJob(x, job) {
     ('receipt #' + String(job._receiptNo || 0).padStart(4, '0') + ' · ' + time + ' · thank you <3');
   x.font = '400 20px "Segoe UI", Arial';
   y += 40; x.fillText(footer, W / 2, y);
+  if (th && th.foot) { th.foot(x, y); x.fillStyle = '#000'; x.strokeStyle = '#000'; }
 
   return y;
 }

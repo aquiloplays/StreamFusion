@@ -3099,6 +3099,17 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
             <button class="tbtn" onclick="printerShiftTicket()" style="font-size:11px;font-weight:700;padding:5px 10px">Print tonight's shift ticket</button>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SEASONAL THEME</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Border decorations on every receipt (including PowerDeck / ScratchDrop / PunchCard prints). Auto follows the calendar: spring Mar&ndash;May, summer Jun&ndash;Aug, autumn Sep&ndash;Nov, winter Dec&ndash;Feb.</div>
+            <label class="frow"><span>Theme</span><select id="prnTheme" onchange="onPrinterCfgChange()" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:4px 6px;font-size:11px">
+              <option value="auto">Auto (by season)</option>
+              <option value="off">Off (plain)</option>
+              <option value="spring">Spring</option>
+              <option value="summer">Summer</option>
+              <option value="autumn">Autumn</option>
+              <option value="winter">Winter</option>
+            </select></label>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DISCORD MIRROR</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Every real receipt also posts its image to this webhook (test prints and system tickets stay local). Clear the field to disable.</div>
             <label class="frow"><span>Webhook URL</span><input type="password" id="prnDiscordWebhook" placeholder="https://discord.com/api/webhooks/…" style="width:230px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
@@ -16196,6 +16207,7 @@ var printerCfg = {
   enabled: false, printerName: '', maxPerMinute: 6,
   ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true },
   noteReward: 'Print My Note',
+  theme: 'auto',
   follows: { tw: false, kk: false, yt: false, tt: false },
   plats: { tw: true, kk: true, yt: true, tt: true },
   min: { bits: 100, coins: 100, kick: 1, super: 0, raid: 2 }
@@ -16233,7 +16245,8 @@ function _printerSaveCfg() {
     var _patch = {
       enabled: printerCfg.enabled && _printerGate,
       printerName: printerCfg.printerName,
-      maxPerMinute: printerCfg.maxPerMinute
+      maxPerMinute: printerCfg.maxPerMinute,
+      theme: printerCfg.theme
     };
     if (_prnWebhookVal !== null) _patch.discordWebhook = _prnWebhookVal;
     window.electronAPI.printerSetConfig(_patch).then(_printerShowStatus).catch(function() {});
@@ -16249,6 +16262,7 @@ function _printerLoadCfg() {
       if (typeof d.maxPerMinute === 'number') printerCfg.maxPerMinute = d.maxPerMinute;
       if (d.ev) Object.assign(printerCfg.ev, d.ev);
       if (typeof d.noteReward === 'string') printerCfg.noteReward = d.noteReward;
+      if (typeof d.theme === 'string') printerCfg.theme = d.theme;
       if (d.follows) Object.assign(printerCfg.follows, d.follows);
       // Migrate the pre-1.20.3 single follow toggle to per-platform.
       else if (d.ev && d.ev.follow === true) printerCfg.follows = { tw: true, kk: true, yt: true, tt: true };
@@ -16268,6 +16282,7 @@ function _printerSyncUi() {
   _prnEl('prnEvRaid').checked = printerCfg.ev.raid;    _prnEl('prnEvRedeem').checked = printerCfg.ev.redeem;
   _prnEl('prnEvHype').checked = printerCfg.ev.hype;    _prnEl('prnEvSongs').checked = printerCfg.ev.songs;
   _prnEl('prnEvNote').checked = printerCfg.ev.note;    _prnEl('prnNoteReward').value = printerCfg.noteReward;
+  _prnEl('prnTheme').value = printerCfg.theme;
   _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
   _prnEl('prnFollowYt').checked = printerCfg.follows.yt; _prnEl('prnFollowTt').checked = printerCfg.follows.tt;
   _prnEl('prnPlatTw').checked = printerCfg.plats.tw;   _prnEl('prnPlatKk').checked = printerCfg.plats.kk;
@@ -16290,6 +16305,7 @@ function onPrinterCfgChange() {
     note: _prnEl('prnEvNote').checked
   };
   printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
+  printerCfg.theme = _prnEl('prnTheme').value || 'auto';
   var _wh = _prnEl('prnDiscordWebhook');
   if (_wh && (_prnWebhookSynced || _wh.value.trim() !== '')) _prnWebhookVal = _wh.value.trim();
   printerCfg.follows = {
