@@ -2990,6 +2990,14 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <button class="tbtn" onclick="printerDoodleQueue()" style="font-size:11px;font-weight:700;padding:5px 10px">Refresh queue</button>
             <div id="prnDoodles" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:10px 0 4px;letter-spacing:.4px">DOODLE PRICING</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Charge viewers to submit a doodle. Off = free. When on, viewers spend Bolts (or Bits, once your extension has a Bits product with the SKU below). Rejected doodles refund the Bolts automatically. Bits require Bits-in-Extensions set up on Twitch.</div>
+            <label class="frow"><span>Charge for doodle submissions</span><input type="checkbox" id="dpEnabled" onchange="doodlePriceSave()"></label>
+            <label class="frow"><span>Bolts price</span><input type="number" id="dpBolts" min="0" step="10" style="width:90px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="doodlePriceSave()"></label>
+            <label class="frow"><span>Bits price</span><input type="number" id="dpBits" min="0" step="10" style="width:90px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="doodlePriceSave()"></label>
+            <label class="frow"><span>Bits product SKU</span><input type="text" id="dpSku" placeholder="doodle" style="width:120px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="doodlePriceSave()"></label>
+            <div id="dpStatus" style="font-size:10px;color:var(--mut);margin-top:4px"></div>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">WARDEN BRIDGE</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Connect this machine to your <a href="https://aquilo.gg/warden" target="_blank" style="color:#8b7bff">Warden</a> mod console. Relay lets mods see Kick / YouTube / TikTok chat in the unified feed; OBS control lets mods trigger the scenes and actions you allow below.</div>
             <label class="frow"><span>Relay non-Twitch chat to Warden</span><input type="checkbox" id="wdnRelay" onchange="onWardenCfgChange()"></label>
@@ -11589,6 +11597,7 @@ function switchSettingsTab(tab) {
   if (tab === 'discordea') renderDiscordTab();
   if (tab === 'integrations') renderDiscordStatus();
   if (tab === 'checkins') renderCheckinsTab();
+  if (tab === 'printer' && typeof doodlePriceLoad === 'function') doodlePriceLoad();
   if (tab === 'about' && typeof _renderEventTrail === 'function') _renderEventTrail();
 }
 
@@ -15622,6 +15631,47 @@ function printerDoodleQueue() {
           box.appendChild(d);
         });
       }).catch(function() {});
+  }).catch(function() {});
+}
+
+// Doodle pricing: read the current config (public /doodle-cost carries it)
+// and persist edits via the key-authed /doodle-config route (same gallery
+// key the queue uses). Loaded once when the Printer pane opens.
+var _dpLoaded = false;
+function doodlePriceLoad() {
+  fetch('https://loadout-discord.aquiloplays.workers.dev/api/printflair/doodle-cost')
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (!j || !j.ok) return;
+      if (_prnEl('dpEnabled')) _prnEl('dpEnabled').checked = !!j.enabled;
+      if (_prnEl('dpBolts')) _prnEl('dpBolts').value = j.bolts;
+      if (_prnEl('dpBits')) _prnEl('dpBits').value = j.bits;
+      if (_prnEl('dpSku')) _prnEl('dpSku').value = j.bitsSku || 'doodle';
+      _dpLoaded = true;
+    }).catch(function() {});
+}
+function doodlePriceSave() {
+  if (!_dpLoaded) return; // don't write defaults over the real config before load
+  var st = _prnEl('dpStatus');
+  if (st) st.textContent = 'Saving…';
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) return;
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) { if (st) st.textContent = 'Gallery key not configured (see the receipt gallery setup).'; return; }
+    var body = {
+      enabled: !!(_prnEl('dpEnabled') && _prnEl('dpEnabled').checked),
+      bolts: Math.max(0, parseInt((_prnEl('dpBolts') && _prnEl('dpBolts').value) || '0', 10) || 0),
+      bits: Math.max(0, parseInt((_prnEl('dpBits') && _prnEl('dpBits').value) || '0', 10) || 0),
+      bitsSku: ((_prnEl('dpSku') && _prnEl('dpSku').value) || 'doodle').trim() || 'doodle'
+    };
+    fetch('https://loadout-discord.aquiloplays.workers.dev/api/printflair/doodle-config', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey },
+      body: JSON.stringify(body)
+    }).then(function(r) { return r.json(); }).then(function(j) {
+      if (st) st.textContent = (j && j.ok)
+        ? (body.enabled ? ('On — ' + body.bolts + ' Bolts / ' + body.bits + ' Bits per doodle.') : 'Off — doodles are free.')
+        : ('Save failed (' + ((j && j.error) || '?') + ')');
+    }).catch(function() { if (st) st.textContent = 'Save failed — try again.'; });
   }).catch(function() {});
 }
 
