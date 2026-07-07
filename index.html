@@ -2056,7 +2056,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="ttsToggleBtn" onclick="toggleTTS()"><svg class="ic"><use href="#i-mute"/></svg>TTS: OFF</button>
   <button class="tbtn" id="ttsPauseBtn" onclick="toggleTTSPause()" style="display:none"><svg class="ic"><use href="#i-pause"/></svg>Pause TTS</button>
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
-  <button class="tbtn" id="raidBtn" onclick="openRaidFinder()" title="Raid Finder"><svg class="ic"><use href="#i-rocket"/></svg>Raid</button>
+  <!-- Raid button removed: the Raid Finder lives in the Aquilo Dock (aquilo.gg/dock/panel). -->
   <button class="tbtn" id="clipBtn" onclick="createClipNow()" title="Create a Twitch clip (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
   <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info: edit your title, category &amp; tags"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
@@ -2141,7 +2141,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     <h1 class="tw-h1" id="twScreenHeading">Connect your Twitch account</h1>
     <p class="tw-sub" id="twScreenSub">Sign in once with Twitch to unlock the features StreamFusion drives directly through your own Twitch app &mdash; no Streamer.bot setup required.</p>
     <div class="tw-feats">
-      <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-rocket"/></svg></span><div><b>Raid Finder</b><small>Search for live channels and start a raid in one click.</small></div></div>
+      <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-rocket"/></svg></span><div><b>Hotkey actions</b><small>Drop VOD markers and run/snooze ads with global hotkeys, mid-game.</small></div></div>
       <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-camera"/></svg></span><div><b>Create clips</b><small>Clip your stream straight from the toolbar while live.</small></div></div>
       <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-party"/></svg></span><div><b>Native events (EventSub)</b><small>Subs, bits, follows, raids &amp; redeems straight from Twitch.</small></div></div>
       <div class="tw-feat"><span class="tw-fi"><svg class="ic"><use href="#i-pencil"/></svg></span><div><b>Stream info &amp; more</b><small>Future direct-Twitch features reuse this one connection.</small></div></div>
@@ -2226,7 +2226,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <div class="sec-hd" style="margin:0">Twitch account (direct)</div>
             </div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:10px">
-              Sign in with your own Twitch app so StreamFusion can drive Twitch directly: <strong style="color:var(--txt)">Raid Finder</strong> (no Streamer.bot needed), <strong style="color:var(--txt)">clips</strong> from the toolbar, and accurate <strong style="color:var(--txt)">native events</strong> (EventSub) including hype trains and ad breaks. Optional, and never required for chat. For the full walkthrough, open the <a onclick="openTwitchSignIn();return false" style="color:#9146FF;cursor:pointer;text-decoration:none;font-weight:700">Twitch sign-in screen</a>.
+              Sign in with your own Twitch app so StreamFusion can drive Twitch directly: <strong style="color:var(--txt)">clips</strong> from the toolbar, <strong style="color:var(--txt)">hotkey markers and ads</strong>, and accurate <strong style="color:var(--txt)">native events</strong> (EventSub) including hype trains and ad breaks. Raids, polls, predictions and stream info live in the <strong style="color:var(--txt)">Aquilo Dock</strong> inside OBS. Optional, and never required for chat. For the full walkthrough, open the <a onclick="openTwitchSignIn();return false" style="color:#9146FF;cursor:pointer;text-decoration:none;font-weight:700">Twitch sign-in screen</a>.
             </div>
             <div id="twitchStatusCard" style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:10px">
               <div id="twitchStatusText" style="font-size:12px;color:var(--txt);font-weight:600;margin-bottom:3px">Not connected</div>
@@ -2429,96 +2429,20 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
              (Helix), so it needs the Twitch account connected on the Accounts
              tab. renderStreamTab() gates the whole pane on that. -->
         <div class="settings-pane" id="pane-stream">
-          <div class="sec" id="streamNeedsTwitch" style="display:none">
-            <div class="sec-hd">Stream control</div>
-            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">Connect your Twitch account to edit your title and category, run ads, launch polls and predictions, drop VOD markers, and manage your channel-point redemption queue straight from StreamFusion.</div>
-            <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 14px;border-radius:7px" onclick="switchSettingsTab('accounts')">Go to Accounts to connect</button>
-          </div>
-          <div id="streamControls" style="display:none">
-            <!-- Title + Category -->
-            <div class="sec">
-              <div class="sec-hd">Title &amp; Category</div>
-              <input class="minput" id="siTitleInput" maxlength="140" placeholder="Stream title" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
-              <div style="position:relative">
-                <input class="minput" id="siCatInput" placeholder="Search a game or category..." oninput="siCategorySearch(this.value)" autocomplete="off" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2)">
-                <div id="siCatResults" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:0 0 8px 8px;max-height:220px;overflow:auto"></div>
-              </div>
-              <div id="siCatChosen" style="font-size:11px;color:var(--mut);margin:6px 0 4px"></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-                <button class="cbtn" style="flex:1;min-width:120px;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="siApplyChannelInfo()">Update stream</button>
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="siLoadChannelInfo()">Reload</button>
-              </div>
-              <div id="siInfoStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+          <div class="sec">
+            <div class="sec-hd">Stream control moved to the Aquilo Dock</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:8px">
+              Title &amp; category (applied to <b>Twitch, Kick and YouTube at once</b>), ads, polls, predictions, VOD markers, the redemption queue and the <b>Raid Finder</b> now live in the <b>Aquilo Dock</b> — a panel inside OBS itself, so they sit next to your scenes instead of in this app. StreamFusion stays focused on what it does best: chat.
             </div>
-            <!-- Ads -->
-            <div class="sec">
-              <div class="sec-hd">Ads</div>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-                <div id="adNextLine" style="font-size:12px;color:var(--txt);font-weight:600">Next ad: unknown</div>
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:10px;padding:5px 9px;border-radius:6px" onclick="adRefreshSchedule()">Refresh</button>
-              </div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adSnooze()">Snooze next</button>
-                <button class="cbtn" style="background:rgba(240,136,62,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adRun(30)">Run 30s</button>
-                <button class="cbtn" style="background:rgba(240,136,62,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adRun(60)">Run 60s</button>
-                <button class="cbtn" style="background:rgba(240,136,62,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="adRun(90)">Run 90s</button>
-              </div>
-              <div id="adStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:10px">
+              Set it up once: open the page below, sign in, and paste your dock URL into OBS via <b>Docks &rarr; Custom Browser Docks</b>.
             </div>
-            <!-- Poll -->
-            <div class="sec">
-              <div class="sec-hd">Poll</div>
-              <input class="minput" id="pollTitleInput" maxlength="60" placeholder="Poll question" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
-              <textarea id="pollChoicesInput" placeholder="One choice per line (2 to 5)" rows="3" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;resize:vertical;outline:none"></textarea>
-              <div class="frow" style="gap:6px;margin-top:6px"><label style="font-size:11px">Duration (sec)</label><input class="minput" id="pollDurInput" type="number" min="15" max="1800" value="120" style="width:80px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-                <button class="cbtn" style="flex:1;min-width:120px;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="startPollFromSF()">Start poll</button>
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="endActivePoll()">End now</button>
-              </div>
-              <div id="pollStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
-            </div>
-            <!-- Prediction -->
-            <div class="sec">
-              <div class="sec-hd">Prediction</div>
-              <input class="minput" id="predTitleInput" maxlength="45" placeholder="Prediction title" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
-              <input class="minput" id="predOutAInput" maxlength="25" placeholder="Outcome 1" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2);margin-bottom:6px">
-              <input class="minput" id="predOutBInput" maxlength="25" placeholder="Outcome 2" style="width:100%;font-size:12px;padding:7px 9px;background:var(--surf2)">
-              <div class="frow" style="gap:6px;margin-top:6px"><label style="font-size:11px">Window (sec)</label><input class="minput" id="predWindowInput" type="number" min="30" max="1800" value="120" style="width:80px;font-size:12px;padding:5px 8px;background:var(--surf2)"></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-                <button class="cbtn" style="flex:1;min-width:120px;background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 12px;border-radius:7px" onclick="startPredictionFromSF()">Start prediction</button>
-              </div>
-              <div id="predActiveControls" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="lockActivePrediction()">Lock</button>
-                <button class="cbtn" style="background:rgba(83,252,24,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" id="predWinBtnA" onclick="resolveActivePrediction(0)">Outcome 1 wins</button>
-                <button class="cbtn" style="background:rgba(83,252,24,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" id="predWinBtnB" onclick="resolveActivePrediction(1)">Outcome 2 wins</button>
-                <button class="cbtn" style="background:rgba(248,81,73,.16);color:var(--txt);border:1px solid var(--bdr);font-size:11px;font-weight:700;padding:7px 11px;border-radius:7px" onclick="cancelActivePrediction()">Cancel</button>
-              </div>
-              <div id="predStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
-            </div>
-            <!-- Stream marker -->
-            <div class="sec">
-              <div class="sec-hd">Stream marker</div>
-              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:6px">Bookmark this moment in your VOD so you can find it later for clipping.</div>
-              <div style="display:flex;gap:6px">
-                <input class="minput" id="markerDescInput" maxlength="140" placeholder="Marker note (optional)" style="flex:1;font-size:12px;padding:7px 9px;background:var(--surf2)">
-                <button class="cbtn" style="background:#9146FF;color:#fff;border:0;font-size:11px;font-weight:700;padding:8px 14px;border-radius:7px" onclick="createStreamMarker()">Drop marker</button>
-              </div>
-              <div id="markerStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
-            </div>
-            <!-- Redemption queue -->
-            <div class="sec">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                <div class="sec-hd" style="margin:0">Redemption queue</div>
-                <button class="cbtn" style="background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);font-size:10px;padding:5px 9px;border-radius:6px" onclick="loadRedemptionQueue()">Refresh</button>
-              </div>
-              <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:5px 0 8px">Twitch only lets an app manage rewards it created, so this lists pending redemptions for StreamFusion-created rewards. Approve marks them fulfilled; refund returns the points.</div>
-              <div id="redemptionQueue" style="display:flex;flex-direction:column;gap:6px"></div>
-              <div id="redemptionStatus" style="font-size:10px;color:var(--accent);margin-top:6px;min-height:13px"></div>
+            <button class="cbtn" style="background:linear-gradient(90deg,#7c5cff,#46ff8c);color:#0a0c13;border:0;font-size:11px;font-weight:800;padding:8px 14px;border-radius:7px" onclick="require('electron').shell.openExternal('https://aquilo.gg/dock/panel/')">Open aquilo.gg/dock/panel</button>
+            <div style="font-size:10.5px;color:var(--mut);line-height:1.6;margin-top:10px">
+              Your <b>global hotkeys</b> for markers, ad snooze and ad runs (Hotkeys tab) still fire from here — those work mid-game with no UI needed.
             </div>
           </div>
         </div>
-
-        <!-- ═══ BOT TAB — the bot moved to the cloud (migration pointer) ═══ -->
         <div class="settings-pane" id="pane-bot">
           <div class="sec">
             <div class="sec-hd">The bot moved to the cloud</div>
@@ -2934,7 +2858,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           <div class="sec">
             <div class="sec-hd">Stream control actions</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:6px">
-              Bind the direct-Twitch actions from the <button class="tbtn" onclick="switchSettingsTab('stream')" style="font-size:11px;font-weight:700;padding:2px 8px">Stream</button> tab to a global hotkey so you can fire them mid-game. Click a binding, press a key combo (<code>Ctrl+Shift+M</code>), a lone F-key (<code>F13</code>), or a mouse side button (<code>Mouse4</code> / <code>Mouse5</code>). Poll/prediction/title actions use whatever you have typed in the Stream tab fields.
+              Bind clip, VOD-marker and ad actions to a global hotkey so you can fire them mid-game. (Polls, predictions and stream info moved to the Aquilo Dock in OBS.) Click a binding, press a key combo (<code>Ctrl+Shift+M</code>), a lone F-key (<code>F13</code>), or a mouse side button (<code>Mouse4</code> / <code>Mouse5</code>).
             </div>
             <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-bottom:8px">
               <strong style="color:var(--txt)">Extra keyboard / mouse buttons (Logitech, Razer, etc.):</strong> Windows only distinguishes the two side buttons natively (<code>Mouse4</code> / <code>Mouse5</code>). For G-keys, macro keys, or extra mouse buttons, open your device software (Logitech G HUB / Logi Options+, Razer Synapse, Corsair iCUE) and map each button to an unused combo. <code>F13</code> to <code>F24</code> are ideal since nothing else uses them, then bind those here.
@@ -4849,7 +4773,7 @@ async function adRefreshSchedule() {
   _setStat('adStatus', '');
   try {
     var res = await _twReq('GET', 'channels/ads', 'broadcaster_id=' + encodeURIComponent(_twUid()));
-    if (!_twOK(res)) { document.getElementById('adNextLine').textContent = 'Next ad: unavailable'; return; }
+    if (!_twOK(res)) { var nl = document.getElementById('adNextLine'); if (nl) nl.textContent = 'Next ad: unavailable'; return; }
     var a = (res.data && res.data.data && res.data.data[0]) || {};
     _adNextAt = Number(a.next_ad_at || 0) || 0;
     _adRenderCountdown();
@@ -14724,19 +14648,10 @@ var _capturingStreamAction = null;   // actionId currently being captured
 var STREAM_ACTIONS = [
   { id: 'clip',          label: 'Create clip',                 run: function () { if (typeof createClipNow === 'function') createClipNow(); } },
   { id: 'marker',        label: 'Drop stream marker',          run: function () { if (typeof createStreamMarker === 'function') createStreamMarker(); } },
-  { id: 'update-stream', label: 'Update title / category',     run: function () { if (typeof siApplyChannelInfo === 'function') siApplyChannelInfo(); } },
   { id: 'ad-snooze',     label: 'Snooze next ad',              run: function () { if (typeof adSnooze === 'function') adSnooze(); } },
   { id: 'ad-run-30',     label: 'Run 30s ad',                  run: function () { if (typeof adRun === 'function') adRun(30); } },
   { id: 'ad-run-60',     label: 'Run 60s ad',                  run: function () { if (typeof adRun === 'function') adRun(60); } },
-  { id: 'ad-run-90',     label: 'Run 90s ad',                  run: function () { if (typeof adRun === 'function') adRun(90); } },
-  { id: 'poll-start',    label: 'Start poll',                  run: function () { if (typeof startPollFromSF === 'function') startPollFromSF(); } },
-  { id: 'poll-end',      label: 'End poll',                    run: function () { if (typeof endActivePoll === 'function') endActivePoll(); } },
-  { id: 'pred-start',    label: 'Start prediction',            run: function () { if (typeof startPredictionFromSF === 'function') startPredictionFromSF(); } },
-  { id: 'pred-lock',     label: 'Lock prediction',             run: function () { if (typeof lockActivePrediction === 'function') lockActivePrediction(); } },
-  { id: 'pred-win-a',    label: 'Prediction: outcome 1 wins',  run: function () { if (typeof resolveActivePrediction === 'function') resolveActivePrediction(0); } },
-  { id: 'pred-win-b',    label: 'Prediction: outcome 2 wins',  run: function () { if (typeof resolveActivePrediction === 'function') resolveActivePrediction(1); } },
-  { id: 'pred-cancel',   label: 'Cancel prediction',           run: function () { if (typeof cancelActivePrediction === 'function') cancelActivePrediction(); } },
-  { id: 'redemptions',   label: 'Refresh redemption queue',    run: function () { if (typeof loadRedemptionQueue === 'function') loadRedemptionQueue(); } }
+  { id: 'ad-run-90',     label: 'Run 90s ad',                  run: function () { if (typeof adRun === 'function') adRun(90); } }
 ];
 var _streamHotkeys = {};   // actionId -> accel
 function _loadStreamHotkeys() { try { _streamHotkeys = JSON.parse(localStorage.getItem('sf_stream_hotkeys') || '{}') || {}; } catch (e) { _streamHotkeys = {}; } }
