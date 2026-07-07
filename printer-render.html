@@ -274,21 +274,65 @@ function drawBadge(x, cx, cy, plat, r) {
   x.fillStyle = '#000';   // the '#fff' circle fill survives restore — reset for callers
 }
 
-function drawAvatar(x, img, user, cy) {
+function _shapePath(x, cx, cy, r, shape) {
+  x.beginPath();
+  if (shape === 'squircle') x.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.42);
+  else if (shape === 'hex') {
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + i * Math.PI / 3;
+      x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    x.closePath();
+  } else if (shape === 'diamond') {
+    x.moveTo(cx, cy - r); x.lineTo(cx + r, cy); x.lineTo(cx, cy + r); x.lineTo(cx - r, cy);
+    x.closePath();
+  } else x.arc(cx, cy, r, 0, 7);
+}
+
+function drawAvatar(x, img, user, cy, shape) {
   const cx = W / 2, r = 80;
   if (img) {
-    x.save(); x.beginPath(); x.arc(cx, cy, r, 0, 7); x.clip();
+    x.save(); _shapePath(x, cx, cy, r, shape); x.clip();
     x.drawImage(img, cx - r, cy - r, r * 2, r * 2); x.restore();
   } else {
-    x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fillStyle = '#000'; x.fill();
+    _shapePath(x, cx, cy, r, shape); x.fillStyle = '#000'; x.fill();
     x.fillStyle = '#fff'; x.font = '700 52px "Segoe UI", Arial';
     x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText(String(user || '?').slice(0, 2).toUpperCase(), cx, cy + 2);
     x.textBaseline = 'alphabetic';
   }
-  x.beginPath(); x.arc(cx, cy, r + 2, 0, 7);
+  _shapePath(x, cx, cy, r + 2, shape);
   x.lineWidth = 4; x.strokeStyle = '#000'; x.stroke();
   x.fillStyle = '#000';   // initials branch leaves '#fff' — reset for callers
+}
+
+// Full-perimeter personal frames (viewer flair). Drawn after content, once
+// the final height is known, inset 6 dots.
+function drawFrame(x, style, h) {
+  x.strokeStyle = '#000'; x.fillStyle = '#000';
+  if (style === 'double') {
+    x.lineWidth = 2.5; x.strokeRect(5.5, 5.5, W - 11, h - 11);
+    x.lineWidth = 1.5; x.strokeRect(11.5, 11.5, W - 23, h - 23);
+  } else if (style === 'dashed') {
+    x.lineWidth = 3; x.setLineDash([14, 10]); x.strokeRect(6, 6, W - 12, h - 12); x.setLineDash([]);
+  } else if (style === 'dots') {
+    for (let i = 8; i < W - 8; i += 18) { x.beginPath(); x.arc(i, 8, 2.5, 0, 7); x.arc(i, h - 8, 2.5, 0, 7); x.fill(); }
+    for (let j = 8; j < h - 8; j += 18) { x.beginPath(); x.arc(8, j, 2.5, 0, 7); x.arc(W - 8, j, 2.5, 0, 7); x.fill(); }
+  } else if (style === 'zigzag') {
+    x.lineWidth = 2.5;
+    x.beginPath();
+    for (let i = 0; i <= W; i += 14) { x.lineTo(i, i % 28 ? 12 : 5); x.moveTo(i, i % 28 ? 12 : 5); x.lineTo(i + 14, (i + 14) % 28 ? 12 : 5); }
+    x.stroke();
+    x.beginPath();
+    for (let i = 0; i <= W; i += 14) { x.moveTo(i, h - (i % 28 ? 12 : 5)); x.lineTo(i + 14, h - ((i + 14) % 28 ? 12 : 5)); }
+    x.stroke();
+    x.beginPath();
+    for (let j = 0; j <= h; j += 14) { x.moveTo(j % 28 ? 12 : 5, j); x.lineTo((j + 14) % 28 ? 12 : 5, j + 14); }
+    x.stroke();
+    x.beginPath();
+    for (let j = 0; j <= h; j += 14) { x.moveTo(W - (j % 28 ? 12 : 5), j); x.lineTo(W - ((j + 14) % 28 ? 12 : 5), j + 14); }
+    x.stroke();
+  }
 }
 
 // Draws the job, returns the y coordinate just below the last element.
@@ -307,14 +351,23 @@ async function drawJob(x, job) {
 
   const av = await loadImg(job.avatarData);
   if (job.user) {
-    drawAvatar(x, av, job.user, y + 80);
+    drawAvatar(x, av, job.user, y + 80, job.flairShape || '');
     drawBadge(x, W / 2 + 57, y + 137, job.platform);
     y += 196;
     const s = fitFont(x, job.user, 700, 40, '', MAXW);
-    y += s; x.fillText(job.user, W / 2, y);
+    y += s;
+    const nw = x.measureText(job.user).width;
+    if (job.flairName === 'pill') {
+      x.beginPath(); x.roundRect(W / 2 - nw / 2 - 18, y - s + 2, nw + 36, s + 14, (s + 14) / 2); x.fill();
+      x.fillStyle = '#fff'; x.fillText(job.user, W / 2, y + 3); x.fillStyle = '#000';
+      y += 8;
+    } else if (job.flairName === 'outline') {
+      x.lineWidth = 2.2; x.strokeStyle = '#000'; x.strokeText(job.user, W / 2, y);
+    } else {
+      x.fillText(job.user, W / 2, y);
+    }
     if (job.flairIcon) {
-      const nw = x.measureText(job.user).width;
-      const fx = Math.min(nw / 2 + 32, W / 2 - 20);
+      const fx = Math.min(nw / 2 + (job.flairName === 'pill' ? 46 : 32), W / 2 - 20);
       drawFlair(x, job.flairIcon, W / 2 - fx, y - s * 0.32, 13);
       drawFlair(x, job.flairIcon, W / 2 + fx, y - s * 0.32, 13);
       x.fillStyle = '#000';
@@ -472,6 +525,7 @@ ipcRenderer.on('printer-render-job', async function (ev, payload) {
     x.fillStyle = '#fff'; x.fillRect(0, 0, W, c.height);
     const drawnY = await drawJob(x, payload.job || {});
     const roughH = Math.min(c.height, Math.ceil(drawnY + BOTTOM_PAD));
+    if (payload.job && payload.job.flairFrame) drawFrame(x, payload.job.flairFrame, roughH);
     const packed = ditherPack(x, roughH);
     const height = Math.min(roughH, lastInkRow(packed, roughH) + 1 + BOTTOM_PAD);
     const cropped = packed.slice(0, WIDTH_BYTES * height);

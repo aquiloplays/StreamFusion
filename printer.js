@@ -52,9 +52,12 @@ function fetchFlair(job, cb) {
   } catch (e) { fin(); }
 }
 function applyFlair(job, d) {
-  if (d && (d.icon || d.tagline)) {
+  if (d && (d.icon || d.tagline || d.frame || d.shape || d.nameStyle)) {
     job.flairIcon = String(d.icon || '');
     job.flairTag = String(d.tagline || '').slice(0, 40);
+    job.flairFrame = ['double', 'dashed', 'zigzag', 'dots'].indexOf(d.frame) !== -1 ? d.frame : '';
+    job.flairShape = ['squircle', 'hex', 'diamond'].indexOf(d.shape) !== -1 ? d.shape : '';
+    job.flairName = ['pill', 'outline'].indexOf(d.nameStyle) !== -1 ? d.nameStyle : '';
   }
 }
 
