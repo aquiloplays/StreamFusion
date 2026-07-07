@@ -187,6 +187,57 @@ function loadImg(src) {
   });
 }
 
+// Viewer flair icons (aquilo.gg/printflair) — small solid glyphs drawn
+// flanking the viewer's name. Names must match the worker's ICONS list.
+function drawFlair(x, name, cx, cy, s) {
+  x.fillStyle = '#000'; x.strokeStyle = '#000';
+  if (name === 'heart') {
+    x.beginPath(); x.moveTo(cx, cy + s);
+    x.bezierCurveTo(cx - s * 1.5, cy - s * 0.3, cx - s * 0.6, cy - s * 1.2, cx, cy - s * 0.35);
+    x.bezierCurveTo(cx + s * 0.6, cy - s * 1.2, cx + s * 1.5, cy - s * 0.3, cx, cy + s); x.fill();
+  } else if (name === 'star') {
+    x.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = Math.PI * i / 5 - Math.PI / 2, r = i % 2 ? s * 0.45 : s;
+      x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    x.closePath(); x.fill();
+  } else if (name === 'bolt') {
+    x.beginPath(); x.moveTo(cx + s * 0.35, cy - s); x.lineTo(cx - s * 0.55, cy + s * 0.2);
+    x.lineTo(cx - s * 0.05, cy + s * 0.2); x.lineTo(cx - s * 0.35, cy + s);
+    x.lineTo(cx + s * 0.55, cy - s * 0.15); x.lineTo(cx + s * 0.05, cy - s * 0.15);
+    x.closePath(); x.fill();
+  } else if (name === 'skull') {
+    x.beginPath(); x.arc(cx, cy - s * 0.15, s * 0.8, 0, 7); x.fill();
+    x.fillRect(cx - s * 0.45, cy + s * 0.3, s * 0.9, s * 0.55);
+    x.fillStyle = '#fff';
+    x.beginPath(); x.arc(cx - s * 0.32, cy - s * 0.2, s * 0.22, 0, 7); x.arc(cx + s * 0.32, cy - s * 0.2, s * 0.22, 0, 7); x.fill();
+    x.fillStyle = '#000';
+  } else if (name === 'flame') {
+    x.beginPath(); x.moveTo(cx, cy - s);
+    x.bezierCurveTo(cx + s * 0.9, cy - s * 0.2, cx + s * 0.65, cy + s * 0.7, cx, cy + s);
+    x.bezierCurveTo(cx - s * 0.65, cy + s * 0.7, cx - s * 0.9, cy - s * 0.2, cx, cy - s); x.fill();
+    x.fillStyle = '#fff';
+    x.beginPath(); x.ellipse(cx, cy + s * 0.45, s * 0.24, s * 0.34, 0, 0, 7); x.fill();
+    x.fillStyle = '#000';
+  } else if (name === 'crown') {
+    x.beginPath(); x.moveTo(cx - s, cy + s * 0.7); x.lineTo(cx - s, cy - s * 0.25);
+    x.lineTo(cx - s * 0.4, cy + s * 0.1); x.lineTo(cx, cy - s * 0.85);
+    x.lineTo(cx + s * 0.4, cy + s * 0.1); x.lineTo(cx + s, cy - s * 0.25);
+    x.lineTo(cx + s, cy + s * 0.7); x.closePath(); x.fill();
+  } else if (name === 'paw') {
+    [[-0.62, -0.45], [0, -0.7], [0.62, -0.45]].forEach(function (p) {
+      x.beginPath(); x.arc(cx + p[0] * s, cy + p[1] * s, s * 0.28, 0, 7); x.fill();
+    });
+    x.beginPath(); x.ellipse(cx, cy + s * 0.35, s * 0.55, s * 0.45, 0, 0, 7); x.fill();
+  } else if (name === 'moon') {
+    x.beginPath(); x.arc(cx, cy, s, 0, 7); x.fill();
+    x.fillStyle = '#fff';
+    x.beginPath(); x.arc(cx + s * 0.5, cy - s * 0.15, s * 0.85, 0, 7); x.fill();
+    x.fillStyle = '#000';
+  }
+}
+
 function fitFont(x, text, weight, size, style, maxW) {
   let s = size;
   while (s > 14) {
@@ -260,7 +311,15 @@ async function drawJob(x, job) {
     drawBadge(x, W / 2 + 57, y + 137, job.platform);
     y += 196;
     const s = fitFont(x, job.user, 700, 40, '', MAXW);
-    y += s; x.fillText(job.user, W / 2, y); y += 10;
+    y += s; x.fillText(job.user, W / 2, y);
+    if (job.flairIcon) {
+      const nw = x.measureText(job.user).width;
+      const fx = Math.min(nw / 2 + 32, W / 2 - 20);
+      drawFlair(x, job.flairIcon, W / 2 - fx, y - s * 0.32, 13);
+      drawFlair(x, job.flairIcon, W / 2 + fx, y - s * 0.32, 13);
+      x.fillStyle = '#000';
+    }
+    y += 10;
   } else if (PICON[job.platform]) {
     drawBadge(x, W / 2, y + 34, job.platform, 34); y += 84;
   }
@@ -357,6 +416,10 @@ async function drawJob(x, job) {
   x.font = '400 20px "Segoe UI", Arial';
   y += 40; x.fillText(footer, W / 2, y);
   if (th && th.foot) { th.foot(x, y, seed); x.fillStyle = '#000'; x.strokeStyle = '#000'; }
+  if (job.flairTag) {
+    x.font = 'italic 400 19px "Segoe UI", Arial';
+    y += 28; x.fillText('“' + job.flairTag + '”', W / 2, y);
+  }
 
   return y;
 }

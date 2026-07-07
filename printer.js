@@ -18,7 +18,45 @@ const https = require('https');
 const http = require('http');
 const { spawn } = require('child_process');
 
-let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '', theme: 'auto' };
+let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '', theme: 'auto', flair: true };
+
+// ── Viewer flair ─────────────────────────────────────────────────────────────
+// Viewers customize their receipts at aquilo.gg/printflair (icon + tagline,
+// server-validated). Fetched per Twitch login at print time, 6h cache;
+// any failure just prints plain.
+const flairCache = new Map();
+function fetchFlair(job, cb) {
+  let done = false;
+  const fin = function () { if (!done) { done = true; cb(); } };
+  try {
+    if (!cfg.flair || job.isTest || !job.user || job.platform !== 'tw') return fin();
+    const login = String(job.user).trim().toLowerCase();
+    if (!/^[a-z0-9_]{2,26}$/.test(login)) return fin();
+    const hit = flairCache.get(login);
+    if (hit && Date.now() - hit.at < 6 * 3600e3) { applyFlair(job, hit.data); return fin(); }
+    const req = https.get('https://loadout-discord.aquiloplays.workers.dev/api/printflair/get?login=' + login,
+      { timeout: 3000 }, function (res) {
+        let out = '';
+        res.on('data', function (c) { out += c; if (out.length > 4096) { try { req.destroy(); } catch (e) {} } });
+        res.on('end', function () {
+          let d = null;
+          try { d = JSON.parse(out); } catch (e) {}
+          if (flairCache.size > 300) flairCache.clear();
+          flairCache.set(login, { data: d, at: Date.now() });
+          applyFlair(job, d); fin();
+        });
+        res.on('error', fin);
+      });
+    req.on('timeout', function () { try { req.destroy(); } catch (e) {} fin(); });
+    req.on('error', fin);
+  } catch (e) { fin(); }
+}
+function applyFlair(job, d) {
+  if (d && (d.icon || d.tagline)) {
+    job.flairIcon = String(d.icon || '');
+    job.flairTag = String(d.tagline || '').slice(0, 40);
+  }
+}
 
 // 'auto' follows the meteorological calendar; 'off' prints plain.
 function resolveTheme() {
@@ -121,6 +159,7 @@ function setConfig(patch) {
     if (typeof patch.maxPerMinute === 'number' && patch.maxPerMinute > 0) cfg.maxPerMinute = patch.maxPerMinute;
     if (typeof patch.discordWebhook === 'string') cfg.discordWebhook = patch.discordWebhook.trim();
     if (typeof patch.theme === 'string' && ['auto', 'off', 'spring', 'summer', 'autumn', 'winter'].indexOf(patch.theme) !== -1) cfg.theme = patch.theme;
+    if (typeof patch.flair === 'boolean') cfg.flair = patch.flair;
     saveConfig();
   }
   return getStatus();
@@ -139,7 +178,8 @@ function getStatus() {
     receiptCounter: receiptCounter,
     paper: paperState,
     discordWebhook: cfg.discordWebhook || '',
-    theme: cfg.theme || 'auto'
+    theme: cfg.theme || 'auto',
+    flair: cfg.flair !== false
   };
 }
 
@@ -408,6 +448,7 @@ function pump() {
     fetchDataUrl(job.giftIconUrl, function (giftData) {
       job.avatarData = avatarData;
       job.giftIconData = giftData;
+      fetchFlair(job, function () {
       renderReceipt(job).then(function (r) {
         return spool(buildEscpos(r.rasterB64, r.widthBytes, r.height)).then(function () { return r; });
       }).then(function (r) {
@@ -415,6 +456,7 @@ function pump() {
         finish(true);
       }).catch(function (e) {
         finish(false, (e && e.message) || 'print failed');
+      });
       });
     });
   });

@@ -3109,6 +3109,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <option value="autumn">Autumn</option>
               <option value="winter">Winter</option>
             </select></label>
+            <label class="frow"><span>Viewer flair <span style="color:var(--mut);font-weight:400">(icons + taglines viewers set at aquilo.gg/printflair)</span></span><input type="checkbox" id="prnFlair" checked onchange="onPrinterCfgChange()"></label>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DISCORD MIRROR</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Every real receipt also posts its image to this webhook (test prints and system tickets stay local). Clear the field to disable.</div>
@@ -16208,6 +16209,7 @@ var printerCfg = {
   ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true },
   noteReward: 'Print My Note',
   theme: 'auto',
+  flair: true,
   follows: { tw: false, kk: false, yt: false, tt: false },
   plats: { tw: true, kk: true, yt: true, tt: true },
   min: { bits: 100, coins: 100, kick: 1, super: 0, raid: 2 }
@@ -16246,7 +16248,8 @@ function _printerSaveCfg() {
       enabled: printerCfg.enabled && _printerGate,
       printerName: printerCfg.printerName,
       maxPerMinute: printerCfg.maxPerMinute,
-      theme: printerCfg.theme
+      theme: printerCfg.theme,
+      flair: printerCfg.flair
     };
     if (_prnWebhookVal !== null) _patch.discordWebhook = _prnWebhookVal;
     window.electronAPI.printerSetConfig(_patch).then(_printerShowStatus).catch(function() {});
@@ -16263,6 +16266,7 @@ function _printerLoadCfg() {
       if (d.ev) Object.assign(printerCfg.ev, d.ev);
       if (typeof d.noteReward === 'string') printerCfg.noteReward = d.noteReward;
       if (typeof d.theme === 'string') printerCfg.theme = d.theme;
+      if (typeof d.flair === 'boolean') printerCfg.flair = d.flair;
       if (d.follows) Object.assign(printerCfg.follows, d.follows);
       // Migrate the pre-1.20.3 single follow toggle to per-platform.
       else if (d.ev && d.ev.follow === true) printerCfg.follows = { tw: true, kk: true, yt: true, tt: true };
@@ -16283,6 +16287,7 @@ function _printerSyncUi() {
   _prnEl('prnEvHype').checked = printerCfg.ev.hype;    _prnEl('prnEvSongs').checked = printerCfg.ev.songs;
   _prnEl('prnEvNote').checked = printerCfg.ev.note;    _prnEl('prnNoteReward').value = printerCfg.noteReward;
   _prnEl('prnTheme').value = printerCfg.theme;
+  _prnEl('prnFlair').checked = printerCfg.flair;
   _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
   _prnEl('prnFollowYt').checked = printerCfg.follows.yt; _prnEl('prnFollowTt').checked = printerCfg.follows.tt;
   _prnEl('prnPlatTw').checked = printerCfg.plats.tw;   _prnEl('prnPlatKk').checked = printerCfg.plats.kk;
@@ -16306,6 +16311,7 @@ function onPrinterCfgChange() {
   };
   printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
   printerCfg.theme = _prnEl('prnTheme').value || 'auto';
+  printerCfg.flair = _prnEl('prnFlair').checked;
   var _wh = _prnEl('prnDiscordWebhook');
   if (_wh && (_prnWebhookSynced || _wh.value.trim() !== '')) _prnWebhookVal = _wh.value.trim();
   printerCfg.follows = {
