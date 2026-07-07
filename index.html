@@ -3098,6 +3098,10 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SHIFT TICKET</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
             <button class="tbtn" onclick="printerShiftTicket()" style="font-size:11px;font-weight:700;padding:5px 10px">Print tonight's shift ticket</button>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DISCORD MIRROR</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Every real receipt also posts its image to this webhook (test prints and system tickets stay local). Clear the field to disable.</div>
+            <label class="frow"><span>Webhook URL</span><input type="password" id="prnDiscordWebhook" placeholder="https://discord.com/api/webhooks/…" style="width:230px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
           </div>
         </div>
 
@@ -16199,6 +16203,11 @@ var printerCfg = {
 var _printerGate = false;
 var _printerSkipped = {};                // kind → count while rate-limited
 var _printerDigestTimer = null;
+// Discord webhook lives MAIN-side (printer-config.json) so it survives and
+// can be seeded externally; the pane edits it. null = never synced/edited —
+// omitted from config pushes so an empty boot-time input can't wipe it.
+var _prnWebhookVal = null;
+var _prnWebhookSynced = false;
 
 function _printerGateCheck() {
   var apply = function(ok) {
@@ -16221,11 +16230,13 @@ function _printerGateCheck() {
 function _printerSaveCfg() {
   try { localStorage.setItem('sf_printer_cfg', JSON.stringify(printerCfg)); } catch (e) {}
   if (window.electronAPI && window.electronAPI.printerSetConfig) {
-    window.electronAPI.printerSetConfig({
+    var _patch = {
       enabled: printerCfg.enabled && _printerGate,
       printerName: printerCfg.printerName,
       maxPerMinute: printerCfg.maxPerMinute
-    }).then(_printerShowStatus).catch(function() {});
+    };
+    if (_prnWebhookVal !== null) _patch.discordWebhook = _prnWebhookVal;
+    window.electronAPI.printerSetConfig(_patch).then(_printerShowStatus).catch(function() {});
   }
 }
 
@@ -16279,6 +16290,8 @@ function onPrinterCfgChange() {
     note: _prnEl('prnEvNote').checked
   };
   printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
+  var _wh = _prnEl('prnDiscordWebhook');
+  if (_wh && (_prnWebhookSynced || _wh.value.trim() !== '')) _prnWebhookVal = _wh.value.trim();
   printerCfg.follows = {
     tw: _prnEl('prnFollowTw').checked, kk: _prnEl('prnFollowKk').checked,
     yt: _prnEl('prnFollowYt').checked, tt: _prnEl('prnFollowTt').checked
@@ -16323,6 +16336,12 @@ function _printerShowStatus(st) {
   if (st.lastOk === true) bits.push('last print OK');
   if (st.lastOk === false) bits.push('last print FAILED: ' + (st.lastError || '?'));
   if (st.paper && st.paper !== 'unknown') bits.push('paper: ' + st.paper);
+  if (st.discordWebhook) bits.push('mirror on');
+  var _swh = _prnEl('prnDiscordWebhook');
+  if (_swh && document.activeElement !== _swh && typeof st.discordWebhook === 'string' && !_prnWebhookSynced) {
+    _swh.value = st.discordWebhook;
+    _prnWebhookSynced = true;
+  }
   if (st.receiptCounter) bits.push('#' + st.receiptCounter + ' lifetime');
   el.textContent = bits.join(' · ');
 }

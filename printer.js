@@ -18,7 +18,7 @@ const https = require('https');
 const http = require('http');
 const { spawn } = require('child_process');
 
-let cfg = { enabled: false, printerName: '', maxPerMinute: 6 };
+let cfg = { enabled: false, printerName: '', maxPerMinute: 6, discordWebhook: '' };
 let queue = [];
 let printing = false;
 let renderWin = null;
@@ -111,6 +111,7 @@ function setConfig(patch) {
     if (typeof patch.enabled === 'boolean') cfg.enabled = patch.enabled;
     if (typeof patch.printerName === 'string') cfg.printerName = patch.printerName;
     if (typeof patch.maxPerMinute === 'number' && patch.maxPerMinute > 0) cfg.maxPerMinute = patch.maxPerMinute;
+    if (typeof patch.discordWebhook === 'string') cfg.discordWebhook = patch.discordWebhook.trim();
     saveConfig();
   }
   return getStatus();
@@ -127,8 +128,42 @@ function getStatus() {
     lastError: lastResult.error,
     lastAt: lastResult.at,
     receiptCounter: receiptCounter,
-    paper: paperState
+    paper: paperState,
+    discordWebhook: cfg.discordWebhook || ''
   };
+}
+
+// ── Discord mirror ───────────────────────────────────────────────────────────
+// Fire-and-forget: after a real receipt prints, post its paper-styled PNG to
+// the configured webhook (multipart, payload_json + files[0]). Failures log
+// and never block the print queue. Test prints and system tickets skip it.
+function sendDiscord(pngB64, job) {
+  const url = cfg.discordWebhook;
+  if (!url || url.indexOf('https://discord.com/api/webhooks/') !== 0 || !pngB64) return;
+  try {
+    const no = String(job._receiptNo || 0).padStart(4, '0');
+    const boundary = '----sfreceipt' + Date.now().toString(36);
+    const payload = JSON.stringify({ content: '🧾 receipt #' + no });
+    const head = Buffer.from(
+      '--' + boundary + '\r\n' +
+      'Content-Disposition: form-data; name="payload_json"\r\n' +
+      'Content-Type: application/json\r\n\r\n' + payload + '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Disposition: form-data; name="files[0]"; filename="receipt-' + no + '.png"\r\n' +
+      'Content-Type: image/png\r\n\r\n');
+    const tail = Buffer.from('\r\n--' + boundary + '--\r\n');
+    const body = Buffer.concat([head, Buffer.from(pngB64, 'base64'), tail]);
+    const req = https.request(url, {
+      method: 'POST', timeout: 8000,
+      headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': body.length }
+    }, function (res) {
+      if (res.statusCode >= 400) logFn('discord mirror HTTP ' + res.statusCode);
+      res.resume();
+    });
+    req.on('error', function (e) { logFn('discord mirror: ' + (e && e.message)); });
+    req.on('timeout', function () { try { req.destroy(); } catch (e) {} });
+    req.end(body);
+  } catch (e) { logFn('discord mirror threw: ' + (e && e.message)); }
 }
 
 // ── Printer discovery ────────────────────────────────────────────────────────
@@ -363,8 +398,9 @@ function pump() {
       job.avatarData = avatarData;
       job.giftIconData = giftData;
       renderReceipt(job).then(function (r) {
-        return spool(buildEscpos(r.rasterB64, r.widthBytes, r.height));
-      }).then(function () {
+        return spool(buildEscpos(r.rasterB64, r.widthBytes, r.height)).then(function () { return r; });
+      }).then(function (r) {
+        if (!job.isTest) sendDiscord(r.pngB64, job);
         finish(true);
       }).catch(function (e) {
         finish(false, (e && e.message) || 'print failed');

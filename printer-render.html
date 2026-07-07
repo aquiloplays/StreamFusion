@@ -257,7 +257,20 @@ ipcRenderer.on('printer-render-job', async function (ev, payload) {
     const cropped = packed.slice(0, WIDTH_BYTES * height);
     let bin = '';
     for (let i = 0; i < cropped.length; i++) bin += String.fromCharCode(cropped[i]);
-    ipcRenderer.send(chan, { ok: true, rasterB64: btoa(bin), widthBytes: WIDTH_BYTES, height: height });
+    // Paper-styled PNG of the exact dithered raster — used by the Discord
+    // mirror so the channel sees precisely what came out of the printer.
+    const vis = document.createElement('canvas');
+    vis.width = W; vis.height = height;
+    const vx = vis.getContext('2d');
+    const vd = vx.createImageData(W, height);
+    for (let y = 0; y < height; y++) for (let px = 0; px < W; px++) {
+      const on = (cropped[y * WIDTH_BYTES + (px >> 3)] >> (7 - (px & 7))) & 1;
+      const o = (y * W + px) * 4;
+      vd.data[o] = on ? 40 : 249; vd.data[o + 1] = on ? 36 : 246; vd.data[o + 2] = on ? 30 : 237; vd.data[o + 3] = 255;
+    }
+    vx.putImageData(vd, 0, 0);
+    const pngB64 = vis.toDataURL('image/png').split(',')[1];
+    ipcRenderer.send(chan, { ok: true, rasterB64: btoa(bin), widthBytes: WIDTH_BYTES, height: height, pngB64: pngB64 });
   } catch (e) {
     ipcRenderer.send(chan, { ok: false, error: (e && e.message) || 'draw error' });
   }
