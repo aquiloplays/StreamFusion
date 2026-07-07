@@ -2985,6 +2985,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             </select></label>
             <label class="frow"><span>Viewer flair <span style="color:var(--mut);font-weight:400">(icons + taglines viewers set at aquilo.gg/printflair)</span></span><input type="checkbox" id="prnFlair" checked onchange="onPrinterCfgChange()"></label>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DOODLE APPROVALS</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Viewer pixel doodles (drawn in the Twitch extension's Doodle tab) wait here. Nothing prints until you approve it; reject wipes it.</div>
+            <button class="tbtn" onclick="printerDoodleQueue()" style="font-size:11px;font-weight:700;padding:5px 10px">Refresh queue</button>
+            <div id="prnDoodles" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DISCORD MIRROR</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Every real receipt also posts its image to this webhook (test prints and system tickets stay local). Clear the field to disable.</div>
             <label class="frow"><span>Webhook URL</span><input type="password" id="prnDiscordWebhook" placeholder="https://discord.com/api/webhooks/…" style="width:230px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
@@ -15524,6 +15529,57 @@ function printerShiftTicket() {
     if (S.twGame) rows.push({ label: 'category', value: String(S.twGame).slice(0, 22) });
     send(rows);
   });
+}
+
+// Doodle moderation: list pending viewer doodles from the worker (auth'd
+// with the same shared key the gallery uploader uses) and approve/reject.
+function printerDoodleQueue() {
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) return;
+  window.electronAPI.printerGetStatus().then(function(st) {
+    var box = _prnEl('prnDoodles');
+    if (!box) return;
+    if (!st || !st.galleryKey) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">gallery key not configured</span>'; return; }
+    fetch('https://loadout-discord.aquiloplays.workers.dev/api/printflair/doodle-queue',
+      { headers: { 'x-aquilo-print-key': st.galleryKey } })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        box.innerHTML = '';
+        var items = (j && j.items) || [];
+        if (!items.length) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">queue empty</span>'; return; }
+        items.forEach(function(it) {
+          var d = document.createElement('div');
+          d.style.cssText = 'background:var(--surf3);border:1px solid var(--bdr);border-radius:6px;padding:6px;text-align:center';
+          var cv = document.createElement('canvas');
+          cv.width = 64; cv.height = 64;
+          cv.style.cssText = 'background:#f6f3ea;border-radius:3px';
+          var cx = cv.getContext('2d');
+          cx.fillStyle = '#1b1b1b';
+          for (var p = 0; p < 256; p++) {
+            var byte = parseInt(it.doodle.substr((p >> 3) * 2, 2), 16);
+            if (byte & (0x80 >> (p & 7))) cx.fillRect((p % 16) * 4, ((p / 16) | 0) * 4, 4, 4);
+          }
+          d.appendChild(cv);
+          var nm = document.createElement('div');
+          nm.textContent = it.login;
+          nm.style.cssText = 'font-size:10px;color:var(--txt);margin:4px 0';
+          d.appendChild(nm);
+          [['✓ print it', true], ['✕', false]].forEach(function(bb) {
+            var b = document.createElement('button');
+            b.textContent = bb[0]; b.className = 'tbtn';
+            b.style.cssText = 'font-size:11px;padding:2px 8px;margin:0 2px';
+            b.onclick = function() {
+              fetch('https://loadout-discord.aquiloplays.workers.dev/api/printflair/doodle-review', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', 'x-aquilo-print-key': st.galleryKey },
+                body: JSON.stringify({ login: it.login, approve: bb[1] })
+              }).then(function() { printerDoodleQueue(); }).catch(function() {});
+            };
+            d.appendChild(b);
+          });
+          box.appendChild(d);
+        });
+      }).catch(function() {});
+  }).catch(function() {});
 }
 
 function printerTestPrint() {

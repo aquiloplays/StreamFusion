@@ -104,6 +104,7 @@ function fetchMeme(job, cb) {
 function applyFlair(job, d) {
   if (d && (d.icon || d.tagline || d.frame || d.shape || d.nameStyle || d.emoteUrl)) {
     job.flairEmoteUrl = (typeof d.emoteUrl === 'string' && d.emoteUrl.indexOf('https://static-cdn.jtvnw.net/emoticons/v2/') === 0) ? d.emoteUrl : '';
+    job.flairDoodle = /^[0-9a-f]{64}$/.test(String(d.doodle || '')) ? String(d.doodle) : '';
     job.flairIcon = String(d.icon || '');
     job.flairTag = String(d.tagline || '').slice(0, 40);
     job.flairFrame = ['double', 'dashed', 'zigzag', 'dots'].indexOf(d.frame) !== -1 ? d.frame : '';
@@ -233,7 +234,8 @@ function getStatus() {
     paper: paperState,
     discordWebhook: cfg.discordWebhook || '',
     theme: cfg.theme || 'auto',
-    flair: cfg.flair !== false
+    flair: cfg.flair !== false,
+    galleryKey: cfg.galleryKey || ''
   };
 }
 

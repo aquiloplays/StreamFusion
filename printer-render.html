@@ -521,6 +521,17 @@ async function drawJob(x, job) {
     x.font = 'italic 400 19px "Segoe UI", Arial';
     y += 28; x.fillText('“' + job.flairTag + '”', W / 2, y);
   }
+  // Approved viewer doodle: 16×16 1-bit pixel art, 5-dot cells, centered.
+  if (job.flairDoodle && /^[0-9a-f]{64}$/.test(job.flairDoodle)) {
+    y += 14;
+    const cell = 5, dx = W / 2 - 8 * cell;
+    x.fillStyle = '#000';
+    for (let p = 0; p < 256; p++) {
+      const byte = parseInt(job.flairDoodle.substr((p >> 3) * 2, 2), 16);
+      if (byte & (0x80 >> (p & 7))) x.fillRect(dx + (p % 16) * cell, y + ((p / 16) | 0) * cell, cell, cell);
+    }
+    y += 16 * cell;
+  }
 
   return y;
 }
