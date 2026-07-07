@@ -513,6 +513,10 @@ const BROADCASTER_CONNECT_SCOPES = [
   'moderator:manage:banned_users', 'moderator:manage:chat_messages',
   'moderator:manage:announcements', 'moderator:read:shoutouts',
   'moderator:read:suspicious_users',
+  // moderation:read — Warden's mod-list auto-sync (Helix Get Moderators
+  // mirrors the channel's Twitch mods into the Warden team). Added
+  // 2026-07-07; streamers who connected earlier need one reconnect.
+  'moderation:read',
   'channel:manage:raids', 'clips:edit',
   'channel:manage:broadcast', 'channel:manage:ads', 'channel:edit:commercial'
 ].join(' ');
