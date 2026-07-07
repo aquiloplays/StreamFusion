@@ -66,39 +66,114 @@ function _waveRow(x, y) {
   for (let i = 0; i < 10; i++) { x.moveTo(i * 64, y); x.quadraticCurveTo(i * 64 + 32, y - 14, i * 64 + 64, y); }
   x.stroke();
 }
-const THEMES = {
-  spring: {
-    top: function (x) { for (let i = 0; i < 7; i++) _sprout(x, 45 + i * 82, 26, 15); },
-    foot: function (x, fy) { _sprout(x, 68, fy - 16, 12); _sprout(x, 508, fy - 16, 12); }
-  },
-  summer: {
-    top: function (x) { _waveRow(x, 22); _waveRow(x, 38); _sun(x, 62, 96, 19); },
-    foot: function (x, fy) {
-      x.lineWidth = 3; x.strokeStyle = '#000';
-      [50, 478].forEach(function (sx) {
-        x.beginPath(); x.moveTo(sx, fy - 6); x.quadraticCurveTo(sx + 12, fy - 16, sx + 24, fy - 6);
-        x.quadraticCurveTo(sx + 36, fy + 4, sx + 48, fy - 6); x.stroke();
-      });
-    }
-  },
-  autumn: {
-    top: function (x) {
-      for (let i = 0; i < 8; i++) _leaf(x, 30 + _sd(i) * 516, 14 + _sd(i + 5) * 34, 9 + _sd(i + 2) * 6, _sd(i) * 3);
-      _leaf(x, 46, 108, 13, 0.5); _leaf(x, 530, 102, 13, -0.4);
-    },
-    foot: function (x, fy) { _leaf(x, 66, fy - 8, 11, 0.9); _leaf(x, 510, fy - 8, 11, -0.7); }
-  },
-  winter: {
-    top: function (x) {
-      x.fillStyle = '#000'; x.fillRect(0, 0, W, 8);
-      for (let i = 0; i < 12; i++) {
-        const ix = 14 + i * 48;
-        x.beginPath(); x.moveTo(ix, 8); x.lineTo(ix + 9, 8); x.lineTo(ix + 4.5, 8 + 12 + _sd(i) * 20); x.closePath(); x.fill();
-      }
-      _snow(x, 48, 100, 13); _snow(x, 528, 94, 12);
-    },
-    foot: function (x, fy) { _snow(x, 66, fy - 7, 11); _snow(x, 510, fy - 7, 12); }
+function _tulip(x, cx, cy, s) {
+  x.lineWidth = 3; x.strokeStyle = '#000';
+  x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx, cy + s * 1.4); x.stroke();
+  _leaf(x, cx - s * 0.4, cy + s, s * 0.5, -1);
+  x.beginPath(); x.moveTo(cx - s * 0.55, cy);
+  x.quadraticCurveTo(cx - s * 0.65, cy - s, cx - s * 0.2, cy - s * 0.55);
+  x.lineTo(cx, cy - s); x.lineTo(cx + s * 0.2, cy - s * 0.55);
+  x.quadraticCurveTo(cx + s * 0.65, cy - s, cx + s * 0.55, cy);
+  x.closePath(); x.fill();
+}
+function _butterfly(x, cx, cy, s) {
+  x.fillStyle = '#000';
+  [-1, 1].forEach(function (d) {
+    x.beginPath(); x.ellipse(cx + d * s * 0.5, cy - s * 0.25, s * 0.5, s * 0.36, d * 0.6, 0, 7); x.fill();
+    x.beginPath(); x.ellipse(cx + d * s * 0.38, cy + s * 0.3, s * 0.34, s * 0.26, d * 0.9, 0, 7); x.fill();
+  });
+  x.fillRect(cx - 1.5, cy - s * 0.5, 3, s);
+}
+function _cloudRain(x, cx, cy, s) {
+  x.lineWidth = 3; x.strokeStyle = '#000';
+  x.beginPath(); x.arc(cx - s * 0.5, cy, s * 0.42, Math.PI * 0.4, Math.PI * 1.6);
+  x.arc(cx, cy - s * 0.34, s * 0.5, Math.PI * 0.9, Math.PI * 2.05);
+  x.arc(cx + s * 0.55, cy, s * 0.4, Math.PI * 1.3, Math.PI * 0.6);
+  x.closePath(); x.stroke();
+  for (let i = -1; i <= 1; i++) {
+    x.beginPath(); x.moveTo(cx + i * s * 0.4 + 3, cy + s * 0.55); x.lineTo(cx + i * s * 0.4 - 3, cy + s * 0.95); x.stroke();
   }
+}
+function _gull(x, cx, cy, s) {
+  x.lineWidth = 3; x.strokeStyle = '#000';
+  x.beginPath(); x.arc(cx - s * 0.5, cy, s * 0.5, Math.PI * 1.15, Math.PI * 1.9);
+  x.stroke();
+  x.beginPath(); x.arc(cx + s * 0.5, cy, s * 0.5, Math.PI * 1.1, Math.PI * 1.85); x.stroke();
+}
+function _shell(x, cx, cy, s) {
+  x.lineWidth = 2.5; x.strokeStyle = '#000';
+  x.beginPath(); x.arc(cx, cy, s, Math.PI, 0); x.closePath(); x.stroke();
+  for (let i = 1; i < 4; i++) {
+    const a = Math.PI + i * Math.PI / 4;
+    x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s); x.stroke();
+  }
+}
+function _acorn(x, cx, cy, s) {
+  x.beginPath(); x.ellipse(cx, cy + s * 0.25, s * 0.5, s * 0.62, 0, 0, 7); x.fill();
+  x.beginPath(); x.ellipse(cx, cy - s * 0.3, s * 0.62, s * 0.34, 0, Math.PI, 0); x.fill();
+  x.lineWidth = 3; x.beginPath(); x.moveTo(cx, cy - s * 0.6); x.lineTo(cx + s * 0.25, cy - s * 0.95); x.stroke();
+}
+function _branch(x, x0, y0, len, dir) {
+  x.lineWidth = 3; x.strokeStyle = '#000';
+  x.beginPath(); x.moveTo(x0, y0); x.quadraticCurveTo(x0 + dir * len * 0.5, y0 + 8, x0 + dir * len, y0 - 6); x.stroke();
+  for (let i = 1; i <= 3; i++) {
+    const bx = x0 + dir * len * i / 3.5, by = y0 + 4 - i * 2;
+    x.beginPath(); x.moveTo(bx, by); x.lineTo(bx + dir * 10, by - 12); x.stroke();
+  }
+}
+function _pine(x, cx, cy, s) {
+  x.fillStyle = '#000';
+  for (let i = 0; i < 3; i++) {
+    const w = s * (1 - i * 0.26), ty = cy - i * s * 0.55;
+    x.beginPath(); x.moveTo(cx - w / 2, ty); x.lineTo(cx + w / 2, ty); x.lineTo(cx, ty - s * 0.7); x.closePath(); x.fill();
+  }
+  x.fillRect(cx - 2.5, cy, 5, s * 0.3);
+}
+function _snowman(x, cx, cy, s) {
+  x.lineWidth = 3; x.strokeStyle = '#000';
+  x.beginPath(); x.arc(cx, cy, s * 0.55, 0, 7); x.stroke();
+  x.beginPath(); x.arc(cx, cy - s * 0.95, s * 0.38, 0, 7); x.stroke();
+  x.fillRect(cx - s * 0.3, cy - s * 1.35, s * 0.6, 3);
+  x.fillRect(cx - s * 0.18, cy - s * 1.62, s * 0.36, s * 0.3);
+  x.beginPath(); x.arc(cx - 4, cy - s, 1.6, 0, 7); x.arc(cx + 4, cy - s, 1.6, 0, 7); x.fill();
+}
+
+// Each season has 3 variant compositions; the pick + all scatter is seeded
+// by the receipt number, so every print looks a little different but a
+// reprint (and the Discord mirror) reproduces exactly.
+const THEMES = {
+  spring: [
+    { top: function (x, s) { for (let i = 0; i < 7; i++) _sprout(x, 40 + i * 82 + _sd(s + i) * 14, 24 + _sd(s + i * 3) * 8, 13 + _sd(s * 2 + i) * 5); },
+      foot: function (x, fy, s) { _sprout(x, 68, fy - 16, 12); _sprout(x, 508, fy - 16, 12); } },
+    { top: function (x, s) { _tulip(x, 52, 30, 16); _tulip(x, 96, 34, 12); _tulip(x, 524, 30, 16); _tulip(x, 482, 34, 12); _butterfly(x, 280 + _sd(s) * 60, 26, 14); },
+      foot: function (x, fy, s) { _tulip(x, 66, fy - 22, 12); _butterfly(x, 510, fy - 12, 11); } },
+    { top: function (x, s) { _cloudRain(x, 70, 24, 26); _cloudRain(x, 500, 20, 22); for (let i = 0; i < 4; i++) { const rx = 180 + i * 60 + _sd(s + i) * 30; x.lineWidth = 2.5; x.beginPath(); x.moveTo(rx, 16 + _sd(s + i * 7) * 16); x.lineTo(rx - 5, 30 + _sd(s + i * 7) * 16); x.stroke(); } },
+      foot: function (x, fy, s) { _sprout(x, 66, fy - 15, 11); _sprout(x, 288, fy + 4, 9); _sprout(x, 510, fy - 15, 11); } }
+  ],
+  summer: [
+    { top: function (x, s) { _waveRow(x, 22); _waveRow(x, 38); _sun(x, 56 + _sd(s) * 40, 94, 18); },
+      foot: function (x, fy, s) { x.lineWidth = 3; [50, 478].forEach(function (sx) { x.beginPath(); x.moveTo(sx, fy - 6); x.quadraticCurveTo(sx + 12, fy - 16, sx + 24, fy - 6); x.quadraticCurveTo(sx + 36, fy + 4, sx + 48, fy - 6); x.stroke(); }); } },
+    { top: function (x, s) { _sun(x, 66, 34, 20); _gull(x, 300 + _sd(s) * 80, 30, 20); _gull(x, 420 + _sd(s + 3) * 60, 20, 15); _gull(x, 200 + _sd(s + 7) * 50, 18, 13); },
+      foot: function (x, fy, s) { _shell(x, 68, fy - 8, 13); _shell(x, 508, fy - 8, 13); } },
+    { top: function (x, s) { _waveRow(x, 16); for (let i = 0; i < 5; i++) { const bx = 60 + i * 116 + _sd(s + i) * 30; x.beginPath(); x.arc(bx, 38 + _sd(s + i * 5) * 10, 4 + _sd(s + i * 3) * 4, 0, 7); x.lineWidth = 2.5; x.stroke(); } _sun(x, 512, 92, 17); },
+      foot: function (x, fy, s) { _gull(x, 70, fy - 10, 16); _gull(x, 506, fy - 10, 16); } }
+  ],
+  autumn: [
+    { top: function (x, s) { for (let i = 0; i < 8; i++) _leaf(x, 30 + _sd(s + i) * 516, 14 + _sd(s + i + 5) * 34, 9 + _sd(s + i + 2) * 6, _sd(s + i) * 3); _leaf(x, 46, 106, 13, 0.5); _leaf(x, 530, 100, 13, -0.4); },
+      foot: function (x, fy, s) { _leaf(x, 66, fy - 8, 11, 0.9); _leaf(x, 510, fy - 8, 11, -0.7); } },
+    { top: function (x, s) { _acorn(x, 60, 30, 16); _acorn(x, 100, 38, 11); _acorn(x, 516, 30, 16); _acorn(x, 476, 38, 11); for (let i = 0; i < 4; i++) _leaf(x, 200 + i * 60 + _sd(s + i) * 30, 20 + _sd(s + i * 3) * 20, 8 + _sd(s + i) * 4, _sd(s + i) * 3); },
+      foot: function (x, fy, s) { _acorn(x, 68, fy - 10, 12); _acorn(x, 508, fy - 10, 12); } },
+    { top: function (x, s) { _branch(x, 0, 26, 150, 1); _branch(x, W, 22, 150, -1); for (let i = 0; i < 3; i++) _leaf(x, 220 + i * 70 + _sd(s + i) * 30, 24 + _sd(s + i * 5) * 22, 8 + _sd(s + i) * 5, _sd(s + i) * 3); },
+      foot: function (x, fy, s) { _leaf(x, 66, fy - 8, 11, 0.9); _leaf(x, 288, fy + 2, 8, 2); _leaf(x, 510, fy - 8, 11, -0.7); } }
+  ],
+  winter: [
+    { top: function (x, s) { x.fillStyle = '#000'; x.fillRect(0, 0, W, 8); for (let i = 0; i < 12; i++) { const ix = 14 + i * 48; x.beginPath(); x.moveTo(ix, 8); x.lineTo(ix + 9, 8); x.lineTo(ix + 4.5, 8 + 12 + _sd(s + i) * 20); x.closePath(); x.fill(); } _snow(x, 48, 98, 13); _snow(x, 528, 92, 12); },
+      foot: function (x, fy, s) { _snow(x, 66, fy - 7, 11); _snow(x, 510, fy - 7, 12); } },
+    { top: function (x, s) { for (let i = 0; i < 6; i++) _snow(x, 30 + _sd(s + i) * 516, 16 + _sd(s + i + 4) * 34, 7 + _sd(s + i * 2) * 7); for (let i = 0; i < 8; i++) { x.beginPath(); x.arc(40 + _sd(s + i + 20) * 496, 12 + _sd(s + i + 30) * 40, 2.2, 0, 7); x.fill(); } },
+      foot: function (x, fy, s) { _snowman(x, 68, fy - 6, 15); _snow(x, 510, fy - 7, 12); } },
+    { top: function (x, s) { _pine(x, 54, 44, 26); _pine(x, 96, 48, 18); _pine(x, 522, 44, 26); _pine(x, 480, 48, 18); _snow(x, 288 + (_sd(s) - 0.5) * 80, 24, 10); },
+      foot: function (x, fy, s) { _pine(x, 66, fy - 2, 14); _pine(x, 510, fy - 2, 14); } }
+  ]
 };
 
 let birdImg = null;
@@ -171,8 +246,10 @@ async function drawJob(x, job) {
   const MAXW = 520;
   let y = 24;
 
-  const th = THEMES[job.theme] || null;
-  if (th) { th.top(x); x.fillStyle = '#000'; x.strokeStyle = '#000'; y = 62; }
+  const vars = THEMES[job.theme] || null;
+  const seed = Number(job._receiptNo) || 0;
+  const th = vars ? vars[seed % vars.length] : null;
+  if (th) { th.top(x, seed); x.fillStyle = '#000'; x.strokeStyle = '#000'; y = 62; }
 
   if (!birdImg) birdImg = await loadImg(BIRD);
   if (birdImg) { x.drawImage(birdImg, W / 2 - 55, y, 110, 80); y += 80 + 38; }
@@ -279,7 +356,7 @@ async function drawJob(x, job) {
     ('receipt #' + String(job._receiptNo || 0).padStart(4, '0') + ' · ' + time + ' · thank you <3');
   x.font = '400 20px "Segoe UI", Arial';
   y += 40; x.fillText(footer, W / 2, y);
-  if (th && th.foot) { th.foot(x, y); x.fillStyle = '#000'; x.strokeStyle = '#000'; }
+  if (th && th.foot) { th.foot(x, y, seed); x.fillStyle = '#000'; x.strokeStyle = '#000'; }
 
   return y;
 }
