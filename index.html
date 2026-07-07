@@ -9561,6 +9561,20 @@ function _rfStartRaid(login, displayName, opts) {
     var prefix = opts.fromSchedule ? 'Scheduled raid firing now: ' : 'Raiding ';
     sysMsg('tw', prefix + (displayName || login) + '\u2026 give Twitch a few seconds.');
   }
+  // Boarding pass: the raid just fired (native or SB, manual or scheduled) \u2014
+  // print the send-off ticket. Target avatar comes from the Raid Finder's
+  // last search results when available.
+  try {
+    var _bpAv = '';
+    var _bpStreams = (S.raidFinder.lastResults && S.raidFinder.lastResults.streams) || [];
+    for (var _bpi = 0; _bpi < _bpStreams.length; _bpi++) {
+      if ((_bpStreams[_bpi].user_login || '').toLowerCase() === String(login).toLowerCase()) {
+        _bpAv = _bpStreams[_bpi].profile_image_url || '';
+        break;
+      }
+    }
+    printerPost({ kind: 'raidout', plat: 'tw', target: login, targetName: displayName || login, avatar: _bpAv, viewers: S.viewers.tw });
+  } catch (e) {}
   // closeModal() shuts the Raid Finder UI after a user-initiated raid lands.
   // Was previously gated on !opts.skipConfirm, but the polish-pass refactor
   // (1.6.3+) splits the confirm into a styled dialog, so the post-confirm
@@ -16417,7 +16431,7 @@ function printerPost(o) {
     var evKey = { sub: 'sub', resub: 'sub', member: 'sub', gift1: 'gift', bomb: 'gift',
                   cheer: 'cheer', kicks: 'kicks', super: 'super', ttgift: 'ttgift',
                   raid: 'raid', redeem: 'redeem', follow: 'follow',
-                  hype: 'hype', song: 'songs' }[o.kind];
+                  hype: 'hype', song: 'songs', raidout: 'raid' }[o.kind];
     if (!evKey) return;
     if (evKey === 'follow') { if (!printerCfg.follows[o.plat]) return; }
     else if (printerCfg.ev[evKey] === false) return;
@@ -16480,6 +16494,18 @@ function printerPost(o) {
       job.action = o.phase === 'start' ? 'all aboard'
                  : o.phase === 'end' ? 'train complete · reached lv ' + (o.level || 1)
                  : (o.contributor ? o.contributor + ' boosted the train' : 'level up');
+    } else if (o.kind === 'raidout') {
+      job.user = o.targetName || o.target;
+      job.action = 'now boarding · outgoing raid';
+      job.banner = 'BOARDING PASS';
+      var _bt = new Date();
+      job.rows = [
+        { label: 'flight', value: 'AQ-' + String(_bt.getHours()).padStart(2, '0') + String(_bt.getMinutes()).padStart(2, '0') },
+        { label: 'from', value: '@' + (S.twLogin || 'aquilo') },
+        { label: 'to', value: '@' + String(o.target).slice(0, 20) },
+        { label: 'passengers', value: (o.viewers != null && o.viewers !== '') ? Number(o.viewers).toLocaleString() : '?' }
+      ];
+      job.footer = 'gate closes shortly · see you there <3';
     } else if (o.kind === 'song') {
       job.user = o.requester || '';
       job.action = o.requester ? 'requested a song' : 'now playing';
