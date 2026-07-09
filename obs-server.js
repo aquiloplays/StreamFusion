@@ -302,9 +302,12 @@ function handleRequest(req, res) {
     // the payload only so existing overlay clients parse it cleanly.
     var cfg = lastConfig[overlayType] || {};
     var hello = { entitled: true, cfg: cfg };
-    // The viewers overlay wants the current count on scene load, not just
-    // the next tick — replay the last stats packet in its hello.
-    if (overlayType === 'viewers' && lastStats) hello.stats = lastStats;
+    // The viewers + goals overlays want current numbers on scene load, not
+    // just the next tick — replay the last stats packet in the hello, but
+    // ONLY when it's recent (10 min): an OBS scene loaded hours after the
+    // stream ended used to render the dead counts immediately and forever.
+    var statsFresh = lastStats && lastStats.ts && (Date.now() - lastStats.ts) < 10 * 60 * 1000;
+    if ((overlayType === 'viewers' || overlayType === 'goals') && statsFresh) hello.stats = lastStats;
     res.write('event: hello\ndata: ' + JSON.stringify(hello) + '\n\n');
 
     var client = { res: res, overlayType: overlayType };

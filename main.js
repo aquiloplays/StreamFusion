@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, dialog, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, dialog, globalShortcut, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -1414,36 +1414,81 @@ ipcMain.on('maximize-window', () => {
 ipcMain.on('close-window', () => mainWindow?.hide()); // hides to tray
 ipcMain.on('quit-app', () => { isQuitting = true; app.quit(); });
 
-// Kick viewer count — public API, no auth required, fetched from main process to avoid CORS
-ipcMain.handle('fetch-kick-viewers', async (event, slug) => {
+// Kick viewer count — public API, no auth required, fetched from main process
+// to avoid CORS. Uses Electron's net.request (Chromium network stack: real TLS
+// fingerprint + session cookies) instead of plain Node https — kick.com sits
+// behind Cloudflare bot management and plain-Node requests intermittently get
+// served a 403 "Just a moment" HTML challenge, which used to read as a parse
+// failure and freeze the count forever.
+//
+// Result contract (shared by all fetch-*-viewers handlers):
+//   number >= 0  → live, that many viewers
+//   0            → confirmed OFFLINE (livestream: null in a healthy response)
+//   null         → transient error (network / 403 challenge / parse) — the
+//                  renderer keeps the previous value briefly and tracks
+//                  consecutive misses.
+function kickApiFetch(path) {
   return new Promise((resolve) => {
-    const req = https.get({
-      hostname: 'kick.com',
-      path: '/api/v1/channels/' + encodeURIComponent(slug),
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StreamFusion)', 'Accept': 'application/json' }
-    }, (res) => {
-      let data = '';
-      res.on('data', d => data += d);
-      res.on('end', () => {
-        try {
-          const j = JSON.parse(data);
-          resolve(j.livestream ? (j.livestream.viewer_count || 0) : null);
-        } catch (e) { resolve(null); }
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    try {
+      const req = net.request({
+        method: 'GET',
+        url: 'https://kick.com' + path,
+        // Chromium supplies its own realistic UA/headers; Accept nudges the
+        // API route (HTML would mean a challenge page → parse fail → null).
+        redirect: 'follow',
       });
-    });
-    req.on('error', () => resolve(null));
-    req.setTimeout(10000, () => { req.destroy(); resolve(null); });
+      req.setHeader('Accept', 'application/json');
+      const timer = setTimeout(() => { try { req.abort(); } catch (e) {} done(null); }, 10000);
+      req.on('response', (res) => {
+        let data = '';
+        res.on('data', d => data += d);
+        res.on('end', () => {
+          clearTimeout(timer);
+          if (res.statusCode < 200 || res.statusCode >= 300) { done(null); return; }
+          try { done(JSON.parse(data)); } catch (e) { done(null); }
+        });
+        res.on('error', () => { clearTimeout(timer); done(null); });
+      });
+      req.on('error', () => { clearTimeout(timer); done(null); });
+      req.end();
+    } catch (e) { done(null); }
   });
+}
+ipcMain.handle('fetch-kick-viewers', async (event, slug) => {
+  const enc = encodeURIComponent(slug);
+  // v1 first (richer channel object), v2 livestream as the fallback when v1
+  // is challenged/unavailable.
+  let j = await kickApiFetch('/api/v1/channels/' + enc);
+  if (j && typeof j === 'object') {
+    // Healthy response: livestream null = channel offline → explicit 0 so the
+    // renderer can zero the chip instead of freezing the last live number.
+    return j.livestream ? (j.livestream.viewer_count || 0) : 0;
+  }
+  j = await kickApiFetch('/api/v2/channels/' + enc + '/livestream');
+  if (j && typeof j === 'object') {
+    const ls = j.data || j.livestream || j;
+    if (ls && (typeof ls.viewer_count === 'number' || typeof ls.viewers === 'number')) {
+      return (typeof ls.viewer_count === 'number' ? ls.viewer_count : ls.viewers) || 0;
+    }
+    return 0; // healthy v2 response, no live payload → offline
+  }
+  return null; // both attempts errored → transient failure, keep prior value
 });
 
 // Twitch viewer count — decapi.me public API, no auth required. Returns a
 // plain-text integer when live, or a string like "User is not live" when
-// offline / invalid. We parse and return null on anything non-numeric so the
-// renderer keeps the previous value instead of showing 0 while transient
-// network failures are in flight. Streamer.bot can't reliably emit
-// Twitch.PresentViewers events via wildcard subscribe, so this is our
-// authoritative ongoing source of truth (initial count still comes from
-// GetBroadcaster / SB events when they do fire).
+// offline / invalid. Contract matches fetch-kick-viewers: a recognised
+// offline/not-found response resolves 0 (so the renderer zeroes the chip and
+// the OBS overlay instead of freezing the last live number forever — the old
+// behaviour returned null for offline, which the renderer treated as a
+// transient blip and kept the phantom count). null is reserved for genuinely
+// non-numeric garbage + network errors. Streamer.bot can't reliably emit
+// Twitch.PresentViewers events via wildcard subscribe, so this is the keyless
+// fallback source of truth; when the streamer is natively signed in the
+// renderer prefers the authenticated Helix poll and only uses this when it
+// has no token.
 ipcMain.handle('fetch-twitch-viewers', async (event, login) => {
   return new Promise((resolve) => {
     const req = https.get({
@@ -1454,12 +1499,77 @@ ipcMain.handle('fetch-twitch-viewers', async (event, login) => {
       let data = '';
       res.on('data', d => data += d);
       res.on('end', () => {
-        var n = parseInt(String(data).trim(), 10);
-        resolve(isFinite(n) && n >= 0 ? n : null);
+        const txt = String(data).trim();
+        const n = parseInt(txt, 10);
+        if (isFinite(n) && n >= 0) { resolve(n); return; }
+        // decapi's offline/invalid responses are short English sentences —
+        // treat them as an explicit offline 0, not a transient failure.
+        if (/not live|offline|not found|no user|error/i.test(txt)) { resolve(0); return; }
+        resolve(null);
       });
     });
     req.on('error', () => resolve(null));
     req.setTimeout(10000, () => { req.destroy(); resolve(null); });
+  });
+});
+
+// YouTube live viewer count — keyless innertube updated_metadata endpoint
+// (the same call the YouTube watch page itself polls; consumes ZERO Data API
+// quota and needs no OAuth). YouTube was the only platform with no fallback
+// poll at all: it relied entirely on Streamer.bot pushing PresentViewers,
+// which many SB versions never emit under wildcard subscribe — leaving the
+// YT chip frozen at "–"/0 for whole streams. Same result contract as the
+// other fetch-*-viewers handlers: number = live count, 0 = confirmed not
+// live, null = transient/parse failure (renderer keeps prior value).
+ipcMain.handle('fetch-youtube-viewers', async (event, videoId) => {
+  if (!videoId) return null;
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      context: { client: { clientName: 'WEB', clientVersion: '2.20240401.00.00' } },
+      videoId: String(videoId),
+    });
+    const req = https.request({
+      hostname: 'www.youtube.com',
+      path: '/youtubei/v1/updated_metadata',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) { resolve(null); return; }
+        try {
+          const j = JSON.parse(data);
+          const actions = Array.isArray(j.actions) ? j.actions : [];
+          for (const a of actions) {
+            const r = a && a.updateViewershipAction && a.updateViewershipAction.viewCount
+              && a.updateViewershipAction.viewCount.videoViewCountRenderer;
+            if (!r) continue;
+            // isLive:false → the broadcast ended → explicit 0 so the chip and
+            // OBS overlay drop the dead count instead of freezing it.
+            if (r.isLive === false) { resolve(0); return; }
+            const vc = r.viewCount;
+            let txt = '';
+            if (vc && typeof vc.simpleText === 'string') txt = vc.simpleText;
+            else if (vc && Array.isArray(vc.runs)) txt = vc.runs.map(x => x.text || '').join('');
+            const digits = String(txt).replace(/[^0-9]/g, '');
+            if (digits) { resolve(parseInt(digits, 10)); return; }
+            // "watching now" with no digits (e.g. waiting room) → treat as 0
+            // live viewers rather than an error.
+            if (r.isLive === true) { resolve(0); return; }
+          }
+          resolve(null);
+        } catch (e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(10000, () => { req.destroy(); resolve(null); });
+    req.write(body);
+    req.end();
   });
 });
 
