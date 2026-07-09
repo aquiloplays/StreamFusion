@@ -6675,14 +6675,21 @@ function connectSB(host, port, pass) {
         if (tid) { S.twUserId = tid; saveSettings(); fetchAllEmotes(tid); } else setEmoteStatus('Connect Twitch in Streamer.bot to load emotes');
         if (twp.broadcastUserName) S.twLogin = twp.broadcastUserName.toLowerCase();
         var bvc = twp.viewerCount != null ? twp.viewerCount : twp.viewers != null ? twp.viewers : null;
-        // Freshness-gated: SB answers GetBroadcaster from its own cache, so
-        // this number can be minutes old — only accept it when our poll/event
-        // sources haven't delivered anything fresher recently, otherwise the
-        // count visibly jumps backwards every GetBroadcaster tick.
-        if (bvc != null && (Date.now() - (_lastViewerUpdate.tw || 0)) > 45000) {
+        // Yield-to-poll: SB answers GetBroadcaster from its own cache, so
+        // this number can be minutes old. Accept it ONLY while our own poll
+        // isn't running (cold start / no source) — when the poll runs it is
+        // strictly fresher, and accepting SB's sample would make the count
+        // jump backwards and re-stamp stale data as fresh (which would blind
+        // the staleness sweep). While SB is the only source, stamping is
+        // correct — it's what keeps _isPlatLive working for SB-only setups.
+        if (bvc != null && !_twViewerPoll && (Date.now() - (_lastViewerUpdate.tw || 0)) > 40000) {
           S.viewers.tw = bvc; S.twViewersFetched = true; _lastViewerUpdate.tw = Date.now(); updateViewers();
         }
-        if (S.twLogin) startTwViewerPoll();
+        // Start (never blindly restart) the poll: GetBroadcaster re-fires
+        // every 45s, and an unconditional restart here reset the poll phase
+        // each time — the immediate doFetch inside made the effective cadence
+        // 45s and the configured interval never completed a full cycle.
+        if (S.twLogin && (!_twViewerPoll || S.twLogin !== _twViewerPollLogin)) startTwViewerPoll();
         // Game name + ID extraction. SB has shipped these under MANY
         // different field shapes across versions — flat `gameName`,
         // nested `broadcast.gameName`, snake_case `game_id`, etc. We
@@ -6709,19 +6716,22 @@ function connectSB(host, port, pass) {
       var ytp = msg.platforms && msg.platforms.youtube;
       if (ytp) {
         var ytbvc = ytp.viewerCount != null ? ytp.viewerCount : ytp.viewers != null ? ytp.viewers : null;
-        // Same freshness gate + stamp as the tw branch (the missing stamp
-        // used to make _isPlatLive treat a YT-primary stream as dead after
-        // 4 minutes even while counts WERE arriving via this path).
-        if (ytbvc != null && (Date.now() - (_lastViewerUpdate.yt || 0)) > 45000) {
+        // Yield-to-poll like the tw branch: only accept SB's cached sample
+        // when the innertube poll isn't running (GetBroadcaster fires every
+        // 45s but the yt poll only stamps every 60s, so a pure time gate
+        // would let SB clobber fresher data on alternating ticks). The stamp
+        // stays — when SB is the ONLY yt source it's what keeps _isPlatLive
+        // treating a YT-primary stream as alive.
+        if (ytbvc != null && !_ytViewerPoll && (Date.now() - (_lastViewerUpdate.yt || 0)) > 40000) {
           S.viewers.yt = ytbvc; S.ytViewersFetched = true; _lastViewerUpdate.yt = Date.now(); updateViewers();
         }
       }
       var kkp = msg.platforms && msg.platforms.kick;
       if (kkp) {
         var kkbvc = kkp.viewerCount != null ? kkp.viewerCount : kkp.viewers != null ? kkp.viewers : null;
-        // Freshness-gated so SB's cached sample never clobbers the (much
-        // fresher) 30s slug poll; stamp added for _isPlatLive parity.
-        if (kkbvc != null && (Date.now() - (_lastViewerUpdate.kk || 0)) > 45000) {
+        // Yield-to-poll: the 30s slug poll is strictly fresher when running;
+        // SB's cache only fills in when there is no poll (no slug learned).
+        if (kkbvc != null && !_kkViewerPoll && (Date.now() - (_lastViewerUpdate.kk || 0)) > 40000) {
           S.viewers.kk = kkbvc; S.kkViewersFetched = true; _lastViewerUpdate.kk = Date.now(); updateViewers();
         }
         var kkSlug = kkp.broadcastUserName || kkp.broadcastUser || kkp.channelSlug || kkp.slug || null;
@@ -7416,7 +7426,7 @@ function _siRenderPreview() {
   el.innerHTML = '<div class="si-preview-card">'
     + box
     + '<div class="si-preview-main">'
-    +   '<div class="si-preview-top">' + (live ? '<span class="si-preview-live">LIVE</span>' : '') + (S.twViewersFetched && S.viewers && S.viewers.tw != null ? '<span class="si-preview-vc">' + esc(String(S.viewers.tw)) + ' viewers</span>' : '') + '</div>'
+    +   '<div class="si-preview-top">' + (live ? '<span class="si-preview-live">LIVE</span>' : '') + (live && S.viewers && S.viewers.tw != null ? '<span class="si-preview-vc">' + esc(String(S.viewers.tw)) + ' viewers</span>' : '') + '</div>'
     +   '<div class="si-preview-title">' + (d.title ? esc(d.title) : '<span style="opacity:.5">Your stream title…</span>') + '</div>'
     +   '<div class="si-preview-chan">' + esc(S.twLogin || 'your_channel') + '</div>'
     +   '<div class="si-preview-game">' + (d.gameName ? esc(d.gameName) : 'No category') + '</div>'
@@ -7565,7 +7575,11 @@ function _siRemoveTag(i) {
 function _siRefreshFromTwitch() { _siGetInfo(); }
 
 // ── Live indicator ────────────────────────────────────────────────────────────
-function _siIsLive() { return !!(S.twViewersFetched && S.viewers && S.viewers.tw != null); }
+// Canonical liveness, not the fetched flag: twViewersFetched now goes true
+// for a CONFIRMED-OFFLINE zero too (the explicit-0 contract), so using it as
+// a live proxy would render a LIVE badge + "0 viewers" on an offline channel.
+// _isPlatLive = viewers>0 with a fresh stamp OR recent chat activity.
+function _siIsLive() { return _isPlatLive('tw'); }
 function _siUpdateLivePulse() {
   var el = document.getElementById('si-live-pulse'); if (!el) return;
   el.style.display = _siIsLive() ? '' : 'none';
@@ -8132,7 +8146,9 @@ function _rfRenderPanel() {
   var game = S.raidFinder.gameOverride || S.twGame || '(not detected)';
   var gameId = S.raidFinder.gameIdOverride || S.twGameId || '';
   var viewers = S.viewers.tw || 0;
-  var isLive = viewers > 0 || S.twViewersFetched;
+  // twViewersFetched now also marks a confirmed-offline 0 — use the canonical
+  // liveness signal so the header shows the count only when actually live.
+  var isLive = _isPlatLive('tw');
   var rf = S.raidFinder;
 
   // Compute range display
@@ -8386,15 +8402,20 @@ async function _rfNativeRefreshGame() {
       if (c.game_id && String(c.game_id) !== '0') S.twGameId = String(c.game_id);
     }
     var st = await _rfHelix('GET', 'streams', 'user_id=' + encodeURIComponent(me));
-    var s = st.data && st.data.data && st.data.data[0];
-    // Empty data array = offline = 0 (used to keep the stale value and still
-    // mark it fetched); stamp + updateViewers so this perfectly fresh Helix
-    // number actually reaches the top bar and the OBS overlay instead of
-    // being stranded in state.
-    S.viewers.tw = s ? (s.viewer_count || 0) : 0;
-    S.twViewersFetched = true;
-    _lastViewerUpdate.tw = Date.now();
-    try { updateViewers(); } catch (e2) {}
+    // Only a healthy 2xx response is a verdict — status 0 (network/timeout)
+    // or 4xx/5xx must NOT be stamped as a fresh "offline 0", or a transient
+    // Helix blip would zero a live count and blind the freshness gate.
+    if (st && st.status >= 200 && st.status < 300) {
+      var s = st.data && st.data.data && st.data.data[0];
+      // Empty data array = offline = 0 (used to keep the stale value and
+      // still mark it fetched); stamp + updateViewers so this perfectly
+      // fresh Helix number actually reaches the top bar and the OBS overlay
+      // instead of being stranded in state.
+      S.viewers.tw = s ? (s.viewer_count || 0) : 0;
+      S.twViewersFetched = true;
+      _lastViewerUpdate.tw = Date.now();
+      try { updateViewers(); } catch (e2) {}
+    }
   } catch (e) { /* best effort */ }
   try { saveSettings(); } catch (e) {}
   var modalEl = document.getElementById('modal');
@@ -9468,11 +9489,15 @@ function startKickViewerPoll() {
 // _lastViewerUpdate so the stream-session auto-detector keeps working
 // regardless of which source triggered it).
 var _twViewerPoll = null;
+var _twViewerPollLogin = null;  // login the running poll serves — restart guard
+var _twHelixMisses = 0;         // consecutive native-branch failures
 function startTwViewerPoll() {
-  clearInterval(_twViewerPoll); _twViewerPoll = null;
+  clearInterval(_twViewerPoll); _twViewerPoll = null; _twViewerPollLogin = null;
   if (!window.electronAPI) return;
   var login = (S.twLogin || (S.twitch && S.twitch.login) || '').toLowerCase();
   if (!_rfNative() && (!login || !window.electronAPI.fetchTwitchViewers)) return;
+  _twViewerPollLogin = login || null;
+  _twHelixMisses = 0;
   function applyCount(count) {
     if (count == null) return; // transient failure — keep previous value
     S.viewers.tw = count;      // 0 = confirmed offline
@@ -9486,7 +9511,20 @@ function startTwViewerPoll() {
       // streams payload carries both, so the decapi game poll below is
       // skipped entirely on this path.
       _rfHelix('GET', 'streams', 'user_id=' + encodeURIComponent(S.twitch.userId)).then(function(st) {
-        if (!st || !st.status || st.status < 200 || st.status >= 300) return; // transient
+        if (!st || !st.status || st.status < 200 || st.status >= 300) {
+          // Transient — but signedIn is never invalidated by twitch-auth on
+          // a dead token, so a persistently failing Helix would otherwise
+          // freeze the count (then sweep it to 0) while the stream is LIVE.
+          // After 3 straight misses (~90s) run the keyless decapi fallback
+          // on each failing tick; keep trying Helix so the poll snaps back
+          // to authoritative counts the moment auth recovers.
+          _twHelixMisses++;
+          if (_twHelixMisses >= 3 && login && window.electronAPI.fetchTwitchViewers) {
+            window.electronAPI.fetchTwitchViewers(login).then(applyCount).catch(function() {});
+          }
+          return;
+        }
+        _twHelixMisses = 0;
         var s = st.data && st.data.data && st.data.data[0];
         applyCount(s ? (s.viewer_count || 0) : 0);
         if (s && s.game_name && s.game_name !== S.twGame) S.twGame = s.game_name;
@@ -9526,18 +9564,33 @@ function startTwViewerPoll() {
 // is learned from SB YouTube chat events; the poll (re)starts whenever the id
 // appears or changes.
 var _ytViewerPoll = null;
+var _ytViewerZeros = 0; // consecutive 0 results — dead-video poll cutoff
 function startYtViewerPoll() {
   clearInterval(_ytViewerPoll); _ytViewerPoll = null;
   if (!window.electronAPI || !window.electronAPI.fetchYouTubeViewers) return;
   if (!S.ytBroadcastId) return;
+  _ytViewerZeros = 0;
   function doFetch() {
     if (!S.ytBroadcastId) return;
     window.electronAPI.fetchYouTubeViewers(S.ytBroadcastId).then(function(count) {
       if (count == null) return; // transient — keep previous value
-      S.viewers.yt = count;      // 0 = broadcast ended (isLive:false)
+      S.viewers.yt = count;      // 0 = broadcast ended / no live viewers
       S.ytViewersFetched = true;
       _lastViewerUpdate.yt = Date.now();
       updateViewers();
+      // Dead-video cutoff: after ~10 minutes of straight zeros the broadcast
+      // is over (or nobody is watching a video that also stopped chatting) —
+      // stop polling the dead id instead of hitting innertube for hours. A
+      // fresh broadcast id from chat restarts the poll; the SB GetBroadcaster
+      // yield-gate also resumes feeding yt once no poll is running.
+      if (count === 0) {
+        _ytViewerZeros++;
+        if (_ytViewerZeros >= 10) {
+          clearInterval(_ytViewerPoll); _ytViewerPoll = null;
+        }
+      } else {
+        _ytViewerZeros = 0;
+      }
     }).catch(function() {});
   }
   doFetch();
@@ -9587,12 +9640,13 @@ function disconnectSB() {
   if (_rfNative() || S.twLogin) {
     startTwViewerPoll();
   } else {
-    clearInterval(_twViewerPoll); _twViewerPoll = null;
+    clearInterval(_twViewerPoll); _twViewerPoll = null; _twViewerPollLogin = null;
     S.viewers.tw = 0; S.twViewersFetched = false;
   }
   S.twGame = ''; S.twGameId = '';
   // YouTube: SB is its only id/event source — zero it.
   S.viewers.yt = 0; S.ytViewersFetched = false; S.ytBroadcastId = '';
+  S._ytIdSeen = null; // broadcast-id last-seen map (adoption quiet-window)
   // Kick: the slug poll is SB-independent — leave the count, fetched flag and
   // poll untouched (an SB blip used to blank the Kick chip for up to 60s for
   // no reason).
@@ -10004,9 +10058,20 @@ function handleSBEvent(event, data, fromES) {
     // Track the CURRENT broadcast (was once-per-session): a second YouTube
     // stream in the same app session used to keep the FIRST video's id, which
     // broke the recap link and would pin the viewer poll to a dead video.
-    if (data.broadcast && data.broadcast.id && data.broadcast.id !== S.ytBroadcastId) {
-      S.ytBroadcastId = data.broadcast.id;
-      startYtViewerPoll();
+    // Adoption is gated on the incumbent going quiet (~30s without chat) so
+    // interleaved chat from two concurrent broadcasts can't ping-pong the id
+    // and restart the innertube poll (immediate fetch) on every message.
+    if (data.broadcast && data.broadcast.id) {
+      S._ytIdSeen = S._ytIdSeen || {};
+      var _ytBid = data.broadcast.id;
+      var _ytCur = S.ytBroadcastId;
+      var _ytNow = Date.now();
+      var _ytCurQuiet = !_ytCur || !S._ytIdSeen[_ytCur] || (_ytNow - S._ytIdSeen[_ytCur]) > 30000;
+      S._ytIdSeen[_ytBid] = _ytNow;
+      if (_ytBid !== _ytCur && _ytCurQuiet) {
+        S.ytBroadcastId = _ytBid;
+        startYtViewerPoll();
+      }
     }
     var yu = data.user || data.author || data.sender || {};
     var _ytm = data.message;
@@ -10566,7 +10631,7 @@ function connectTF(port) {
   var ws = new WebSocket('ws://localhost:' + port); S.tfWS = ws;
   ws.onopen = function() { S.tfConnected = true; _tfErrShown = false; setDot('tf', 'ok'); setLbl('tf', 'TikTok \u2014 port ' + port); updateConnBtn('tf', true); sysMsg('tt', 'Tikfinity connected \u2014 TikTok active'); removeEmpty(); updateStatBar(); };
   ws.onmessage = function(e) { try { handleTFEvent(JSON.parse(e.data)); } catch(x) {} };
-  ws.onclose = function() { if (S.tfWS === ws) { var wasConn = S.tfConnected; S.tfConnected = false; if (wasConn) { addEvHistory('StreamFusion', 'TikTok (Tikfinity) disconnected \u2014 attempting to reconnect\u2026', 'tt', false); /* drop the dead TT count from chips/total/OBS now \u2014 a fresh roomUser event repopulates it seconds after the bridge returns */ S.viewers.tt = 0; S.ttViewersFetched = false; try { updateViewers(); sendOverlayStats(); } catch (e) {} } setDot('tf', 'wait'); setLbl('tf', 'Reconnecting...'); updateStatBar(); setTimeout(function() { if (S.tfWS === ws) connectTF(S.tfPort); }, 5000); } };
+  ws.onclose = function() { if (S.tfWS === ws) { var wasConn = S.tfConnected; S.tfConnected = false; if (wasConn) { addEvHistory('StreamFusion', 'TikTok (Tikfinity) disconnected \u2014 attempting to reconnect\u2026', 'tt', false); /* re-render only: the freshness gate (tfConnected=false) already drops TT from chips/total/OBS instantly, while the state keeps its value so a 5s TikFinity restart doesn't flicker the live bar; the streamEnd handler + 4-min sweep cover genuine offline */ try { updateViewers(); sendOverlayStats(); } catch (e) {} } setDot('tf', 'wait'); setLbl('tf', 'Reconnecting...'); updateStatBar(); setTimeout(function() { if (S.tfWS === ws) connectTF(S.tfPort); }, 5000); } };
   ws.onerror = function() { if (!S.tfConnected) { setDot('tf', 'off'); setLbl('tf', 'Connection failed'); if (!_tfErrShown && S.useTF) { _tfErrShown = true; sysMsg('tt', 'Tikfinity failed on port ' + port + ' \u2014 will keep retrying.'); } updateConnBtn('tf', false); updateStatBar(); } };
 }
 function disconnectTF() {

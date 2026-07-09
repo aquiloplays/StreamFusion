@@ -1499,12 +1499,20 @@ ipcMain.handle('fetch-twitch-viewers', async (event, login) => {
       let data = '';
       res.on('data', d => data += d);
       res.on('end', () => {
+        // Non-2xx = decapi/Cloudflare error page, never an offline verdict —
+        // without this gate a '521 Web server is down' HTML body could text-
+        // match the offline phrasings below and zero a live count.
+        if (res.statusCode < 200 || res.statusCode >= 300) { resolve(null); return; }
         const txt = String(data).trim();
-        const n = parseInt(txt, 10);
-        if (isFinite(n) && n >= 0) { resolve(n); return; }
-        // decapi's offline/invalid responses are short English sentences —
-        // treat them as an explicit offline 0, not a transient failure.
-        if (/not live|offline|not found|no user|error/i.test(txt)) { resolve(0); return; }
+        // Strict integer match so status-text bodies ('502 Bad Gateway')
+        // can never parse as a viewer count.
+        if (/^\d+$/.test(txt)) { resolve(parseInt(txt, 10)); return; }
+        // decapi's GENUINE offline/invalid responses ('<user> is offline',
+        // 'User not found: <user>') → explicit 0. Deliberately NOT matching
+        // 'error': decapi's transient upstream failures are 200 bodies like
+        // '[Error from Twitch API] ...' and must stay transient (null) so the
+        // renderer keeps the previous value instead of zeroing a live count.
+        if (/not live|offline|not found|no user/i.test(txt)) { resolve(0); return; }
         resolve(null);
       });
     });
@@ -1525,7 +1533,9 @@ ipcMain.handle('fetch-youtube-viewers', async (event, videoId) => {
   if (!videoId) return null;
   return new Promise((resolve) => {
     const body = JSON.stringify({
-      context: { client: { clientName: 'WEB', clientVersion: '2.20240401.00.00' } },
+      // hl:'en' pins the response language so the text heuristics below
+      // ('watching', 'views') are deterministic regardless of system locale.
+      context: { client: { clientName: 'WEB', clientVersion: '2.20240401.00.00', hl: 'en' } },
       videoId: String(videoId),
     });
     const req = https.request({
@@ -1556,11 +1566,26 @@ ipcMain.handle('fetch-youtube-viewers', async (event, videoId) => {
             let txt = '';
             if (vc && typeof vc.simpleText === 'string') txt = vc.simpleText;
             else if (vc && Array.isArray(vc.runs)) txt = vc.runs.map(x => x.text || '').join('');
+            const label = (r.viewCountLabel && r.viewCountLabel.simpleText) || '';
+            // Digits are only trusted as a LIVE count when isLive:true — for
+            // an ended broadcast the renderer comes back with isLive ABSENT
+            // and viewCount "N views" (the cumulative VOD total). Trusting
+            // digits blindly there would report thousands of phantom live
+            // viewers and re-stamp them fresh every poll, permanently
+            // defeating the staleness sweep.
+            if (r.isLive !== true) {
+              // Ended/never-live shape: "N views" text or a "Views" label →
+              // explicit offline 0. Anything unrecognised → transient null
+              // (renderer keeps prior value; the 4-min sweep zeroes it).
+              if (/view/i.test(label) || /\bviews?\b/i.test(txt)) { resolve(0); return; }
+              resolve(null); return;
+            }
+            // Waiting room: "N waiting" is people waiting, not live viewers.
+            if (/\bwaiting\b/i.test(txt)) { resolve(0); return; }
             const digits = String(txt).replace(/[^0-9]/g, '');
             if (digits) { resolve(parseInt(digits, 10)); return; }
-            // "watching now" with no digits (e.g. waiting room) → treat as 0
-            // live viewers rather than an error.
-            if (r.isLive === true) { resolve(0); return; }
+            // Live with no digits yet → 0 live viewers, not an error.
+            resolve(0); return;
           }
           resolve(null);
         } catch (e) { resolve(null); }
