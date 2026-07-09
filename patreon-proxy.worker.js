@@ -517,6 +517,9 @@ const BROADCASTER_CONNECT_SCOPES = [
   // mirrors the channel's Twitch mods into the Warden team). Added
   // 2026-07-07; streamers who connected earlier need one reconnect.
   'moderation:read',
+  // Mod management from the dock (add/remove Twitch moderators) + Warden
+  // Shield Mode + AutoMod queue. Added 2026-07-08; needs one reconnect.
+  'channel:manage:moderators', 'moderator:manage:shield_mode', 'moderator:manage:automod',
   'channel:manage:raids', 'clips:edit',
   'channel:manage:broadcast', 'channel:manage:ads', 'channel:edit:commercial'
 ].join(' ');
