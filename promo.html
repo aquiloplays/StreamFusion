@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>StreamFusion — Promo Overlay (for OBS capture)</title>
+<title>StreamFusion Promo Overlay (for OBS capture)</title>
 <style>
 :root{
   /* aquilo.gg brand tokens — promo overlay variant (OBS-capture).
@@ -893,7 +893,7 @@ function applyClickThrough(enabled) {
   if (btn) {
     btn.classList.toggle('lock-on', enabled);
     btn.innerHTML = enabled ? '&#128274;' : '&#128275;';
-    btn.title = enabled ? 'Locked — click to unlock' : 'Lock overlay (mouse passes through)';
+    btn.title = enabled ? 'Locked: click to unlock' : 'Lock overlay (mouse passes through)';
   }
   // Notify main process so the main app header lock icon stays in sync
   if (api.overlayLockChanged) api.overlayLockChanged(enabled);

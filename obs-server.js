@@ -208,7 +208,7 @@ function landingPage() {
            '<code>' + r.hosted + '</code>' +
            '<div class="legacy">Legacy (still works via redirect): <code class="muted">' + r.legacy + '</code></div></li>';
   }).join('');
-  return '<!doctype html><html><head><meta charset="utf-8"><title>StreamFusion — OBS Overlays</title>' +
+  return '<!doctype html><html><head><meta charset="utf-8"><title>StreamFusion OBS Overlays</title>' +
          '<style>body{font-family:Geist,"Geist Sans",-apple-system,Segoe UI,sans-serif;background:#0a0b12;color:#ffffff;padding:32px;max-width:680px;margin:0 auto}' +
          'h1{font-size:20px;font-weight:800;letter-spacing:-0.01em;margin:0 0 4px} .sub{color:#94a3b8;margin:0 0 22px;font-size:13px;line-height:1.55}' +
          '.sub a{color:#9a82ff;text-decoration:none} .sub a:hover{text-decoration:underline}' +

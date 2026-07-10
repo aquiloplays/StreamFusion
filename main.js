@@ -209,12 +209,12 @@ function _isReservedPopoutAccel(accel) {
   if (lower === 'alt+f4')                return 'Alt+F4 is a system close shortcut and cannot be reassigned.';
   if (lower === 'ctrl+alt+delete')       return 'Ctrl+Alt+Delete is reserved by the operating system.';
   if (lower.indexOf('super') === 0)      return 'The Windows / Super key cannot be remapped from inside the app.';
-  if (lower === 'f1')                    return 'F1 opens Windows Help — pick a different key.';
+  if (lower === 'f1')                    return 'F1 opens Windows Help. Pick a different key.';
   // Pure modifier (or empty key part) — Electron rejects these but we
   // give a friendlier message.
   var parts = a.split('+');
   var key = parts[parts.length - 1];
-  if (!key) return 'No final key — combo must end with a real key.';
+  if (!key) return 'No final key: combo must end with a real key.';
   var KEYWORDS = ['Control', 'Ctrl', 'CommandOrControl', 'CmdOrCtrl', 'Cmd', 'Command', 'Shift', 'Alt', 'Option', 'Meta', 'Super'];
   if (KEYWORDS.indexOf(key) !== -1) return 'Combo must include a non-modifier key (letter, digit, or F-key).';
   // Plain letters/digits without any modifier would swallow normal typing.
@@ -677,7 +677,7 @@ function createTray() {
   }
 
   tray = new Tray(trayIcon);
-  tray.setToolTip('StreamFusion v' + app.getVersion() + ' — Running');
+  tray.setToolTip('StreamFusion v' + app.getVersion() + ' (Running)');
 
   // Tray menu is rebuilt whenever a downloaded update arrives so the
   // "Install Update Now" item can appear without restarting the app.
@@ -981,8 +981,8 @@ function maybeShowLegacyBetaNotice() {
       title: 'StreamFusion Beta is merged into the main app',
       message: 'StreamFusion 1.6 merges the Beta install into the main app.',
       detail:
-        'Early Access features now unlock the moment you sign in with Patreon — ' +
-        'no separate StreamFusion Beta download needed.\n\n' +
+        'Early Access features now unlock the moment you sign in with Patreon. ' +
+        'No separate StreamFusion Beta download needed.\n\n' +
         'You still have the old StreamFusion Beta install on this machine. ' +
         'It\'s safe to leave it (it just sits unused), but you can remove it ' +
         'to clean up your taskbar / Start Menu / disk space.\n\n' +
@@ -2429,7 +2429,7 @@ function createPromoWindow(opts) {
     height: opts.height || 720,
     minWidth: 380,
     minHeight: 480,
-    title: 'StreamFusion — Promo Overlay (for OBS capture)',
+    title: 'StreamFusion Promo Overlay (for OBS capture)',
     frame: true,             // visible chrome so streamers can move/close it
     resizable: true,
     alwaysOnTop: false,       // not on top — it's meant to be captured, not watched
