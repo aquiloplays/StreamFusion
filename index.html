@@ -515,6 +515,9 @@ body.has-sf-notice { padding-top: 42px !important; }
 .ev-item.rotation{border-color:#1db954;background:rgba(29,185,84,.08)}
 .ev-item.rotation .ev-item-user{color:#1db954}
 .ev-item.rotation .ev-pico{background:#1db954;color:#0a0b12}
+.ev-item.counter{border-color:#9a82ff;background:rgba(154,130,255,.08)}
+.ev-item.counter .ev-item-user{color:#9a82ff}
+.ev-item.counter .ev-pico{background:#9a82ff;color:#0a0b12}
 .ev-body{flex:1;min-width:0}
 .ev-item-user{font-weight:700;color:var(--ev);font-size:17px}
 .ev-item-text{color:var(--txt);line-height:1.5;margin-top:3px;font-size:17px}
@@ -2298,6 +2301,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="ccard tt" id="ccard-tf"><div class="sdot off" id="dot-tf"></div><div class="lbl">Tikfinity<small id="lbl-tf">TikTok LIVE</small></div><button class="cbtn tt" id="btn-tf" onclick="openModal('tf')">Connect</button></div>
             <div class="ccard" id="ccard-rotation" style="--accent:#1db954;"><div class="sdot off" id="dot-rotation"></div><div class="lbl">Rotation Widget<small id="lbl-rotation">Song events from widget.aquilo.gg</small></div><button class="cbtn" id="btn-rotation" onclick="openRotationRelayConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
             <div class="ccard" id="ccard-jukebox" style="--accent:#1db954;"><div class="sdot off" id="dot-jukebox"></div><div class="lbl">Jukebox<small id="lbl-jukebox">Now-playing from aquilo.gg/jukebox</small></div><button class="cbtn" id="btn-jukebox" onclick="openJukeboxConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
+            <div class="ccard" id="ccard-counter" style="--accent:#9a82ff;"><div class="sdot off" id="dot-counter"></div><div class="lbl">Counters<small id="lbl-counter">Counter changes from aquilo.gg/counters</small></div><button class="cbtn" id="btn-counter" onclick="openCounterFeedConfig()" style="background:#9a82ff;color:#0a0b12">Connect</button></div>
           </div>
           <div class="sec" id="sec-rotation-relay" style="display:none">
             <div class="sec-hd" style="color:#1db954">Rotation Widget</div>
@@ -2329,6 +2333,17 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             </div>
             <div id="jukebox-status-line" style="font-size:10.5px;color:var(--mut);margin-top:6px;min-height:14px"></div>
             <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:6px">Uses the same "Show now-playing bar" toggle as Rotation, above. Playback buttons stay off (the cloud feed is read-only — control songs from Jukebox chat commands).</div>
+          </div>
+          <div class="sec" id="sec-counter-feed" style="display:none">
+            <div class="sec-hd" style="color:#9a82ff">Counters</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Shows every change to your <a href="https://aquilo.gg/counters/" target="_blank" style="color:#9a82ff">Counters</a> (deaths, push-ups, etc.) as a row in the events feed — however you bump them (dock, Stream Deck, chat, or link). Read-only: this only <em>watches</em> counters, it never changes them.</div>
+            <label class="frow" style="margin-bottom:6px"><span>Enable Counter events</span><input type="checkbox" id="counter-feed-enabled" onchange="onCounterFeedToggle(this.checked)"></label>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">Reuses your <strong>Jukebox</strong> read key automatically — connect Jukebox above and this just works. To use a different channel, paste a counter feed URL from aquilo.gg/bot below.</div>
+            <div style="display:flex;gap:5px;align-items:center">
+              <input class="minput" id="counter-feed-url" placeholder="(optional) https://rotation-bot.aquiloplays.workers.dev/api/counter?key=..." style="font-size:11px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
+              <button class="cbtn" onclick="onCounterFeedApplyUrl()" style="background:#9a82ff;color:#0a0b12;font-size:11px;height:28px;padding:0 12px">Save</button>
+            </div>
+            <div id="counter-feed-status-line" style="font-size:10.5px;color:var(--mut);margin-top:6px;min-height:14px"></div>
           </div>
           <div class="sec">
             <div class="sec-hd">Show Platforms</div>
@@ -5956,7 +5971,7 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
     else if (plat === 'yt' && /^[a-z0-9_-]{1,40}$/.test(_evUserKey)) _unaSlug = 'youtube/' + encodeURIComponent(_evUserKey);
     if (_unaSlug) avSrc = 'https://unavatar.io/' + _unaSlug;
   }
-  var _evPlatSvgs = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>',rotation:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/></svg>'};
+  var _evPlatSvgs = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>',rotation:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.214c3.809-.871 7.077-.496 9.713 1.114a.623.623 0 0 1 .206.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 1 1-.452-1.491c3.632-1.103 8.147-.568 11.232 1.328a.781.781 0 0 1 .257 1.072zm.105-2.835C14.692 8.857 9.375 8.682 6.331 9.608a.935.935 0 1 1-.542-1.788c3.493-1.06 9.348-.852 13.005 1.323a.937.937 0 1 1-.95 1.62l-.014.001z"/></svg>',counter:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9h16v2H4zm0 4h16v2H4zM7 5l-1 14h2l1-14zm9 0l-1 14h2l1-14z"/></svg>'};
   var _sfBoltSvg = '<svg viewBox="0 0 24 24"><defs><linearGradient id="sfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9a82ff"/><stop offset="100%" stop-color="#5bff95"/></linearGradient></defs><path fill="url(#sfg)" d="M13 2L3 14h7l-1 8 11-14h-7l1-6z"/></svg>';
   var isSFSystem = (user === 'StreamFusion');
   var picoSvg = isSFSystem ? _sfBoltSvg : (_evPlatSvgs[plat] || '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>');
@@ -5970,7 +5985,7 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
   }
   var isRealUser = user && user !== 'System' && user !== 'Moderation' && user !== 'Stream' && user !== 'Hype Train' && user !== 'StreamFusion';
   var actHtml = '';
-  if (isRealUser) {
+  if (isRealUser && plat !== 'counter') {
     actHtml = '<div class="ev-actions">';
     if (plat === 'tw') actHtml += '<button class="ev-so-btn" onclick="quickShoutout(\'' + escA(user) + '\')">Shoutout</button>';
     actHtml += '<button class="ev-reply-btn" onclick="replyTo(\'' + escA(user) + '\')">Reply</button>';
@@ -12001,6 +12016,91 @@ function openJukeboxConfig() { var s = document.getElementById('sec-jukebox'); i
     var el = document.getElementById('jukebox-feed-url'); if (el) el.value = url;
     var dot = document.getElementById('dot-jukebox'); if (dot && url) dot.className = 'sdot on';
     if (url) _jbFeedStart();
+  } catch (e) {}
+})();
+
+// ---- Counters feed (aquilo.gg/counters) → events history ----
+// Polls the same rotation-bot Worker the Jukebox feed does, but /api/counter,
+// every 5s, and turns each counter value change into its own 'counter' row in
+// the events history — however the streamer bumped it (dock / Stream Deck /
+// chat / link). Read-only (feedKey), self-contained: own localStorage keys.
+// Reuses the Jukebox feedKey when present so there's nothing extra to paste.
+var _cfFeedTimer = null;
+var _cfLast = null;   // null = not seeded yet; {} after the first poll (so we
+                      // don't dump every counter as a "change" on startup)
+function _counterFeedEnabled() { try { return localStorage.getItem('sf-counter-feed-on') === '1'; } catch (e) { return false; } }
+function _counterFeedUrl() {
+  // Explicit override wins; otherwise derive from the Jukebox feed URL — same
+  // rotation-bot feedKey (read-only). No &c= → the Worker returns all counters.
+  try { var ov = localStorage.getItem('sf-counter-feed') || ''; if (ov) return ov; } catch (e) {}
+  var jb = _jbFeedUrl();
+  var m = jb.match(/[?&]key=([^&]+)/);
+  if (!m) return '';
+  return jb.split('/api/')[0] + '/api/counter?key=' + m[1];
+}
+function _counterFeedPoll() {
+  if (!_counterFeedEnabled()) return;
+  var url = _counterFeedUrl(); if (!url) return;
+  fetch(url, { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !Array.isArray(d.counters)) return;
+      var seeding = (_cfLast === null);
+      if (seeding) _cfLast = {};
+      d.counters.forEach(function (c) {
+        if (!c || !c.id) return;
+        var v = Number(c.value);
+        if (isNaN(v)) return;
+        var prev = _cfLast[c.id];
+        if (!seeding && prev !== undefined && v !== prev) {
+          var delta = v - prev;
+          var dtxt = delta > 0 ? ' (+' + delta + ')' : ' (' + delta + ')';
+          try { if (typeof addEvHistory === 'function') addEvHistory(c.label || 'Counter', '→ ' + v + dtxt, 'counter', false, null, '', ''); } catch (e) {}
+        }
+        _cfLast[c.id] = v;
+      });
+      var st = document.getElementById('counter-feed-status-line');
+      if (st) st.textContent = 'Connected — watching ' + d.counters.length + ' counter' + (d.counters.length === 1 ? '' : 's') + '.';
+      var dot = document.getElementById('dot-counter'); if (dot) dot.className = 'sdot on';
+    })
+    .catch(function () { var dot = document.getElementById('dot-counter'); if (dot) dot.className = 'sdot wait'; });
+}
+function _counterFeedStart() { if (_cfFeedTimer) return; if (!_counterFeedEnabled() || !_counterFeedUrl()) return; _cfLast = null; _cfFeedTimer = setInterval(_counterFeedPoll, 5000); _counterFeedPoll(); }
+function _counterFeedStop() { if (_cfFeedTimer) { clearInterval(_cfFeedTimer); _cfFeedTimer = null; } }
+function openCounterFeedConfig() {
+  try { switchSettingsTab('connections'); } catch (e) {}
+  var s = document.getElementById('sec-counter-feed');
+  if (s) { s.style.display = ''; s.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+function onCounterFeedToggle(on) {
+  try { localStorage.setItem('sf-counter-feed-on', on ? '1' : '0'); } catch (e) {}
+  _counterFeedStop();
+  var st = document.getElementById('counter-feed-status-line');
+  var dot = document.getElementById('dot-counter');
+  if (on) {
+    if (!_counterFeedUrl()) { if (st) st.textContent = 'Connect Jukebox above first (counters reuse its read key), or paste a counter feed URL below.'; if (dot) dot.className = 'sdot off'; return; }
+    _counterFeedStart();
+    if (st) st.textContent = 'Enabled — counter changes will appear in your events feed.';
+    if (dot) dot.className = 'sdot on';
+  } else {
+    if (st) st.textContent = 'Disabled.'; if (dot) dot.className = 'sdot off';
+  }
+}
+function onCounterFeedApplyUrl() {
+  var el = document.getElementById('counter-feed-url');
+  var url = el ? String(el.value || '').trim() : '';
+  try { localStorage.setItem('sf-counter-feed', url); } catch (e) {}
+  _counterFeedStop();
+  if (_counterFeedEnabled()) _counterFeedStart();
+  var st = document.getElementById('counter-feed-status-line');
+  if (st) st.textContent = url ? 'Saved a custom counter feed URL.' : 'Cleared — using your Jukebox read key.';
+}
+(function () {
+  try {
+    var cb = document.getElementById('counter-feed-enabled'); if (cb) cb.checked = _counterFeedEnabled();
+    var el = document.getElementById('counter-feed-url'); if (el) { try { el.value = localStorage.getItem('sf-counter-feed') || ''; } catch (e) {} }
+    var dot = document.getElementById('dot-counter');
+    if (_counterFeedEnabled() && _counterFeedUrl()) { if (dot) dot.className = 'sdot on'; _counterFeedStart(); }
   } catch (e) {}
 })();
 function _ciToggleFeed() {
