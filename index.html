@@ -2302,6 +2302,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="ccard" id="ccard-rotation" style="--accent:#1db954;"><div class="sdot off" id="dot-rotation"></div><div class="lbl">Rotation Widget<small id="lbl-rotation">Song events from widget.aquilo.gg</small></div><button class="cbtn" id="btn-rotation" onclick="openRotationRelayConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
             <div class="ccard" id="ccard-jukebox" style="--accent:#1db954;"><div class="sdot off" id="dot-jukebox"></div><div class="lbl">Jukebox<small id="lbl-jukebox">Now-playing from aquilo.gg/jukebox</small></div><button class="cbtn" id="btn-jukebox" onclick="openJukeboxConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
             <div class="ccard" id="ccard-counter" style="--accent:#9a82ff;"><div class="sdot off" id="dot-counter"></div><div class="lbl">Counters<small id="lbl-counter">Counter changes from aquilo.gg/counters</small></div><button class="cbtn" id="btn-counter" onclick="openCounterFeedConfig()" style="background:#9a82ff;color:#0a0b12">Connect</button></div>
+            <div class="ccard" id="ccard-penance" style="--accent:#9a82ff;"><div class="sdot off" id="dot-penance"></div><div class="lbl">Penance<small id="lbl-penance">Auto push-ups from follows/subs/hype</small></div><button class="cbtn" id="btn-penance" onclick="openPenanceConfig()" style="background:#9a82ff;color:#0a0b12">Set up</button></div>
           </div>
           <div class="sec" id="sec-rotation-relay" style="display:none">
             <div class="sec-hd" style="color:#1db954">Rotation Widget</div>
@@ -2344,6 +2345,21 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <button class="cbtn" onclick="onCounterFeedApplyUrl()" style="background:#9a82ff;color:#0a0b12;font-size:11px;height:28px;padding:0 12px">Save</button>
             </div>
             <div id="counter-feed-status-line" style="font-size:10.5px;color:var(--mut);margin-top:6px;min-height:14px"></div>
+          </div>
+          <div class="sec" id="sec-penance" style="display:none">
+            <div class="sec-hd" style="color:#9a82ff">Penance — auto push-ups</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Adds push-ups to your <a href="https://aquilo.gg/counters/" target="_blank" style="color:#9a82ff">push-ups counter</a> from stream events, while StreamFusion is open: <strong>follow +10</strong> (Twitch/Kick/YouTube, each) · <strong>Twitch sub +15/+25/+35</strong> (T1/T2/T3, resubs too) · <strong>Kick sub +20</strong> · <strong>YouTube member +15</strong> · gift subs count per gift (capped per bomb) · <strong>hype train +25/+50/+100</strong> per level (L1–4/5–8/9+). Your push-ups→lifetime link keeps the lifetime total in sync.</div>
+            <label class="frow" style="margin-bottom:6px"><span>Enable auto push-ups</span><input type="checkbox" id="penance-enabled" onchange="onPenanceToggle(this.checked)"></label>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">Push-ups counter <strong>bump URL</strong> — on aquilo.gg/counters, open your push-ups counter and copy its Stream Deck / bump link (it has your key + <code>&amp;c=</code>). This writes to the counter, so keep it private.</div>
+            <div style="display:flex;gap:5px;align-items:center">
+              <input class="minput" id="penance-url" placeholder="https://jukebox.aquilo.gg/api/counter/bump?key=...&amp;c=..." style="font-size:11px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
+              <button class="cbtn" onclick="onPenanceApplyUrl()" style="background:#9a82ff;color:#0a0b12;font-size:11px;height:28px;padding:0 12px">Save</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+              <span style="font-size:11px;color:var(--mut)">Gift-bomb cap (max push-ups per bomb)</span>
+              <input class="minput" id="penance-cap" type="number" min="1" value="100" onchange="onPenanceApplyCap()" style="font-size:11px;padding:4px 6px;width:70px;background:var(--surf2)">
+            </div>
+            <div id="penance-status-line" style="font-size:10.5px;color:var(--mut);margin-top:8px;min-height:14px"></div>
           </div>
           <div class="sec">
             <div class="sec-hd">Show Platforms</div>
@@ -12103,6 +12119,111 @@ function onCounterFeedApplyUrl() {
     if (_counterFeedEnabled() && _counterFeedUrl()) { if (dot) dot.className = 'sdot on'; _counterFeedStart(); }
   } catch (e) {}
 })();
+
+// ---- Penance: auto-add push-ups from stream events (aquilo.gg/counters) ----
+// Follows/subs/gifts/hype on any platform add push-ups to the push-ups counter
+// via its keyed bump URL. Fires from penanceTap(), hooked at the TOP of
+// printerPost so it sees every normalized follow/sub/gift/hype event WITHOUT
+// depending on the printer being enabled. Bump is best-effort (CORS-open GET).
+// The existing push-ups -> lifetime counter link keeps lifetime in sync
+// server-side. Own localStorage keys; OFF by default.
+//   Rules: follow +10 (tw/kk/yt each) · Twitch sub/resub +15/+25/+35 (T1/T2/T3)
+//   · Kick sub +20 · YouTube member +15 · gift subs count per gift, capped per
+//   bomb (default 100) · hype train +25/+50/+100 per level (L1-4/5-8/9+).
+function _penanceEnabled() { try { return localStorage.getItem('sf-penance-on') === '1'; } catch (e) { return false; } }
+function _penanceUrl() { try { return (localStorage.getItem('sf-penance-url') || '').trim(); } catch (e) { return ''; } }
+function _penanceGiftCap() { try { var v = parseInt(localStorage.getItem('sf-penance-cap') || '', 10); if (v > 0) return v; } catch (e) {} return 100; }
+function _twSubPush(tierName) {
+  var t = String(tierName || '');
+  if (t.indexOf('3') >= 0) return 35;   // Tier 3
+  if (t.indexOf('2') >= 0) return 25;   // Tier 2
+  return 15;                            // Tier 1 / Prime / unknown
+}
+function _hypeLevelPush(lvl) {
+  var n = Number(lvl) || 1;
+  if (n >= 9) return 100;
+  if (n >= 5) return 50;
+  return 25;                            // levels 1-4
+}
+// Returns { push:<number>, why:<string> } for an event, or null if it earns none.
+function _penanceForEvent(o) {
+  if (!o || o.plat === 'tt' || o.plat === 'sys') return null;   // TikTok + system excluded
+  var plat = o.plat, kind = o.kind;
+  var platName = plat === 'tw' ? 'Twitch' : plat === 'kk' ? 'Kick' : plat === 'yt' ? 'YouTube' : plat;
+  if (kind === 'follow') return { push: 10, why: platName + ' follow' };
+  if ((kind === 'sub' || kind === 'resub') && plat === 'tw') return { push: _twSubPush(o.tier), why: 'Twitch ' + (kind === 'resub' ? 'resub' : 'sub') + (o.tier ? ' · ' + o.tier : '') };
+  if (kind === 'sub' && plat === 'kk') return { push: 20, why: 'Kick sub' };
+  if (kind === 'member' && plat === 'yt') return { push: 15, why: 'YouTube member' };
+  if (kind === 'gift1') {
+    if (plat === 'tw') return { push: 15, why: 'Twitch gift sub' };
+    if (plat === 'kk') return { push: 20, why: 'Kick gift sub' };
+    return null;   // yt single gift comes through as 'bomb' with a count
+  }
+  if (kind === 'bomb') {
+    var per = plat === 'kk' ? 20 : 15;   // tw gift subs + yt gift memberships = 15, kk = 20
+    var n = Math.max(1, Number(o.count) || 1);
+    var raw = n * per, cap = _penanceGiftCap();
+    return { push: Math.min(raw, cap), why: platName + ' ' + n + ' gifts' + (raw > cap ? ' (capped ' + cap + ')' : '') };
+  }
+  if (kind === 'hype' && plat === 'tw') {
+    if (o.phase === 'start' || o.phase === 'levelup') return { push: _hypeLevelPush(o.level), why: 'Hype train L' + (Number(o.level) || 1) };
+    return null;   // 'end' adds nothing — each level already counted at start/levelup
+  }
+  return null;
+}
+function penanceTap(o) {
+  try {
+    if (!_penanceEnabled()) return;
+    var base = _penanceUrl(); if (!base) return;
+    var r = _penanceForEvent(o);
+    if (!r || !(r.push > 0)) return;
+    var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'op=' + encodeURIComponent('+' + r.push);
+    fetch(url, { method: 'GET', cache: 'no-store', keepalive: true }).catch(function () {});
+    var st = document.getElementById('penance-status-line');
+    if (st) st.textContent = 'Last: +' + r.push + ' · ' + r.why + ' · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {}
+}
+function openPenanceConfig() {
+  try { switchSettingsTab('connections'); } catch (e) {}
+  var s = document.getElementById('sec-penance');
+  if (s) { s.style.display = ''; s.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+function _penanceRefreshDot() {
+  var dot = document.getElementById('dot-penance');
+  if (dot) dot.className = 'sdot ' + (_penanceEnabled() && _penanceUrl() ? 'on' : 'off');
+}
+function onPenanceToggle(on) {
+  try { localStorage.setItem('sf-penance-on', on ? '1' : '0'); } catch (e) {}
+  var st = document.getElementById('penance-status-line');
+  if (on && !_penanceUrl()) { if (st) st.textContent = 'Paste your push-ups bump URL below to arm it.'; }
+  else if (st) st.textContent = on ? 'Armed — stream events will add push-ups.' : 'Disabled.';
+  _penanceRefreshDot();
+}
+function onPenanceApplyUrl() {
+  var el = document.getElementById('penance-url');
+  var url = el ? String(el.value || '').trim() : '';
+  try { localStorage.setItem('sf-penance-url', url); } catch (e) {}
+  var st = document.getElementById('penance-status-line');
+  if (st) st.textContent = url ? (_penanceEnabled() ? 'Armed — stream events will add push-ups.' : 'Saved. Toggle on to arm.') : 'Cleared.';
+  _penanceRefreshDot();
+}
+function onPenanceApplyCap() {
+  var el = document.getElementById('penance-cap');
+  var v = el ? parseInt(el.value, 10) : NaN;
+  var cap = v > 0 ? v : 100;
+  try { localStorage.setItem('sf-penance-cap', cap + ''); } catch (e) {}
+  if (el) el.value = cap;
+  var st = document.getElementById('penance-status-line');
+  if (st) st.textContent = 'Gift-bomb cap set to ' + cap + ' push-ups.';
+}
+(function () {
+  try {
+    var cb = document.getElementById('penance-enabled'); if (cb) cb.checked = _penanceEnabled();
+    var el = document.getElementById('penance-url'); if (el) el.value = _penanceUrl();
+    var cap = document.getElementById('penance-cap'); if (cap) cap.value = _penanceGiftCap();
+    _penanceRefreshDot();
+  } catch (e) {}
+})();
 function _ciToggleFeed() {
   var on = !!((document.getElementById('ci-show-in-feed') || {}).checked);
   try { localStorage.setItem('sf-ci-feed', on ? '1' : '0'); } catch (e) {}
@@ -16047,6 +16168,9 @@ function _printerScheduleDigest() {
 // recipients, recipient, bits, coins, usd, amountText, giftName, giftImage,
 // viewers, reward, cost, actionText, bannerText }
 function printerPost(o) {
+  // Penance auto-push-ups tap — own try so it can never affect printing, and
+  // runs BEFORE the printer-enabled gate below so it works with the printer off.
+  try { penanceTap(o); } catch (e) {}
   try {
     if (!_printerGate || !printerCfg.enabled || !o) return;
     if (o.plat !== 'sys' && !printerCfg.plats[o.plat]) return;
