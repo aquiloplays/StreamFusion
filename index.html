@@ -10056,17 +10056,39 @@ function handleSBEvent(event, data, fromES) {
     sendObsAlert({ eventType: 'channelPoints', platform: 'tw', user: ren, rewardName: (rtitle && rtitle !== '?') ? rtitle : '', message: _redeemMsg || '' });
     printerPost({ kind: 'redeem', plat: 'tw', user: ren, avatar: _resolveEvAvatar('tw', data.user || data.redeemer, ren), reward: (rtitle && rtitle !== '?') ? rtitle : 'reward', cost: rcost, message: _redeemMsg });
   } else if (key === 'Twitch.UserBanned' || key === 'Twitch.Ban') {
-    if (chk('ev-tw-mod')) return;
     var _bt = data.targetUser || data.target || {};
     var _bn = _bt.display_name || _bt.displayName || _bt.name || _bt.login || _bt.username || _bt.userName || data.targetUserName || data.target_user_name || data.targetDisplayName || '?';
+    var _bl = _bt.login || _bt.username || _bt.userName || _bt.userLogin || data.targetUserLogin || data.target_user_login || '';
+    // Mod-sync: purge this chatter's messages from the OBS overlays. Sent
+    // BEFORE the feed-filter guard below — pruning moderated spam from the
+    // stream is independent of whether the streamer shows a feed row.
+    sendObsModeration({ platform: 'tw', action: 'purgeUser', user: _bn !== '?' ? _bn : _bl, login: _bl });
+    if (chk('ev-tw-mod')) return;
     var _br = data.reason || data.banReason || '';
     pushMsg({ plat: 'tw', isEv: true, evType: 'mod', user: 'Moderation', text: _bn + ' was banned.' + (_br ? ' Reason: ' + _br : '') });
   } else if (key === 'Twitch.UserTimedOut' || key === 'Twitch.Timeout') {
-    if (chk('ev-tw-mod')) return;
     var _tt = data.targetUser || data.target || {};
     var _tn = _tt.display_name || _tt.displayName || _tt.name || _tt.login || _tt.username || _tt.userName || data.targetUserName || data.target_user_name || data.targetDisplayName || '?';
+    var _tl = _tt.login || _tt.username || _tt.userName || _tt.userLogin || data.targetUserLogin || data.target_user_login || '';
+    sendObsModeration({ platform: 'tw', action: 'purgeUser', user: _tn !== '?' ? _tn : _tl, login: _tl });
+    if (chk('ev-tw-mod')) return;
     var _td = data.duration || data.timeoutDuration || data.timeout_duration || '?';
     pushMsg({ plat: 'tw', isEv: true, evType: 'mod', user: 'Moderation', text: _tn + ' timed out (' + _td + 's).' });
+  } else if (key === 'Twitch.ChatMessageDeleted' || key === 'Twitch.MessageDeleted' || key === 'Twitch.DeleteMessage') {
+    // Mod-sync: drop exactly the deleted message from the OBS overlays by
+    // its id. Silent on the internal feed (a single deleted line isn't a
+    // feed-worthy event); the overlay prune is the whole point.
+    var _du = data.targetUser || data.user || {};
+    var _dmid = data.messageId || data.message_id || data.msgId ||
+                (data.message && (data.message.msgId || data.message.messageId)) ||
+                data.targetMessageId || data.target_message_id || null;
+    sendObsModeration({ platform: 'tw', action: 'deleteMessage', msgId: _dmid,
+      user: _du.display_name || _du.displayName || _du.name || _du.login || '',
+      login: _du.login || _du.username || _du.userName || '' });
+  } else if (key === 'Twitch.ChatCleared' || key === 'Twitch.ClearChat' || key === 'Twitch.ChatClear') {
+    sendObsModeration({ platform: 'tw', action: 'clear' });
+    if (chk('ev-tw-mod')) return;
+    pushMsg({ plat: 'tw', isEv: true, evType: 'mod', user: 'Moderation', text: 'Chat was cleared.' });
   } else if (key === 'Twitch.PresentViewers' || key === 'Twitch.StreamUpdate' || key === 'Twitch.ViewerCountUpdate' || key === 'Twitch.ViewCountUpdate') {
     // SB sends viewer count under several possible keys depending on version.
     // ViewerCountUpdate is silent — we update the count but never push to the
@@ -15803,8 +15825,22 @@ function sendObsChat(m) {
     badges:    m.badges || [],
     emotes:    emotes,
     avatar:    m.avatar || null,
+    // msgId + login let the overlay's mod-sync target a deleted message
+    // by id and a banned/timed-out chatter by their stable login.
+    msgId:     m.msgId || null,
+    login:     m.login || null,
     ts:        Date.now()
   });
+}
+// Forwards a moderation action (message delete / ban / timeout / chat
+// clear) to the OBS chat + vertical overlays so their mod-sync removes
+// the affected messages. The overlays no-op when their modSync knob is
+// off. Chat + vertical are the only overlays with a persistent feed to
+// prune; alerts/shoutout/ticker don't need it.
+function sendObsModeration(obj) {
+  if (!window.electronAPI || !window.electronAPI.obsBroadcastModeration) return;
+  if (!obj || !obj.action) return;
+  window.electronAPI.obsBroadcastModeration(obj);
 }
 function sendObsAlert(obj) {
   if (!window.electronAPI || !window.electronAPI.obsBroadcastAlert) return;

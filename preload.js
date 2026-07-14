@@ -170,9 +170,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // payload object; data contracts live in the hosted overlay sources
   // at aquilo-site/public/sf/overlay/*/index.html (the bundled
   // obs-overlays/ copies were migrated to aquilo.gg on 2026-06-09).
-  obsBroadcastChat:     (data)        => ipcRenderer.send('obs-broadcast-chat',     data || {}),
-  obsBroadcastAlert:    (data)        => ipcRenderer.send('obs-broadcast-alert',    data || {}),
-  obsBroadcastShoutout: (data)        => ipcRenderer.send('obs-broadcast-shoutout', data || {}),
+  obsBroadcastChat:       (data)      => ipcRenderer.send('obs-broadcast-chat',       data || {}),
+  obsBroadcastAlert:      (data)      => ipcRenderer.send('obs-broadcast-alert',      data || {}),
+  obsBroadcastShoutout:   (data)      => ipcRenderer.send('obs-broadcast-shoutout',   data || {}),
+  obsBroadcastModeration: (data)      => ipcRenderer.send('obs-broadcast-moderation', data || {}),
   obsBroadcastStats:    (data)        => ipcRenderer.send('obs-broadcast-stats',    data || {}),
   // Update per-overlay config (chat/alerts/shoutout). Server remembers
   // the last config and replays it to new clients so OBS sources pick up

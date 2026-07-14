@@ -1180,6 +1180,14 @@ ipcMain.on('obs-broadcast-alert', function(event, data) {
 ipcMain.on('obs-broadcast-shoutout', function(event, data) {
   try { obsServer.broadcast('shoutout', data, 'shoutout'); } catch (e) {}
 });
+ipcMain.on('obs-broadcast-moderation', function(event, data) {
+  // Moderation actions (message delete / ban / timeout / chat clear) fan
+  // out to the two overlays with a persistent message feed to prune —
+  // the horizontal chat overlay and the vertical bar. Each decides via
+  // its own modSync config whether to act; the alerts/shoutout/ticker
+  // overlays have nothing to remove.
+  try { obsServer.broadcast('moderation', data, ['chat', 'vertical']); } catch (e) {}
+});
 ipcMain.on('obs-broadcast-stats', function(event, data) {
   try { obsServer.broadcastStats(data); } catch (e) {}
 });
