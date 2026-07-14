@@ -1270,6 +1270,15 @@ body.has-sf-notice { padding-top: 42px !important; }
 .gv-winner .ic{width:16px;height:16px;color:var(--ev)}
 .gv-winner b{font-weight:800}
 .clip-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:6px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;line-height:16px}
+/* Spam collapse: ×N badge on a repeated message row */
+.msg .msg-xn{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:15px;padding:0 5px;margin-left:6px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;line-height:15px;font-variant-numeric:tabular-nums;flex-shrink:0}
+@keyframes sfXnPulse{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
+.msg.xn-pulse .msg-xn{animation:sfXnPulse .3s ease}
+@media (prefers-reduced-motion:reduce){.msg.xn-pulse .msg-xn{animation:none}}
+/* Inline translation line under a message */
+.msg .mtrans{font-size:12px;color:var(--mut);margin-top:2px;line-height:1.35}
+.msg .mtrans-arrow{opacity:.55}
+.msg .mtrans-lang{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;opacity:.7;margin-left:4px;border:1px solid var(--bdr);border-radius:6px;padding:0 4px;white-space:nowrap}
 .so-picker-list::-webkit-scrollbar{width:4px}
 .so-picker-list::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
 .so-picker-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;transition:background .1s;font-size:13px;color:var(--txt)}
@@ -2475,6 +2484,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Welcome back returning viewers <span style="opacity:.6">(banner + sound + feed on their first chat of the day)</span></span><input type="checkbox" id="welcomeBackOn" checked onchange="saveSettings()"></label>
             <div class="ev-sub-hd" style="margin-top:14px">Hide from the feed <span class="ev-sub-note">check an item to stop it showing</span></div>
             <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
+            <label class="frow"><span>Collapse repeated messages <span style="opacity:.6">(same user &amp; text &rarr; &times;N badge, not a new line)</span></span><input type="checkbox" id="spamCollapse" checked onchange="saveSettings()"></label>
+            <label class="frow"><span>&nbsp;&nbsp;&nbsp;&#8627; Also across different users <span style="opacity:.6">(emote spam &mdash; keeps the first name)</span></span><input type="checkbox" id="spamCollapseAny" onchange="saveSettings()"></label>
+            <label class="frow"><span>Translate foreign-language chat <span style="opacity:.6">(shows a translation under the message)</span></span><input type="checkbox" id="xlOn" onchange="saveSettings()"></label>
+            <div style="display:flex;align-items:center;gap:8px;padding:2px 2px 0 22px;font-size:11px;color:var(--mut)"><span>to language</span><input id="xlLang" value="en" maxlength="8" onchange="try{localStorage.setItem('sf_xl_lang',(this.value||'en').trim().toLowerCase())}catch(e){}" style="width:52px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:3px 6px;font-size:11px"><span style="opacity:.7">code: en, es, ja, pt&hellip;</span></div>
+            <label class="frow"><span>&nbsp;&nbsp;&nbsp;&#8627; Also translate plain-text messages <span style="opacity:.6">(Spanish, French&hellip; &mdash; more API calls)</span></span><input type="checkbox" id="xlAll" onchange="saveSettings()"></label>
             <div class="ev-group"><div class="ev-group-hd tw">Twitch</div>
               <label class="frow"><span>Follows</span><input type="checkbox" id="ev-tw-follow" onchange="saveSettings()"></label>
               <label class="frow"><span>Subs &amp; Resubs</span><input type="checkbox" id="ev-tw-sub" onchange="saveSettings()"></label>
@@ -2515,9 +2529,14 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="ev-group">
               <div class="ev-group-hd" style="color:var(--ev)">Third-party extensions</div>
               <label class="frow"><span>Other integration events</span><input type="checkbox" id="ev-ext-other" onchange="saveSettings()"></label>
-              <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Events from any Streamer.bot source we don't recognize (Crowd Control, custom integrations, etc.) are routed here.</div>
+              <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Events from any Streamer.bot source we don't recognize (custom integrations, etc.) are routed here. Crowd Control has its own section below.</div>
               <label class="frow"><span>Show <b>every</b> raw extension event <span style="opacity:.6">(verbose)</span></span><input type="checkbox" id="ev-ext-all" onchange="saveSettings()"></label>
               <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Surfaces <b>everything</b> a third-party source emits — including bus/housekeeping traffic (Custom actions, reward/channel/stream updates) that's normally hidden. Great for wiring up a new integration; noisy otherwise. Overrides the mute above.</div>
+            </div>
+            <div class="ev-group">
+              <div class="ev-group-hd" style="color:#f0883e">Crowd Control</div>
+              <label class="frow"><span>Effect triggers &amp; coin purchases</span><input type="checkbox" id="ev-cc" onchange="saveSettings()"></label>
+              <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Viewer effect triggers and Crowd Control coin exchanges (via the Crowd Control &rarr; Streamer.bot integration) land in the events feed as orange events.</div>
             </div>
             <div class="ev-group">
               <div class="ev-group-hd" style="color:var(--accent)">Aquilo products</div>
@@ -5714,7 +5733,7 @@ var S = {
   }
 };
 
-var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-tw-join','ev-yt-sub','ev-yt-super','ev-yt-member','ev-yt-join','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-kk-join','ev-ext-other','ev-ext-all','ev-se-tip','ev-aq','hideCmd','sfTickerOn','sfChattersOn','welcomeBackOn'];
+var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-tw-join','ev-yt-sub','ev-yt-super','ev-yt-member','ev-yt-join','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-kk-join','ev-ext-other','ev-ext-all','ev-se-tip','ev-aq','ev-cc','hideCmd','spamCollapse','spamCollapseAny','xlOn','xlAll','sfTickerOn','sfChattersOn','welcomeBackOn'];
 var SOUND_IDS = ['snd-chat','snd-tw-follow','snd-tw-sub','snd-tw-gift','snd-tw-raid','snd-tw-cheer','snd-yt-sub','snd-yt-super','snd-tt-follow','snd-tt-gift','snd-kk-follow','snd-kk-sub','snd-ext','snd-welcome','snd-se-tip','snd-kw'];
 
 var ttsEnabled = false;
@@ -9548,6 +9567,27 @@ function _twGoalTypeLabel(t) {
   if (t.indexOf('bit') >= 0 || t.indexOf('cheer') >= 0) return 'Bits goal';
   return 'Goal';
 }
+// ── Crowd Control field extractors (SB CC integration payloads) ──────────────
+var _ccSeen = {};   // requestID -> ts, so one effect isn't shown 3× (Request/Success/Timed)
+function _ccEffect(d) {
+  return (d.effect && (d.effect.name || d.effect.displayName || d.effect.title)) || d.effectName || d.effect_name || d.name || '';
+}
+function _ccName(d) {
+  return (d.requester && (d.requester.name || d.requester.displayName || d.requester.login))
+    || (d.user && (d.user.name || d.user.displayName))
+    || d.requesterName || d.userName || d.displayName || d.viewer
+    || (typeof gu === 'function' ? gu(d) : '') || '';
+}
+function _ccPrice(d) {
+  var p = (d.effect && (d.effect.price != null ? d.effect.price : d.effect.cost));
+  if (p == null) p = d.price; if (p == null) p = d.cost; if (p == null) p = d.unitPrice; if (p == null) p = d.amount;
+  var n = Number(p); return isFinite(n) && n > 0 ? n : null;
+}
+function _ccCoinAmt(d) {
+  var c = d.quantity != null ? d.quantity : d.coins != null ? d.coins : d.amount != null ? d.amount
+    : d.count != null ? d.count : d.total != null ? d.total : (d.bonus != null ? d.bonus : null);
+  var n = Number(c); return isFinite(n) ? n : null;
+}
 
 // Called from startStreamSession — fresh stream means fresh chatter
 // universe, so re-discovery is desirable.
@@ -11087,6 +11127,50 @@ function handleSBEvent(event, data, fromES) {
     // Refresh the Helix schedule shortly after the break ends to pick up the
     // next_ad_at for the following roll.
     setTimeout(function () { try { adRefreshSchedule(); } catch (e) {} }, (_adSecs + 3) * 1000);
+  } else if (/crowd\s*control/i.test(src)) {
+    // Crowd Control (via its Streamer.bot integration). Two things funnel into
+    // the events feed: coin exchanges (viewers buying/earning CC coins) and
+    // effect triggers. Field names follow the SB CC trigger docs (effect.name,
+    // effect.price, requester.name, requestID, coinType, exchangeSource) with
+    // fallbacks; unrecognized shapes are logged so the mapping can be tightened.
+    if (chk('ev-cc')) return;
+    var _ccType = type || '';
+    if (/coin|exchange/i.test(_ccType)) {
+      var _ccAnon = (data.anonymous === true || data.anonymous === 'true');
+      var _ccUser = _ccAnon ? 'Someone' : (_ccName(data) || 'Someone');
+      var _ccAmt = _ccCoinAmt(data);
+      var _ccVia = data.exchangeSource || data.source || '';
+      var _ccFree = String(data.coinType || '').toLowerCase() === 'free';
+      var _ccTxt = _ccUser + ' got ' + (_ccAmt != null ? _ccAmt + ' ' : '') + 'Crowd Control coins'
+        + (_ccVia ? ' via ' + _ccVia : '') + (_ccFree ? ' (free)' : '');
+      maybeSound('snd-ext', 'cheer');
+      // A paid coin purchase is a support moment (rare vs. effect triggers) — give
+      // it a banner + big card. Free grants stay quiet, feed-only.
+      if (!_ccFree) showBanner('i-bolt', _ccUser + ' — Crowd Control', (_ccAmt != null ? _ccAmt + ' coins' : 'bought coins') + (_ccVia ? ' · ' + _ccVia : ''), null, 'cc');
+      pushMsg({ plat: 'cc', isEv: true, evType: 'cc', big: !_ccFree, user: _ccUser, text: _ccTxt });
+      return;
+    }
+    if (/effect/i.test(_ccType) && !/fail|refund|end|update|menu|available|list/i.test(_ccType)) {
+      // Dedup by request id so the Request/Success/TimedStarted trio for one
+      // effect only produces a single feed row.
+      var _rid = data.requestID || data.requestId || (data.request && data.request.id) || '';
+      var _ccNow = Date.now();
+      if (_rid) {
+        if (_ccSeen[_rid] && _ccNow - _ccSeen[_rid] < 60000) return;
+        if (Object.keys(_ccSeen).length > 400) _ccSeen = {};
+        _ccSeen[_rid] = _ccNow;
+      }
+      var _eff = _ccEffect(data);
+      var _ecUser = _ccName(data) || 'Someone';
+      var _price = _ccPrice(data);
+      var _eTxt = _ecUser + ' triggered ' + (_eff || 'an effect') + (_price != null ? ' (' + _price + ' coins)' : '');
+      maybeSound('snd-ext', 'cheer');
+      pushMsg({ plat: 'cc', isEv: true, evType: 'cc', big: (_price != null && _price >= 500), user: _ecUser, text: _eTxt });
+      return;
+    }
+    // Session start/end + anything else: log for visibility, don't clutter feed.
+    try { console.log('[SF CrowdControl]', _ccType, JSON.stringify(data).slice(0, 300)); } catch (e) {}
+    return;
   } else if (src === 'Twitch' && /^Goal(Begin|Start|Created|End|Ended|Complete|Finished)/i.test(type || '')) {
     // Twitch's native creator Goals (set in the Twitch dashboard). Celebrate a
     // goal starting and — loudly — a goal being reached. The high-frequency
@@ -11316,6 +11400,89 @@ feed.addEventListener('scroll', function() {
   document.getElementById('scrollSnap').classList.toggle('show', !S.autoScroll);
 });
 
+// Spam collapse helpers. _spamNorm = comparable form of a message's text;
+// _bumpCollapse increments the ×N badge on an already-rendered row.
+function _spamNorm(m) { return String((m && m.text) || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+// Returns the newest feed row this message would fold into, or null. Same user
+// by default; also across users when "spamCollapseAny" is on (emote spam).
+function _findCollapseTarget(m) {
+  var feedEl = document.getElementById('feed');
+  var last = feedEl && feedEl.lastChild;
+  if (!last || !last.classList || !last.classList.contains('msg')) return null;
+  var norm = _spamNorm(m);
+  if (!norm || last.getAttribute('data-norm') !== norm) return null;
+  if (!chk('spamCollapseAny') && last.getAttribute('data-user') !== String(m.user || '').toLowerCase()) return null;
+  return last;
+}
+function _bumpCollapse(row, timeStr) {
+  var n = (parseInt(row.getAttribute('data-count'), 10) || 1) + 1;
+  row.setAttribute('data-count', n);
+  var meta = row.querySelector('.mmeta');
+  var badge = row.querySelector('.msg-xn');
+  if (!badge && meta) { badge = document.createElement('span'); badge.className = 'msg-xn'; var tmEl = meta.querySelector('.mtime'); meta.insertBefore(badge, tmEl || null); }
+  if (badge) badge.textContent = '×' + n;
+  var tm = row.querySelector('.mtime'); if (tm && timeStr) tm.textContent = timeStr;
+  row.classList.remove('xn-pulse'); void row.offsetWidth; row.classList.add('xn-pulse');
+}
+// ── Inline chat translation ──────────────────────────────────────────────────
+// Foreign-language chat is translated (Google gtx via the main process) and the
+// result rendered as a muted line under the original. Off by default. Pure-ASCII
+// messages are skipped unless "translate all" is on (saves the English flood).
+var _xlCache = new Map();      // "target|text" -> { translation, src } | null (null = don't show)
+var _xlActive = 0, _XL_MAX = 3, _xlQueue = [];
+function _xlTarget() {
+  var el = document.getElementById('xlLang');
+  var v = ((el && el.value) || 'en').trim().toLowerCase();
+  return /^[a-z-]{2,8}$/.test(v) ? v : 'en';
+}
+function _xlNorm(t) { return String(t || '').replace(/\s+/g, ' ').trim(); }
+function _maybeTranslate(el, text) {
+  if (!chk('xlOn') || !window.electronAPI || !window.electronAPI.translateText) return;
+  var norm = _xlNorm(text);
+  if (norm.length < 2 || norm.charAt(0) === '!') return;
+  try { if (!/\p{L}/u.test(norm)) return; } catch (e) { if (!/[a-zA-Z]/.test(norm) && !/[^\x00-\x7F]/.test(norm)) return; } // no letters
+  if (/^https?:\/\/\S+$/i.test(norm)) return;
+  var target = _xlTarget();
+  if (!chk('xlAll') && !/[^\x00-\x7F]/.test(norm)) return;   // skip plain-ASCII unless aggressive
+  var key = target + '|' + norm.toLowerCase();
+  if (_xlCache.has(key)) { _xlInject(el, _xlCache.get(key), target); return; }
+  _xlQueue.push({ el: el, text: norm, target: target, key: key });
+  _xlPump();
+}
+function _xlPump() {
+  while (_xlActive < _XL_MAX && _xlQueue.length) {
+    var job = _xlQueue.shift();
+    _xlActive++;
+    (function (job) {
+      Promise.resolve(window.electronAPI.translateText({ text: job.text, target: job.target }))
+        .then(function (r) {
+          var val = null;
+          if (r && r.ok && r.translation) {
+            var src = String(r.src || '').toLowerCase();
+            if (src && src.indexOf(job.target) !== 0 && _xlNorm(r.translation).toLowerCase() !== job.text.toLowerCase()) {
+              val = { translation: r.translation, src: src };
+            }
+          }
+          if (_xlCache.size > 600) _xlCache.clear();
+          _xlCache.set(job.key, val);
+          if (val) _xlInject(job.el, val, job.target);
+        })
+        .catch(function () {})
+        .then(function () { _xlActive--; _xlPump(); });
+    })(job);
+  }
+}
+function _xlInject(el, val, target) {
+  if (!el || !el.isConnected || !val || !val.translation) return;
+  var body = el.querySelector('.mbody'); if (!body || body.querySelector('.mtrans')) return;
+  var mtext = body.querySelector('.mtext');
+  var div = document.createElement('div');
+  div.className = 'mtrans';
+  div.innerHTML = '<span class="mtrans-arrow">↳</span> ' + esc(val.translation)
+    + ' <span class="mtrans-lang">' + esc(String(val.src || '?')) + '→' + esc(target) + '</span>';
+  if (mtext && mtext.parentNode) mtext.parentNode.insertBefore(div, mtext.nextSibling);
+  else body.appendChild(div);
+}
 function pushMsg(m) {
   // Record chat/event activity as a liveness signal per platform — used by
   // _isPlatLive() when viewer-count polling isn't available (e.g. decapi
@@ -11368,10 +11535,14 @@ function pushMsg(m) {
       }
     }
   }
+  // Spam collapse target (newest feed row this message folds into). Found early
+  // so a collapsed repeat is muted for TTS + sound + overlay too, not just the
+  // feed line.
+  var _collapseTarget = (chk('spamCollapse') && m.user && !m.isEv) ? _findCollapseTarget(m) : null;
   var isHighlighted = checkKeywords(m.text || '');
-  if (isHighlighted) maybeSound('snd-kw', 'keyword');
-  maybeSound('snd-chat', 'chat');
-  if (ttsEnabled) ttSpeak(m.user, m.text || '', m.html || null);
+  if (isHighlighted && !_collapseTarget) maybeSound('snd-kw', 'keyword');
+  if (!_collapseTarget) maybeSound('snd-chat', 'chat');
+  if (ttsEnabled && !_collapseTarget) ttSpeak(m.user, m.text || '', m.html || null);
   // First-time chatter and first-words detection
   var isFirstMsg = !!m.isFirstMsg;
   var isFirstWords = false;
@@ -11450,11 +11621,22 @@ function pushMsg(m) {
   var _nameCls = 'mname ' + m.plat + (_vLogin ? ' vclick' : '');
   var _nameClick = _vLogin ? ' onclick="openViewerCard(\'' + escA(_vLogin) + '\',\'' + escA(m.user || '') + '\')"' : '';
   el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="' + _nameCls + '"' + nStyle + _nameClick + '>' + esc(m.user || '?') + '</span>' + suspHtml + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
-  feed.appendChild(el);
+  // Spam collapse: fold this message into the target row (bump ×N) instead of
+  // adding a new line + re-sending it to the OBS chat overlay.
+  var _collapsed = false;
+  if (_collapseTarget && _collapseTarget.parentNode) {
+    _bumpCollapse(_collapseTarget, t);
+    _collapsed = true;
+  }
+  if (!_collapsed) {
+    el.setAttribute('data-norm', _spamNorm(m));
+    feed.appendChild(el);
+  }
   tintBackground(m.plat, 'light');
   m.isFirstWords = isFirstWords;
-  sendOverlayChat(m);
-  while (feed.children.length > (perfMode ? 250 : 800)) { var f = feed.firstChild; if (f && f.id !== 'emptyState') feed.removeChild(f); else break; }
+  if (!_collapsed) sendOverlayChat(m);
+  if (!_collapsed) { try { _maybeTranslate(el, m.text); } catch (e) {} }
+  if (!_collapsed) { while (feed.children.length > (perfMode ? 250 : 800)) { var f = feed.firstChild; if (f && f.id !== 'emptyState') feed.removeChild(f); else break; } }
   if (S.autoScroll) _scrollToBottom();
 }
 function ttsPrepareTtext(user, rawText, html) {
@@ -18744,6 +18926,7 @@ function dismissChangelog() {
 window.addEventListener('load', function() {
   ['tw','yt','tt','kk'].forEach(function(p) { document.getElementById('f-' + p).classList.toggle('on', S.show[p]); });
   if (window._savedEvFilters) EV_FILTERS.forEach(function(id) { var el = document.getElementById(id); if (el && window._savedEvFilters[id] !== undefined) el.checked = window._savedEvFilters[id]; });
+  try { var _xll = localStorage.getItem('sf_xl_lang'); var _xle = document.getElementById('xlLang'); if (_xll && _xle) _xle.value = _xll; } catch (e) {}
   if (window._savedSoundStates) SOUND_IDS.forEach(function(id) { var el = document.getElementById(id); if (el && window._savedSoundStates[id] !== undefined) el.checked = window._savedSoundStates[id]; });
   document.getElementById('textSize').value = S.textSize;
   updateTextSize(S.textSize);
@@ -18858,14 +19041,15 @@ window.addEventListener('load', function() {
   var LOOP_MS = 90000; // heartbeat / live-recheck cadence (worker stale TTL is 6 min)
   var isWebDemo = !!window.__SF_WEB_DEMO__;
 
-  var cfg = { enabled: false, displayName: '', shareEvents: false, userId: '' };
+  var cfg = { enabled: false, displayName: '', shareEvents: false, shareChatters: false, userId: '' };
   try {
     var saved = JSON.parse(localStorage.getItem(STORE) || '{}');
     if (saved && typeof saved === 'object') {
-      cfg.enabled     = !!saved.enabled;
-      cfg.displayName = String(saved.displayName || '');
-      cfg.shareEvents = !!saved.shareEvents;
-      cfg.userId      = String(saved.userId || '');
+      cfg.enabled       = !!saved.enabled;
+      cfg.displayName   = String(saved.displayName || '');
+      cfg.shareEvents   = !!saved.shareEvents;
+      cfg.shareChatters = !!saved.shareChatters;
+      cfg.userId        = String(saved.userId || '');
     }
   } catch (e) {}
 
@@ -19005,6 +19189,22 @@ window.addEventListener('load', function() {
             vtot = (vbp.tw || 0) + (vbp.yt || 0) + (vbp.tt || 0) + (vbp.kk || 0);
           }
         } catch (e) {}
+        // Optional: the current cross-platform chatter roster, for the streamer's
+        // own Aquilo Bot / Dock (separate opt-in from the public radar). Capped +
+        // freshest-first so the payload stays small.
+        var chatters, chatterCount;
+        if (cfg.shareChatters) {
+          try {
+            var cm = window._chatterMap;
+            if (cm && cm.forEach) {
+              var _cArr = [];
+              cm.forEach(function (v, k) { _cArr.push({ n: v.display || k, p: v.plat || '', t: v.lastSeen || 0 }); });
+              chatterCount = _cArr.length;
+              _cArr.sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
+              chatters = _cArr.slice(0, 200).map(function (c) { return { n: c.n, p: c.p }; });
+            }
+          } catch (e) {}
+        }
         post(LIVE_ENDPOINT, {
           userId:   uid,
           name:     name,
@@ -19016,6 +19216,8 @@ window.addEventListener('load', function() {
           viewers:  meta.viewers != null ? meta.viewers : undefined,
           viewersByPlatform: vbp || undefined,
           viewersTotal: vtot != null ? vtot : undefined,
+          chatterCount: (chatterCount != null) ? chatterCount : undefined,
+          chatters: (chatters && chatters.length) ? chatters : undefined,
           live:     true
         });
         setStatus('You’re live — showing on the aquilo.gg radar'
@@ -19093,14 +19295,24 @@ window.addEventListener('load', function() {
     persist();
   }
 
+  function onChattersToggle(on) {
+    // Same gating as events: the live heartbeat (which carries the roster)
+    // only runs when live-status sharing is on.
+    if (on && !cfg.enabled) on = false;
+    cfg.shareChatters = on;
+    persist();
+  }
+
   function syncEventsToggleEnabled() {
     var ev = document.getElementById('aql-events-enabled');
-    if (!ev) return;
-    ev.disabled = !cfg.enabled;
-    if (!cfg.enabled && ev.checked) {
-      ev.checked = false;
-      cfg.shareEvents = false;
-      persist();
+    if (ev) {
+      ev.disabled = !cfg.enabled;
+      if (!cfg.enabled && ev.checked) { ev.checked = false; cfg.shareEvents = false; persist(); }
+    }
+    var ch = document.getElementById('aql-chatters-enabled');
+    if (ch) {
+      ch.disabled = !cfg.enabled;
+      if (!cfg.enabled && ch.checked) { ch.checked = false; cfg.shareChatters = false; persist(); }
     }
   }
 
@@ -19156,6 +19368,18 @@ window.addEventListener('load', function() {
       + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">'
       + 'Requires live-status sharing above to be on. Follows are skipped (too noisy); '
       + 'only headline events fire.</div>'
+      + '</div>'
+      + '<div class="sec" style="margin-top:14px">'
+      + '<div class="sec-hd" style="color:#9a82ff">Aquilo Bot &amp; Dock — live viewer data</div>'
+      + '<div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">'
+      + 'Send your current <strong>cross-platform viewer list</strong> (names + platform) so your own '
+      + '<strong>Aquilo Bot</strong> and <strong>Dock</strong> can use SF&rsquo;s multi-platform data &mdash; e.g. for '
+      + 'shoutouts or on-panel display. These are public chat participants, shared only with your own tools. Off by default.'
+      + '</div>'
+      + '<label class="frow"><span>Share my live viewer list with Aquilo Bot &amp; Dock</span>'
+      + '<input type="checkbox" id="aql-chatters-enabled" disabled></label>'
+      + '<div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:8px">'
+      + 'Requires live-status sharing above to be on &mdash; it rides the same heartbeat.</div>'
       + '</div>';
     aboutPane.parentNode.insertBefore(pane, aboutPane);
 
@@ -19176,6 +19400,11 @@ window.addEventListener('load', function() {
     if (evChk) {
       evChk.checked = cfg.shareEvents && cfg.enabled;
       evChk.addEventListener('change', function () { onEventsToggle(this.checked); });
+    }
+    var chChk = document.getElementById('aql-chatters-enabled');
+    if (chChk) {
+      chChk.checked = cfg.shareChatters && cfg.enabled;
+      chChk.addEventListener('change', function () { onChattersToggle(this.checked); });
     }
     syncEventsToggleEnabled();
     setStatus(cfg.enabled

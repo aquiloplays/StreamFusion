@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchTwitchViewers: (login) => ipcRenderer.invoke('fetch-twitch-viewers', login),
   fetchYouTubeViewers: (videoId) => ipcRenderer.invoke('fetch-youtube-viewers', videoId),
   fetchTwitchGame: (login)    => ipcRenderer.invoke('fetch-twitch-game', login),
+  translateText: (args)       => ipcRenderer.invoke('translate-text', args || {}),
   // Overlay (pop-out chat)
   openOverlay:      (opts)    => ipcRenderer.invoke('open-overlay', opts || {}),
   closeOverlay:     ()        => ipcRenderer.send('close-overlay'),

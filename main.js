@@ -1485,6 +1485,47 @@ ipcMain.handle('fetch-kick-viewers', async (event, slug) => {
   return null; // both attempts errored → transient failure, keep prior value
 });
 
+// Inline chat translation. The renderer can't hit the translate endpoint
+// directly (CORS), so proxy it through net.request like the viewer fetches.
+// Uses Google's free unofficial gtx endpoint (auto-detects source language).
+// Result contract: { ok:true, translation, src } on success, { ok:false } on any
+// error/timeout — the renderer simply skips showing a translation on failure.
+ipcMain.handle('translate-text', async (event, args) => {
+  args = (args && typeof args === 'object') ? args : {};
+  const text = String(args.text || '').slice(0, 500);
+  const target = /^[a-zA-Z-]{2,8}$/.test(String(args.target || '')) ? String(args.target) : 'en';
+  if (!text.trim()) return { ok: false };
+  const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='
+    + encodeURIComponent(target) + '&dt=t&q=' + encodeURIComponent(text);
+  return await new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    try {
+      const req = net.request({ method: 'GET', url: url, redirect: 'follow' });
+      req.setHeader('Accept', 'application/json');
+      const timer = setTimeout(() => { try { req.abort(); } catch (e) {} done({ ok: false }); }, 7000);
+      req.on('response', (res) => {
+        let data = '';
+        res.on('data', d => data += d);
+        res.on('end', () => {
+          clearTimeout(timer);
+          if (res.statusCode < 200 || res.statusCode >= 300) { done({ ok: false }); return; }
+          try {
+            const j = JSON.parse(data);
+            let out = '';
+            if (Array.isArray(j[0])) for (const seg of j[0]) if (seg && seg[0]) out += seg[0];
+            const src = j[2] || (j[8] && j[8][0] && j[8][0][0]) || '';
+            done({ ok: true, translation: out, src: String(src || '') });
+          } catch (e) { done({ ok: false }); }
+        });
+        res.on('error', () => { clearTimeout(timer); done({ ok: false }); });
+      });
+      req.on('error', () => { clearTimeout(timer); done({ ok: false }); });
+      req.end();
+    } catch (e) { done({ ok: false }); }
+  });
+});
+
 // Twitch viewer count — decapi.me public API, no auth required. Returns a
 // plain-text integer when live, or a string like "User is not live" when
 // offline / invalid. Contract matches fetch-kick-viewers: a recognised
