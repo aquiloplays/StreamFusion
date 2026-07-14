@@ -10410,7 +10410,19 @@ function handleSBEvent(event, data, fromES) {
         }
       }
     }
-    pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', login: _twLoginKey, html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg });
+    // Reply thread parent (a reply object, or the IRC reply-parent-* tags)
+    // + the Twitch "Highlight My Message" redemption flag (msg-id tag,
+    // already lowercased into _msgType above). Both flow through pushMsg so
+    // the OBS chat overlay can render the reply line + purple highlight.
+    var _reply = msg.reply || data.reply || null;
+    var _replyName = _reply
+      ? (_reply.userName || _reply.displayName || _reply.userLogin || _reply.user || _reply.name)
+      : (_msgTags['reply-parent-display-name'] || _msgTags['reply-parent-user-login'] || null);
+    var _replyBody = _reply
+      ? (_reply.msgBody || _reply.message || _reply.text || _reply.body)
+      : (_msgTags['reply-parent-msg-body'] || null);
+    var _isHighlight = (_msgType === 'highlighted-message') || !!(msg.isHighlighted || data.isHighlighted);
+    pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', login: _twLoginKey, html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg, replyTo: _replyName || null, replyBody: _replyBody || null, highlighted: _isHighlight });
     // Viewer CRM: track this chatter (msgs / days seen / last seen).
     if (_twLoginKey && typeof _viewerTrackMsg === 'function') { try { _viewerTrackMsg(_twLoginKey, u.displayName || u.name || _twLoginKey, 'tw'); } catch (e) {} }
   } else if (key === 'Twitch.AnnouncementMessage' || key === 'Twitch.Announcement' || key === 'Twitch.ChatMessageAnnouncement' || key === 'Twitch.AnnouncementSent') {
@@ -16414,6 +16426,12 @@ function sendObsChat(m) {
     // by id and a banned/timed-out chatter by their stable login.
     msgId:     m.msgId || null,
     login:     m.login || null,
+    // Reply thread parent + Twitch "Highlight My Message" flag so the
+    // overlay can render the reply line + purple highlight (parity with
+    // the overlays' direct Streamer.bot path).
+    replyTo:   m.replyTo || null,
+    replyBody: m.replyBody || null,
+    highlighted: !!m.highlighted,
     ts:        Date.now()
   });
 }
