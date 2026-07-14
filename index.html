@@ -2354,7 +2354,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div class="sec-hd">Connection Status</div>
             <div class="ccard tw" id="ccard-sb"><div class="sdot off" id="dot-sb"></div><div class="lbl">Streamer.bot<small id="lbl-sb">Twitch, YouTube &amp; Kick</small></div><button class="cbtn tw" id="btn-sb" onclick="openModal('sb')">Connect</button></div>
             <div class="ccard tt" id="ccard-tf"><div class="sdot off" id="dot-tf"></div><div class="lbl">Tikfinity<small id="lbl-tf">TikTok LIVE</small></div><button class="cbtn tt" id="btn-tf" onclick="openModal('tf')">Connect</button></div>
-            <div class="ccard" id="ccard-rotation" style="--accent:#1db954;"><div class="sdot off" id="dot-rotation"></div><div class="lbl">Rotation Widget<small id="lbl-rotation">Song events from widget.aquilo.gg</small></div><button class="cbtn" id="btn-rotation" onclick="openRotationRelayConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
+            <div class="ccard" id="ccard-rotation" style="--accent:#1db954;"><div class="sdot off" id="dot-rotation"></div><div class="lbl">Rotation Widget<small id="lbl-rotation">Song events from the Rotation widget or Jukebox</small></div><button class="cbtn" id="btn-rotation" onclick="openRotationRelayConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
             <div class="ccard" id="ccard-jukebox" style="--accent:#1db954;"><div class="sdot off" id="dot-jukebox"></div><div class="lbl">Jukebox<small id="lbl-jukebox">Now-playing from aquilo.gg/jukebox</small></div><button class="cbtn" id="btn-jukebox" onclick="openJukeboxConfig()" style="background:#1db954;color:#0a1a10">Connect</button></div>
             <div class="ccard" id="ccard-counter" style="--accent:#9a82ff;"><div class="sdot off" id="dot-counter"></div><div class="lbl">Counters<small id="lbl-counter">Counter changes from aquilo.gg/counters</small></div><button class="cbtn" id="btn-counter" onclick="openCounterFeedConfig()" style="background:#9a82ff;color:#0a0b12">Connect</button></div>
             <div class="ccard" id="ccard-penance" style="--accent:#9a82ff;"><div class="sdot off" id="dot-penance"></div><div class="lbl">Penance<small id="lbl-penance">Auto push-ups from follows/subs/hype</small></div><button class="cbtn" id="btn-penance" onclick="openPenanceConfig()" style="background:#9a82ff;color:#0a0b12">Set up</button></div>
@@ -2373,7 +2373,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <details style="margin-top:8px">
               <summary style="cursor:pointer;font-size:11px;color:var(--mut)">Advanced — relay base URL</summary>
               <div style="display:flex;gap:5px;align-items:center;margin-top:6px">
-                <input class="minput" id="rotation-relay-base" placeholder="wss://aquilo-rotation-relay.bisherclay.workers.dev" style="font-size:10.5px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
+                <input class="minput" id="rotation-relay-base" placeholder="wss://aquilo-rotation-relay.aquiloplays.workers.dev" style="font-size:10.5px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
                 <button class="cbtn" onclick="onRotationRelayApplyBase()" style="background:var(--surf2);color:var(--txt);font-size:10.5px;height:24px;padding:0 10px">Save</button>
               </div>
               <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:5px">Override only if you've deployed your own relay. Default points at the Aquilo-hosted instance.</div>
@@ -2382,7 +2382,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           <div class="sec" id="sec-jukebox" style="display:none">
             <div class="sec-hd" style="color:#1db954">Jukebox</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Mirrors <strong>now-playing</strong> + <strong>who requested it</strong> from your hosted <a href="https://aquilo.gg/jukebox/" target="_blank" style="color:#1db954">Jukebox</a> bot into the now-playing bar. No OBS, no Spotify login here — Jukebox reads Spotify in the cloud and this just displays it.</div>
-            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">Jukebox dashboard → <em>StreamFusion</em> card → Copy the link, paste below.</div>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin:6px 0 4px">Jukebox dashboard → <em>StreamFusion</em> card → Copy the link, paste below. This one paste also lights up song requests in your <strong>Events</strong> tab (it fills the Rotation Widget room key for you).</div>
             <div style="display:flex;gap:5px;align-items:center">
               <input class="minput" id="jukebox-feed-url" placeholder="https://rotation-bot.aquiloplays.workers.dev/api/nowplaying?key=..." style="font-size:11px;padding:5px 8px;flex:1;background:var(--surf2);font-family:ui-monospace,monospace">
               <button class="cbtn" onclick="onJukeboxApplyUrl()" style="background:#1db954;color:#0a1a10;font-size:11px;height:28px;padding:0 12px">Save</button>
@@ -12595,8 +12595,39 @@ function onJukeboxApplyUrl() {
   var st = document.getElementById('jukebox-status-line');
   var dot = document.getElementById('dot-jukebox');
   _jbFeedStop();
-  if (url) { _jbFeedStart(); if (st) st.textContent = 'Connected — reading now-playing from Jukebox.'; if (dot) dot.className = 'sdot on'; }
+  if (url) { _jbFeedStart(); if (st) st.textContent = 'Connected — reading now-playing from Jukebox.'; if (dot) dot.className = 'sdot on'; _maybeAutoLinkRotationRelay(url); }
   else { if (st) st.textContent = ''; if (dot) dot.className = 'sdot off'; }
+}
+
+// One-paste convenience: the Jukebox now-playing feed URL carries the
+// streamer's feedKey as ?key=, which is ALSO their Rotation relay room key.
+// So when they connect Jukebox we can derive the room key and turn on the
+// relay for them — one paste then lights up BOTH the now-playing bar (this
+// feed, pull) and song events in the Events tab + chat overlay (the relay,
+// push). Only auto-links when no room key is set yet, so it never stomps a
+// Rotation-widget user who already pasted a different key.
+function _maybeAutoLinkRotationRelay(feedUrl) {
+  var key = '';
+  try { key = new URL(feedUrl).searchParams.get('key') || ''; } catch (e) { return; }
+  if (!key || !/^[A-Za-z0-9_-]{8,64}$/.test(key)) return;
+  if (!window.electronAPI || !window.electronAPI.rotationRelaySetConfig) return;
+  var apply = function () {
+    var keyI = document.getElementById('rotation-relay-room-key');
+    if (keyI && document.activeElement !== keyI) keyI.value = key;
+    window.electronAPI.rotationRelaySetConfig({ roomKey: key, enabled: true }).then(function (s) {
+      try { _renderRotationRelayStatus(s); } catch (e) {}
+      var st = document.getElementById('jukebox-status-line');
+      if (st) st.textContent = 'Connected — now-playing bar + song events (Events tab) both linked.';
+    }).catch(function () {});
+  };
+  if (window.electronAPI.rotationRelayGetStatus) {
+    window.electronAPI.rotationRelayGetStatus().then(function (s) {
+      if (s && s.roomKey) return;   // already configured (widget or prior) — leave it
+      apply();
+    }).catch(function () { apply(); });
+  } else {
+    apply();
+  }
 }
 function openJukeboxConfig() { var s = document.getElementById('sec-jukebox'); if (s) s.style.display = (s.style.display === 'none' ? 'block' : 'none'); }
 (function () {
