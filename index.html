@@ -59,14 +59,20 @@ body{background:var(--bg);color:var(--txt);font-family:'Geist','Geist Sans',syst
 body:not(.is-electron) .titlebar{display:none}
 .topbar{background:var(--surf);border-bottom:1px solid var(--bdr);padding:8px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
 .logo{font-size:18px;font-weight:900;background:var(--brand-grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;margin-right:4px}
-.vcounts{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
-.vc{display:flex;align-items:center;gap:5px;background:var(--surf2);border:1px solid var(--bdr);border-radius:16px;padding:4px 10px;font-size:12px;font-weight:700;white-space:nowrap}
-.vc .dot{width:8px;height:8px;border-radius:50%}
+.vcounts{display:flex;gap:7px;flex-wrap:wrap;min-width:0;align-items:center}
+.vc{display:flex;align-items:center;gap:6px;background:var(--surf2);border:1px solid var(--bdr);border-radius:16px;padding:4px 11px;font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.vc .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.vc .vcl{font-size:10px;font-weight:800;letter-spacing:.4px;color:var(--mut);text-transform:uppercase}
+.vc b{font-size:13.5px;font-weight:800;color:var(--txt)}
+.vc.tw .vcl{color:var(--tw)}.vc.yt .vcl{color:var(--yt)}.vc.tt .vcl{color:var(--tt)}.vc.kk .vcl{color:var(--kk)}
 .vc.tw .dot{background:var(--tw);box-shadow:0 0 5px var(--tw);animation:pulse 2s infinite}
 .vc.yt .dot{background:var(--yt);box-shadow:0 0 5px var(--yt);animation:pulse 2s infinite}
 .vc.tt .dot{background:var(--tt);box-shadow:0 0 5px var(--tt);animation:pulse 2s infinite}
 .vc.kk .dot{background:var(--kk);box-shadow:0 0 5px var(--kk);animation:pulse 2s infinite}
-.vc.total{border-color:#555;font-weight:700}
+.vc.total{border-color:#6a6a6a;background:rgba(255,255,255,.03)}
+.vc.total b{font-size:14.5px}
+.vc.total .vcl{color:var(--mut)}
+.vc.total .ic{width:13px;height:13px;color:var(--mut)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .tbtn{background:var(--surf2);border:1px solid var(--bdr);color:var(--mut);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;white-space:nowrap}
 .tbtn:hover{color:var(--txt);border-color:#555}
@@ -116,6 +122,7 @@ body:not(.is-electron) .titlebar{display:none}
 
 .lb-chip{font-size:11px;font-weight:800;padding:3px 8px;border-radius:12px;background:var(--surf2);border:1px solid var(--bdr);color:var(--mut);letter-spacing:.5px;flex-shrink:0;transition:all .2s;display:inline-flex;align-items:center;justify-content:center}
 .lb-chip svg{display:block;flex-shrink:0}
+.lb-chip.on[data-n]:not([data-n=""])::after{content:attr(data-n);margin-left:5px;font-size:11.5px;font-weight:800;color:var(--txt);font-variant-numeric:tabular-nums;letter-spacing:0}
 .lb-chip.on.tw{color:var(--tw);border-color:var(--tw);background:rgba(145,71,255,.15);box-shadow:0 0 10px rgba(145,71,255,.3)}
 .lb-chip.on.yt{color:var(--yt);border-color:var(--yt);background:rgba(255,0,0,.15);box-shadow:0 0 10px rgba(255,0,0,.3)}
 .lb-chip.on.tt{color:var(--tt);border-color:var(--tt);background:rgba(0,242,234,.15);box-shadow:0 0 10px rgba(0,242,234,.3)}
@@ -291,6 +298,8 @@ body.has-sf-notice { padding-top: 42px !important; }
 .hk-reset{font-size:11px;font-weight:600;padding:5px 10px}
 .hk-row.capturing .tbtn:not(.hk-reset){border-color:var(--accent);color:var(--accent)}
 .ev-group{margin-bottom:2px}
+.ev-sub-hd{font-size:11px;font-weight:800;color:var(--txt);letter-spacing:.3px;margin:2px 0 6px;display:flex;align-items:baseline;gap:6px}
+.ev-sub-note{font-size:9.5px;font-weight:600;color:var(--mut);letter-spacing:0}
 .ev-group-hd{font-size:10px;font-weight:700;color:var(--mut);padding:5px 7px 2px;text-transform:uppercase;letter-spacing:.5px}
 .ev-group-hd.tw{color:var(--tw)}.ev-group-hd.yt{color:var(--yt)}.ev-group-hd.tt{color:var(--tt)}.ev-group-hd.kk{color:var(--kk)}
 .size-row{display:flex;align-items:center;gap:8px;padding:4px 7px}
@@ -433,6 +442,21 @@ body.has-sf-notice { padding-top: 42px !important; }
 .sf-ticker-viewers{display:flex;align-items:center;gap:5px;padding:5px 11px;background:transparent;border:none;border-left:1px solid var(--bdr);color:var(--mut);font-size:11.5px;font-weight:700;cursor:pointer;flex-shrink:0;transition:background .15s ease,color .15s ease}
 .sf-ticker-viewers:hover{background:rgba(255,255,255,.06);color:var(--txt)}
 .sf-ticker-viewers .ic{width:14px;height:14px}
+/* Rotating "in chat" bar — cycles through everyone active in chat this session */
+.sf-chatters{display:flex;align-items:center;gap:10px;background:var(--surf2);border-bottom:1px solid var(--bdr);flex-shrink:0;font-size:11.5px;padding:5px 11px;cursor:pointer;overflow:hidden;transition:background .15s ease}
+.sf-chatters:hover{background:rgba(255,255,255,.05)}
+.sf-chatters-label{display:flex;align-items:center;gap:5px;color:var(--mut);font-weight:700;flex-shrink:0;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px;font-size:10px}
+.sf-chatters-label .ic{width:13px;height:13px}
+.sf-chatters-rot{flex:1;min-width:0;overflow:hidden;height:18px}
+.sf-chatters-item{display:flex;align-items:center;gap:6px;height:18px;line-height:18px;white-space:nowrap;overflow:hidden;animation:sfChSwap .38s ease}
+.sf-chatters-item .ic{width:14px;height:14px;flex-shrink:0}
+.sf-chatters-item .nm{overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--txt)}
+.sf-chatters-item.tw .ic{color:var(--tw)}.sf-chatters-item.yt .ic{color:var(--yt)}.sf-chatters-item.tt .ic{color:var(--tt)}.sf-chatters-item.kk .ic{color:var(--kk)}
+.sf-chatters-item.other .ic{color:var(--mut)}
+.sf-chatters-empty{color:var(--mut);line-height:18px}
+.sf-chatters-count{flex-shrink:0;color:var(--mut);font-weight:700;font-variant-numeric:tabular-nums}
+@keyframes sfChSwap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.sf-chatters-item{animation:none}}
 /* Current-viewers modal list */
 .vw-list{display:flex;flex-direction:column;gap:1px;max-height:52vh;overflow-y:auto;margin-top:8px;border:1px solid var(--bdr);border-radius:8px}
 .vw-row{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px}
@@ -440,6 +464,7 @@ body.has-sf-notice { padding-top: 42px !important; }
 .vw-row .ic{width:14px;height:14px;flex-shrink:0}
 .vw-row .vw-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt);font-weight:600}
 .vw-plat-tw{color:var(--tw)}.vw-plat-yt{color:var(--yt)}.vw-plat-tt{color:var(--tt)}.vw-plat-kk{color:var(--kk)}
+.vw-ic{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;flex-shrink:0}.vw-ic svg{width:100%;height:100%}
 .vw-empty{padding:22px 10px;text-align:center;color:var(--mut);font-size:13px}
 .vw-search{width:100%;box-sizing:border-box;margin-top:4px;padding:8px 10px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-size:13px}
 /* PIN BAR */
@@ -467,18 +492,19 @@ body.has-sf-notice { padding-top: 42px !important; }
 .hbtn-edit{border-style:dashed;color:var(--mut)}
 .hbtn-edit:hover{border-color:var(--ev);color:var(--ev);background:var(--ev-d);border-style:dashed}
 /* STREAM STATS BAR */
-.streamstats{display:flex;align-items:center;gap:4px;background:var(--surf);border-bottom:1px solid var(--bdr);padding:3px 10px;flex-shrink:0;overflow-x:auto;white-space:nowrap;min-height:28px}
+.streamstats{display:flex;align-items:center;gap:6px;background:var(--surf);border-bottom:1px solid var(--bdr);padding:3px 12px;flex-shrink:0;overflow-x:auto;white-space:nowrap;min-height:30px}
 .streamstats::-webkit-scrollbar{height:3px}.streamstats::-webkit-scrollbar-thumb{background:var(--bdr)}
-.ss-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);font-weight:700;padding:0 3px;flex-shrink:0}
-.ss-div{width:1px;height:18px;background:var(--bdr);flex-shrink:0;margin:0 5px}
-.ss-item{font-size:10px;font-weight:600;color:var(--mut);padding:2px 7px;border-radius:10px;background:var(--surf2);border:1px solid var(--bdr);flex-shrink:0}
-.ss-item span{font-weight:800;font-size:12px;color:var(--txt);margin-left:2px}
+.ss-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--sub,var(--mut));font-weight:800;padding:0 4px 0 2px;flex-shrink:0}
+.ss-div{width:1px;height:15px;background:var(--bdr);flex-shrink:0;margin:0 7px}
+.ss-item{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--mut);padding:2px 9px;border-radius:10px;background:var(--surf2);border:1px solid var(--bdr);flex-shrink:0}
+.ss-item span{font-weight:800;font-size:13.5px;color:var(--txt);margin-left:0;font-variant-numeric:tabular-nums}
+.ss-item .ic{width:12px;height:12px}
 .ss-item.tw{color:var(--tw);border-color:#9147ff33}.ss-item.yt{color:var(--yt);border-color:#ff000033}
 .ss-item.kk{color:var(--kk);border-color:#53fc1833}.ss-item.tt{color:var(--tt);border-color:#00f2ea33}
 .ss-item.bits{color:#bf94ff;border-color:#bf94ff33}
-.ss-revenue{font-size:11px;font-weight:800;color:#ffd700;padding:2px 8px;border-radius:10px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);white-space:nowrap;flex-shrink:0}
-.ss-revenue span{font-size:13px;margin-left:3px}
-.ss-reset{margin-left:auto;font-size:10px;color:var(--mut);cursor:pointer;background:none;border:none;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.ss-revenue{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:#ffd700;padding:2px 10px;border-radius:10px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.22);white-space:nowrap;flex-shrink:0}
+.ss-revenue span{font-size:14.5px;margin-left:1px;font-variant-numeric:tabular-nums}
+.ss-reset{margin-left:auto;font-size:10px;color:var(--mut);cursor:pointer;background:none;border:none;padding:3px 8px;border-radius:5px;flex-shrink:0}
 .ss-reset:hover{color:var(--red)}
 /* STREAM GOALS */
 .goals-bar{display:none;background:var(--surf);border-bottom:1px solid var(--bdr);padding:4px 14px;flex-shrink:0;overflow-x:auto;gap:8px;align-items:center;white-space:nowrap}
@@ -1216,6 +1242,34 @@ body.has-sf-notice { padding-top: 42px !important; }
 .so-picker-search input{width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:7px;padding:7px 10px;font-size:13px;outline:none;box-sizing:border-box}
 .so-picker-search input:focus{border-color:var(--accent)}
 .so-picker-list{flex:1;overflow-y:auto;padding:4px 0}
+/* Command palette (Ctrl+K) */
+.cmdp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9600;display:none;align-items:flex-start;justify-content:center;backdrop-filter:blur(3px);padding-top:12vh}
+.cmdp-overlay.show{display:flex}
+.cmdp{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;width:560px;max-width:92vw;max-height:64vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;animation:setFadeIn .16s ease}
+.cmdp-inwrap{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--bdr)}
+.cmdp-inwrap svg{width:18px;height:18px;color:var(--mut);flex-shrink:0}
+.cmdp-inwrap input{flex:1;background:transparent;border:0;outline:0;color:var(--txt);font-size:15px;font-family:inherit}
+.cmdp-list{flex:1;overflow-y:auto;padding:6px}
+.cmdp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--txt)}
+.cmdp-item .cmdp-tag{margin-left:auto;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);background:var(--surf2);padding:2px 7px;border-radius:10px}
+.cmdp-item.sel{background:var(--accent);color:#fff}
+.cmdp-item.sel .cmdp-tag{color:#fff;background:rgba(255,255,255,.2)}
+.cmdp-empty{padding:20px;text-align:center;color:var(--mut);font-size:13px}
+.cmdp-hint{padding:8px 14px;border-top:1px solid var(--bdr);font-size:10.5px;color:var(--mut);text-align:center}
+/* Connection health strip (in the statbar) */
+.conn-strip{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.conn-pips{display:inline-flex;align-items:center;gap:5px}
+.conn-pip{display:inline-flex;align-items:center;width:14px;height:14px}
+.conn-pip svg{width:100%;height:100%}
+.conn-pip.off{color:var(--mut);opacity:.3}
+.conn-strip:hover .conn-pip.off{opacity:.55}
+.conn-pip.on.tw{color:var(--tw)}.conn-pip.on.yt{color:var(--yt)}.conn-pip.on.tt{color:var(--tt)}.conn-pip.on.kk{color:var(--kk)}
+.conn-none{color:var(--mut)}
+/* Giveaway winner + clip badge */
+.gv-winner{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--txt);background:linear-gradient(90deg,rgba(124,92,255,.16),rgba(91,255,149,.14));border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:10px}
+.gv-winner .ic{width:16px;height:16px;color:var(--ev)}
+.gv-winner b{font-weight:800}
+.clip-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:6px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;line-height:16px}
 .so-picker-list::-webkit-scrollbar{width:4px}
 .so-picker-list::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
 .so-picker-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;transition:background .1s;font-size:13px;color:var(--txt)}
@@ -2060,9 +2114,10 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <button class="tbtn" id="ttsPauseBtn" onclick="toggleTTSPause()" style="display:none"><svg class="ic"><use href="#i-pause"/></svg>Pause TTS</button>
   <button class="tbtn" id="hotbarBtn" onclick="toggleHotbar()"><svg class="ic"><use href="#i-bolt"/></svg>Actions</button>
   <!-- Raid button removed: the Raid Finder lives in the Aquilo Dock (aquilo.gg/dock/panel). -->
-  <button class="tbtn" id="clipBtn" onclick="createClipNow()" title="Create a Twitch clip (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
+  <button class="tbtn" id="clipBtn" onclick="createClipNow()" oncontextmenu="openClipLog();return false;" title="Create a Twitch clip \u00b7 right-click for this session's clips (requires Connect Twitch in Settings)" style="display:none"><svg class="ic"><use href="#i-camera"/></svg>Clip</button>
   <button class="tbtn" id="streamInfoBtn" onclick="openStreamInfo()" title="Stream Info: edit your title, category &amp; tags"><svg class="ic"><use href="#i-pencil"/></svg>Stream Info</button>
   <button class="tbtn" id="soQueueBtn" onclick="_shoutoutOpen()" title="Smart Shoutout Queue \u2014 fellow streamers who chatted in"><svg class="ic"><use href="#i-megaphone"/></svg>Shoutouts</button>
+  <button class="tbtn" id="giveawayBtn" onclick="openGiveaway()" title="Run a keyword giveaway / raffle across chat"><svg class="ic"><use href="#i-party"/></svg>Giveaway</button>
   <button class="tbtn" id="evPanelBtn" onclick="toggleEvPanel()"><svg class="ic"><use href="#i-party"/></svg>Events</button>
   <button class="tbtn" id="overlayBtn" onclick="toggleOverlay()"><svg class="ic"><use href="#i-window"/></svg>Pop Out</button>
   <a class="tbtn tbtn-discord" href="https://discord.gg/zWHfeAxhc5" target="_blank" rel="noopener" title="Join the StreamFusion Discord"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
@@ -2414,8 +2469,12 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           </div>
           <div class="sec">
             <div class="sec-hd">Event Filters</div>
-            <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
+            <div class="ev-sub-hd">Bars &amp; alerts <span class="ev-sub-note">checked = shown</span></div>
             <label class="frow"><span>Ticker bar (ads + pinned event, above chat)</span><input type="checkbox" id="sfTickerOn" checked onchange="saveSettings(); sfTickerApply();"></label>
+            <label class="frow"><span>Rotating &ldquo;in chat&rdquo; bar <span style="opacity:.6">(cycles every chatter + platform, above chat)</span></span><input type="checkbox" id="sfChattersOn" checked onchange="saveSettings(); sfChattersApply();"></label>
+            <label class="frow"><span>Welcome back returning viewers <span style="opacity:.6">(banner + sound + feed on their first chat of the day)</span></span><input type="checkbox" id="welcomeBackOn" checked onchange="saveSettings()"></label>
+            <div class="ev-sub-hd" style="margin-top:14px">Hide from the feed <span class="ev-sub-note">check an item to stop it showing</span></div>
+            <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
             <div class="ev-group"><div class="ev-group-hd tw">Twitch</div>
               <label class="frow"><span>Follows</span><input type="checkbox" id="ev-tw-follow" onchange="saveSettings()"></label>
               <label class="frow"><span>Subs &amp; Resubs</span><input type="checkbox" id="ev-tw-sub" onchange="saveSettings()"></label>
@@ -2457,6 +2516,8 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
               <div class="ev-group-hd" style="color:var(--ev)">Third-party extensions</div>
               <label class="frow"><span>Other integration events</span><input type="checkbox" id="ev-ext-other" onchange="saveSettings()"></label>
               <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Events from any Streamer.bot source we don't recognize (Crowd Control, custom integrations, etc.) are routed here.</div>
+              <label class="frow"><span>Show <b>every</b> raw extension event <span style="opacity:.6">(verbose)</span></span><input type="checkbox" id="ev-ext-all" onchange="saveSettings()"></label>
+              <div style="font-size:10px;color:var(--mut);line-height:1.4;padding:4px 2px">Surfaces <b>everything</b> a third-party source emits — including bus/housekeeping traffic (Custom actions, reward/channel/stream updates) that's normally hidden. Great for wiring up a new integration; noisy otherwise. Overrides the mute above.</div>
             </div>
             <div class="ev-group">
               <div class="ev-group-hd" style="color:var(--accent)">Aquilo products</div>
@@ -2530,6 +2591,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Click <strong style="color:var(--txt)">Custom</strong> to use your own .mp3/.wav file instead of the built-in tone.</div>
             <div class="vol-row"><label>Volume</label><input type="range" id="soundVol" min="0" max="100" step="5" value="80" oninput="updateSoundVol(this.value)"><span class="vol-val" id="volVal">80%</span></div>
             <div class="sound-row"><span>Chat messages</span><button class="snd-pick" data-snd="chat" onclick="pickCustomSound('chat')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="chat" onclick="clearCustomSound('chat')">&times;</button><input type="checkbox" id="snd-chat" onchange="saveSettings()"></div>
+            <div class="sound-row"><span>Returning viewer</span><button class="snd-pick" data-snd="welcome" onclick="pickCustomSound('welcome')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="welcome" onclick="clearCustomSound('welcome')">&times;</button><input type="checkbox" id="snd-welcome" checked onchange="saveSettings()"></div>
             <div class="sound-row"><span>Twitch Follow</span><button class="snd-pick" data-snd="follow" onclick="pickCustomSound('follow')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="follow" onclick="clearCustomSound('follow')">&times;</button><input type="checkbox" id="snd-tw-follow" checked onchange="saveSettings()"></div>
             <div class="sound-row"><span>Twitch Sub / Resub</span><button class="snd-pick" data-snd="sub" onclick="pickCustomSound('sub')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="sub" onclick="clearCustomSound('sub')">&times;</button><input type="checkbox" id="snd-tw-sub" checked onchange="saveSettings()"></div>
             <div class="sound-row"><span>Twitch Gift Sub</span><button class="snd-pick" data-snd="gift" onclick="pickCustomSound('gift')">Custom</button><button class="snd-clear" title="Clear custom sound" data-snd="gift" onclick="clearCustomSound('gift')">&times;</button><input type="checkbox" id="snd-tw-gift" checked onchange="saveSettings()"></div>
@@ -2676,6 +2738,18 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             </div>
           </div>
 
+          <div class="sec">
+            <div class="sec-hd">Auto-thank</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">Automatically post a thank-you in Twitch chat for new subs, cheers and gift subs. Off by default; sends through Streamer.bot with per-user + anti-flood cooldowns so it never spams. Placeholders: <code>{user}</code> <code>{amount}</code>.</div>
+            <label class="frow"><span>Enable auto-thank</span><input type="checkbox" id="atEnabled" onchange="S.autoThank.enabled=this.checked;saveSettings()"></label>
+            <label class="frow"><span>Thank subs &amp; resubs</span><input type="checkbox" id="atSub" onchange="S.autoThank.sub=this.checked;saveSettings()"></label>
+            <label class="frow"><span>Thank cheers / bits</span><input type="checkbox" id="atCheer" onchange="S.autoThank.cheer=this.checked;saveSettings()"></label>
+            <label class="frow"><span>Thank gift subs</span><input type="checkbox" id="atGift" onchange="S.autoThank.gift=this.checked;saveSettings()"></label>
+            <div style="display:flex;align-items:center;gap:8px;padding:2px 2px;font-size:11px;color:var(--mut)"><span>Only thank cheers of at least</span><input id="atMinBits" type="number" min="0" max="1000000" value="100" style="width:70px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:4px 6px;font-size:11px" onchange="S.autoThank.minBits=Math.max(0,parseInt(this.value,10)||0);saveSettings()"><span>bits</span></div>
+            <div style="margin-top:8px"><div style="font-size:10px;color:var(--mut);margin-bottom:4px">Sub message</div><input id="atSubMsg" type="text" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px" onchange="S.autoThank.subMsg=this.value;saveSettings()"></div>
+            <div style="margin-top:6px"><div style="font-size:10px;color:var(--mut);margin-bottom:4px">Cheer message</div><input id="atCheerMsg" type="text" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px" onchange="S.autoThank.cheerMsg=this.value;saveSettings()"></div>
+            <div style="margin-top:6px"><div style="font-size:10px;color:var(--mut);margin-bottom:4px">Gift message</div><input id="atGiftMsg" type="text" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px" onchange="S.autoThank.giftMsg=this.value;saveSettings()"></div>
+          </div>
           <!-- Smart Shoutout Queue (Tier 2 EA) — settings only; the queue
                itself opens from the Shoutouts toolbar button. -->
           <div class="sec">
@@ -2683,6 +2757,9 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:8px">When a Twitch chatter is themselves a live streamer, SF queues them in the <strong style="color:var(--txt)">Shoutouts</strong> toolbar button for one-click <code>/shoutout</code>. Auto-fire skips the click and dispatches as soon as a fellow streamer\u2019s detected.</div>
             <label class="frow"><span>Enable smart shoutout detection</span><input type="checkbox" id="soEnabled" onchange="S.shoutout.enabled=this.checked;saveSettings()"></label>
             <label class="frow"><span>Auto-fire shoutouts (no manual click)</span><input type="checkbox" id="soAutoFire" onchange="S.shoutout.autoFire=this.checked;saveSettings()"></label>
+            <label class="frow"><span>Auto-shoutout raiders <span style="opacity:.6">&mdash; /shoutout the raider a few seconds after they raid you</span></span><input type="checkbox" id="soAutoRaid" onchange="S.shoutout.autoRaid=this.checked;saveSettings()"></label>
+            <div style="display:flex;align-items:center;gap:8px;padding:2px 2px 0;font-size:11px;color:var(--mut)"><span>Only raids bringing at least</span><input id="soAutoRaidMin" type="number" min="0" max="100000" value="0" style="width:64px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:4px 6px;font-size:11px" onchange="S.shoutout.autoRaidMinViewers=Math.max(0,parseInt(this.value,10)||0);saveSettings()"><span>viewers</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;line-height:1.5">Uses the same command template + exclude list below, and Twitch&rsquo;s native <code>/shoutout</code> already shows the raider&rsquo;s last category. Honors a 2-min per-user cooldown and won&rsquo;t repeat a raider within a stream.</div>
             <div style="margin-top:8px">
               <div style="font-size:10px;color:var(--mut);margin-bottom:4px">Shoutout command <span style="color:#888">— placeholders: {target} {name}</span></div>
               <input id="soCmdTemplate" type="text" placeholder="/shoutout {target}" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:4px;padding:5px 8px;font-size:11px;font-family:Consolas,monospace" onchange="S.shoutout.cmdTemplate=this.value;saveSettings()">
@@ -3366,6 +3443,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
         <svg class="ic"><use href="#i-eye"/></svg> <span id="sfTickerVwCount">0</span>
       </button>
     </div>
+    <div class="sf-chatters" id="sfChatters" style="display:none" onclick="openViewersModal()" title="Everyone active in chat this session — click for the full list">
+      <span class="sf-chatters-label"><svg class="ic"><use href="#i-eye"/></svg> In chat</span>
+      <div class="sf-chatters-rot" id="sfChattersRot"><span class="sf-chatters-empty">Waiting for chat&hellip;</span></div>
+      <span class="sf-chatters-count" id="sfChattersCount">0</span>
+    </div>
     <div class="chat-modes" id="chatModes"></div>
     <div class="chat-search-wrap" id="chatSearchWrap"><input class="chat-search" id="chatSearchInput" placeholder="Search chat..." oninput="filterChat()"><span class="chat-search-count" id="chatSearchCount"></span><button class="chat-search-close" onclick="toggleChatSearch()" title="Close search" aria-label="Close search">&times;</button></div>
     <div class="pins-bar" id="pinsBar"></div>
@@ -3404,7 +3486,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     <div class="statbar">
       <div><svg class="ic"><use href="#i-chat"/></svg> <span id="stMsgs">0</span> msgs</div>
       <div><svg class="ic"><use href="#i-party"/></svg> <span id="stEvs">0</span> events</div>
-      <div><svg class="ic"><use href="#i-block"/></svg> <span id="stFilt">0</span> filtered</div>
+      <div id="stFiltBtn" onclick="openFilterManager()" style="cursor:pointer" title="See what's hidden from the feed and un-mute it"><svg class="ic"><use href="#i-block"/></svg> <span id="stFilt">0</span> filtered</div>
       <div id="stConn" style="margin-left:auto"><svg class="ic"><use href="#i-plug"/></svg> Not connected</div>
     </div>
   </div>
@@ -3438,6 +3520,14 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     </div>
     <div class="so-picker-list" id="soPickerList"></div>
     <div class="so-picker-hint">&uarr;&darr; Navigate &middot; Enter Shoutout &middot; Esc Close</div>
+  </div>
+</div>
+
+<div class="cmdp-overlay" id="cmdPaletteOverlay" onclick="if(event.target===this)closeCmdPalette()">
+  <div class="cmdp">
+    <div class="cmdp-inwrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input type="text" id="cmdpInput" placeholder="Jump to a setting, toggle a bar, fire a test event…" autocomplete="off" spellcheck="false" oninput="_cmdpRender()" onkeydown="_cmdpKey(event)"></div>
+    <div class="cmdp-list" id="cmdpList"></div>
+    <div class="cmdp-hint">&uarr;&darr; Navigate &middot; Enter Run &middot; Esc Close</div>
   </div>
 </div>
 
@@ -3866,7 +3956,16 @@ async function createClipNow() {
   _twToast('Creating clip…');
   try {
     var r = await window.electronAPI.twitchCreateClip();
-    if (r && r.ok) { _twToast('Clip created'); if (r.editUrl) window.open(r.editUrl, '_blank'); }
+    if (r && r.ok) {
+      _twToast('Clip created');
+      // Log it for the session clip list (right-click the Clip button to view).
+      _clipLog.unshift({ url: r.editUrl || r.url || '', id: r.id || '', at: Date.now() });
+      if (_clipLog.length > 100) _clipLog.pop();
+      _updateClipBadge();
+      // Best-effort VOD marker at the clip point so it's easy to find in the VOD.
+      try { if (_twReady()) _twReq('POST', 'streams/markers', '', { user_id: _twUid(), description: 'Clip' }); } catch (e) {}
+      if (r.editUrl) window.open(r.editUrl, '_blank');
+    }
     else { _twToast('Clip failed: ' + ((r && r.error === 'not_connected') ? 'connect Twitch' : ((r && r.error) || 'are you live?'))); }
   } catch (e) { _twToast('Clip failed'); }
 }
@@ -4461,13 +4560,50 @@ function _vProfile(login, name) {
   if (name) p.name = name;
   return p;
 }
-function _viewerTrackMsg(login, name) {
+function _viewerTrackMsg(login, name, plat) {
   if (!_viewers) _viewersLoad();
   var p = _vProfile(login, name); if (!p) return;
   p.msgs = (p.msgs || 0) + 1; p.last = Date.now();
   var d = new Date(), day = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-  if (p.lastDay !== day) { p.streams = (p.streams || 0) + 1; p.lastDay = day; }
+  var _returning = false;
+  if (p.lastDay !== day) {
+    // First message of a new day. If they'd already chatted on a prior day
+    // (streams >= 1 before this bump), they're a returning viewer — greet them.
+    _returning = (p.streams || 0) >= 1;
+    p.streams = (p.streams || 0) + 1; p.lastDay = day;
+  }
   _viewersDirty = true;
+  if (_returning) _welcomeBackMaybe(p, plat);
+}
+// ── Returning-viewer welcome ────────────────────────────────────────────────
+// Greets a viewer we've seen before, by name, with how many streams they've
+// shown up for. Fires at most once per viewer per day (it rides the CRM's
+// per-day streams bump above), skips the broadcaster + common chat bots, and
+// makes milestone visits (5th, 10th, 25th, then every 25th) a bigger moment.
+var _WELCOME_BOTS = { nightbot:1, streamelements:1, streamlabs:1, moobot:1, wizebot:1, soundalerts:1, sery_bot:1, fossabot:1, botrix:1, commanderroot:1, kofistreambot:1, blerp:1, tangiabot:1, pretzelrocks:1, streamstickers:1, aquilobot:1 };
+function _ordinal(n) {
+  n = Number(n) || 0;
+  var s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function _welcomeBackMaybe(p, plat) {
+  try {
+    if (!p || !chk('welcomeBackOn') || S.paused) return;
+    var login = (p.login || '').toLowerCase();
+    if (!login || login === (S.twLogin || '').toLowerCase() || _WELCOME_BOTS[login]) return;
+    var name = p.name || p.login;
+    var n = p.streams || 0;
+    var ord = _ordinal(n);
+    var milestone = (n === 5 || n === 10 || n === 25 || (n >= 50 && n % 25 === 0));
+    maybeSound('snd-welcome', 'welcome');
+    if (milestone) {
+      showBanner('i-party', name + ' is back!', ord + ' stream with you 🎉', null, plat || 'tw');
+      try { fireBurstConfetti(plat || 'tw'); } catch (e) {}
+    } else {
+      showBanner('i-heart', name + ' is back', 'Returning viewer · ' + ord + ' stream', null, plat || 'tw');
+    }
+    pushMsg({ plat: plat || 'tw', isEv: true, evType: 'welcome', big: milestone, user: name, text: name + ' is back — ' + ord + ' stream 👋' });
+  } catch (e) {}
 }
 function _viewerAddContribution(name, amount) {
   if (!_viewers) _viewersLoad();
@@ -4932,6 +5068,58 @@ function sfTickerRender() {
 // ── Current-viewers list ──
 var _viewerRowsCache = [];
 var _PLAT_LABEL = { tw: 'Twitch', yt: 'YouTube', tt: 'TikTok', kk: 'Kick' };
+// Shared inline platform glyphs (also used by pushMsg's per-message icon). `_other`
+// is the neutral fallback for any source outside the big four.
+var SF_PLAT_SVG = {
+  tw: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',
+  yt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',
+  tt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',
+  kk: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>',
+  _other: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'
+};
+
+// ── Rotating "in chat" bar ──────────────────────────────────────────────────
+// A thin strip above chat that cycles through everyone who's been active in
+// chat this session, one at a time, showing their platform glyph + name. Data
+// source is _chatterMap (populated by pushMsg); it clears when a session ends.
+var _sfChIdx = 0, _sfChInt = null, _sfChList = [];
+function sfChattersApply() {
+  var bar = document.getElementById('sfChatters');
+  if (!bar) return;
+  if (chk('sfChattersOn')) {
+    bar.style.display = 'flex';
+    if (!_sfChInt) _sfChInt = setInterval(sfChattersTick, 2600);
+    sfChattersTick();
+  } else {
+    bar.style.display = 'none';
+    if (_sfChInt) { clearInterval(_sfChInt); _sfChInt = null; }
+  }
+}
+function _sfChBuild() {
+  var arr = [];
+  _chatterMap.forEach(function (v, k) { arr.push({ name: v.display || k, plat: v.plat || '' }); });
+  // Stable alphabetical order so the rotation index stays meaningful as the
+  // roster grows (matches the current-viewers modal ordering).
+  arr.sort(function (a, b) { var an = (a.name || '').toLowerCase(), bn = (b.name || '').toLowerCase(); return an < bn ? -1 : an > bn ? 1 : 0; });
+  return arr;
+}
+function sfChattersTick() {
+  var bar = document.getElementById('sfChatters');
+  if (!bar || bar.style.display === 'none') return;
+  _sfChList = _sfChBuild();
+  var cnt = document.getElementById('sfChattersCount');
+  if (cnt) cnt.textContent = _sfChList.length;
+  var rot = document.getElementById('sfChattersRot');
+  if (!rot) return;
+  if (!_sfChList.length) { rot.innerHTML = '<span class="sf-chatters-empty">Waiting for chat&hellip;</span>'; _sfChIdx = 0; return; }
+  if (_sfChIdx >= _sfChList.length) _sfChIdx = 0;
+  var c = _sfChList[_sfChIdx];
+  var plat = c.plat || 'other';
+  var svg = SF_PLAT_SVG[c.plat] || SF_PLAT_SVG._other;
+  // Re-creating the node lets the CSS insert-animation replay each rotation.
+  rot.innerHTML = '<div class="sf-chatters-item ' + esc(plat) + '">' + svg + '<span class="nm">' + esc(c.name) + '</span></div>';
+  _sfChIdx = (_sfChIdx + 1) % _sfChList.length;
+}
 async function openViewersModal() {
   var overlay = document.getElementById('overlay');
   var m = document.getElementById('modal');
@@ -4981,8 +5169,223 @@ function _filterViewers() {
   if (!rows.length) { list.innerHTML = '<div class="vw-empty">' + (q ? 'No viewers match that name.' : 'No chatters yet this session.') + '</div>'; return; }
   list.innerHTML = rows.map(function (r) {
     var lbl = _PLAT_LABEL[r.plat] || 'Other';
-    return '<div class="vw-row"><span class="vw-name">' + esc(r.name) + '</span><span class="vw-plat-' + esc(r.plat || 'other') + '" style="font-size:11px;font-weight:700">' + esc(lbl) + '</span></div>';
+    var p = esc(r.plat || 'other');
+    var svg = SF_PLAT_SVG[r.plat] || SF_PLAT_SVG._other;
+    return '<div class="vw-row"><span class="vw-ic vw-plat-' + p + '">' + svg + '</span><span class="vw-name">' + esc(r.name) + '</span><span class="vw-plat-' + p + '" style="font-size:11px;font-weight:700">' + esc(lbl) + '</span></div>';
   }).join('');
+}
+
+// ── Hidden-events manager (opens from the statbar "N filtered" count) ─────────
+// Lists the event types currently muted from the feed and lets the streamer
+// un-mute any of them in one click, without hunting through Settings.
+function _muteFilterIds() {
+  return EV_FILTERS.filter(function (id) {
+    return id !== 'ev-ext-all' && id !== 'sfTickerOn' && id !== 'sfChattersOn' && id !== 'welcomeBackOn';
+  });
+}
+function _filterMgrLabel(id) {
+  var el = document.getElementById(id); if (!el) return id;
+  var row = el.closest('.frow'); var sp = row ? row.querySelector('span') : null;
+  return sp ? sp.textContent.trim() : id;
+}
+function _filterMgrPlat(id) {
+  if (/^ev-tw|^hideCmd/.test(id)) return 'tw';
+  if (/^ev-yt/.test(id)) return 'yt';
+  if (/^ev-tt/.test(id)) return 'tt';
+  if (/^ev-kk/.test(id)) return 'kk';
+  return 'other';
+}
+function openFilterManager() {
+  var overlay = document.getElementById('overlay'), m = document.getElementById('modal');
+  if (!overlay || !m) return;
+  overlay.classList.add('show');
+  _renderFilterManager();
+}
+function _renderFilterManager() {
+  var m = document.getElementById('modal'); if (!m) return;
+  var muted = _muteFilterIds().filter(function (id) { return chk(id); });
+  var body;
+  if (!muted.length) {
+    body = '<p class="mp">Nothing is muted — every event type is showing in the feed. You can hide events from <b>Settings &rarr; Filters</b>.</p>';
+  } else {
+    body = '<p class="mp">These event types are hidden from your feed. Click <b>Show</b> to bring one back.</p><div class="vw-list">' + muted.map(function (id) {
+      var p = _filterMgrPlat(id), svg = SF_PLAT_SVG[p] || SF_PLAT_SVG._other;
+      return '<div class="vw-row"><span class="vw-ic vw-plat-' + p + '">' + svg + '</span><span class="vw-name">' + esc(_filterMgrLabel(id)) + '</span><button class="btn-x" style="padding:3px 12px;font-size:11px" onclick="_unmuteFilter(\'' + id + '\')">Show</button></div>';
+    }).join('') + '</div>';
+  }
+  m.innerHTML = '<div class="mh">Hidden events <span style="color:var(--mut);font-weight:600">(' + muted.length + ')</span></div>' + body + '<div class="mbtns"><button class="btn-x" onclick="closeModal()">Close</button></div>';
+}
+function _unmuteFilter(id) {
+  var el = document.getElementById(id);
+  if (el) { el.checked = false; saveSettings(); }
+  _renderFilterManager();
+}
+
+// ── Command palette (Ctrl+K) ─────────────────────────────────────────────────
+// One fuzzy launcher for the whole app: jump to any settings tab, toggle a bar,
+// open a panel, or fire a test event — all keyboard-driven.
+var _cmdpOpen = false, _cmdpIdx = 0, _cmdpAll = [], _cmdpItems = [];
+function _cmdpToggle(id, apply) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.checked = !el.checked;
+  if (typeof saveSettings === 'function') saveSettings();
+  if (typeof apply === 'function') apply();
+}
+function _cmdpBuildCommands() {
+  var c = [];
+  document.querySelectorAll('#settingsTabs .settings-tab[data-tab]').forEach(function (t) {
+    var tab = t.dataset.tab, name = (t.textContent || tab).trim();
+    if (name) c.push({ label: 'Settings: ' + name, tag: 'settings', run: function () { openSettingsTab(tab); } });
+  });
+  function add(label, tag, fn) { c.push({ label: label, tag: tag, run: fn }); }
+  add('Current viewers', 'open', function () { openViewersModal(); });
+  add('Shoutout queue', 'open', function () { if (typeof _shoutoutOpen === 'function') _shoutoutOpen(); });
+  add('Quick shoutout picker', 'open', function () { if (typeof openSOPicker === 'function') openSOPicker(); });
+  add('Hidden events', 'open', function () { openFilterManager(); });
+  add('Giveaway / raffle', 'open', function () { openGiveaway(); });
+  add('Session clips', 'open', function () { openClipLog(); });
+  add('Create clip now', 'action', function () { if (typeof createClipNow === 'function') createClipNow(); });
+  add('Toggle ticker bar', 'toggle', function () { _cmdpToggle('sfTickerOn', sfTickerApply); });
+  add('Toggle rotating “in chat” bar', 'toggle', function () { _cmdpToggle('sfChattersOn', sfChattersApply); });
+  add('Toggle welcome-back alerts', 'toggle', function () { _cmdpToggle('welcomeBackOn'); });
+  add('Toggle TTS', 'toggle', function () { if (typeof toggleTTS === 'function') toggleTTS(); });
+  add('Toggle chat search', 'toggle', function () { if (typeof toggleChatSearch === 'function') toggleChatSearch(); });
+  add('Clear events panel', 'action', function () { if (typeof clearEvHistory === 'function') clearEvHistory(); });
+  [['Follow', 'tw-follow'], ['Sub', 'tw-sub'], ['Cheer', 'tw-cheer'], ['Raid', 'tw-raid'], ['Hype train', 'tw-hype']].forEach(function (p) {
+    add('Test alert: ' + p[0], 'test', function () { if (typeof testEvent === 'function') testEvent(p[1]); });
+  });
+  return c;
+}
+function openCmdPalette() {
+  var ov = document.getElementById('cmdPaletteOverlay'); if (!ov) return;
+  _cmdpAll = _cmdpBuildCommands(); _cmdpIdx = 0; _cmdpOpen = true;
+  ov.classList.add('show');
+  var inp = document.getElementById('cmdpInput'); if (inp) inp.value = '';
+  _cmdpRender();
+  setTimeout(function () { if (inp) inp.focus(); }, 30);
+}
+function closeCmdPalette() { var ov = document.getElementById('cmdPaletteOverlay'); if (ov) ov.classList.remove('show'); _cmdpOpen = false; }
+function _cmdpRender() {
+  var inp = document.getElementById('cmdpInput'), list = document.getElementById('cmdpList');
+  if (!list) return;
+  var q = ((inp && inp.value) || '').toLowerCase().trim();
+  _cmdpItems = _cmdpAll.filter(function (c) { return !q || c.label.toLowerCase().indexOf(q) >= 0 || c.tag.indexOf(q) >= 0; });
+  if (_cmdpIdx >= _cmdpItems.length) _cmdpIdx = Math.max(0, _cmdpItems.length - 1);
+  if (!_cmdpItems.length) { list.innerHTML = '<div class="cmdp-empty">No commands match that.</div>'; return; }
+  list.innerHTML = _cmdpItems.map(function (c, i) {
+    return '<div class="cmdp-item' + (i === _cmdpIdx ? ' sel' : '') + '" onmousemove="_cmdpHover(' + i + ')" onclick="_cmdpRun(' + i + ')">' + esc(c.label) + '<span class="cmdp-tag">' + esc(c.tag) + '</span></div>';
+  }).join('');
+  var sel = list.querySelector('.cmdp-item.sel'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+}
+function _cmdpHover(i) {
+  if (i === _cmdpIdx) return;
+  _cmdpIdx = i;
+  var list = document.getElementById('cmdpList');
+  if (list) list.querySelectorAll('.cmdp-item').forEach(function (el, j) { el.classList.toggle('sel', j === i); });
+}
+function _cmdpRun(i) { var c = _cmdpItems[i]; closeCmdPalette(); if (c && c.run) { try { c.run(); } catch (e) {} } }
+function _cmdpKey(e) {
+  if (e.key === 'ArrowDown') { e.preventDefault(); if (_cmdpIdx < _cmdpItems.length - 1) { _cmdpIdx++; _cmdpRender(); } }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); if (_cmdpIdx > 0) { _cmdpIdx--; _cmdpRender(); } }
+  else if (e.key === 'Enter') { e.preventDefault(); _cmdpRun(_cmdpIdx); }
+  else if (e.key === 'Escape') { e.preventDefault(); closeCmdPalette(); }
+}
+
+// ── Giveaway / raffle ────────────────────────────────────────────────────────
+// Viewers enter by typing a keyword in any connected chat; one entry per person
+// (deduped by platform+login). Draw a random winner with a banner + overlay +
+// confetti, optionally announced in Twitch chat. Entries are session-only.
+var _giveaway = { active: false, keyword: '!raffle', entrants: {}, winner: null, announce: false };
+try { var _gvKw = localStorage.getItem('sf_giveaway_kw'); if (_gvKw) _giveaway.keyword = _gvKw; } catch (e) {}
+var _giveawayOpen = false;
+function _giveawayCount() { return Object.keys(_giveaway.entrants).length; }
+function _giveawayCheck(m) {
+  if (!_giveaway.active || !m || m.isEv || !m.user) return;
+  var t = String(m.text || '').trim().toLowerCase(), kw = String(_giveaway.keyword || '').trim().toLowerCase();
+  if (!kw || (t !== kw && t.indexOf(kw + ' ') !== 0)) return;
+  var key = (m.plat || 'tw') + ':' + String(m.user).toLowerCase();
+  if (_giveaway.entrants[key]) return;
+  _giveaway.entrants[key] = { name: m.user, plat: m.plat || 'tw' };
+  if (_giveawayOpen) _giveawayRender();
+}
+function openGiveaway() { var ov = document.getElementById('overlay'); if (!ov) return; ov.classList.add('show'); _giveawayOpen = true; _giveawayRender(); }
+function giveawayToggle() {
+  if (_giveaway.active) { _giveaway.active = false; }
+  else {
+    var inp = document.getElementById('gvKeyword');
+    if (inp) { _giveaway.keyword = (inp.value || '').trim() || '!raffle'; try { localStorage.setItem('sf_giveaway_kw', _giveaway.keyword); } catch (e) {} }
+    _giveaway.active = true; _giveaway.winner = null;
+  }
+  _giveawayRender();
+}
+function giveawayReset() { _giveaway.entrants = {}; _giveaway.winner = null; _giveawayRender(); }
+function giveawayDraw() {
+  var keys = Object.keys(_giveaway.entrants); if (!keys.length) return;
+  var pool = keys;
+  if (_giveaway.winner) { var wk = _giveaway.winner.key; pool = keys.filter(function (k) { return k !== wk; }); if (!pool.length) pool = keys; }
+  var k = pool[Math.floor(Math.random() * pool.length)], e = _giveaway.entrants[k];
+  _giveaway.winner = { key: k, name: e.name, plat: e.plat };
+  try { maybeSound('snd-tw-sub', 'sub'); } catch (x) {}
+  showBanner('i-party', 'Giveaway winner!', e.name, null, e.plat || 'tw');
+  try { fireBurstConfetti(e.plat || 'tw'); } catch (x) {}
+  pushMsg({ plat: e.plat || 'tw', isEv: true, evType: 'giveaway', big: true, user: 'Giveaway', text: e.name + ' won the giveaway! 🎉' });
+  if (_giveaway.announce && S.sbConnected) { try { handleTwitchCommand('🎉 Congrats @' + e.name + ' — you won the giveaway!'); } catch (x) {} }
+  _giveawayRender();
+}
+function _giveawayRender() {
+  var m = document.getElementById('modal'); if (!m || !_giveawayOpen) return;
+  var n = _giveawayCount();
+  var entrants = Object.keys(_giveaway.entrants).map(function (k) { return _giveaway.entrants[k]; });
+  var listHtml = n
+    ? '<div class="vw-list" style="max-height:32vh">' + entrants.map(function (e) {
+        var p = esc(e.plat || 'tw'), svg = SF_PLAT_SVG[e.plat] || SF_PLAT_SVG._other;
+        return '<div class="vw-row"><span class="vw-ic vw-plat-' + p + '">' + svg + '</span><span class="vw-name">' + esc(e.name) + '</span></div>';
+      }).join('') + '</div>'
+    : '<div class="vw-empty">No entries yet. Viewers type the keyword to enter.</div>';
+  var winHtml = _giveaway.winner ? '<div class="gv-winner"><svg class="ic"><use href="#i-party"/></svg> Winner: <b>' + esc(_giveaway.winner.name) + '</b> 🎉</div>' : '';
+  m.innerHTML =
+    '<div class="mh">Giveaway <span style="color:var(--mut);font-weight:600">(' + n + ' ' + (n === 1 ? 'entry' : 'entries') + ')</span></div>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin:2px 0 8px">'
+    +   '<input id="gvKeyword" class="minput" style="flex:1;font-size:12px;padding:7px 9px;background:var(--surf2)" value="' + esc(_giveaway.keyword) + '"' + (_giveaway.active ? ' disabled' : '') + ' placeholder="!raffle">'
+    +   '<button class="' + (_giveaway.active ? 'btn-dis' : 'btn-x') + '" style="min-width:84px" onclick="giveawayToggle()">' + (_giveaway.active ? 'Stop' : 'Start') + '</button>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:8px">' + (_giveaway.active ? ('<span style="color:var(--grn)">● Open</span> — viewers type <b>' + esc(_giveaway.keyword) + '</b> in any connected chat to enter.') : 'Set a keyword and press Start to open entries.') + '</div>'
+    + winHtml
+    + listHtml
+    + '<label class="frow" style="margin-top:8px"><span>Announce winner in Twitch chat</span><input type="checkbox" id="gvAnnounce" onchange="_giveaway.announce=this.checked"' + (_giveaway.announce ? ' checked' : '') + '></label>'
+    + '<div class="mbtns"><button class="btn-x" onclick="giveawayReset()">Reset</button><button class="btn-x" onclick="giveawayDraw()"' + (n ? '' : ' disabled') + '>' + (_giveaway.winner ? 'Draw again' : 'Draw winner') + '</button><button class="btn-x" onclick="closeModal()">Close</button></div>';
+}
+
+// ── Session clip log (companion to createClipNow) ────────────────────────────
+var _clipLog = [];
+function _updateClipBadge() {
+  var btn = document.getElementById('clipBtn'); if (!btn) return;
+  var ex = btn.querySelector('.clip-badge'); if (ex) ex.remove();
+  if (_clipLog.length) { var b = document.createElement('span'); b.className = 'clip-badge'; b.textContent = _clipLog.length; btn.appendChild(b); }
+}
+function _clipCopy(text) {
+  if (!text) return;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    if (typeof _twToast === 'function') _twToast('Copied');
+  } catch (e) {}
+}
+function _copyClip(i) { var c = _clipLog[i]; if (c && c.url) _clipCopy(c.url); }
+function _copyAllClips() { _clipCopy(_clipLog.map(function (c) { return c.url; }).filter(Boolean).join('\n')); }
+function openClipLog() {
+  var ov = document.getElementById('overlay'), m = document.getElementById('modal'); if (!ov || !m) return;
+  ov.classList.add('show');
+  if (!_clipLog.length) {
+    m.innerHTML = '<div class="mh">Session clips</div><p class="mp">No clips yet this session. Hit the <b>Clip</b> button or your clip hotkey to grab a moment.</p><div class="mbtns"><button class="btn-x" onclick="closeModal()">Close</button></div>';
+    return;
+  }
+  var rows = _clipLog.map(function (c, i) {
+    var t = new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return '<div class="vw-row"><span class="vw-name" style="font-family:Consolas,monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis">' + esc(c.url || ('clip ' + (i + 1))) + '</span><span style="color:var(--mut);font-size:11px">' + t + '</span><button class="btn-x" style="padding:3px 10px;font-size:11px" onclick="_copyClip(' + i + ')">Copy</button></div>';
+  }).join('');
+  m.innerHTML = '<div class="mh">Session clips <span style="color:var(--mut);font-weight:600">(' + _clipLog.length + ')</span></div><p class="mp">Clips you grabbed this session — copy the links for Discord or your VOD notes.</p><div class="vw-list" style="max-height:40vh">' + rows + '</div><div class="mbtns"><button class="btn-x" onclick="_copyAllClips()">Copy all</button><button class="btn-x" onclick="closeModal()">Close</button></div>';
 }
 
 // ── Polls ──
@@ -5278,9 +5681,19 @@ var S = {
     cmdTemplate: '/shoutout {target}',    // streamer can swap for /so or a custom thank-you
     excludeList: 'nightbot\nstreamlabs\nstreamelements\nmoobot\nfossabot\nsoundalerts\ntangiabot',
     minViewersToShoutout: 0,              // skip <N viewer streamers (set 0 = all live streamers)
+    autoRaid: false,                      // auto-/shoutout a raider the moment they raid the channel
+    autoRaidMinViewers: 0,                // only auto-SO raids bringing >= N viewers (0 = every raid)
     queue: [],                            // [{ login, displayName, game, viewers, queuedAt, status }]
     knownLogins: {},                      // login -> 'live'|'offline'|'pending' for this session
     shoutedThisStream: {}                 // login -> fired-timestamp (so we don't re-queue)
+  },
+  // Auto-thank — opt-in templated chat thank-you for subs / cheers / gift subs.
+  // Posts through Streamer.bot with per-user + global cooldowns so it can't flood.
+  autoThank: {
+    enabled: false, sub: true, cheer: true, gift: true, minBits: 100,
+    subMsg: 'Thanks for the sub, @{user}! 💜',
+    cheerMsg: 'Thanks for the {amount} bits, @{user}! 🎉',
+    giftMsg: 'Thanks for gifting, @{user}! 💜'
   },
   // Discord Live-Announce — reuses the existing discordWebhook (set in
   // Settings → Discord). When the streamer goes live we POST a "🔴 Live now"
@@ -5301,8 +5714,8 @@ var S = {
   }
 };
 
-var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-tw-join','ev-yt-sub','ev-yt-super','ev-yt-member','ev-yt-join','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-kk-join','ev-ext-other','ev-se-tip','ev-aq','hideCmd','sfTickerOn'];
-var SOUND_IDS = ['snd-chat','snd-tw-follow','snd-tw-sub','snd-tw-gift','snd-tw-raid','snd-tw-cheer','snd-yt-sub','snd-yt-super','snd-tt-follow','snd-tt-gift','snd-kk-follow','snd-kk-sub','snd-ext','snd-se-tip','snd-kw'];
+var EV_FILTERS = ['ev-tw-follow','ev-tw-sub','ev-tw-gift','ev-tw-cheer','ev-tw-raid','ev-tw-redeem','ev-tw-mod','ev-tw-announce','ev-tw-join','ev-yt-sub','ev-yt-super','ev-yt-member','ev-yt-join','ev-tt-follow','ev-tt-gift','ev-tt-sub','ev-tt-join','ev-tt-share','ev-tt-like','ev-kk-follow','ev-kk-sub','ev-kk-gift','ev-kk-raid','ev-kk-redeem','ev-kk-join','ev-ext-other','ev-ext-all','ev-se-tip','ev-aq','hideCmd','sfTickerOn','sfChattersOn','welcomeBackOn'];
+var SOUND_IDS = ['snd-chat','snd-tw-follow','snd-tw-sub','snd-tw-gift','snd-tw-raid','snd-tw-cheer','snd-yt-sub','snd-yt-super','snd-tt-follow','snd-tt-gift','snd-kk-follow','snd-kk-sub','snd-ext','snd-welcome','snd-se-tip','snd-kw'];
 
 var ttsEnabled = false;
 var keywords = [], quickMessages = [], evHistory = [];
@@ -5440,6 +5853,20 @@ function loadSettings() {
       if (d.shoutout.cmdTemplate !== undefined) S.shoutout.cmdTemplate = d.shoutout.cmdTemplate;
       if (d.shoutout.excludeList !== undefined) S.shoutout.excludeList = d.shoutout.excludeList;
       if (d.shoutout.minViewersToShoutout !== undefined) S.shoutout.minViewersToShoutout = d.shoutout.minViewersToShoutout;
+      if (d.shoutout.autoRaid !== undefined) S.shoutout.autoRaid = !!d.shoutout.autoRaid;
+      if (d.shoutout.autoRaidMinViewers !== undefined) S.shoutout.autoRaidMinViewers = d.shoutout.autoRaidMinViewers;
+    }
+    // Auto-thank
+    if (d.autoThank) {
+      var _at = d.autoThank;
+      if (_at.enabled !== undefined) S.autoThank.enabled = !!_at.enabled;
+      if (_at.sub !== undefined) S.autoThank.sub = !!_at.sub;
+      if (_at.cheer !== undefined) S.autoThank.cheer = !!_at.cheer;
+      if (_at.gift !== undefined) S.autoThank.gift = !!_at.gift;
+      if (_at.minBits !== undefined) S.autoThank.minBits = _at.minBits;
+      if (_at.subMsg !== undefined) S.autoThank.subMsg = _at.subMsg;
+      if (_at.cheerMsg !== undefined) S.autoThank.cheerMsg = _at.cheerMsg;
+      if (_at.giftMsg !== undefined) S.autoThank.giftMsg = _at.giftMsg;
     }
     // Discord Live-Announce
     if (d.discordAnnounce) {
@@ -5492,7 +5919,12 @@ function saveSettings() {
     shoutout: {
       enabled: S.shoutout.enabled, autoFire: S.shoutout.autoFire,
       cmdTemplate: S.shoutout.cmdTemplate, excludeList: S.shoutout.excludeList,
-      minViewersToShoutout: S.shoutout.minViewersToShoutout
+      minViewersToShoutout: S.shoutout.minViewersToShoutout,
+      autoRaid: S.shoutout.autoRaid, autoRaidMinViewers: S.shoutout.autoRaidMinViewers
+    },
+    autoThank: {
+      enabled: S.autoThank.enabled, sub: S.autoThank.sub, cheer: S.autoThank.cheer, gift: S.autoThank.gift,
+      minBits: S.autoThank.minBits, subMsg: S.autoThank.subMsg, cheerMsg: S.autoThank.cheerMsg, giftMsg: S.autoThank.giftMsg
     },
     discordAnnounce: {
       enabled: S.discordAnnounce.enabled, liveTemplate: S.discordAnnounce.liveTemplate,
@@ -5550,6 +5982,16 @@ loadSettings();
   // Smart Shoutouts
   var soEn = document.getElementById('soEnabled'); if (soEn) soEn.checked = S.shoutout.enabled;
   var soAf = document.getElementById('soAutoFire'); if (soAf) soAf.checked = S.shoutout.autoFire;
+  var soAr = document.getElementById('soAutoRaid'); if (soAr) soAr.checked = S.shoutout.autoRaid;
+  var soArm = document.getElementById('soAutoRaidMin'); if (soArm) soArm.value = S.shoutout.autoRaidMinViewers || 0;
+  var atE = document.getElementById('atEnabled'); if (atE) atE.checked = S.autoThank.enabled;
+  var atS = document.getElementById('atSub'); if (atS) atS.checked = S.autoThank.sub;
+  var atC = document.getElementById('atCheer'); if (atC) atC.checked = S.autoThank.cheer;
+  var atG = document.getElementById('atGift'); if (atG) atG.checked = S.autoThank.gift;
+  var atMb = document.getElementById('atMinBits'); if (atMb) atMb.value = S.autoThank.minBits;
+  var atSm = document.getElementById('atSubMsg'); if (atSm) atSm.value = S.autoThank.subMsg;
+  var atCm = document.getElementById('atCheerMsg'); if (atCm) atCm.value = S.autoThank.cheerMsg;
+  var atGm = document.getElementById('atGiftMsg'); if (atGm) atGm.value = S.autoThank.giftMsg;
   var soTpl = document.getElementById('soCmdTemplate'); if (soTpl) soTpl.value = S.shoutout.cmdTemplate;
   var soXc = document.getElementById('soExcludeList'); if (soXc) soXc.value = S.shoutout.excludeList;
   // Discord Live-Announce
@@ -5739,6 +6181,7 @@ function playSound(type) {
   else if (type === 'keyword') { playTone(880, 'sine', 0.07, v); playTone(1100, 'sine', 0.22, v, 0.08); }
   else if (type === 'tip' || type === 'ext') { playTone(523, 'triangle', 0.12, v); playTone(659, 'triangle', 0.12, v, 0.1); playTone(784, 'triangle', 0.3, v, 0.2); }
   else if (type === 'reminder') { playTone(880, 'sine', 0.14, v); playTone(1174, 'sine', 0.16, v, 0.14); playTone(1568, 'sine', 0.3, v, 0.28); }
+  else if (type === 'welcome') { playTone(523, 'sine', 0.1, v); playTone(784, 'sine', 0.12, v, 0.09); playTone(1047, 'sine', 0.28, v, 0.18); }
 }
 _loadCustomSounds();
 
@@ -5752,7 +6195,7 @@ var _sndIdToKey = {
   'snd-chat':'chat','snd-tw-follow':'follow','snd-tw-sub':'sub','snd-tw-gift':'gift',
   'snd-tw-raid':'raid','snd-tw-cheer':'cheer','snd-yt-sub':'yt-sub','snd-yt-super':'super',
   'snd-tt-follow':'tt-follow','snd-tt-gift':'tt-gift','snd-kk-follow':'kk-follow',
-  'snd-kk-sub':'kk-sub','snd-ext':'ext','snd-se-tip':'tip','snd-kw':'keyword'
+  'snd-kk-sub':'kk-sub','snd-ext':'ext','snd-welcome':'welcome','snd-se-tip':'tip','snd-kw':'keyword'
 };
 function maybeSound(id, type) {
   var el = document.getElementById(id);
@@ -9042,6 +9485,70 @@ function _shoutoutDismiss(login) {
   _shoutoutRefreshUI();
 }
 
+// Auto-shoutout a raider when they raid the channel (opt-in). Fires a few
+// seconds after the raid so the raid alert / hype lands first, honors the
+// exclude list + the broadcaster skip, and dispatches through _shoutoutFire so
+// the streamer's command template and the native /shoutout 2-min cooldown apply.
+var _AUTO_RAID_SO_DELAY = 5000;
+function _maybeAutoRaidShoutout(login, name, viewers) {
+  try {
+    if (!S.shoutout || !S.shoutout.autoRaid) return;
+    login = String(login || '').toLowerCase().replace(/^@/, '');
+    if (!login) return;
+    if (login === (S.twLogin || '').toLowerCase()) return;            // never SO yourself
+    var vc = Number(viewers); if (!isFinite(vc)) vc = 0;
+    if (vc < (Number(S.shoutout.autoRaidMinViewers) || 0)) return;    // below the viewer floor
+    var excl = String(S.shoutout.excludeList || '').toLowerCase().split(/[\s,]+/).filter(Boolean);
+    if (excl.indexOf(login) >= 0) return;                             // on the exclude list
+    if (S.shoutout.shoutedThisStream && S.shoutout.shoutedThisStream[login]) return; // already done this stream
+    addEvHistory('StreamFusion', 'Auto-shoutout for raider ' + (name || login) + ' in ' + Math.round(_AUTO_RAID_SO_DELAY / 1000) + 's…', 'tw', false);
+    setTimeout(function () {
+      try {
+        if (!S.shoutout.autoRaid) return;                            // toggled off during the wait
+        if (!S.sbConnected) { addEvHistory('StreamFusion', 'Auto-shoutout skipped for ' + (name || login) + ' — Streamer.bot not connected', 'tw', false); return; }
+        _shoutoutFire(login, name);
+      } catch (e) {}
+    }, _AUTO_RAID_SO_DELAY);
+  } catch (e) {}
+}
+
+// Auto-thank a sub / cheer / gift in Twitch chat (opt-in). Central hook off
+// pushMsg, so every Twitch alert flows through it. Per-user (60s) + global
+// (3.5s) cooldowns keep gift-bombs and busy moments from flooding chat.
+var _autoThankCd = {}, _autoThankLastGlobal = 0;
+function _autoThankMaybe(evType, user, text) {
+  var at = S.autoThank;
+  if (!at || !at.enabled || !user || !S.sbConnected) return;
+  var type = evType === 'sub' ? 'sub' : evType === 'cheer' ? 'cheer' : evType === 'gift' ? 'gift' : null;
+  if (!type || !at[type]) return;
+  var login = String(user).toLowerCase().replace(/^@/, '');
+  if (!login || login === (S.twLogin || '').toLowerCase()) return;
+  // Best-effort amount from the alert text (e.g. "cheered 500 bits", "gifted 5 subs").
+  var amt = '';
+  if (type !== 'sub') { var mm = /(\d[\d,]*)/.exec(text || ''); if (mm) amt = mm[1]; }
+  if (type === 'cheer' && at.minBits) {
+    var b = parseInt((amt || '0').replace(/,/g, ''), 10) || 0;
+    if (b < at.minBits) return;
+  }
+  var now = Date.now();
+  if (_autoThankCd[login] && now - _autoThankCd[login] < 60000) return;
+  if (now - _autoThankLastGlobal < 3500) return;
+  var tmpl = type === 'sub' ? at.subMsg : type === 'cheer' ? at.cheerMsg : at.giftMsg;
+  var msg = String(tmpl || '').replace(/\{user\}/g, user).replace(/\{amount\}/g, amt).trim();
+  if (!msg) return;
+  _autoThankCd[login] = now; _autoThankLastGlobal = now;
+  handleTwitchCommand(msg);
+}
+// Human label for a Twitch native-goal type (contribution_type from EventSub).
+function _twGoalTypeLabel(t) {
+  t = String(t || '').toLowerCase();
+  if (t.indexOf('follow') >= 0) return 'Follower goal';
+  if (t.indexOf('subscription_point') >= 0 || t.indexOf('sub_point') >= 0) return 'Sub-points goal';
+  if (t.indexOf('sub') >= 0) return 'Sub goal';
+  if (t.indexOf('bit') >= 0 || t.indexOf('cheer') >= 0) return 'Bits goal';
+  return 'Goal';
+}
+
 // Called from startStreamSession — fresh stream means fresh chatter
 // universe, so re-discovery is desirable.
 function _shoutoutResetSession() {
@@ -9905,7 +10412,7 @@ function handleSBEvent(event, data, fromES) {
     }
     pushMsg({ plat: 'tw', user: u.name || u.displayName || u.login || '?', login: _twLoginKey, html: renderTwitchMessage(parts, rawText, emotes), text: rawText, color: u.color || null, badges: parseSBBadges(u.badges, msg.badges), msgId: msgId, avatar: _twAvatar, isFirstMsg: _isFirstMsg });
     // Viewer CRM: track this chatter (msgs / days seen / last seen).
-    if (_twLoginKey && typeof _viewerTrackMsg === 'function') { try { _viewerTrackMsg(_twLoginKey, u.displayName || u.name || _twLoginKey); } catch (e) {} }
+    if (_twLoginKey && typeof _viewerTrackMsg === 'function') { try { _viewerTrackMsg(_twLoginKey, u.displayName || u.name || _twLoginKey, 'tw'); } catch (e) {} }
   } else if (key === 'Twitch.AnnouncementMessage' || key === 'Twitch.Announcement' || key === 'Twitch.ChatMessageAnnouncement' || key === 'Twitch.AnnouncementSent') {
     if (chk('ev-tw-announce')) return;
     var _annUser = gu(data) || 'Announcement';
@@ -10003,6 +10510,14 @@ function handleSBEvent(event, data, fromES) {
     var _raidAv = _resolveEvAvatar('tw', _rdr, rn2);
     var raidText = rn2 + ' raided with ' + rc2 + ' viewers!'; maybeSound('snd-tw-raid', 'raid'); triggerRaid(rn2, rc2, 'tw'); pushMsg({ plat: 'tw', isEv: true, evType: 'raid', user: rn2, text: raidText, avatar: _raidAv }); setPinnedEvent(rn2, raidText, 'tw');
     printerPost({ kind: 'raid', plat: 'tw', user: rn2, avatar: _raidAv, viewers: rc2 });
+    // Auto-shoutout the raider (opt-in via Settings → Smart Shoutouts). Prefer a
+    // real login over the display name for the /shoutout target.
+    var _raidLogin = _rdr.login || _rdr.userLogin || _rdr.user_login || _rdr.username || _rdr.userName
+      || data.fromBroadcasterUserLogin || data.from_broadcaster_user_login
+      || data.raiderUserLogin || data.raider_user_login || data.raiderLogin
+      || data.fromBroadcasterUserName || data.from_broadcaster_user_name
+      || rn2 || '';
+    _maybeAutoRaidShoutout(_raidLogin, rn2, rc2);
   } else if (key === 'Twitch.RewardRedemption' || key === 'Twitch.ChannelPointRedemption' || key === 'Twitch.ChannelPointsRedemption' || key === 'Twitch.Reward.Redemption' || key === 'Twitch.PointsRedemption' || key === 'Twitch.RewardRedeemed' || key === 'Twitch.ChannelRewardRedemption') {
     if (chk('ev-tw-redeem')) return;
     var ren = gu(data);
@@ -10572,6 +11087,28 @@ function handleSBEvent(event, data, fromES) {
     // Refresh the Helix schedule shortly after the break ends to pick up the
     // next_ad_at for the following roll.
     setTimeout(function () { try { adRefreshSchedule(); } catch (e) {} }, (_adSecs + 3) * 1000);
+  } else if (src === 'Twitch' && /^Goal(Begin|Start|Created|End|Ended|Complete|Finished)/i.test(type || '')) {
+    // Twitch's native creator Goals (set in the Twitch dashboard). Celebrate a
+    // goal starting and — loudly — a goal being reached. The high-frequency
+    // GoalProgress / GoalUpdate ticks fall through to the drop branch below.
+    var _gLbl = _twGoalTypeLabel(data.goalType || data.type || data.description);
+    var _gTgt = Number(data.targetAmount != null ? data.targetAmount : data.target_amount != null ? data.target_amount : data.target);
+    var _gCur = Number(data.currentAmount != null ? data.currentAmount : data.current_amount != null ? data.current_amount : data.current);
+    var _gTgtStr = (isFinite(_gTgt) && _gTgt > 0) ? _gTgt.toLocaleString() : '';
+    if (/Goal(Begin|Start|Created)/i.test(type)) {
+      pushMsg({ plat: 'tw', isEv: true, evType: 'goal', user: 'Goal', text: 'New ' + _gLbl.toLowerCase() + (_gTgtStr ? ' — target ' + _gTgtStr : '') + ' started' });
+    } else {
+      var _gWon = (data.isAchieved === true || data.is_achieved === true || (isFinite(_gCur) && isFinite(_gTgt) && _gTgt > 0 && _gCur >= _gTgt));
+      if (_gWon) {
+        maybeSound('snd-tw-sub', 'sub');
+        showBanner('i-party', 'Goal reached!', _gLbl + (_gTgtStr ? ' — ' + _gTgtStr : ''), null, 'tw');
+        fireBurstConfetti('tw');
+        pushMsg({ plat: 'tw', isEv: true, evType: 'goal', big: true, user: 'Goal', text: _gLbl + ' reached' + (_gTgtStr ? ' (' + _gTgtStr + ')' : '') + '! 🎉' });
+      } else {
+        pushMsg({ plat: 'tw', isEv: true, evType: 'goal', user: 'Goal', text: _gLbl + ' ended' + (isFinite(_gCur) && _gTgtStr ? ' (' + _gCur.toLocaleString() + '/' + _gTgtStr + ')' : '') });
+      }
+    }
+    return;
   } else if (src === 'Twitch' && /^Goal/i.test(type || '')) {
     // Silently consume Twitch channel Goal events (GoalBegin, GoalProgress,
     // GoalEnd, GoalUpdate). These fire on every follow/sub tick and aren't
@@ -10580,8 +11117,17 @@ function handleSBEvent(event, data, fromES) {
     return;
   } else {
     // Generic third-party / unknown-source extension events
+    // Verbose mode ("Show every raw extension event") surfaces everything a
+    // third-party source emits — including the bus/housekeeping traffic that's
+    // normally dropped below — so a streamer can see exactly what a new
+    // integration is firing. Default off; overrides the per-type mutes.
+    var _extAll = chk('ev-ext-all');
     if (!src || !type) {
       console.log('[SB unhandled]', key, JSON.stringify(data).slice(0, 200));
+      if (_extAll) {
+        maybeSound('snd-ext', 'cheer');
+        pushMsg({ plat: 'ev', isEv: true, user: 'Extension', text: 'Raw event — ' + (key || '(unnamed)') });
+      }
       return;
     }
     // Log any unhandled first-party platform events loudly so streamers can
@@ -10620,7 +11166,8 @@ function handleSBEvent(event, data, fromES) {
       if (_vcShaped) return;
     }
     // Drop noisy housekeeping events that aren't user-facing actions
-    if (/RewardUpdated|RewardCreated|RewardDeleted|ChannelUpdate|StreamUpdate|PollCreated|PredictionCreated/i.test(type)) return;
+    // (verbose mode keeps them so the streamer can see the raw firehose).
+    if (!_extAll && /RewardUpdated|RewardCreated|RewardDeleted|ChannelUpdate|StreamUpdate|PollCreated|PredictionCreated/i.test(type)) return;
     // Streamer.bot's "Custom" events (General.Custom and friends) are an
     // internal action-to-action message bus, not viewer events. Anything SF is
     // meant to show arrives through an explicit contract handled above
@@ -10628,9 +11175,10 @@ function handleSBEvent(event, data, fromES) {
     // else is bus traffic between actions (printer bot, companions, product
     // packs) and kept showing up as "General: Custom" cards no matter what
     // payload it carried, so unrecognized Custom events are now dropped
-    // unconditionally. 1.15.0 only dropped the content-less ones.
-    if (/^Custom$/i.test(type)) return;
-    if (chk('ev-ext-other')) return;
+    // unconditionally. 1.15.0 only dropped the content-less ones. Verbose mode
+    // opts back into seeing them.
+    if (!_extAll && /^Custom$/i.test(type)) return;
+    if (!_extAll && chk('ev-ext-other')) return;
     var _extUser = gu(data) || src || 'Extension';
     var _extDesc = '';
     if (data && typeof data === 'object') {
@@ -10776,6 +11324,7 @@ function pushMsg(m) {
   if (m && m.plat && _lastChatActivity[m.plat] != null) {
     _lastChatActivity[m.plat] = Date.now();
   }
+  if (_giveaway.active && !m.isEv && m.user) { try { _giveawayCheck(m); } catch (e) {} }
   // Warden relay: forward non-Twitch chat lines to the mod console's
   // unified feed (Twitch has its own native EventSub ingest). One tap here
   // covers Kick/YouTube/TikTok; gated on the pane toggle.
@@ -10793,6 +11342,7 @@ function pushMsg(m) {
     trailLog('shown', { type: m.evType || 'event', user: m.user || '', bits: m.coinAmount != null ? m.coinAmount : null });
     S.evs++; updateStatBar(); removeEmpty();
     addEvHistory(m.user || 'System', m.text || '', m.plat, m.big, m.giftHtml || null, m.evMessage || '', m.avatar || '');
+    if (m.plat === 'tw') { try { _autoThankMaybe(m.evType, m.user, m.text); } catch (e) {} }
     ttsEventSpeak(m.plat, m.evType || '', m.user || '', m.text || '', m.coinAmount);
     tintBackground(m.plat, 'strong');
     return;
@@ -10848,8 +11398,7 @@ function pushMsg(m) {
 
   var el = document.createElement('div');
   var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  var _platSvgs = {tw:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>',yt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg>',tt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.3 0 .59.04.86.12V9.01a6.27 6.27 0 0 0-1-.08 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.98a8.18 8.18 0 0 0 4.78 1.53V7.1a4.84 4.84 0 0 1-.88-.41z"/></svg>',kk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h5v6h3V6h3V3h5v6h-3v3h3v9h-5v-3h-3v-3H8v6H3V3z"/></svg>'};
-  var icon = _platSvgs[m.plat] || '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
+  var icon = SF_PLAT_SVG[m.plat] || SF_PLAT_SVG._other;
   el.className = 'msg ' + m.plat + (isHighlighted ? ' highlighted' : '') + (isFirstMsg ? ' first-msg' : '') + (isFirstWords ? ' first-words' : '');
   if (m.user) el.setAttribute('data-user', m.user.toLowerCase());
   var bhtml = (m.badges || []).map(function(b) { return b.img ? '<img class="tw-badge" src="' + esc(b.img) + '" title="' + esc(b.lbl || '') + '">' : '<span class="badge ' + esc(b.cls||'') + '">' + esc(b.lbl) + '</span>'; }).join('');
@@ -11310,17 +11859,9 @@ function updateViewers() {
   ['tw','yt','kk','tt'].forEach(function(p) {
     if (sh[p] && _viewerFresh(p)) total += S.viewers[p];
   });
-  var html = '';
-  // Chips render when their own source is up — Kick's slug poll and a native
-  // Twitch sign-in are SB-independent, so an SB blip no longer blanks them.
-  if (sh.tw && _viewerSourceUp('tw')) html += '<div class="vc tw"><div class="dot"></div>TW: ' + (twF ? S.viewers.tw.toLocaleString() : '–') + '</div>';
-  if (sh.yt && _viewerSourceUp('yt')) html += '<div class="vc yt"><div class="dot"></div>YT: ' + (ytF ? S.viewers.yt.toLocaleString() : '–') + '</div>';
-  if (sh.kk && _viewerSourceUp('kk')) html += '<div class="vc kk"><div class="dot"></div>KK: ' + (kkF ? S.viewers.kk.toLocaleString() : '–') + '</div>';
-  // TikTok now renders 0 and the '–' unfetched placeholder like the other
-  // platforms (it used to silently vanish at 0, indistinguishable from a bug).
-  if (sh.tt && tfLive) html += '<div class="vc tt"><div class="dot"></div>TT: ' + (ttF ? S.viewers.tt.toLocaleString() : '–') + '</div>';
-  html += '<div class="vc total"><svg class="ic"><use href="#i-eye"/></svg>' + total.toLocaleString() + ' total</div>';
-  wrap.innerHTML = html;
+  // Per-platform counts now live in the live-bar chips; the topbar carries only
+  // the combined total (kept prominent as the headline number).
+  wrap.innerHTML = '<div class="vc total"><svg class="ic"><use href="#i-eye"/></svg><b>' + total.toLocaleString() + '</b><span class="vcl">total</span></div>';
   sendOverlayStats();
   if (typeof updateLiveBar === 'function') updateLiveBar();
 }
@@ -11341,14 +11882,24 @@ function _statSet(el, val) {
     _statPop(el);
   }
 }
+// Per-platform ingest health: Twitch/YouTube/Kick ride Streamer.bot, TikTok
+// rides TikFinity. Lit glyph = source up, dimmed = not connected.
+function _connHealthHtml() {
+  var c = { tw: S.sbConnected, yt: S.sbConnected, kk: S.sbConnected, tt: S.tfConnected };
+  var via = { tw: 'Streamer.bot', yt: 'Streamer.bot', kk: 'Streamer.bot', tt: 'TikFinity' };
+  var pips = ['tw', 'yt', 'kk', 'tt'].map(function (pl) {
+    var ok = !!c[pl], svg = SF_PLAT_SVG[pl] || SF_PLAT_SVG._other, lbl = _PLAT_LABEL[pl] || pl;
+    var title = lbl + (ok ? ' — connected via ' + via[pl] : ' — ' + via[pl] + ' not connected');
+    return '<span class="conn-pip ' + (ok ? 'on ' + pl : 'off') + '" title="' + esc(title) + '">' + svg + '</span>';
+  }).join('');
+  var none = (!S.sbConnected && !S.tfConnected) ? '<span class="conn-none">Not connected</span>' : '';
+  return '<span class="conn-strip" onclick="openSettingsTab(\'connections\')" title="Open connection settings">' + none + '<span class="conn-pips">' + pips + '</span></span>';
+}
 function updateStatBar() {
   _statSet(document.getElementById('stMsgs'), S.msgs);
   _statSet(document.getElementById('stEvs'), S.evs);
   _statSet(document.getElementById('stFilt'), S.filt);
-  var p = [];
-  if (S.sbConnected) p.push('Streamer.bot');
-  if (S.tfConnected) p.push('Tikfinity');
-  document.getElementById('stConn').innerHTML = '<svg class="ic"><use href="#i-plug"/></svg> ' + (p.length ? esc(p.join(' · ')) : 'Not connected');
+  document.getElementById('stConn').innerHTML = _connHealthHtml();
   updateInputBar();
 }
 
@@ -13412,7 +13963,7 @@ function qBlock(n) { if (n && S.blocked.indexOf(n) < 0) { S.blocked.push(n); sav
 function renderBlocked() { document.getElementById('blist').innerHTML = S.blocked.length ? S.blocked.map(function(b) { return '<div class="bitem">' + esc(b) + '<span class="x" onclick="removeBlock(\'' + escA(b) + '\')"><svg class="ic"><use href="#i-x"/></svg></span></div>'; }).join('') : '<div style="font-size:11px;color:var(--mut)">No blocked accounts</div>'; }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
-function closeModal() { document.getElementById('overlay').classList.remove('show'); }
+function closeModal() { document.getElementById('overlay').classList.remove('show'); _giveawayOpen = false; }
 function openModal(which) {
   var m = document.getElementById('modal');
   document.getElementById('overlay').classList.add('show');
@@ -14755,6 +15306,9 @@ function updateLiveBar() {
     if (!el) return;
     el.style.display = S.show[p] ? '' : 'none';
     el.classList.toggle('on', _liveBar[p]);
+    // Fold the per-platform viewer count into the live chip (shown via ::after
+    // when live). The topbar now carries only the combined total.
+    el.setAttribute('data-n', _liveBar[p] ? Number(S.viewers[p] || 0).toLocaleString() : '');
   });
   var t = document.getElementById('lbTimer');
   if (t) {
@@ -18172,6 +18726,7 @@ window.addEventListener('load', function() {
   document.getElementById('qsendBtn').classList.toggle('on', qsendVisible);
   renderBlocked(); renderKeywords(); renderQSend(); updateViewers(); updateStreamStats(); updateLiveBar();
   try { sfTickerApply(); } catch (e) {}
+  try { sfChattersApply(); } catch (e) {}
   // Restore TTS settings UI
   var ttsRU = document.getElementById('ttsReadUser'); if (ttsRU) ttsRU.checked = ttsReadUser;
   var ttsRE = document.getElementById('ttsReadEmoji'); if (ttsRE) ttsRE.checked = ttsReadEmoji;
@@ -18215,6 +18770,10 @@ window.addEventListener('load', function() {
   maybeShowChangelog();
   // Global keyboard shortcuts
   document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd+K → command palette (toggle)
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault(); if (_cmdpOpen) closeCmdPalette(); else openCmdPalette(); return;
+    }
     // Ctrl+Shift+T → toggle TTS
     if (e.ctrlKey && e.shiftKey && (e.key === 'T' || e.key === 't')) { e.preventDefault(); toggleTTS(); }
     // Ctrl+Shift+F → toggle chat search
