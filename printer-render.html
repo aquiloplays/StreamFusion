@@ -10,6 +10,7 @@ const { ipcRenderer } = require('electron');
 
 const W = 576, WIDTH_BYTES = 72;
 const BOTTOM_PAD = 16;      // dots of quiet zone before the cut — keep tight
+const CAH_MARK = 'cards against humanity';   // tiny logo label on CAH cards
 
 const BIRD = 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="140 280 744 540">' +
@@ -361,6 +362,39 @@ function drawFrame(x, style, h) {
   }
 }
 
+// Draws one CAH-style card at yTop. dark=true → black card with white text;
+// otherwise a white card with a black border + black text. Left-aligned body
+// with a tiny logo mark bottom-left. Returns the bottom y.
+function drawCahCard(x, yTop, text, dark) {
+  const M = 34, cardW = W - M * 2, pad = 26, fs = 30, lh = 40, brandH = 30;
+  const maxW = cardW - pad * 2;
+  x.font = '700 ' + fs + 'px "Segoe UI", Arial';
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let ln = '';
+  for (const w of words) {
+    const t = ln ? ln + ' ' + w : w;
+    if (x.measureText(t).width > maxW && ln) { lines.push(ln); ln = w; }
+    else ln = t;
+  }
+  if (ln) lines.push(ln);
+  const cardH = pad + lines.length * lh + brandH;
+  x.beginPath(); x.roundRect(M, yTop, cardW, cardH, 16);
+  if (dark) { x.fillStyle = '#000'; x.fill(); }
+  else { x.fillStyle = '#fff'; x.fill(); x.lineWidth = 3; x.strokeStyle = '#000'; x.stroke(); }
+  x.fillStyle = dark ? '#fff' : '#000';
+  x.textAlign = 'left';
+  let ty = yTop + pad + fs * 0.78;
+  for (const l of lines) { x.fillText(l, M + pad, ty); ty += lh; }
+  const sq = 15, by = yTop + cardH - 12;
+  x.fillStyle = dark ? '#fff' : '#000';
+  x.fillRect(M + pad, by - sq + 2, sq, sq);
+  x.font = '700 13px "Segoe UI", Arial';
+  x.fillText(CAH_MARK, M + pad + sq + 8, by);
+  x.textAlign = 'center'; x.fillStyle = '#000';   // reset shared state for the caller
+  return yTop + cardH;
+}
+
 // Draws the job, returns the y coordinate just below the last element.
 async function drawJob(x, job) {
   x.fillStyle = '#000'; x.textAlign = 'center';
@@ -430,6 +464,22 @@ async function drawJob(x, job) {
     try { x.letterSpacing = '0px'; } catch (e) {}
     x.fillStyle = '#000';
     y += h + 10;
+  }
+
+  // Cards Against Humanity: the black prompt card, then the white answer
+  // card(s), each joined by a connector caret. Read the prompt, reveal the rest.
+  if (job.cahBlack) {
+    y += 20;
+    y = drawCahCard(x, y, job.cahBlack, true);
+    const whites = job.cahWhites || [];
+    for (const wc of whites) {
+      y += 12;
+      x.fillStyle = '#000';
+      x.beginPath(); x.moveTo(W / 2 - 13, y); x.lineTo(W / 2 + 13, y); x.lineTo(W / 2, y + 15); x.closePath(); x.fill();
+      y += 24;
+      y = drawCahCard(x, y, String(wc), false);
+    }
+    y += 4;
   }
 
   // Big image (meme prints): full-width dithered frame with a border.

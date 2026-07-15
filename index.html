@@ -3088,6 +3088,12 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Print memes</span><input type="checkbox" id="prnEvMeme" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Reward name</span><input type="text" id="prnMemeReward" value="Print a Meme" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">CARDS AGAINST HUMANITY</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Channel-point reward: draws a random black prompt + white answer card for you to read on stream. No viewer text needed. Pick a deck &mdash; <b>Raunch is adult (18+)</b>, so mind Twitch's content rules when you read it aloud.</div>
+            <label class="frow"><span>Print CAH cards</span><input type="checkbox" id="prnEvCah" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Reward name</span><input type="text" id="prnCahReward" value="Cards Against Humanity" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Deck</span><select id="prnCahDeck" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"><option value="clean">Clean &mdash; all-ages</option><option value="pg13" selected>PG-13 &mdash; cheeky</option><option value="raunch">Raunch &mdash; adult (18+)</option></select></label>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SHIFT TICKET</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
             <button class="tbtn" onclick="printerShiftTicket()" style="font-size:11px;font-weight:700;padding:5px 10px">Print tonight's shift ticket</button>
@@ -16765,9 +16771,11 @@ function sendObsAlert(obj) {
 var PRINTER_ALLOWLIST = ['991099623'];   // Twitch user ids that see the feature
 var printerCfg = {
   enabled: false, printerName: '', maxPerMinute: 6,
-  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true, meme: true },
+  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true, meme: true, cah: true },
   noteReward: 'Print My Note',
   memeReward: 'Print a Meme',
+  cahReward: 'Cards Against Humanity',
+  cahDeck: 'pg13',   // 'clean' | 'pg13' | 'raunch'
   theme: 'auto',
   flair: true,
   follows: { tw: false, kk: false, yt: false, tt: false },
@@ -16826,6 +16834,8 @@ function _printerLoadCfg() {
       if (d.ev) Object.assign(printerCfg.ev, d.ev);
       if (typeof d.noteReward === 'string') printerCfg.noteReward = d.noteReward;
       if (typeof d.memeReward === 'string') printerCfg.memeReward = d.memeReward;
+      if (typeof d.cahReward === 'string') printerCfg.cahReward = d.cahReward;
+      if (d.cahDeck === 'clean' || d.cahDeck === 'pg13' || d.cahDeck === 'raunch') printerCfg.cahDeck = d.cahDeck;
       if (typeof d.theme === 'string') printerCfg.theme = d.theme;
       if (typeof d.flair === 'boolean') printerCfg.flair = d.flair;
       if (d.follows) Object.assign(printerCfg.follows, d.follows);
@@ -16848,6 +16858,7 @@ function _printerSyncUi() {
   _prnEl('prnEvHype').checked = printerCfg.ev.hype;    _prnEl('prnEvSongs').checked = printerCfg.ev.songs;
   _prnEl('prnEvNote').checked = printerCfg.ev.note;    _prnEl('prnNoteReward').value = printerCfg.noteReward;
   _prnEl('prnEvMeme').checked = printerCfg.ev.meme;    _prnEl('prnMemeReward').value = printerCfg.memeReward;
+  if (_prnEl('prnEvCah')) { _prnEl('prnEvCah').checked = printerCfg.ev.cah !== false; _prnEl('prnCahReward').value = printerCfg.cahReward; _prnEl('prnCahDeck').value = printerCfg.cahDeck; }
   _prnEl('prnTheme').value = printerCfg.theme;
   _prnEl('prnFlair').checked = printerCfg.flair;
   _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
@@ -16869,10 +16880,13 @@ function onPrinterCfgChange() {
     super: _prnEl('prnEvSuper').checked, ttgift: _prnEl('prnEvTtGift').checked,
     raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked,
     hype: _prnEl('prnEvHype').checked,   songs: _prnEl('prnEvSongs').checked,
-    note: _prnEl('prnEvNote').checked,   meme: _prnEl('prnEvMeme').checked
+    note: _prnEl('prnEvNote').checked,   meme: _prnEl('prnEvMeme').checked,
+    cah: _prnEl('prnEvCah') ? _prnEl('prnEvCah').checked : true
   };
   printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
   printerCfg.memeReward = _prnEl('prnMemeReward').value || 'Print a Meme';
+  if (_prnEl('prnCahReward')) printerCfg.cahReward = _prnEl('prnCahReward').value || 'Cards Against Humanity';
+  if (_prnEl('prnCahDeck')) printerCfg.cahDeck = _prnEl('prnCahDeck').value || 'pg13';
   printerCfg.theme = _prnEl('prnTheme').value || 'auto';
   printerCfg.flair = _prnEl('prnFlair').checked;
   var _wh = _prnEl('prnDiscordWebhook');
@@ -17097,6 +17111,169 @@ function _printerScheduleDigest() {
   }, 70000);
 }
 
+// ── Cards Against Humanity print reward ──────────────────────────────────────
+// Redeeming the configured reward draws one BLACK (prompt) card + N WHITE
+// (answer) cards for the streamer to read aloud. Three generic decks by tier;
+// content is original (not the retail product). Black `pick` = how many white
+// cards to draw. Bundled locally, so the print is instant and offline.
+var CAH_DECKS = {
+  clean: {
+    label: 'Clean',
+    black: [
+      { t: "What's the secret ingredient in Grandma's soup?" },
+      { t: "What did I find under the couch cushions?" },
+      { t: "I never leave the house without ____." },
+      { t: "What's my hidden talent?" },
+      { t: "The zoo's newest exhibit is just ____." },
+      { t: "What ended the dinner party early?" },
+      { t: "What's that mysterious smell coming from the fridge?" },
+      { t: "The school talent show was stolen by ____." },
+      { t: "What did the wizard pull out of his hat?" },
+      { t: "What's the worst thing to bring to a potluck?" },
+      { t: "The new theme-park ride is basically ____." },
+      { t: "What's my New Year's resolution?" },
+      { t: "Why is the cat staring at me like that?" },
+      { t: "Instead of my homework, I spent all night with ____." },
+      { t: "What made the birthday party legendary?" },
+      { t: "What did I wish for when I blew out the candles?" },
+      { t: "The camping trip fell apart because of ____." },
+      { t: "What's the real reason I was late?" },
+      { t: "This holiday, I'm thankful for ____ and ____.", pick: 2 },
+      { t: "My superhero fights crime with ____ and a sidekick made of ____.", pick: 2 }
+    ],
+    white: [
+      "A very confused goose.", "Three raccoons in a trench coat.", "An aggressively large sandwich.",
+      "Grandma's competitive streak.", "A slightly haunted vending machine.", "The power of friendship.",
+      "A trombone playing sad noises.", "Way too much glitter.", "A dog wearing tiny shoes.",
+      "An overdue library book.", "A suspiciously wise squirrel.", "The last slice of pizza.",
+      "A dramatic reading of the phone book.", "A cat who knows all my secrets.", "Interpretive dance.",
+      "A bucket of lukewarm soup.", "An extremely polite dragon.", "My inability to whistle.",
+      "A parade of confused ducks.", "A motivational poster with a typo.", "A goblin with a business degree.",
+      "A tiny hat for a big problem.", "Unlimited breadsticks.", "A dad joke that went too far.",
+      "A snowman with commitment issues.", "The world's okayest trophy.", "A llama in the express lane.",
+      "An accordion solo nobody asked for.", "A wizard who forgot his own spells.", "A jar of mystery jam.",
+      "A pigeon with a five-year plan.", "The floor being lava.", "A haunted rubber duck.",
+      "My browser's 400 open tabs.", "A surprisingly strong toddler.", "A grumpy old owl.",
+      "The vibes, and only the vibes.", "A sentient pile of laundry.", "A goat that yells my name.",
+      "A very long nap.", "An overachieving houseplant.", "A conga line of penguins.",
+      "A questionable magic trick.", "A moth in love with my lamp.", "A committee that never ends.",
+      "A cheese of unusual size.", "A robot learning to love.", "The last five chicken nuggets.",
+      "An enthusiastic kazoo.", "A thunderstorm, indoors.", "A slightly cursed board game.",
+      "A pep talk from a pelican.", "An unreasonable number of hats.", "A snail with big dreams.",
+      "A ghost who just wants a hug.", "A pancake the size of a manhole cover.", "An emotional-support cactus.",
+      "A choir of confused frogs.", "The final boss of Monday.", "A budget crisis at the lemonade stand."
+    ]
+  },
+  pg13: {
+    label: 'PG-13',
+    black: [
+      { t: "What ruined the family group chat?" },
+      { t: "My dating profile is just two words: ____." },
+      { t: "What's my toxic trait?" },
+      { t: "The reason I got kicked out of the gym was ____." },
+      { t: "What's the real reason I'm still single?" },
+      { t: "What did I text my ex at 2am?" },
+      { t: "What's in my search history?" },
+      { t: "The company retreat ended early because of ____." },
+      { t: "What's my villain origin story?" },
+      { t: "How do I cope?" },
+      { t: "What's the worst thing to say on a first date?" },
+      { t: "My last words will be ____." },
+      { t: "Nothing kills the mood like ____." },
+      { t: "What's my biggest red flag?" },
+      { t: "The Uber driver kicked me out because of ____." },
+      { t: "What's secretly running my life?" },
+      { t: "What do the neighbors keep complaining about?" },
+      { t: "I'd sell my soul for ____." },
+      { t: "My autobiography is titled '____ and ____.'", pick: 2 },
+      { t: "A healthy relationship is 10% love and 90% ____, with a side of ____.", pick: 2 }
+    ],
+    white: [
+      "Crippling student debt.", "My 3,000 unread emails.", "Aggressive passive-aggression.",
+      "A gas-station energy drink.", "Emotional baggage with a matching set.", "My ex's questionable choices.",
+      "Screaming into a pillow.", "A dangerously confident 'trust me.'", "Petty revenge.",
+      "My entire browser history.", "Absolutely zero impulse control.", "Three hours of doomscrolling.",
+      "A concerning amount of cheese.", "My credit score.", "Unresolved childhood issues.",
+      "A text I definitely shouldn't have sent.", "The sheer audacity.", "My last two brain cells.",
+      "A 47-slide presentation nobody wanted.", "Blaming Mercury retrograde.", "A suspiciously cheap gym membership.",
+      "Good old-fashioned peer pressure.", "My rapidly declining will to adult.", "A questionable tattoo.",
+      "Ghosting everyone I love.", "The group project I did nothing for.", "A midlife crisis, ten years early.",
+      "My landlord's terrible decisions.", "An unhinged one-star review.", "Pretending to be busy.",
+      "My complete lack of a filter.", "A tequila-based decision.", "Financial instability with a fun personality.",
+      "My mother's quiet disappointment.", "A dramatic exit through the wrong door.", "Just replying 'k.'",
+      "Crying in the office bathroom.", "My commitment issues.", "A hangover that lasted three days.",
+      "The bare minimum, delivered late.", "Screenshotting the entire conversation.", "My inability to read the room.",
+      "A meltdown in aisle five.", "Spending the rent on snacks.", "A red flag the size of a parade.",
+      "My deeply cursed playlist.", "Overthinking a two-word text.", "Aggressively liking old photos at 3am.",
+      "Confidence unsupported by evidence.", "My Roman Empire.", "Faking a phone call to escape.",
+      "An entire cake, for one.", "Chaotic gremlin energy.", "My unpaid parking tickets.",
+      "A stranger's unsolicited life advice.", "The ick.", "My 2am life decisions.",
+      "Emotionally unavailable, but consistent.", "A haunted Ouija board from the thrift store.", "My inability to say no.",
+      "A wildly inappropriate ringtone.", "A very public breakup.", "My tragic backstory.", "Rage-quitting everything."
+    ]
+  },
+  raunch: {
+    label: 'Raunch',
+    black: [
+      { t: "What's my safe word?" },
+      { t: "What did I accidentally send to the family group chat?" },
+      { t: "What ended the marriage?" },
+      { t: "What's the real reason I got fired?" },
+      { t: "What did we do behind the Denny's?" },
+      { t: "What's in the bedside drawer?" },
+      { t: "What am I giving up for Lent?" },
+      { t: "What did the doctor find?" },
+      { t: "What ruined Thanksgiving this year?" },
+      { t: "What do I think about during church?" },
+      { t: "Why am I banned from the aquarium?" },
+      { t: "What's my OnlyFans actually about?" },
+      { t: "What's the secret to a happy marriage?" },
+      { t: "What's the new dating-app feature?" },
+      { t: "What finally got Grandpa arrested?" },
+      { t: "What's the worst thing to yell during sex?" },
+      { t: "What did I regret the morning after?" },
+      { t: "What's my type?" },
+      { t: "In bed, I like a little ____ and a whole lot of ____.", pick: 2 },
+      { t: "My leaked tape is just ____ and forty minutes of ____.", pick: 2 }
+    ],
+    white: [
+      "A truly regrettable one-night stand.", "Grandma's secret stash of edibles.", "An aggressively unsolicited nude.",
+      "Whatever's growing in the gas-station bathroom.", "A deeply disappointing inch.", "The worst possible timing.",
+      "A three-day bender.", "My roommate's unspeakable bedroom noises.", "A suspiciously sticky TV remote.",
+      "Faking it, every single time.", "A pact with the devil and a jar of mayonnaise.", "Two shots of tequila and zero regrets — until morning.",
+      "My tragic performance in bed.", "A 2am booty call from my ex.", "Whatever the hell that rash is.",
+      "An unflushable secret.", "Crying during sex. Twice.", "A midlife crisis and a motorcycle I can't ride.",
+      "My browser's very private tab.", "An extremely ill-timed situation downstairs.", "A hookup who just won't leave.",
+      "Peeing in the pool with total confidence.", "Grandpa's questionable magazine collection.", "Getting caught by my mom.",
+      "A deeply cursed dream about my coworker.", "The world's saddest lap dance.", "A condom with a hole in it.",
+      "My complicated relationship with a body pillow.", "An HR-ending Christmas party.", "Whiskey-fueled poor decisions.",
+      "A very confident 'trust me, I've done this before.'", "Losing a bet and my dignity.", "The walk of shame in last night's clothes.",
+      "An unholy amount of edibles.", "My ex's new, somehow worse partner.", "A wildly inappropriate massage.",
+      "Getting to know myself a little too well.", "A leaked group chat.", "A drunk text to my boss.",
+      "The stripper who somehow knew my name.", "Whatever happened in Vegas.", "A shameful, unsearchable history.",
+      "Bad decisions and worse consequences.", "A very public accident.", "A questionable date named Chad.",
+      "Twelve tabs I cannot explain.", "Screaming the wrong name.", "A hot tub full of regret.",
+      "An emotional-support one-night stand.", "Public indecency charges.", "A truly haunted mattress.",
+      "Getting absolutely railed by student loans.", "My unpaid tab and my overpaid therapist.", "A back-alley tattoo of my ex's name.",
+      "A church-ruining confession.", "An ungodly amount of body glitter.", "The clap.",
+      "A very sincere apology to my liver.", "Texting nudes to the group chat instead of one person.", "My throuple's shared Google calendar."
+    ]
+  }
+};
+
+// Draw a hand from the active deck: one black prompt + `pick` distinct whites.
+function _cahHand() {
+  var deck = CAH_DECKS[printerCfg.cahDeck] || CAH_DECKS.pg13;
+  if (!deck || !deck.black.length || !deck.white.length) return null;
+  var black = deck.black[Math.floor(Math.random() * deck.black.length)];
+  var pick = Math.max(1, Math.min(3, black.pick || 1));
+  var pool = deck.white.slice(), whites = [];
+  while (whites.length < pick && pool.length) {
+    whites.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return { black: black.t, whites: whites };
+}
+
 // The tap. o: { kind, plat, user, avatar, tier, months, message, count,
 // recipients, recipient, bits, coins, usd, amountText, giftName, giftImage,
 // viewers, reward, cost, actionText, bannerText }
@@ -17140,6 +17317,21 @@ function printerPost(o) {
           banner: 'MEME', memeQuery: memeQ,
           action: 'redeemed a meme print' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
           message: memeQ
+        });
+        return;
+      }
+      // "Cards Against Humanity": draw a black prompt + white answer(s) from the
+      // selected deck and print them card-styled. Own toggle, like notes/memes.
+      var _cr = String(printerCfg.cahReward || '').trim().toLowerCase();
+      if (_cr && String(o.reward || '').trim().toLowerCase() === _cr) {
+        if (printerCfg.ev.cah === false) return;
+        var hand = _cahHand();
+        if (!hand || !hand.black) return;
+        _printerSend({
+          platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null, _kind: 'cah',
+          banner: 'CARDS AGAINST HUMANITY',
+          action: 'drew a hand' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
+          cahBlack: hand.black, cahWhites: hand.whites
         });
         return;
       }
