@@ -17114,7 +17114,7 @@ function printerCreateCahReward() {
       headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey },
       body: JSON.stringify({
         title: title, cost: cost, prompt: '', requiresInput: false,
-        platforms: ['tw', 'kk'], streamerId: String(S.twUserId || ''), color: '#1b1b1b'
+        platforms: ['tw', 'kk'], channel: String(S.twLogin || ''), streamerId: String(S.twUserId || ''), color: '#1b1b1b'
       })
     }).then(function(r) { return r.json(); }).then(function(j) {
       setSt(_cahCreateMsg(j));
