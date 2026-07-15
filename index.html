@@ -1083,6 +1083,31 @@ body.has-sf-notice { padding-top: 42px !important; }
 .tw-fine{margin:18px auto 0;font-size:10.5px;line-height:1.5;color:var(--mut);max-width:420px;opacity:.85}
 /* topbar account chip reflects connection */
 .tbtn.tw-connected{color:#fff;border-color:rgba(145,70,255,0.55);background:linear-gradient(135deg,rgba(145,70,255,0.28),rgba(145,70,255,0.1))}
+/* Unified account button + menu (Twitch / Kick / YouTube, equal) */
+.acct-btn{position:relative;gap:6px}
+.acct-btn.signed{color:#fff;border-color:var(--bdr)}
+.acct-av{width:18px;height:18px;border-radius:50%;object-fit:cover;background:var(--surf3);flex-shrink:0}
+.acct-dot{position:absolute;top:1px;right:1px;width:7px;height:7px;border-radius:50%;background:#3ddc84;border:1.5px solid var(--surf2);display:none}
+.acct-btn.signed .acct-dot{display:block}
+.acct-menu{position:fixed;z-index:10001;background:var(--surf);border:1px solid var(--accent);border-radius:10px;padding:8px;min-width:256px;box-shadow:0 12px 34px rgba(0,0,0,.55);animation:setFadeIn .16s ease}
+.acct-menu-hd{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;padding:4px 6px 8px}
+.acct-row{display:flex;align-items:center;gap:9px;padding:8px 6px}
+.acct-row + .acct-row{border-top:1px solid var(--bdr)}
+.acct-row-av{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--surf3)}
+.acct-row-ic{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.acct-row-ic.tw{background:#9146FF}.acct-row-ic.kk{background:#53fc18}.acct-row-ic.yt{background:#ff0000}
+.acct-row-ic svg{width:16px;height:16px;fill:#fff}
+.acct-row-ic .kk-k{font-weight:900;color:#0a0a0a;font-size:15px;line-height:1}
+.acct-row-meta{flex:1;min-width:0}
+.acct-row-plat{font-size:12px;font-weight:700;color:var(--txt);line-height:1.25}
+.acct-row-status{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct-row-btn{font-size:11px;font-weight:700;border:0;border-radius:7px;padding:6px 12px;cursor:pointer;flex-shrink:0;transition:filter .15s}
+.acct-row-btn:hover{filter:brightness(1.08)}
+.acct-row-btn.connect.tw{background:#9146FF;color:#fff}
+.acct-row-btn.connect.kk{background:#53fc18;color:#0a0a0a}
+.acct-row-btn.connect.yt{background:#ff0000;color:#fff}
+.acct-row-btn.signout{background:var(--surf2);color:var(--mut);border:1px solid var(--bdr)}
+.acct-menu-ft{font-size:10px;color:var(--mut);line-height:1.5;padding:9px 6px 2px;border-top:1px solid var(--bdr);margin-top:2px}
 
 /* ═══ SETTINGS MODAL ═══════════════════════════════════════════════════════ */
 .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
@@ -2113,7 +2138,11 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   <div class="logo"><svg class="ic"><use href="#i-bolt"/></svg>StreamFusion</div>
   <div class="vcounts" id="vcounts"><div class="vc total"><svg class="ic"><use href="#i-eye"/></svg><span id="vcTotal">0</span> total</div></div>
   <button class="tbtn" id="sbBtn" onclick="toggleSettingsModal()"><svg class="ic"><use href="#i-cog"/></svg>Settings</button>
-  <button class="tbtn" id="twitchAccountBtn" onclick="openTwitchSignIn()" title="Connect your Twitch account"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg><span id="twitchAccountBtnText">Twitch</span></button>
+  <button class="tbtn acct-btn" id="acctBtn" onclick="toggleAcctMenu(event)" title="Accounts — sign in with Twitch, Kick or YouTube">
+    <img class="acct-av" id="acctAv" alt="" style="display:none" onerror="this.style.display='none';var i=document.getElementById('acctIc');if(i)i.style.display=''">
+    <svg class="ic" id="acctIc" viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg>
+    <span id="acctBtnText">Sign in</span><span class="acct-dot" id="acctDot"></span>
+  </button>
   <button class="tbtn" id="overlayLockBtn" onclick="toggleOverlayLockFromMain()" title="Lock pop-out (click-through)" style="display:none"><svg class="ic"><use href="#i-unlock"/></svg>Lock</button>
   <button class="tbtn" id="pauseBtn" onclick="togglePause()"><svg class="ic"><use href="#i-pause"/></svg>Pause</button>
   <button class="tbtn" onclick="clearChat()"><svg class="ic"><use href="#i-trash"/></svg>Clear</button>
@@ -3538,6 +3567,12 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
   </div>
 </div>
 
+<div class="acct-menu" id="acctMenu" style="display:none">
+  <div class="acct-menu-hd">Accounts</div>
+  <div id="acctMenuRows"></div>
+  <div class="acct-menu-ft">Sign in to read that platform's chat &amp; events in StreamFusion — no Streamer.bot needed.</div>
+</div>
+
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modal"></div>
 </div>
@@ -3916,6 +3951,101 @@ function applyTwitchStatus(st) {
   } catch (e) {}
   // Keep the Stream control surface's connect-gate in sync live.
   try { if (typeof renderStreamTab === 'function') renderStreamTab(); } catch (e) {}
+  try { renderAcctButton(); renderAcctMenuIfOpen(); } catch (e) {}
+}
+
+// ── Unified account menu (Twitch / Kick / YouTube, treated equally) ───────────
+// The topbar account button shows the signed-in user's avatar (via unavatar.io,
+// no API call) and opens a popover with one row per platform, each with its own
+// Connect / Sign out — so all three sign in the same way. Twitch uses the native
+// loopback OAuth (connectTwitch); Kick/YouTube use the browser broker (pfConnect).
+var ACCT_ORDER = ['twitch', 'youtube', 'kick']; // avatar priority for the button
+function acctStatus(platform) {
+  if (platform === 'twitch') {
+    var t = S.twitch || {};
+    return { signedIn: !!t.signedIn, name: t.displayName || t.login || '', login: t.login || '' };
+  }
+  var st = (S._pfStatus && S._pfStatus[platform]) || {};
+  return { signedIn: !!st.signedIn, name: st.displayName || st.login || '', login: st.login || '' };
+}
+function acctAvatarUrl(platform, login) {
+  if (!login) return '';
+  if (platform === 'twitch') return 'https://unavatar.io/twitch/' + encodeURIComponent(login);
+  if (platform === 'youtube') return 'https://unavatar.io/youtube/' + encodeURIComponent(login);
+  return ''; // Kick has no reliable keyless avatar → platform icon fallback
+}
+function acctIconHtml(cls) {
+  if (cls === 'tw') return '<div class="acct-row-ic tw"><svg viewBox="0 0 24 24"><path d="M4.3 1 2 4.7v15.6h5.3V23h3l2.7-2.7h4.3L23 15.3V1H4.3zM21 14.3l-3 3h-4.7L11 19.6v-2.3H7V3h14v11.3zM16.3 7v6h-2V7h2zm-5.3 0v6H9V7h2z"/></svg></div>';
+  if (cls === 'yt') return '<div class="acct-row-ic yt"><svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z"/></svg></div>';
+  return '<div class="acct-row-ic kk"><span class="kk-k">K</span></div>';
+}
+function renderAcctButton() {
+  var btn = document.getElementById('acctBtn'); if (!btn) return;
+  var txt = document.getElementById('acctBtnText');
+  var av = document.getElementById('acctAv');
+  var ic = document.getElementById('acctIc');
+  var primary = null, any = false;
+  for (var i = 0; i < ACCT_ORDER.length; i++) {
+    var s = acctStatus(ACCT_ORDER[i]);
+    if (s.signedIn) { any = true; if (!primary) primary = { platform: ACCT_ORDER[i], st: s }; }
+  }
+  btn.classList.toggle('signed', any);
+  if (primary) {
+    var url = acctAvatarUrl(primary.platform, primary.st.login);
+    if (url && av) { if (av.getAttribute('src') !== url) av.src = url; av.style.display = ''; if (ic) ic.style.display = 'none'; }
+    else { if (av) av.style.display = 'none'; if (ic) ic.style.display = ''; }
+    if (txt) txt.textContent = '@' + (primary.st.name || 'you');
+  } else {
+    if (av) { av.style.display = 'none'; av.removeAttribute('src'); }
+    if (ic) ic.style.display = '';
+    if (txt) txt.textContent = 'Sign in';
+  }
+}
+function renderAcctMenu() {
+  var wrap = document.getElementById('acctMenuRows'); if (!wrap) return;
+  var plats = [{ key: 'twitch', cls: 'tw', name: 'Twitch' }, { key: 'kick', cls: 'kk', name: 'Kick' }, { key: 'youtube', cls: 'yt', name: 'YouTube' }];
+  wrap.innerHTML = plats.map(function (p) {
+    var s = acctStatus(p.key);
+    var status = s.signedIn ? ('@' + esc(s.name || 'you')) : 'Not connected';
+    var action = s.signedIn
+      ? '<button class="acct-row-btn signout" onclick="acctSignOut(\'' + p.key + '\')">Sign out</button>'
+      : '<button class="acct-row-btn connect ' + p.cls + '" onclick="acctConnect(\'' + p.key + '\')">Connect</button>';
+    return '<div class="acct-row">' + acctIconHtml(p.cls)
+      + '<div class="acct-row-meta"><div class="acct-row-plat">' + p.name + '</div><div class="acct-row-status">' + status + '</div></div>'
+      + action + '</div>';
+  }).join('');
+}
+function renderAcctMenuIfOpen() { var m = document.getElementById('acctMenu'); if (m && m.style.display === 'block') renderAcctMenu(); }
+function toggleAcctMenu(e) {
+  if (e) e.stopPropagation();
+  var m = document.getElementById('acctMenu'); if (!m) return;
+  if (m.style.display === 'block') { closeAcctMenu(); return; }
+  renderAcctMenu();
+  m.style.display = 'block';
+  var btn = document.getElementById('acctBtn');
+  if (btn) {
+    var r = btn.getBoundingClientRect();
+    var mw = m.offsetWidth || 256;
+    var left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+    m.style.left = left + 'px';
+    m.style.top = (r.bottom + 6) + 'px';
+  }
+  setTimeout(function () { document.addEventListener('mousedown', _acctOutside); }, 0);
+}
+function closeAcctMenu() { var m = document.getElementById('acctMenu'); if (m) m.style.display = 'none'; document.removeEventListener('mousedown', _acctOutside); }
+function _acctOutside(e) {
+  var m = document.getElementById('acctMenu'), b = document.getElementById('acctBtn');
+  if (m && !m.contains(e.target) && b && !b.contains(e.target)) closeAcctMenu();
+}
+function acctConnect(platform) {
+  closeAcctMenu();
+  if (platform === 'twitch') { if (typeof connectTwitch === 'function') connectTwitch(); else if (typeof openTwitchSignIn === 'function') openTwitchSignIn(); }
+  else if (typeof pfConnect === 'function') pfConnect(platform);
+}
+function acctSignOut(platform) {
+  if (platform === 'twitch') { if (typeof disconnectTwitch === 'function') disconnectTwitch(); }
+  else if (typeof pfSignOut === 'function') pfSignOut(platform);
+  setTimeout(function () { renderAcctButton(); renderAcctMenuIfOpen(); }, 40);
 }
 
 // ── Dedicated Twitch sign-in screen ──────────────────────────────────────────
@@ -3945,11 +4075,6 @@ function renderTwitchSignIn() {
   var signOut = document.getElementById('twScreenSignOut');
   var cont    = document.getElementById('twScreenContinue');
   var skip    = document.getElementById('twScreenSkip');
-  // topbar chip
-  var accBtn  = document.getElementById('twitchAccountBtn');
-  var accTxt  = document.getElementById('twitchAccountBtnText');
-  if (accBtn) accBtn.classList.toggle('tw-connected', !!st.signedIn);
-  if (accTxt) accTxt.textContent = st.signedIn ? ('@' + (st.displayName || st.login || 'you')) : 'Twitch';
   if (!heading) return;
   if (st.signedIn) {
     heading.textContent = 'Twitch connected';
@@ -4061,6 +4186,7 @@ function pfApplyStatus(platform, st) {
     if (tog) tog.classList.toggle('on', !!S.nativeChat[platform === 'kick' ? 'kk' : 'yt']);
     pfSyncChatReader(platform);
   }
+  try { renderAcctButton(); renderAcctMenuIfOpen(); } catch (e) {}
 }
 // Kick reads off the channel slug (its sign-in login, or the viewer-count slug
 // as a fallback); YouTube reads off the signed-in channel id.
