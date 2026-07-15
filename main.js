@@ -20,6 +20,7 @@ const { spawn } = require('child_process');
 // doesn't expose (today: the Clip button). See twitch-auth.js.
 const twitchAuth = require('./twitch-auth');
 const browserAuth = require('./browser-auth');
+const platformChat = require('./platform-chat');
 
 // ── OBS overlay server (EA-only) ────────────────────────────────────────────
 // Local HTTP + SSE server that powers browser-source overlays (chat feed,
@@ -1030,6 +1031,30 @@ app.whenReady().then(() => {
   browserAuth.setMainWindow(mainWindow);
   browserAuth.registerIpcHandlers();
 
+  // Native Kick / YouTube chat readers — read the streamer's live chat WITHOUT
+  // Streamer.bot (Kick via its public Pusher socket, YouTube via keyless
+  // innertube once the live video is discovered from the OAuth sign-in) and
+  // forward each message to the renderer. Start/stop is driven from the
+  // renderer's Connections pane; the renderer gates on S.sbConnected so SB
+  // still owns chat when it's connected. Tokens never leave the main process.
+  platformChat.init({
+    getWin: function () { return mainWindow; },
+    getToken: function (platform) {
+      try { return browserAuth.getRawAccessToken(platform, 'broadcaster'); }
+      catch (e) { return null; }
+    },
+  });
+  ipcMain.handle('platform-chat-start', function (e, a) {
+    a = a || {};
+    try { platformChat.start(a.platform, a.opts || {}); return { ok: true }; }
+    catch (err) { return { ok: false, error: (err && err.message) || 'start failed' }; }
+  });
+  ipcMain.handle('platform-chat-stop', function (e, a) {
+    a = a || {};
+    try { platformChat.stop(a.platform); return { ok: true }; }
+    catch (err) { return { ok: false, error: (err && err.message) || 'stop failed' }; }
+  });
+
   // OBS overlay server comes up alongside the main window. It always
   // listens (so the streamer can bookmark the URLs without worrying about
   // whether SF is "ready"), but it returns the gated page if the user
@@ -1151,6 +1176,7 @@ app.on('before-quit', () => {
   try { rotationRelay.stop(); } catch (e) {}
   try { printer.stop(); } catch (e) {}
   try { wardenAgent.stop(); } catch (e) {}
+  try { platformChat.stopAll(); } catch (e) {}
 });
 
 // ── IPC handlers (called from renderer via preload) ──────────────────────────

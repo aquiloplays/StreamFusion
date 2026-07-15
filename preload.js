@@ -163,6 +163,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platformGetStatus:  (platform, role) => ipcRenderer.invoke('platform-get-status', { platform, role }),
   platformSignOut:    (platform, role) => ipcRenderer.invoke('platform-sign-out', { platform, role }),
   onPlatformStatusChanged: (fn) => ipcRenderer.on('platform-status-changed', (e, d) => fn(d)),
+  // ── Native Kick / YouTube chat readers (no Streamer.bot) ───────────────────
+  // start/stop the main-process reader for a platform; opts carries { slug } for
+  // Kick and { channelId } for YouTube. onPlatformChat delivers each normalized
+  // chat message; onPlatformChatStatus delivers reader state (connecting/live/
+  // off/error) so the Connections pane can show a status line.
+  platformChatStart: (platform, opts) => ipcRenderer.invoke('platform-chat-start', { platform, opts: opts || {} }),
+  platformChatStop:  (platform)       => ipcRenderer.invoke('platform-chat-stop', { platform }),
+  onPlatformChat:       (fn) => ipcRenderer.on('platform-chat', (e, d) => fn(d)),
+  onPlatformChatStatus: (fn) => ipcRenderer.on('platform-chat-status', (e, d) => fn(d)),
 
   // ── OBS overlays (EA-only — broadcasts are no-ops until entitled) ───────
   // Renderer-side fan-out: anything the main app learns (chat msg, event,

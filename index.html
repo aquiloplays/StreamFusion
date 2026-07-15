@@ -2311,7 +2311,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
           <div class="sec">
             <div class="sec-hd">Sign in with browser</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:10px">
-              Log into <strong style="color:var(--txt)">Kick</strong> and <strong style="color:var(--txt)">YouTube</strong> through your browser — you're probably already signed in there, so it's one click. A tab opens on aquilo.gg; approve, then come back. <strong style="color:var(--txt)">TikTok</strong> has no login API, so just enter your @username and gifts/events get matched to you.
+              Log into <strong style="color:var(--txt)">Kick</strong> and <strong style="color:var(--txt)">YouTube</strong> through your browser — you're probably already signed in there, so it's one click. A tab opens on aquilo.gg; approve, then come back. Once you're signed in, flip on <strong style="color:var(--txt)">Read chat in StreamFusion</strong> and their live chat flows straight into your feed — no Streamer.bot needed. <strong style="color:var(--txt)">TikTok</strong> has no login API, so just enter your @username and gifts/events get matched to you.
             </div>
             <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -2321,6 +2321,13 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                   <button id="pfOut-kick" onclick="pfSignOut('kick')" style="padding:7px 11px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
                 </div>
               </div>
+              <div id="pfChatRow-kick" style="display:none;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr)">
+                <div style="min-width:0">
+                  <div style="font-size:11px;font-weight:600;color:var(--txt)">Read chat in StreamFusion</div>
+                  <div id="pfChatStatus-kick" style="font-size:10px;color:var(--mut);line-height:1.4"></div>
+                </div>
+                <div class="tog kk" id="pfChatTog-kick" onclick="pfToggleChat('kick')" style="cursor:pointer" title="Read your Kick chat here without Streamer.bot"></div>
+              </div>
             </div>
             <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -2329,6 +2336,13 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                   <button id="pfBtn-youtube" onclick="pfConnect('youtube')" style="padding:7px 11px;border-radius:7px;border:0;background:#ff0000;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Connect YouTube</button>
                   <button id="pfOut-youtube" onclick="pfSignOut('youtube')" style="padding:7px 11px;border-radius:7px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer;display:none">Sign out</button>
                 </div>
+              </div>
+              <div id="pfChatRow-youtube" style="display:none;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr)">
+                <div style="min-width:0">
+                  <div style="font-size:11px;font-weight:600;color:var(--txt)">Read chat in StreamFusion</div>
+                  <div id="pfChatStatus-youtube" style="font-size:10px;color:var(--mut);line-height:1.4"></div>
+                </div>
+                <div class="tog yt" id="pfChatTog-youtube" onclick="pfToggleChat('youtube')" style="cursor:pointer" title="Read your YouTube live chat here without Streamer.bot"></div>
               </div>
             </div>
             <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
@@ -3474,7 +3488,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
       <div class="empty" id="emptyState">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
         <p style="font-weight:600;color:var(--txt);font-size:15px;margin-bottom:2px">Your stream is quiet.</p>
-        <p>Connect <strong>Streamer.bot</strong> for Twitch &amp; YouTube and <strong>TikFinity</strong> for TikTok, then chat from every platform will land here.</p>
+        <p>Sign in with <strong>Twitch</strong>, <strong>YouTube</strong> or <strong>Kick</strong> and your chat lands here, no Streamer.bot required. For <strong>TikTok</strong>, connect <strong>TikFinity</strong>.</p>
         <p style="font-size:12px;margin-top:4px;opacity:.85">Open <svg class="ic"><use href="#i-cog"/></svg> Settings to get started.</p>
       </div>
     </div>
@@ -4035,10 +4049,72 @@ function pfApplyStatus(platform, st) {
   var btn = document.getElementById('pfBtn-' + platform);
   var out = document.getElementById('pfOut-' + platform);
   var on = !!(st && st.signedIn);
+  if (platform === 'kick' || platform === 'youtube') S._pfStatus[platform] = st || null;
   if (s) { s.textContent = on ? ('Connected as @' + (st.login || st.displayName || 'you')) : 'Not connected'; s.style.color = on ? '#53fc18' : 'var(--mut)'; }
   if (btn) { btn.style.display = on ? 'none' : ''; btn.disabled = false; btn.textContent = 'Connect ' + (platform === 'kick' ? 'Kick' : 'YouTube'); }
   if (out) out.style.display = on ? '' : 'none';
+  // The native chat reader + its toggle row only make sense once signed in.
+  if (platform === 'kick' || platform === 'youtube') {
+    var row = document.getElementById('pfChatRow-' + platform);
+    if (row) row.style.display = on ? 'flex' : 'none';
+    var tog = document.getElementById('pfChatTog-' + platform);
+    if (tog) tog.classList.toggle('on', !!S.nativeChat[platform === 'kick' ? 'kk' : 'yt']);
+    pfSyncChatReader(platform);
+  }
 }
+// Kick reads off the channel slug (its sign-in login, or the viewer-count slug
+// as a fallback); YouTube reads off the signed-in channel id.
+function pfChatSlug() {
+  var st = S._pfStatus.kick;
+  var slug = (st && (st.login || st.displayName)) || '';
+  if (!slug) { var el = document.getElementById('kk-slug'); slug = (el && el.value) || ''; }
+  return String(slug || '').trim().toLowerCase().replace(/^@+/, '');
+}
+function pfNativeKey(platform) { return platform === 'kick' ? 'kk' : 'yt'; }
+// Reconcile the main-process reader with (signed-in && toggle-on). Idempotent.
+function pfSyncChatReader(platform) {
+  if (!window.electronAPI || !window.electronAPI.platformChatStart) return;
+  var st = S._pfStatus[platform];
+  var want = !!(st && st.signedIn) && !!S.nativeChat[pfNativeKey(platform)];
+  var running = !!S._pfChatRunning[platform];
+  if (want && !running) {
+    var opts = platform === 'kick' ? { slug: pfChatSlug() } : { channelId: (st && st.userId) || '' };
+    S._pfChatRunning[platform] = true;
+    try { window.electronAPI.platformChatStart(platform, opts); } catch (e) {}
+  } else if (!want && running) {
+    S._pfChatRunning[platform] = false;
+    S._pfChatState[platform] = 'off';
+    try { window.electronAPI.platformChatStop(platform); } catch (e) {}
+    pfSetChatStatus(platform, '');
+  }
+}
+function pfToggleChat(platform) {
+  var k = pfNativeKey(platform);
+  S.nativeChat[k] = !S.nativeChat[k];
+  saveSettings();
+  var tog = document.getElementById('pfChatTog-' + platform);
+  if (tog) tog.classList.toggle('on', S.nativeChat[k]);
+  pfSyncChatReader(platform);
+}
+function pfSetChatStatus(platform, txt, color) {
+  var el = document.getElementById('pfChatStatus-' + platform);
+  if (!el) return;
+  el.textContent = txt || '';
+  el.style.color = color || 'var(--mut)';
+}
+// Render the reader status line from the last-known reader state + whether SB is
+// live (SB owns chat when connected, so the reader is on standby then).
+function pfRenderChatStatus(platform, message) {
+  var st = S._pfChatState[platform] || '';
+  if (!S._pfChatRunning[platform] || st === 'off' || st === '') { pfSetChatStatus(platform, ''); return; }
+  if (S.sbConnected) { pfSetChatStatus(platform, 'On standby — Streamer.bot is handling chat', 'var(--mut)'); return; }
+  if (st === 'live') pfSetChatStatus(platform, 'Reading chat ✓', '#53fc18');
+  else if (st === 'connecting') pfSetChatStatus(platform, 'Waiting for you to go live…', 'var(--mut)');
+  else if (st === 'error') pfSetChatStatus(platform, message || 'Reader error', '#ff6a6a');
+  else pfSetChatStatus(platform, '');
+}
+// Re-render both reader status lines (e.g. when SB connects / drops).
+function pfRefreshChatStatus() { pfRenderChatStatus('kick'); pfRenderChatStatus('youtube'); }
 async function pfConnect(platform) {
   if (!window.electronAPI || !window.electronAPI.platformBeginAuth) return;
   var btn = document.getElementById('pfBtn-' + platform);
@@ -4063,6 +4139,31 @@ function pfSaveTikTok() {
 (function initPlatforms() {
   if (window.electronAPI && window.electronAPI.onPlatformStatusChanged) {
     window.electronAPI.onPlatformStatusChanged(function(d) { if (d && d.platform) pfApplyStatus(d.platform, d.status); });
+  }
+  // Native Kick / YouTube chat: convert each main-process message into the same
+  // Kick.ChatMessage / YouTube.ChatMessage event handleSBEvent already renders.
+  // Gate on S.sbConnected so SB owns chat when connected (mirrors _esRoute), and
+  // on the per-platform toggle so a disabled reader that's still draining can't
+  // leak messages.
+  if (window.electronAPI && window.electronAPI.onPlatformChat) {
+    window.electronAPI.onPlatformChat(function(d) {
+      if (!d || !d.platform || S.sbConnected) return;
+      if (d.platform === 'kick') {
+        if (!S.nativeChat.kk) return;
+        handleSBEvent({ source: 'Kick', type: 'ChatMessage' }, { user: d.user || {}, content: d.content || '', parts: d.parts || null }, true);
+      } else if (d.platform === 'youtube') {
+        if (!S.nativeChat.yt) return;
+        handleSBEvent({ source: 'YouTube', type: 'ChatMessage' }, { broadcast: d.broadcast || null, user: d.user || {}, message: d.message || '', parts: d.parts || null }, true);
+      }
+    });
+  }
+  if (window.electronAPI && window.electronAPI.onPlatformChatStatus) {
+    window.electronAPI.onPlatformChatStatus(function(d) {
+      if (!d || !d.platform) return;
+      var pfp = d.platform; // 'kick' | 'youtube'
+      S._pfChatState[pfp] = d.state || '';
+      pfRenderChatStatus(pfp, d.message);
+    });
   }
   ['kick', 'youtube'].forEach(function(p) {
     if (window.electronAPI && window.electronAPI.platformGetStatus) {
@@ -5580,6 +5681,13 @@ var S = {
   tfPort: 21213,
   show: { tw: true, yt: true, tt: true, kk: true },
   useSB: true, useTF: true,
+  // Native chat readers (no Streamer.bot): read YouTube/Kick chat straight from
+  // the streamer's sign-in. Default on so signing in "just works"; the renderer
+  // still suppresses these while SB is connected so nothing double-renders.
+  nativeChat: { yt: true, kk: true },
+  _pfStatus: { kick: null, youtube: null },
+  _pfChatRunning: { kick: false, youtube: false },
+  _pfChatState: { kick: '', youtube: '' },
   viewers: { tw: 0, yt: 0, tt: 0, kk: 0 },
   blocked: [],
   msgs: 0, evs: 0, filt: 0,
@@ -5812,6 +5920,7 @@ function loadSettings() {
     if (d.tfPort) S.tfPort = d.tfPort;
     if (Array.isArray(d.blocked)) S.blocked = d.blocked;
     if (d.show) { S.show.tw = d.show.tw; S.show.yt = d.show.yt; S.show.tt = d.show.tt; if (d.show.kk !== undefined) S.show.kk = d.show.kk; }
+    if (d.nativeChat) { if (d.nativeChat.yt !== undefined) S.nativeChat.yt = !!d.nativeChat.yt; if (d.nativeChat.kk !== undefined) S.nativeChat.kk = !!d.nativeChat.kk; }
     if (d.textSize) S.textSize = d.textSize;
     if (d.twUserId) S.twUserId = d.twUserId;
     if (d.chatInputVisible !== undefined) S.chatInputVisible = d.chatInputVisible;
@@ -5912,6 +6021,7 @@ function saveSettings() {
   localStorage.setItem('sf_settings', JSON.stringify({
     sbHost: S.sbHost, sbPort: S.sbPort, sbPass: S.sbPass,
     tfPort: S.tfPort, blocked: S.blocked, show: S.show,
+    nativeChat: S.nativeChat,
     textSize: S.textSize, twUserId: S.twUserId,
     chatInputVisible: S.chatInputVisible,
     keywords: keywords, soundVolume: soundVolume, soundStates: soundStates, ttsEnabled: ttsEnabled,
@@ -10192,6 +10302,7 @@ function markSBConnected(host, port) {
   _sbErrShown = false; // reset so next disconnect shows once again
   sysMsg('tw', 'Streamer.bot connected \u2014 Twitch & YouTube active');
   removeEmpty(); updateStatBar();
+  try { pfRefreshChatStatus(); } catch (e) {}
   if (S.sbWS && S.sbWS.readyState === WebSocket.OPEN)
     S.sbWS.send(JSON.stringify({ request: 'GetBroadcaster', id: 'sf-broadcaster' }));
   clearInterval(S._sbViewerTimer);
@@ -10212,6 +10323,7 @@ function disconnectSB() {
   S.sbReconnecting = false;
   if (S.sbWS) { S.sbWS.onclose = null; S.sbWS.onerror = null; try { S.sbWS.close(); } catch(e) {} S.sbWS = null; }
   S.sbConnected = false;
+  try { pfRefreshChatStatus(); } catch (e) {}
   // Twitch: the viewer poll no longer belongs to SB — keep it alive when a
   // native sign-in or an already-learned login can sustain it (restart picks
   // the right source + cadence); only zero when we truly have no source left.
