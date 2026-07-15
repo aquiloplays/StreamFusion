@@ -3093,6 +3093,9 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Print CAH cards</span><input type="checkbox" id="prnEvCah" checked onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Reward name</span><input type="text" id="prnCahReward" value="Cards Against Humanity" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
             <label class="frow"><span>Deck</span><select id="prnCahDeck" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"><option value="clean">Clean &mdash; all-ages</option><option value="pg13" selected>PG-13 &mdash; cheeky</option><option value="raunch">Raunch &mdash; adult (18+)</option></select></label>
+            <label class="frow"><span>Cost (points)</span><input type="number" id="prnCahCost" value="500" min="1" step="50" style="width:110px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px"></label>
+            <button class="tbtn" onclick="printerCreateCahReward()" style="font-size:11px;font-weight:700;padding:5px 10px;margin-top:4px">Create this reward on Twitch + Kick</button>
+            <div id="prnCahCreateStatus" style="font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5"></div>
 
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SHIFT TICKET</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
@@ -17085,6 +17088,53 @@ function printerTestPrint() {
     isTest: true
   });
   setTimeout(printerPollStatus, 1500);
+}
+
+// Create the CAH channel-point reward on Twitch (+ Kick) via the loadout
+// worker, authed with the shared machine key SF already holds (galleryKey).
+// Reports per-platform results and surfaces the exact re-connect link when a
+// manage-rewards scope is missing, instead of a cryptic error.
+function _prnEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+function printerCreateCahReward() {
+  onPrinterCfgChange();
+  var st = _prnEl('prnCahCreateStatus');
+  var setSt = function(html) { if (st) st.innerHTML = html; };
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) { setSt('Printer bridge unavailable.'); return; }
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) { setSt('Gallery key not configured &mdash; finish the receipt-gallery setup first, then retry.'); return; }
+    var title = ((_prnEl('prnCahReward') && _prnEl('prnCahReward').value) || 'Cards Against Humanity').trim().slice(0, 45);
+    var cost = Math.max(1, parseInt(_prnEl('prnCahCost') && _prnEl('prnCahCost').value, 10) || 500);
+    setSt('Creating &ldquo;' + _prnEsc(title) + '&rdquo; (' + cost.toLocaleString() + ' pts)&hellip;');
+    fetch('https://loadout-discord.aquiloplays.workers.dev/api/rewards/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey },
+      body: JSON.stringify({
+        title: title, cost: cost, prompt: '', requiresInput: false,
+        platforms: ['tw', 'kk'], streamerId: String(S.twUserId || ''), color: '#1b1b1b'
+      })
+    }).then(function(r) { return r.json(); }).then(function(j) {
+      setSt(_cahCreateMsg(j));
+    }).catch(function() { setSt('Request failed &mdash; check your connection and that the worker is reachable.'); });
+  });
+}
+function _cahCreateMsg(j) {
+  if (!j || typeof j !== 'object') return 'Unexpected response.';
+  if (j.error === 'bad-key') return '❌ The machine key was rejected. Re-check the receipt-gallery setup.';
+  var line = function(label, r) {
+    if (!r) return '';
+    if (r.ok) return '✅ <b>' + label + '</b>: ' + (r.existed ? 'reward already exists &mdash; you&rsquo;re set.' : 'reward created!');
+    if (r.needsReauth && r.reauthUrl) return '⚠️ <b>' + label + '</b>: grant the manage-rewards scope, then retry &mdash; <a href="' + _prnEsc(r.reauthUrl) + '" target="_blank">re-connect ' + label + '</a>';
+    if (r.needsReconnect && r.reconnectUrl) return '⚠️ <b>' + label + '</b>: connect ' + label + ' with its rewards scope, then retry &mdash; <a href="' + _prnEsc(r.reconnectUrl) + '" target="_blank">connect ' + label + '</a>';
+    return '❌ <b>' + label + '</b>: ' + _prnEsc(r.error || 'failed') + (r.detail ? ' (' + _prnEsc(String(r.detail).slice(0, 120)) + ')' : '');
+  };
+  var parts = [];
+  var tw = line('Twitch', j.tw); if (tw) parts.push(tw);
+  var kk = line('Kick', j.kk); if (kk) parts.push(kk);
+  return parts.length ? parts.join('<br>') : 'Nothing to do.';
 }
 
 function _printerSend(job) {
