@@ -42,6 +42,7 @@ const rotationRelay = require('./rotation-relay-client');
 // alerts) and forwards jobs; rendering/dithering/spooling live in printer.js.
 const printer = require('./printer');
 const wardenAgent = require('./warden-agent');
+const gifit = require('./gifit');
 
 // ── Crash / error logging ───────────────────────────────────────────────────
 function getLogPath() {
@@ -1324,6 +1325,13 @@ ipcMain.handle('discord-webhook-post', function(event, payload) {
 ipcMain.handle('discord-webhook-delete', function(event, payload) {
   if (!payload || !payload.url || !payload.messageId) return Promise.resolve({ ok: false, error: 'missing' });
   return discordBot.deleteWebhookMessage(payload.url, payload.messageId);
+});
+// ── Gif It ────────────────────────────────────────────────────────────────
+// Save the OBS replay buffer, render GIF + MP4, and post to a Discord webhook.
+// Driven by the renderer when a matching channel-point redeem fires.
+ipcMain.handle('gif-it-capture', function(event, opts) {
+  try { return gifit.capture(opts || {}); }
+  catch (e) { return Promise.resolve({ ok: false, reason: (e && e.message) || 'error' }); }
 });
 // Bot lifecycle. The renderer calls connect whenever the token changes or
 // the user toggles the bot on; disconnect when they toggle off or lose EA.

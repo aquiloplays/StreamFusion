@@ -10,6 +10,13 @@ const { ipcRenderer } = require('electron');
 
 const W = 576, WIDTH_BYTES = 72;
 const BOTTOM_PAD = 16;      // dots of quiet zone before the cut — keep tight
+// On-camera legibility scale. The 576-dot paper width is fixed, so this can't
+// widen a receipt — it enlarges every font, avatar, badge, gift art and
+// vertical step so the whole print reads bigger on stream. Long lines still
+// reflow to MAXW via fitFont/wrapText, so nothing runs off the paper edge.
+// Bump this one number to make receipts larger/smaller overall.
+const S = 1.18;
+const sc = function (n) { return Math.round(n * S); };   // scale + round a size
 const CAH_MARK = 'cards against humanity';   // tiny logo label on CAH cards
 
 const BIRD = 'data:image/svg+xml;utf8,' + encodeURIComponent(
@@ -291,7 +298,7 @@ function wrapText(x, text, size, weight, style, maxW) {
 
 function drawBadge(x, cx, cy, plat, r) {
   if (!PICON[plat]) return;
-  r = r || 30;
+  r = r || sc(30);
   x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fillStyle = '#fff'; x.fill();
   x.lineWidth = 4; x.strokeStyle = '#000'; x.stroke();
   const s = r * 1.06;
@@ -317,13 +324,13 @@ function _shapePath(x, cx, cy, r, shape) {
 }
 
 function drawAvatar(x, img, user, cy, shape) {
-  const cx = W / 2, r = 80;
+  const cx = W / 2, r = sc(80);
   if (img) {
     x.save(); _shapePath(x, cx, cy, r, shape); x.clip();
     x.drawImage(img, cx - r, cy - r, r * 2, r * 2); x.restore();
   } else {
     _shapePath(x, cx, cy, r, shape); x.fillStyle = '#000'; x.fill();
-    x.fillStyle = '#fff'; x.font = '700 52px "Segoe UI", Arial';
+    x.fillStyle = '#fff'; x.font = '700 ' + sc(52) + 'px "Segoe UI", Arial';
     x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText(String(user || '?').slice(0, 2).toUpperCase(), cx, cy + 2);
     x.textBaseline = 'alphabetic';
@@ -366,7 +373,7 @@ function drawFrame(x, style, h) {
 // otherwise a white card with a black border + black text. Left-aligned body
 // with a tiny logo mark bottom-left. Returns the bottom y.
 function drawCahCard(x, yTop, text, dark) {
-  const M = 34, cardW = W - M * 2, pad = 26, fs = 30, lh = 40, brandH = 30;
+  const M = 34, cardW = W - M * 2, pad = sc(26), fs = sc(30), lh = sc(40), brandH = sc(30);
   const maxW = cardW - pad * 2;
   x.font = '700 ' + fs + 'px "Segoe UI", Arial';
   const words = String(text).split(/\s+/);
@@ -386,10 +393,10 @@ function drawCahCard(x, yTop, text, dark) {
   x.textAlign = 'left';
   let ty = yTop + pad + fs * 0.78;
   for (const l of lines) { x.fillText(l, M + pad, ty); ty += lh; }
-  const sq = 15, by = yTop + cardH - 12;
+  const sq = sc(15), by = yTop + cardH - 12;
   x.fillStyle = dark ? '#fff' : '#000';
   x.fillRect(M + pad, by - sq + 2, sq, sq);
-  x.font = '700 13px "Segoe UI", Arial';
+  x.font = '700 ' + sc(13) + 'px "Segoe UI", Arial';
   x.fillText(CAH_MARK, M + pad + sq + 8, by);
   x.textAlign = 'center'; x.fillStyle = '#000';   // reset shared state for the caller
   return yTop + cardH;
@@ -398,7 +405,7 @@ function drawCahCard(x, yTop, text, dark) {
 // Draws the job, returns the y coordinate just below the last element.
 async function drawJob(x, job) {
   x.fillStyle = '#000'; x.textAlign = 'center';
-  const MAXW = 520;
+  const MAXW = 520;   // reflow width — kept at the paper-safe margin (frames/2-col rely on it)
   let y = 24;
 
   const vars = THEMES[job.theme] || null;
@@ -407,14 +414,17 @@ async function drawJob(x, job) {
   if (th) { th.top(x, seed); x.fillStyle = '#000'; x.strokeStyle = '#000'; y = 62; }
 
   if (!birdImg) birdImg = await loadImg(BIRD);
-  if (birdImg) { x.drawImage(birdImg, W / 2 - 55, y, 110, 80); y += 80 + 38; }
+  if (birdImg) { const bw = sc(110), bh = sc(80); x.drawImage(birdImg, W / 2 - bw / 2, y, bw, bh); y += bh + sc(38); }
 
   const av = await loadImg(job.avatarData);
   if (job.user) {
-    drawAvatar(x, av, job.user, y + 80, job.flairShape || '');
-    drawBadge(x, W / 2 + 57, y + 137, job.platform);
-    y += 196;
-    const s = fitFont(x, job.user, 700, 40, '', MAXW);
+    // Avatar + platform badge sit as a unit; badge rides the avatar's
+    // lower-right edge (offset ≈ r·cos45°), so both track the same scaled r.
+    const ar = sc(80), acy = y + ar, boff = Math.round(ar * 0.707);
+    drawAvatar(x, av, job.user, acy, job.flairShape || '');
+    drawBadge(x, W / 2 + boff, acy + boff, job.platform);
+    y = acy + ar + sc(36);
+    const s = fitFont(x, job.user, 700, sc(40), '', MAXW);
     y += s;
     const nw = x.measureText(job.user).width;
     if (job.flairName === 'pill') {
@@ -428,57 +438,55 @@ async function drawJob(x, job) {
     }
     const emImg = job.flairEmoteData ? await loadImg(job.flairEmoteData) : null;
     if (emImg || job.flairIcon) {
-      const fx = Math.min(nw / 2 + (job.flairName === 'pill' ? 46 : 32), W / 2 - 20);
+      const em = sc(32), fx = Math.min(nw / 2 + (job.flairName === 'pill' ? sc(46) : sc(32)), W / 2 - 20);
       if (emImg) {
         // Viewer's own emote as the stamp — contrast-boosted like gift art.
         x.save(); x.filter = 'grayscale(1) contrast(1.8) brightness(0.9)';
-        x.drawImage(emImg, W / 2 - fx - 16, y - s * 0.32 - 16, 32, 32);
-        x.drawImage(emImg, W / 2 + fx - 16, y - s * 0.32 - 16, 32, 32);
+        x.drawImage(emImg, W / 2 - fx - em / 2, y - s * 0.32 - em / 2, em, em);
+        x.drawImage(emImg, W / 2 + fx - em / 2, y - s * 0.32 - em / 2, em, em);
         x.filter = 'none'; x.restore();
       } else {
-        drawFlair(x, job.flairIcon, W / 2 - fx, y - s * 0.32, 13);
-        drawFlair(x, job.flairIcon, W / 2 + fx, y - s * 0.32, 13);
+        drawFlair(x, job.flairIcon, W / 2 - fx, y - s * 0.32, sc(13));
+        drawFlair(x, job.flairIcon, W / 2 + fx, y - s * 0.32, sc(13));
       }
       x.fillStyle = '#000';
     }
     y += 10;
   } else if (PICON[job.platform]) {
-    drawBadge(x, W / 2, y + 34, job.platform, 34); y += 84;
+    drawBadge(x, W / 2, y + sc(34), job.platform, sc(34)); y += sc(84);
   }
 
   if (job.action) {
-    x.font = '400 24px "Segoe UI", Arial';
-    y += 24; x.fillText(job.action, W / 2, y); y += 8;
+    x.font = '400 ' + sc(24) + 'px "Segoe UI", Arial';
+    y += sc(24); x.fillText(job.action, W / 2, y); y += 8;
   }
 
   if (job.banner) {
     y += 14;
-    const h = 64;
+    const h = sc(64);
     const text = String(job.banner).toUpperCase();
     x.fillStyle = '#000';
     x.fillRect(0, y, W, h);
     x.fillStyle = '#fff';
     try { x.letterSpacing = '4px'; } catch (e) {}
-    const s = fitFont(x, text, 700, 36, '', MAXW);
+    const s = fitFont(x, text, 700, sc(36), '', MAXW);
     x.fillText(text, W / 2, y + h / 2 + s * 0.36);
     try { x.letterSpacing = '0px'; } catch (e) {}
     x.fillStyle = '#000';
     y += h + 10;
   }
 
-  // Cards Against Humanity: the black prompt card, then the white answer
-  // card(s), each joined by a connector caret. Read the prompt, reveal the rest.
+  // Cards Against Humanity — the reveal prints as two receipts: a lone white
+  // answer card first, then the black prompt card a few seconds later. Each
+  // job carries exactly one card.
+  if (job.cahWhite) {
+    y += 20;
+    y = drawCahCard(x, y, String(job.cahWhite), false);
+    y += 4;
+  }
   if (job.cahBlack) {
     y += 20;
-    y = drawCahCard(x, y, job.cahBlack, true);
-    const whites = job.cahWhites || [];
-    for (const wc of whites) {
-      y += 12;
-      x.fillStyle = '#000';
-      x.beginPath(); x.moveTo(W / 2 - 13, y); x.lineTo(W / 2 + 13, y); x.lineTo(W / 2, y + 15); x.closePath(); x.fill();
-      y += 24;
-      y = drawCahCard(x, y, String(wc), false);
-    }
+    y = drawCahCard(x, y, String(job.cahBlack), true);
     y += 4;
   }
 
@@ -486,7 +494,7 @@ async function drawJob(x, job) {
   const big = await loadImg(job.bigImageData);
   if (big && big.width) {
     y += 14;
-    const bw = 460, bh = Math.max(60, Math.min(420, Math.round(bw * big.height / big.width)));
+    const bw = sc(460), bh = Math.max(60, Math.min(sc(420), Math.round(bw * big.height / big.width)));
     x.save(); x.filter = 'grayscale(1) contrast(1.6)';
     x.drawImage(big, (W - bw) / 2, y, bw, bh);
     x.filter = 'none'; x.restore();
@@ -498,7 +506,7 @@ async function drawJob(x, job) {
   const gift = await loadImg(job.giftIconData);
   if (gift) {
     y += 12;
-    const r = 52, cx = W / 2, cy = y + r;
+    const r = sc(52), cx = W / 2, cy = y + r;
     x.save(); x.beginPath(); x.arc(cx, cy, r - 6, 0, 7); x.clip();
     x.filter = 'grayscale(1) contrast(1.9) brightness(0.85)';
     x.drawImage(gift, cx - r + 6, cy - r + 6, (r - 6) * 2, (r - 6) * 2);
@@ -507,17 +515,17 @@ async function drawJob(x, job) {
     y += r * 2 + 10;
   }
   if (job.giftLabel) {
-    x.font = '600 28px "Segoe UI", Arial';
-    y += 28; x.fillText(job.giftLabel, W / 2, y); y += 6;
+    x.font = '600 ' + sc(28) + 'px "Segoe UI", Arial';
+    y += sc(28); x.fillText(job.giftLabel, W / 2, y); y += 6;
   }
 
   if (job.bigNum) {
     y += 16;
-    const s = fitFont(x, String(job.bigNum), 700, 72, '', MAXW);
+    const s = fitFont(x, String(job.bigNum), 700, sc(72), '', MAXW);
     y += s; x.fillText(String(job.bigNum), W / 2, y);
     if (job.bigNumLabel) {
-      x.font = '400 24px "Segoe UI", Arial';
-      y += 32; x.fillText(job.bigNumLabel, W / 2, y);
+      x.font = '400 ' + sc(24) + 'px "Segoe UI", Arial';
+      y += sc(32); x.fillText(job.bigNumLabel, W / 2, y);
     }
     y += 6;
   }
@@ -525,16 +533,16 @@ async function drawJob(x, job) {
   if (job.recipients && job.recipients.length) {
     y += 30;
     try { x.letterSpacing = '4px'; } catch (e) {}
-    x.font = '600 20px "Segoe UI", Arial';
+    x.font = '600 ' + sc(20) + 'px "Segoe UI", Arial';
     x.fillText('WENT TO', W / 2, y);
     try { x.letterSpacing = '0px'; } catch (e) {}
     y += 14;
-    x.textAlign = 'left'; x.font = '400 24px "Segoe UI", Arial';
+    x.textAlign = 'left'; x.font = '400 ' + sc(24) + 'px "Segoe UI", Arial';
     const names = job.recipients.slice(0, 12);
     for (let i = 0; i < names.length; i += 2) {
-      y += 34;
+      y += sc(34);
       x.fillText('→ ' + names[i], 90, y);
-      if (names[i + 1]) x.fillText('→ ' + names[i + 1], 320, y);
+      if (names[i + 1]) x.fillText('→ ' + names[i + 1], 328, y);
     }
     x.textAlign = 'center';
     y += 6;
@@ -542,17 +550,17 @@ async function drawJob(x, job) {
 
   if (job.message) {
     y += 18;
-    const lines = wrapText(x, '"' + job.message + '"', 26, 400, 'italic', MAXW);
-    for (const ln of lines) { y += 34; x.fillText(ln, W / 2, y); }
+    const lines = wrapText(x, '"' + job.message + '"', sc(26), 400, 'italic', MAXW);
+    for (const ln of lines) { y += sc(34); x.fillText(ln, W / 2, y); }
   }
 
   if (job.rows && job.rows.length) {
     y += 16;
     for (const r of job.rows.slice(0, 12)) {
-      y += 34;
-      x.textAlign = 'left'; x.font = '400 24px "Segoe UI", Arial';
+      y += sc(34);
+      x.textAlign = 'left'; x.font = '400 ' + sc(24) + 'px "Segoe UI", Arial';
       x.fillText(String(r.label), 70, y);
-      x.textAlign = 'right'; x.font = '700 26px "Segoe UI", Arial';
+      x.textAlign = 'right'; x.font = '700 ' + sc(26) + 'px "Segoe UI", Arial';
       x.fillText(String(r.value), W - 70, y);
     }
     x.textAlign = 'center';
@@ -564,17 +572,17 @@ async function drawJob(x, job) {
   const time = hh + ':' + String(t.getMinutes()).padStart(2, '0') + ' ' + ap;
   const footer = job.footer ||
     ('receipt #' + String(job._receiptNo || 0).padStart(4, '0') + ' · ' + time + ' · thank you <3');
-  x.font = '400 20px "Segoe UI", Arial';
-  y += 40; x.fillText(footer, W / 2, y);
+  x.font = '400 ' + sc(20) + 'px "Segoe UI", Arial';
+  y += sc(40); x.fillText(footer, W / 2, y);
   if (th && th.foot) { th.foot(x, y, seed); x.fillStyle = '#000'; x.strokeStyle = '#000'; }
   if (job.flairTag) {
-    x.font = 'italic 400 19px "Segoe UI", Arial';
-    y += 28; x.fillText('“' + job.flairTag + '”', W / 2, y);
+    x.font = 'italic 400 ' + sc(19) + 'px "Segoe UI", Arial';
+    y += sc(28); x.fillText('“' + job.flairTag + '”', W / 2, y);
   }
-  // Approved viewer doodle: 16×16 1-bit pixel art, 5-dot cells, centered.
+  // Approved viewer doodle: 16×16 1-bit pixel art, scaled-dot cells, centered.
   if (job.flairDoodle && /^[0-9a-f]{64}$/.test(job.flairDoodle)) {
     y += 14;
-    const cell = 5, dx = W / 2 - 8 * cell;
+    const cell = sc(5), dx = W / 2 - 8 * cell;
     x.fillStyle = '#000';
     for (let p = 0; p < 256; p++) {
       const byte = parseInt(job.flairDoodle.substr((p >> 3) * 2, 2), 16);

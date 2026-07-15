@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.1.0",
+    "ffmpeg-static": "^5.2.0",
     "ws": "^8.20.0"
   },
   "devDependencies": {
@@ -61,7 +62,9 @@
       "!.wrangler/**",
       "!_vcwt/**"
     ],
-    "asarUnpack": [],
+    "asarUnpack": [
+      "**/node_modules/ffmpeg-static/**"
+    ],
     "publish": [
       {
         "provider": "github",

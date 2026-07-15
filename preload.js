@@ -236,6 +236,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Webhook DELETE by message id. Used to wipe the previous records
   // message before posting the new one.
   discordWebhookDelete: (url, msgId)  => ipcRenderer.invoke('discord-webhook-delete', { url: url, messageId: msgId }),
+  // ── Gif It (auto-clip on channel-point redeem) ──────────────────────────
+  // Saves the OBS replay buffer, renders GIF + MP4 with bundled ffmpeg, and
+  // posts both to a Discord webhook. opts: { user, rewardName, webhook,
+  // formats, seconds, fps, width, obsPort, obsPass }. Returns { ok, reason? }.
+  gifItCapture: (opts) => ipcRenderer.invoke('gif-it-capture', opts || {}),
   // Bot Gateway lifecycle. Call discordBotConnect with a bot token and
   // optional guild/channel IDs to start observing Discord events; call
   // discordBotDisconnect to stop. discord-event IPC fires with the shape

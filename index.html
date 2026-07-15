@@ -3350,6 +3350,33 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <!-- Section 2: Records — persistent message that's edited to
                  reflect all-time highs. Uses delete-and-repost to bump it
                  to the bottom of the channel each time something improves. -->
+            <!-- Gif It: save the OBS replay buffer on a channel-point redeem,
+                 render GIF + MP4, and post them to a Discord webhook. -->
+            <div class="sec">
+              <div class="sec-hd">Gif It - Auto Clip</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When a viewer redeems your chosen channel-point reward, StreamFusion grabs the last few seconds from your <strong>OBS replay buffer</strong>, makes a GIF + MP4, and posts them to Discord. Needs OBS running with the Replay Buffer on (OBS Settings &rarr; Output &rarr; Replay Buffer).</div>
+              <label class="frow" style="font-size:11px"><span>Enable Gif It</span><input type="checkbox" id="gifItEnable" onchange="gifItSaveFromInputs()"></label>
+              <div style="display:flex;gap:6px;align-items:center;margin:8px 0">
+                <input class="minput" id="gifItWebhook" type="text" placeholder="Discord webhook URL" style="font-size:11px;padding:5px 8px;background:var(--surf2);flex:1" oninput="gifItSaveFromInputs()" onchange="gifItSaveFromInputs()">
+                <button class="cbtn" onclick="gifItTest()" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);white-space:nowrap">Test</button>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                <select id="gifItRewardSel" onchange="gifItSaveFromInputs()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:5px 8px;border-radius:4px;font-size:11px"><option value="">(any reward)</option></select>
+                <button class="cbtn" onclick="gifItLoadRewards()" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);white-space:nowrap">Load rewards</button>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                <label style="font-size:10px;color:var(--mut)">Format<select id="gifItFormats" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"><option value="both">GIF + MP4</option><option value="gif">GIF only</option><option value="mp4">MP4 only</option></select></label>
+                <label style="font-size:10px;color:var(--mut)">Seconds<input type="number" id="gifItSeconds" min="2" max="30" value="6" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
+                <label style="font-size:10px;color:var(--mut)">GIF width<input type="number" id="gifItWidth" min="160" max="1280" step="20" value="480" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+                <label style="font-size:10px;color:var(--mut)">GIF fps<input type="number" id="gifItFps" min="8" max="30" value="15" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
+                <label style="font-size:10px;color:var(--mut)">OBS port<input type="number" id="gifItObsPort" min="1" max="65535" value="4455" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
+                <label style="font-size:10px;color:var(--mut)">OBS pass<input type="password" id="gifItObsPass" placeholder="(if set)" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
+              </div>
+              <div id="gifItStatus" style="font-size:10px;color:var(--mut);margin-top:8px;min-height:12px"></div>
+            </div>
+
             <div class="sec">
               <div class="sec-hd">Stream Records</div>
               <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">Keeps a single message in a Discord channel updated with your all-time bests. Categories with no events yet are hidden from the post until they happen. Dedicated channel recommended (e.g. <code style="background:var(--surf3);padding:1px 4px;border-radius:3px">#records</code>).</div>
@@ -5961,6 +5988,7 @@ function loadSettings() {
     if (d.ttsEventPlats) { ttsEventPlats.tw = !!d.ttsEventPlats.tw; ttsEventPlats.yt = !!d.ttsEventPlats.yt; ttsEventPlats.tt = !!d.ttsEventPlats.tt; ttsEventPlats.kk = !!d.ttsEventPlats.kk; }
     if (d.showAvatars !== undefined) showAvatars = d.showAvatars;
     if (d.discordWebhook !== undefined) discordWebhook = d.discordWebhook;
+    if (d.gifit && typeof d.gifit === 'object') { for (var _gk in d.gifit) { if (gifItCfg.hasOwnProperty(_gk)) gifItCfg[_gk] = d.gifit[_gk]; } }
     if (d.discordEnabled !== undefined) discordEnabled = d.discordEnabled;
     if (d.ttsInstant !== undefined) ttsInstant = !!d.ttsInstant;
     if (d.ttsGiftCoinMin !== undefined) ttsGiftCoinMin = Math.max(0, parseInt(d.ttsGiftCoinMin) || 0);
@@ -6040,6 +6068,7 @@ function saveSettings() {
     qsendVisible: qsendVisible, quickMessages: quickMessages, evFilters: evFilters,
     ttsVolume: ttsVolume, ttsRate: ttsRate, ttsEventPlats: ttsEventPlats, showAvatars: showAvatars,
     discordWebhook: discordWebhook, discordEnabled: discordEnabled,
+    gifit: gifItCfg,
     ttsInstant: ttsInstant, ttsGiftCoinMin: ttsGiftCoinMin,
     hideMainAnimations: hideMainAnimations, perfMode: perfMode,
     showNowPlaying: showNowPlaying,
@@ -6075,7 +6104,89 @@ function saveSettings() {
   }));
 }
 
+// ── Gif It (auto-clip a channel-point redeem to Discord) ──────────────────
+// Config lives in sf_settings.gifit; the capture itself runs in the main
+// process (gifit.js) — this side just decides when to fire and shows toasts.
+var gifItCfg = { enabled: false, reward: 'Gif It', webhook: '', formats: 'both', seconds: 6, fps: 15, width: 480, obsPort: 4455, obsPass: '' };
+var gifItBusy = false;
+function gifItReason(r){
+  var m = { 'buffer-off':"OBS replay buffer isn't running", 'no-obs':"Can't reach OBS (check WebSocket port/password)", 'no-ffmpeg':'ffmpeg missing - reinstall StreamFusion', 'no-webhook':'Add a Discord webhook first', 'ffmpeg-failed':'Clip encoding failed', 'no-path':"OBS didn't return a clip file", 'save-failed':"OBS couldn't save the replay", 'upload-failed':'Discord upload failed' };
+  return m[r] || ('Error: ' + (r || 'unknown'));
+}
+function gifItApplyToInputs(){
+  var g = gifItCfg, e;
+  if (e = document.getElementById('gifItEnable')) e.checked = !!g.enabled;
+  if (e = document.getElementById('gifItWebhook')) e.value = g.webhook || '';
+  if (e = document.getElementById('gifItRewardSel')) {
+    var have = Array.prototype.some.call(e.options, function(o){ return o.value === g.reward || o.text === g.reward; });
+    if (g.reward && !have) { var op = document.createElement('option'); op.textContent = g.reward; e.appendChild(op); }
+    e.value = g.reward || '';
+  }
+  if (e = document.getElementById('gifItFormats')) e.value = g.formats || 'both';
+  if (e = document.getElementById('gifItSeconds')) e.value = g.seconds || 6;
+  if (e = document.getElementById('gifItWidth')) e.value = g.width || 480;
+  if (e = document.getElementById('gifItFps')) e.value = g.fps || 15;
+  if (e = document.getElementById('gifItObsPort')) e.value = g.obsPort || 4455;
+  if (e = document.getElementById('gifItObsPass')) e.value = g.obsPass || '';
+}
+function gifItSaveFromInputs(){
+  var v = function(id){ var el = document.getElementById(id); return el ? el.value : undefined; };
+  var c = function(id){ var el = document.getElementById(id); return el ? !!el.checked : undefined; };
+  var g = gifItCfg, t;
+  if ((t = c('gifItEnable')) !== undefined) g.enabled = t;
+  if ((t = v('gifItWebhook')) !== undefined) g.webhook = String(t).trim();
+  if ((t = v('gifItRewardSel')) !== undefined) g.reward = t;
+  if ((t = v('gifItFormats')) !== undefined) g.formats = t;
+  if ((t = v('gifItSeconds')) !== undefined) g.seconds = Math.max(2, parseInt(t) || 6);
+  if ((t = v('gifItWidth')) !== undefined) g.width = Math.max(160, parseInt(t) || 480);
+  if ((t = v('gifItFps')) !== undefined) g.fps = Math.max(8, parseInt(t) || 15);
+  if ((t = v('gifItObsPort')) !== undefined) g.obsPort = parseInt(t) || 4455;
+  if ((t = v('gifItObsPass')) !== undefined) g.obsPass = t;
+  try { saveSettings(); } catch (e) {}
+}
+async function gifItLoadRewards(){
+  var sel = document.getElementById('gifItRewardSel'); if (!sel) return;
+  if (!_twReady()) { _setStat('gifItStatus', 'Sign in to Twitch (Stream tab) to list rewards', true); return; }
+  _setStat('gifItStatus', 'Loading rewards...');
+  try {
+    var res = await _twReq('GET', 'channel_points/custom_rewards', 'broadcaster_id=' + encodeURIComponent(_twUid()) + '&only_manageable_rewards=true');
+    if (!_twOK(res)) { _setStat('gifItStatus', 'Could not load: ' + _twErr(res), true); return; }
+    var list = (res.data && res.data.data) || [];
+    sel.innerHTML = '<option value="">(any reward)</option>' + list.map(function(r){ return '<option>' + esc(r.title) + '</option>'; }).join('');
+    sel.value = gifItCfg.reward || '';
+    _setStat('gifItStatus', list.length ? (list.length + ' rewards loaded') : 'No manageable rewards found (create one in your Twitch dashboard)');
+  } catch (e) { _setStat('gifItStatus', 'Error loading rewards', true); }
+}
+async function gifItTest(){
+  gifItSaveFromInputs();
+  if (!gifItCfg.webhook || gifItCfg.webhook.indexOf('https://discord.com/api/webhooks/') !== 0) { showToast({ title: 'Gif It', message: 'Add a Discord webhook first', kind: 'err' }); return; }
+  if (!(window.electronAPI && window.electronAPI.gifItCapture)) return;
+  _setStat('gifItStatus', 'Testing - saving replay + rendering...');
+  showToast({ title: 'Gif It', message: 'Testing capture...', kind: 'info' });
+  try {
+    var res = await window.electronAPI.gifItCapture({ user: 'Test', rewardName: gifItCfg.reward || '', webhook: gifItCfg.webhook, formats: gifItCfg.formats, seconds: gifItCfg.seconds, fps: gifItCfg.fps, width: gifItCfg.width, obsPort: gifItCfg.obsPort, obsPass: gifItCfg.obsPass });
+    if (res && res.ok) { _setStat('gifItStatus', 'Test clip posted to Discord!'); showToast({ title: 'Gif It', message: 'Test clip posted!', kind: 'ok' }); }
+    else { _setStat('gifItStatus', gifItReason(res && res.reason), true); showToast({ title: 'Gif It failed', message: gifItReason(res && res.reason), kind: 'err' }); }
+  } catch (e) { _setStat('gifItStatus', 'Capture error', true); showToast({ title: 'Gif It', message: 'Capture error', kind: 'err' }); }
+}
+function gifItMaybeCapture(user, rewardName){
+  if (!gifItCfg.enabled) return;
+  if (!gifItCfg.webhook || gifItCfg.webhook.indexOf('https://discord.com/api/webhooks/') !== 0) return;
+  var want = String(gifItCfg.reward || '').trim();
+  if (want && want.toLowerCase() !== String(rewardName || '').trim().toLowerCase()) return;
+  if (gifItBusy) return;
+  if (!(window.electronAPI && window.electronAPI.gifItCapture)) return;
+  gifItBusy = true;
+  showToast({ title: 'Gif It', message: 'Capturing clip...', kind: 'info' });
+  window.electronAPI.gifItCapture({ user: user || 'someone', rewardName: rewardName || '', webhook: gifItCfg.webhook, formats: gifItCfg.formats, seconds: gifItCfg.seconds, fps: gifItCfg.fps, width: gifItCfg.width, obsPort: gifItCfg.obsPort, obsPass: gifItCfg.obsPass }).then(function(res){
+    gifItBusy = false;
+    if (res && res.ok) showToast({ title: 'Gif It', message: 'Clip posted to Discord!', kind: 'ok' });
+    else showToast({ title: 'Gif It failed', message: gifItReason(res && res.reason), kind: 'err' });
+  }).catch(function(){ gifItBusy = false; showToast({ title: 'Gif It', message: 'Capture error', kind: 'err' }); });
+}
+
 loadSettings();
+try { gifItApplyToInputs(); } catch (e) {}
 // Restore new UI elements from loaded settings
 (function() {
   var ttsVolEl = document.getElementById('ttsVol');
@@ -10743,6 +10854,8 @@ function handleSBEvent(event, data, fromES) {
     // EVENT_META entry) so this never floods the banner.
     sendObsAlert({ eventType: 'channelPoints', platform: 'tw', user: ren, rewardName: (rtitle && rtitle !== '?') ? rtitle : '', message: _redeemMsg || '' });
     printerPost({ kind: 'redeem', plat: 'tw', user: ren, avatar: _resolveEvAvatar('tw', data.user || data.redeemer, ren), reward: (rtitle && rtitle !== '?') ? rtitle : 'reward', cost: rcost, message: _redeemMsg });
+    // Gif It — auto-clip this redeem when it matches the configured reward.
+    try { gifItMaybeCapture(ren, (rtitle && rtitle !== '?') ? rtitle : ''); } catch (e) {}
   } else if (key === 'Twitch.UserBanned' || key === 'Twitch.Ban') {
     var _bt = data.targetUser || data.target || {};
     var _bn = _bt.display_name || _bt.displayName || _bt.name || _bt.login || _bt.username || _bt.userName || data.targetUserName || data.target_user_name || data.targetDisplayName || '?';
@@ -17311,17 +17424,19 @@ var CAH_DECKS = {
   }
 };
 
-// Draw a hand from the active deck: one black prompt + `pick` distinct whites.
+// Draw a hand: one black prompt + one white answer. The reveal prints them
+// as two receipts (black question first, then the white answer), so prefer
+// single-blank black prompts — a lone white answer reads cleanly against a
+// one-blank question.
+var CAH_REVEAL_DELAY_MS = 4000;   // pause between the white card and the black
 function _cahHand() {
   var deck = CAH_DECKS[printerCfg.cahDeck] || CAH_DECKS.pg13;
   if (!deck || !deck.black.length || !deck.white.length) return null;
-  var black = deck.black[Math.floor(Math.random() * deck.black.length)];
-  var pick = Math.max(1, Math.min(3, black.pick || 1));
-  var pool = deck.white.slice(), whites = [];
-  while (whites.length < pick && pool.length) {
-    whites.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-  }
-  return { black: black.t, whites: whites };
+  var pool = deck.black.filter(function(b) { return (b.pick || 1) === 1; });
+  if (!pool.length) pool = deck.black;
+  var black = pool[Math.floor(Math.random() * pool.length)];
+  var white = deck.white[Math.floor(Math.random() * deck.white.length)];
+  return { black: black.t, white: white };
 }
 
 // The tap. o: { kind, plat, user, avatar, tier, months, message, count,
@@ -17370,19 +17485,32 @@ function printerPost(o) {
         });
         return;
       }
-      // "Cards Against Humanity": draw a black prompt + white answer(s) from the
-      // selected deck and print them card-styled. Own toggle, like notes/memes.
+      // "Cards Against Humanity": prints like the real game — the black PROMPT
+      // card first (the question), then (a few seconds later) the white ANSWER
+      // card as the punchline. Own toggle, like notes/memes.
       var _cr = String(printerCfg.cahReward || '').trim().toLowerCase();
       if (_cr && String(o.reward || '').trim().toLowerCase() === _cr) {
         if (printerCfg.ev.cah === false) return;
         var hand = _cahHand();
-        if (!hand || !hand.black) return;
+        if (!hand || !hand.black || !hand.white) return;
+        var _cahPlat = o.plat, _cahUser = o.user || '', _cahAv = o.avatar || null, _cahCost = o.cost;
+        // 1) The black prompt card prints first (the question).
         _printerSend({
-          platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null, _kind: 'cah',
+          platform: _cahPlat, user: _cahUser, avatarUrl: _cahAv, _kind: 'cah',
           banner: 'CARDS AGAINST HUMANITY',
-          action: 'drew a hand' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
-          cahBlack: hand.black, cahWhites: hand.whites
+          action: 'drew a hand' + (_cahCost ? ' · ' + Number(_cahCost).toLocaleString() + ' pts' : ''),
+          cahBlack: hand.black,
+          footer: 'the answer is coming…'
         });
+        // 2) …then the white answer card, a few seconds later (the punchline).
+        setTimeout(function() {
+          _printerSend({
+            platform: _cahPlat, user: '', avatarUrl: null, _kind: 'cah',
+            action: '…and the answer is',
+            cahWhite: hand.white,
+            footer: (_cahUser ? '— ' + _cahUser + '’s hand · ' : '') + 'cards against humanity'
+          });
+        }, CAH_REVEAL_DELAY_MS);
         return;
       }
     }

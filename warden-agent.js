@@ -315,10 +315,15 @@ function _moveSource(obs, sourceName, target, done) {
 // Connect to OBS, authenticate, hand a small request runner to `body`, then
 // close. `body(obs, done)` calls done(ok) when finished; `after(ok, err)`
 // fires once with the outcome.
-function obsRun(body, after) {
+function obsRun(body, after, opts) {
+  opts = opts || {};
+  // Lazy-load ws so callers (e.g. Gif It) work even when the Warden agent
+  // itself was never init()'d / enabled.
+  if (!WSLib) { try { WSLib = require('ws'); } catch (e) { WSLib = null; } }
   if (!WSLib) { after(false, 'no-ws'); return; }
-  const port = (cfg.obs && cfg.obs.port) || 4455;
-  const password = (cfg.obs && cfg.obs.password) || '';
+  const oc = opts.obs || cfg.obs || {};
+  const port = oc.port || 4455;
+  const password = oc.password || '';
   let sock;
   try { sock = new WSLib('ws://127.0.0.1:' + port); }
   catch (e) { after(false, 'no-obs'); return; }
@@ -328,7 +333,7 @@ function obsRun(body, after) {
     try { sock.close(); } catch (e) {}
     after(ok, err);
   };
-  const timer = setTimeout(function () { finish(false, 'timeout'); }, 6000);
+  const timer = setTimeout(function () { finish(false, 'timeout'); }, opts.timeout || 6000);
   const pending = new Map();
   let seq = 0;
   const obs = {
@@ -410,4 +415,38 @@ function probeObs(cb) {
   }, function () { cb(out); });
 }
 
-module.exports = { init, setConfig, getStatus, relayChat, probeObs, stop };
+// ── Gif It: replay-buffer capture ──────────────────────────────────────────
+// Ensure the buffer is running, save a fresh replay, and return its file path
+// once OBS finishes writing it. cb({ ok, path?, reason? }). Uses a dedicated
+// OBS connection (own port/password) so it works even when the Warden agent
+// is disabled. reason is one of: no-obs | buffer-off | save-failed | no-path.
+function captureReplay(obsCfg, cb) {
+  let outPath = '', reason = '';
+  obsRun(function (obs, done) {
+    obs.req('GetReplayBufferStatus', {}, function (ok, d) {
+      if (!ok) { reason = 'no-obs'; done(false); return; }
+      if (!d || d.outputActive !== true) { reason = 'buffer-off'; done(false); return; }
+      // Remember the previous saved path so we can tell when the NEW one lands.
+      obs.req('GetLastReplayBufferReplay', {}, function (okB, dB) {
+        const before = (dB && dB.savedReplayPath) || '';
+        obs.req('SaveReplayBuffer', {}, function (okS) {
+          if (okS === false) { reason = 'save-failed'; done(false); return; }
+          let tries = 0;
+          (function poll() {
+            obs.req('GetLastReplayBufferReplay', {}, function (okP, dP) {
+              const p = (dP && dP.savedReplayPath) || '';
+              if (p && p !== before) { outPath = p; done(true); return; }
+              if (++tries >= 40) { reason = 'no-path'; done(false); return; } // ~10s
+              setTimeout(poll, 250);
+            });
+          })();
+        });
+      });
+    });
+  }, function (ok, err) {
+    if (ok && outPath) cb({ ok: true, path: outPath });
+    else cb({ ok: false, reason: reason || err || 'error' });
+  }, { obs: obsCfg || {}, timeout: 20000 });
+}
+
+module.exports = { init, setConfig, getStatus, relayChat, probeObs, stop, captureReplay };

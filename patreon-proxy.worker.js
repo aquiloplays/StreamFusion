@@ -106,6 +106,9 @@ export default {
     // shared vault, reusable by every product.
     if (path === '/twitch/connect')     return handleTwitchConnect(request, env);
     if (path === '/twitch/vault/token') return handleVaultToken(request, env);
+    // Multi-tenancy: per-channel identity directory (read side). See §7 of
+    // docs/MULTI-TENANCY-PLAN.md. Public read, non-secret fields only.
+    if (path === '/tenant/resolve')     return handleTenantResolve(request, env);
     // Kick + YouTube channel/bot connect + vault (mirror the Twitch flow,
     // parameterized by PLATFORM_CFG). Dark until the platform's client id is set.
     if (path === '/kick/connect')        return handlePlatformConnect(request, env, PLATFORM_CFG.kick);
@@ -545,6 +548,24 @@ async function verifyOwnerSig(env, owner, hexSig) {
   } catch (e) { return false; }
 }
 
+// Sign a compact, verified-identity blob for a TRUSTED consumer (aquilo.gg's
+// /api/twitch/link/finish) so it can complete sign-in WITHOUT reading the
+// session back out of eventually-consistent KV — the read that breaks iOS PWAs
+// (the OAuth sheet + the home-screen app resolve at different edges, so the
+// callback's session write isn't visible to /finish in time). Same hex-HMAC /
+// CONNECT_OWNER_SECRET scheme as verifyOwnerSig; /finish re-derives + checks
+// freshness. Public identity only (id/login/display), never tokens.
+async function _signIdt(env, obj) {
+  if (!env.CONNECT_OWNER_SECRET) return '';
+  try {
+    var body = _b64urlEncode(JSON.stringify(obj));
+    var key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.CONNECT_OWNER_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    var sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
+    var hex = [...new Uint8Array(sig)].map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    return body + '.' + hex;
+  } catch (e) { return ''; }
+}
+
 // Helix path prefixes the session proxy will forward. Keeps a leaked session
 // id from being a skeleton key to the whole API.
 const TWITCH_HELIX_ALLOW = [
@@ -712,10 +733,13 @@ async function handleTwitchCallback(request, env) {
     return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=error&reason=not_configured') } });
   }
   var redirectUri = env.TWITCH_REDIRECT_URI || TWITCH_CALLBACK_DEFAULT;
-  var tok = await _twitchExchange(env, { grant_type: 'authorization_code', code: code, redirect_uri: redirectUri });
+  var _xErr = {};
+  var tok = await _twitchExchange(env, { grant_type: 'authorization_code', code: code, redirect_uri: redirectUri }, _xErr);
+  console.log('CB-DIAG ' + JSON.stringify({ hasTok: !!(tok && tok.access_token), xerr: _xErr, mode: (state && state.m) || 'identity', ruri: redirectUri }));
   if (!tok || !tok.access_token) return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=error&reason=exchange') } });
   var meRes = await _twitchHelix(env, tok.access_token, 'GET', 'users', '', null);
   var u = meRes && meRes.data && meRes.data.data && meRes.data.data[0];
+  console.log('CB-DIAG-USER ' + JSON.stringify({ uLogin: u ? u.login : null, meStatus: meRes ? meRes.status : null }));
   var rec = {
     access_token: tok.access_token,
     refresh_token: tok.refresh_token || '',
@@ -760,6 +784,14 @@ async function handleTwitchCallback(request, env) {
     }
     vault.updatedAt = Date.now();
     await env.LOADOUT_BOLTS.put(vkey, JSON.stringify(vault));
+    // Multi-tenancy P0: on a BROADCASTER connect, upsert this streamer's tenant
+    // directory record. Best-effort — wrapped so a directory hiccup can never
+    // break the connect flow. Bot-mode connects are skipped (u is the bot acct,
+    // not the broadcaster). See docs/MULTI-TENANCY-PLAN.md §7.
+    if (mode === 'connect') {
+      try { await upsertTenantOnConnect(env, { twitchId: u.id, login: u.login, displayName: u.display_name }); }
+      catch (e) { console.log('TENANT-UPSERT-ERR ' + String(e && e.message)); }
+    }
     // Merged sign-in (mint=1, broadcaster only): ALSO persist the identity
     // session under the caller's nonce, so aquilo.gg's /api/twitch/link/finish
     // can mint the aq_link login from this SAME consent via /twitch/me — one
@@ -774,7 +806,19 @@ async function handleTwitchCallback(request, env) {
   }
 
   await env.TWITCH_SESSIONS.put('tw:' + session, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 60 });
-  return new Response(null, { status: 302, headers: { 'Location': _appendHash(ret, 'twitch=ok'), 'Cache-Control': 'no-store' } });
+  // Hand the verified identity to the site's /finish DIRECTLY (signed) so it can
+  // mint aq_link WITHOUT reading the session back out of eventually-consistent
+  // KV — the cross-edge read that breaks iOS-PWA sign-in. /finish falls back to
+  // the session read if idt is absent/invalid.
+  var idt = u ? await _signIdt(env, { u: String(u.id), l: u.login || '', d: u.display_name || u.login || '', t: Date.now() }) : '';
+  var retOk = idt ? (ret + (ret.indexOf('?') === -1 ? '?' : '&') + 'idt=' + encodeURIComponent(idt)) : ret;
+  try {
+    var _fpK = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.CONNECT_OWNER_SECRET || ''), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    var _fpS = await crypto.subtle.sign('HMAC', _fpK, new TextEncoder().encode('aq-secret-probe-v1'));
+    var _fp = [...new Uint8Array(_fpS)].map(function (b) { return b.toString(16).padStart(2, '0'); }).join('').slice(0, 12);
+    console.log('IDT-DIAG ' + JSON.stringify({ uLogin: u ? u.login : null, uId: u ? String(u.id) : null, idtLen: idt.length, hasIdt: retOk.indexOf('idt=') >= 0, mode: (state && state.m) || 'identity', secretSet: !!env.CONNECT_OWNER_SECRET, fp: _fp, retLen: retOk.length }));
+  } catch (e) { console.log('IDT-DIAG-ERR ' + String(e && e.message)); }
+  return new Response(null, { status: 302, headers: { 'Location': _appendHash(retOk, 'twitch=ok'), 'Cache-Control': 'no-store' } });
 }
 
 // GET /twitch/me?session=<id> → auth status + the dock's own broadcaster id.
@@ -1393,4 +1437,88 @@ async function handlePlatformVaultToken(request, env, cfg) {
     await env.LOADOUT_BOLTS.put(cfg.vaultKey(vaultId), JSON.stringify(vault));
   }
   return json({ ok: true, access_token: sub.access_token, expires_at: sub.expires_at, scope: sub.scope, login: sub.login, client_id: cfg.clientId(env) }, 200);
+}
+
+// ── Multi-tenancy: tenant directory (P0) ───────────────────────────────────
+// The suite's per-channel identity binding: one record per connected streamer,
+// keyed by Twitch broadcaster id, written here at /twitch/connect time and read
+// by every product (site BFF + workers) via GET /tenant/resolve. It replaces
+// the CLAY_TWITCH_CHANNEL_ID / AQUILO_VAULT_GUILD_ID env singletons that the
+// consumers fall back to today. Fully ADDITIVE: until an ACTIVE record exists
+// for a channel, /tenant/resolve 404s and every consumer keeps its current
+// behavior. See docs/MULTI-TENANCY-PLAN.md §7.
+function _tenantKey(twitchId) { return 'tenant:' + String(twitchId); }
+function _tenantSlugKey(slug)  { return 'slug:' + String(slug).toLowerCase(); }
+function _tenantGuildKey(gid)  { return 'guild:' + String(gid); }
+
+// Onboarding is invite-gated for the first cohort (§7 decision): a connect
+// writes an ACTIVE record only if the streamer's Twitch id is in the
+// comma-separated TENANT_INVITE_IDS var (or they already have an active
+// record). Everyone else gets a PENDING record — stored so we can see who
+// tried, but inert: /tenant/resolve treats non-active as not-found, so
+// consumers fall back to their defaults. Flip to open self-serve later by
+// having _tenantInvited always return true.
+function _tenantInvited(env, twitchId) {
+  var ids = String(env.TENANT_INVITE_IDS || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  return ids.indexOf(String(twitchId)) !== -1;
+}
+
+// Idempotent upsert. Preserves operator-managed fields (namespace,
+// discordGuildId, ownerDiscordId, kickSlug, ytChannelId, slug) across
+// re-connects; only refreshes identity + updatedAt. NEVER overwrites a
+// namespace once set — this is what protects Clay's grandfathered guild-id
+// namespace (his seed record pins namespace to the Discord guild, not tw:<id>).
+async function upsertTenantOnConnect(env, ident) {
+  if (!env.LOADOUT_BOLTS || !ident || !ident.twitchId) return null;
+  var twitchId = String(ident.twitchId);
+  var key = _tenantKey(twitchId);
+  var prevRaw = await env.LOADOUT_BOLTS.get(key);
+  var prev; try { prev = prevRaw ? JSON.parse(prevRaw) : null; } catch (e) { prev = null; }
+  var invited = _tenantInvited(env, twitchId) || !!(prev && prev.status === 'active');
+  var slug = (prev && prev.slug) || String(ident.login || twitchId).toLowerCase();
+  var rec = {
+    twitchId: twitchId,
+    login: String(ident.login || (prev && prev.login) || ''),
+    displayName: String(ident.displayName || (prev && prev.displayName) || ident.login || ''),
+    slug: slug,
+    namespace: (prev && prev.namespace) || ('tw:' + twitchId),
+    discordGuildId: (prev && prev.discordGuildId) || null,
+    ownerDiscordId: (prev && prev.ownerDiscordId) || null,
+    kickSlug: (prev && prev.kickSlug) || null,
+    ytChannelId: (prev && prev.ytChannelId) || null,
+    features: (prev && prev.features) || {},
+    status: invited ? 'active' : 'pending',
+    createdAt: (prev && prev.createdAt) || Date.now(),
+    updatedAt: Date.now()
+  };
+  await env.LOADOUT_BOLTS.put(key, JSON.stringify(rec));
+  // Reverse indexes so a public slug / Discord guild id resolves to the channel.
+  await env.LOADOUT_BOLTS.put(_tenantSlugKey(slug), twitchId);
+  if (rec.discordGuildId) await env.LOADOUT_BOLTS.put(_tenantGuildKey(rec.discordGuildId), twitchId);
+  return rec;
+}
+
+// GET /tenant/resolve?ch=<slug> | ?twitchId=<id> | ?guildId=<id>
+// Public read (no tokens, non-secret fields only). Resolves ACTIVE tenants
+// only; pending/absent records return 404 so they stay inert for consumers.
+async function handleTenantResolve(request, env) {
+  var cors = twitchCors(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (!env.LOADOUT_BOLTS) return json({ ok: false, error: 'not_configured' }, 503, cors);
+  var url = new URL(request.url);
+  var twitchId = url.searchParams.get('twitchId') || '';
+  var slug = url.searchParams.get('ch') || url.searchParams.get('slug') || '';
+  var guildId = url.searchParams.get('guildId') || '';
+  if (!twitchId && slug)    twitchId = (await env.LOADOUT_BOLTS.get(_tenantSlugKey(slug))) || '';
+  if (!twitchId && guildId) twitchId = (await env.LOADOUT_BOLTS.get(_tenantGuildKey(guildId))) || '';
+  if (!twitchId) return json({ ok: false, error: 'not_found' }, 404, cors);
+  var raw = await env.LOADOUT_BOLTS.get(_tenantKey(twitchId));
+  var rec; try { rec = raw ? JSON.parse(raw) : null; } catch (e) { rec = null; }
+  if (!rec || rec.status !== 'active') return json({ ok: false, error: 'not_found' }, 404, cors);
+  return json({
+    ok: true,
+    twitchId: rec.twitchId, login: rec.login, displayName: rec.displayName, slug: rec.slug,
+    namespace: rec.namespace, discordGuildId: rec.discordGuildId, ownerDiscordId: rec.ownerDiscordId,
+    kickSlug: rec.kickSlug, ytChannelId: rec.ytChannelId, status: rec.status
+  }, 200, cors);
 }

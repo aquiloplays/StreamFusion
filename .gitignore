@@ -47,3 +47,9 @@ Desktop.ini
 *.temp
 .cache/
 obs-config.json
+
+# nested git worktrees + local caches (not deliverables)
+.wrangler/
+_acctwt/
+_vcwt/
+.claude/worktrees/
