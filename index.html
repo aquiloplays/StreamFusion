@@ -525,6 +525,25 @@ body.has-sf-notice { padding-top: 42px !important; }
 .ev-panel{width:0;background:var(--surf);border-left:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;position:relative;transition:width .3s cubic-bezier(.4,0,.2,1)}
 .ev-resize-handle{position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s}
 .ev-resize-handle:hover,.ev-resize-handle.dragging{background:var(--accent)}
+/* Events zones — one panel, four layouts (single / split / tabs / dual) */
+.ev-tabs{display:none;gap:4px;padding:6px 8px 0;flex-shrink:0}
+.ev-tab{flex:1;background:var(--surf2);border:1px solid var(--bdr);color:var(--mut);border-radius:6px 6px 0 0;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-tab.on{color:var(--txt);background:var(--surf);border-bottom-color:var(--surf)}
+.evlay-btn{background:var(--surf2);border:1px solid var(--bdr);color:var(--mut);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.evlay-btn.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+.ev-zones{flex:1;min-height:0;display:flex;flex-direction:column}
+.ev-zone{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1}
+.ev-zone-hd{display:none;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);padding:6px 10px 3px;flex-shrink:0}
+.ev-zone .ev-feed{flex:1;min-height:0}
+.ev-panel[data-evlayout="single"] #evZoneB,.ev-panel[data-evlayout="single"] .ev-zone-hd,.ev-panel[data-evlayout="single"] .ev-tabs{display:none}
+.ev-panel[data-evlayout="split"] .ev-zone-hd{display:block}
+.ev-panel[data-evlayout="split"] #evZoneB{border-top:2px solid var(--bdr)}
+.ev-panel[data-evlayout="dual"] .ev-zones{flex-direction:row}
+.ev-panel[data-evlayout="dual"] .ev-zone-hd{display:block}
+.ev-panel[data-evlayout="dual"] #evZoneB{border-left:2px solid var(--bdr)}
+.ev-panel[data-evlayout="tabs"] .ev-tabs{display:flex}
+.ev-panel[data-evlayout="tabs"][data-evtab="a"] #evZoneB{display:none}
+.ev-panel[data-evlayout="tabs"][data-evtab="b"] #evZoneA{display:none}
 .ev-panel-hd{padding:10px 12px 8px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .ev-panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--mut)}
 .ev-width-label{font-size:10px;color:var(--mut);opacity:.6;margin-left:4px;font-weight:400}
@@ -2525,6 +2544,14 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <label class="frow"><span>Ticker bar (ads + pinned event, above chat)</span><input type="checkbox" id="sfTickerOn" checked onchange="saveSettings(); sfTickerApply();"></label>
             <label class="frow"><span>Rotating &ldquo;in chat&rdquo; bar <span style="opacity:.6">(cycles every chatter + platform, above chat)</span></span><input type="checkbox" id="sfChattersOn" checked onchange="saveSettings(); sfChattersApply();"></label>
             <label class="frow"><span>Welcome back returning viewers <span style="opacity:.6">(banner + sound + feed on their first chat of the day)</span></span><input type="checkbox" id="welcomeBackOn" checked onchange="saveSettings()"></label>
+            <div class="ev-sub-hd" style="margin-top:14px">Events layout <span class="ev-sub-note">split events into two zones and choose what shows where</span></div>
+            <div id="evLayoutBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px">
+              <button class="evlay-btn" data-mode="single" onclick="setEvLayout('single')">Single</button>
+              <button class="evlay-btn" data-mode="split" onclick="setEvLayout('split')">Split (stacked)</button>
+              <button class="evlay-btn" data-mode="tabs" onclick="setEvLayout('tabs')">Tabs</button>
+              <button class="evlay-btn" data-mode="dual" onclick="setEvLayout('dual')">Two columns</button>
+            </div>
+            <div id="evZoneAssign" style="display:none"></div>
             <div class="ev-sub-hd" style="margin-top:14px">Hide from the feed <span class="ev-sub-note">check an item to stop it showing</span></div>
             <label class="frow"><span>Hide !commands</span><input type="checkbox" id="hideCmd" onchange="saveSettings()"></label>
             <label class="frow"><span>Collapse repeated messages <span style="opacity:.6">(same user &amp; text &rarr; &times;N badge, not a new line)</span></span><input type="checkbox" id="spamCollapse" checked onchange="saveSettings()"></label>
@@ -3553,7 +3580,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     </div>
   </div>
 
-  <div class="ev-panel" id="evPanel">
+  <div class="ev-panel" id="evPanel" data-evlayout="single">
     <div class="ev-resize-handle" id="evResizeHandle"></div>
     <div class="ev-panel-hd">
       <span class="ev-panel-title">Events <span class="ev-width-label" id="evWidthLabel"></span></span>
@@ -3561,8 +3588,23 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
     </div>
     <div class="ev-likes" id="evLikes"><div class="hearts-wrap" id="heartsWrap"><svg class="ic" style="color:#ff4d6d"><use href="#i-heart"/></svg> <span id="evLikeCount">0</span> likes</div></div>
     <div class="ev-pinned-wrap"><div class="ev-pinned" id="evPinned"></div></div>
-    <div class="ev-feed" id="evFeed">
-      <div class="ev-empty" id="evEmpty">No events yet &mdash; follows, subs, gifts and tips will appear here.</div>
+    <div class="ev-tabs" id="evTabs">
+      <button class="ev-tab on" id="evTabA" onclick="evSelectTab('a')">Zone A</button>
+      <button class="ev-tab" id="evTabB" onclick="evSelectTab('b')">Zone B</button>
+    </div>
+    <div class="ev-zones" id="evZonesWrap">
+      <div class="ev-zone za" id="evZoneA">
+        <div class="ev-zone-hd" id="evZoneAHd">Zone A</div>
+        <div class="ev-feed" id="evFeed">
+          <div class="ev-empty" id="evEmpty">No events yet &mdash; follows, subs, gifts and tips will appear here.</div>
+        </div>
+      </div>
+      <div class="ev-zone zb" id="evZoneB">
+        <div class="ev-zone-hd" id="evZoneBHd">Zone B</div>
+        <div class="ev-feed" id="evFeedB">
+          <div class="ev-empty" id="evEmptyB">No events routed here yet.</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -5974,6 +6016,108 @@ var ttsEnabled = false;
 var keywords = [], quickMessages = [], evHistory = [];
 var evPanelOpen = false, qsendVisible = false;
 var evPanelWidth = 230;
+// Events layout: one panel, four presentations. 'single' = today's behavior
+// (one feed). 'split' = two stacked zones, 'tabs' = two tabbed zones, 'dual' =
+// two side-by-side columns. When not 'single', each event category routes to
+// zone A or B (or both) per evZones, so the streamer decides what shows where.
+var evLayout = 'single';   // 'single' | 'split' | 'tabs' | 'dual'
+var evActiveTab = 'a';     // active zone in 'tabs' mode
+var evZones = { follows: 'b', subs: 'a', bits: 'a', tips: 'a', raids: 'b', other: 'a' };
+var EV_ZONE_CATS = [
+  { key: 'subs',    label: 'Subs, resubs, gifts & members' },
+  { key: 'bits',    label: 'Cheers / Bits' },
+  { key: 'tips',    label: 'Tips & Super Chats' },
+  { key: 'follows', label: 'Follows' },
+  { key: 'raids',   label: 'Raids' },
+  { key: 'other',   label: 'Everything else (mod, hype, system…)' },
+];
+function evCategory(evType) {
+  switch (String(evType || '')) {
+    case 'follow': return 'follows';
+    case 'sub': case 'resub': case 'gift': case 'member': return 'subs';
+    case 'cheer': case 'bits': return 'bits';
+    case 'tip': case 'super': return 'tips';
+    case 'raid': case 'host': return 'raids';
+    default: return 'other';
+  }
+}
+// Which feed element(s) an event of this type should render into, given the
+// current layout. 'single' always uses the one feed (#evFeed = zone A).
+function evTargetFeeds(evType) {
+  var a = document.getElementById('evFeed');
+  if (evLayout === 'single') return a ? [a] : [];
+  var zone = evZones[evCategory(evType)] || 'a';
+  var b = document.getElementById('evFeedB');
+  var out = [];
+  if (zone === 'a' || zone === 'both') { if (a) out.push(a); }
+  if (zone === 'b' || zone === 'both') { if (b) out.push(b); }
+  return out.length ? out : (a ? [a] : []);
+}
+// Insert a freshly-built event row into each target zone feed (cloning for the
+// 'both' case), clearing that feed's empty-state and trimming to 100.
+function _evInsertRow(el, evType) {
+  var feeds = evTargetFeeds(evType);
+  if (!feeds.length) return;
+  for (var i = 0; i < feeds.length; i++) {
+    var f = feeds[i];
+    var em = f.querySelector('.ev-empty');
+    if (em) em.parentNode.removeChild(em);
+    var node = (i === 0) ? el : el.cloneNode(true);
+    f.insertBefore(node, f.firstChild);
+    while (f.children.length > 100) f.removeChild(f.lastChild);
+  }
+}
+// Apply the current layout to the panel (data attributes drive the CSS) and
+// sync the tab bar. Called on load, on layout change, and on tab switch.
+function applyEvLayout() {
+  var p = document.getElementById('evPanel');
+  if (!p) return;
+  p.setAttribute('data-evlayout', evLayout);
+  p.setAttribute('data-evtab', evActiveTab);
+  var ta = document.getElementById('evTabA'), tb = document.getElementById('evTabB');
+  if (ta) ta.classList.toggle('on', evActiveTab === 'a');
+  if (tb) tb.classList.toggle('on', evActiveTab === 'b');
+  // Zone headers reflect what each zone carries, so the labels aren't opaque.
+  var aCats = [], bCats = [];
+  EV_ZONE_CATS.forEach(function (c) {
+    var z = evZones[c.key] || 'a';
+    if (z === 'a' || z === 'both') aCats.push(c.key);
+    if (z === 'b' || z === 'both') bCats.push(c.key);
+  });
+  var ha = document.getElementById('evZoneAHd'), hb = document.getElementById('evZoneBHd');
+  if (ha) ha.textContent = 'Zone A' + (aCats.length ? ' · ' + aCats.join(', ') : ' · (empty)');
+  if (hb) hb.textContent = 'Zone B' + (bCats.length ? ' · ' + bCats.join(', ') : ' · (empty)');
+  if (ta) ta.textContent = 'A · ' + (aCats.length ? aCats.join(', ') : 'empty');
+  if (tb) tb.textContent = 'B · ' + (bCats.length ? bCats.join(', ') : 'empty');
+}
+function evSelectTab(z) { evActiveTab = (z === 'b') ? 'b' : 'a'; saveSettings(); applyEvLayout(); }
+function setEvLayout(mode) {
+  evLayout = ['single', 'split', 'tabs', 'dual'].indexOf(mode) >= 0 ? mode : 'single';
+  saveSettings(); applyEvLayout();
+  try { initEvLayoutControls(); } catch (e) {}
+}
+function setEvZone(cat, zone) {
+  if (EV_ZONE_CATS.some(function (c) { return c.key === cat; })) {
+    evZones[cat] = (['a', 'b', 'both'].indexOf(zone) >= 0) ? zone : 'a';
+    saveSettings(); applyEvLayout();
+  }
+}
+// Reflect saved layout + zone assignments into the Settings → Events controls.
+function initEvLayoutControls() {
+  var btns = document.querySelectorAll('#evLayoutBtns .evlay-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-mode') === evLayout);
+  var assign = document.getElementById('evZoneAssign');
+  if (!assign) return;
+  if (evLayout === 'single') { assign.style.display = 'none'; assign.innerHTML = ''; return; }
+  assign.style.display = '';
+  assign.innerHTML = '<div class="ev-sub-note" style="margin:2px 0 6px">Which zone each event type shows in:</div>'
+    + EV_ZONE_CATS.map(function (c) {
+        var v = evZones[c.key] || 'a';
+        function opt(val, lbl) { return '<option value="' + val + '"' + (v === val ? ' selected' : '') + '>' + lbl + '</option>'; }
+        return '<label class="frow"><span>' + c.label + '</span><select onchange="setEvZone(\'' + c.key + '\', this.value)" style="background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px">'
+          + opt('a', 'Zone A') + opt('b', 'Zone B') + opt('both', 'Both') + '</select></label>';
+      }).join('');
+}
 var soundVolume = 0.8, audioCtx = null, audioUnlocked = false;
 var SEND_PLATS = { tw: false, yt: false, tt: false, kk: false };
 var MAX_CHARS = { tw: 500, yt: 200, tt: 150, kk: 500 };
@@ -6055,6 +6199,9 @@ function loadSettings() {
     if (d.ttsEnabled !== undefined) { ttsEnabled = d.ttsEnabled; var _ttsBtn = document.getElementById('ttsToggleBtn'); if (_ttsBtn) { _ttsBtn.innerHTML = ttsEnabled ? '<svg class="ic"><use href="#i-volume"/></svg>TTS: ON' : '<svg class="ic"><use href="#i-mute"/></svg>TTS: OFF'; if (ttsEnabled) _ttsBtn.classList.add('on'); } }
     if (d.evPanelOpen !== undefined) evPanelOpen = d.evPanelOpen;
     if (d.evPanelWidth) evPanelWidth = d.evPanelWidth;
+    if (d.evLayout) evLayout = d.evLayout;
+    if (d.evActiveTab) evActiveTab = d.evActiveTab;
+    if (d.evZones && typeof d.evZones === 'object') EV_ZONE_CATS.forEach(function (c) { if (d.evZones[c.key]) evZones[c.key] = d.evZones[c.key]; });
     if (d.qsendVisible !== undefined) qsendVisible = d.qsendVisible;
     if (Array.isArray(d.quickMessages)) quickMessages = d.quickMessages;
     if (d.evFilters) window._savedEvFilters = d.evFilters;
@@ -6154,6 +6301,7 @@ function saveSettings() {
     ttsReadUser: ttsReadUser, ttsReadEmoji: ttsReadEmoji, ttsReadEventNames: ttsReadEventNames, ttsEventTypes: ttsEventTypes,
     useSB: S.useSB, useTF: S.useTF, hotbarActions: hotbarActions, hotbarVisible: hotbarVisible,
     evPanelOpen: evPanelOpen, evPanelWidth: evPanelWidth,
+    evLayout: evLayout, evActiveTab: evActiveTab, evZones: evZones,
     qsendVisible: qsendVisible, quickMessages: quickMessages, evFilters: evFilters,
     ttsVolume: ttsVolume, ttsRate: ttsRate, ttsEventPlats: ttsEventPlats, showAvatars: showAvatars,
     discordWebhook: discordWebhook, discordEnabled: discordEnabled,
@@ -6657,13 +6805,10 @@ function testEvent(kind) {
   }
 }
 
-function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
+function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar, evType) {
   var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   evHistory.unshift({ user: user, text: text, plat: plat, time: t, evMessage: evMessage || '' });
   if (evHistory.length > 100) evHistory.pop();
-  var feed = document.getElementById('evFeed');
-  var empty = document.getElementById('evEmpty');
-  if (empty) empty.parentNode.removeChild(empty);
   var el = document.createElement('div');
   var isModEvent = (user === 'Moderation');
   el.className = 'ev-item' + (big ? ' big' : '') + (plat ? ' ' + plat : '') + (isModEvent ? ' mod-event' : '');
@@ -6706,8 +6851,7 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
     actHtml += '</div>';
   }
   el.innerHTML = avHtml + '<div class="ev-body"><div class="ev-item-user">' + esc(user) + '</div><div class="ev-item-text">' + esc(text) + '</div>' + msgBlock + giftBlock + actHtml + '<div class="ev-item-time">' + t + '</div></div>';
-  feed.insertBefore(el, feed.firstChild);
-  while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+  _evInsertRow(el, evType);
   // Pass the resolved avSrc (cache hit / unavatar / passed-in URL) to
   // the pop-out so its event toast renders the same pfp the panel does.
   // Pop-out side has its own onerror fallback to a platform pico.
@@ -6765,6 +6909,8 @@ function addEvHistory(user, text, plat, big, giftHtml, evMessage, avatar) {
 function clearEvHistory() {
   evHistory.length = 0;
   document.getElementById('evFeed').innerHTML = '<div class="ev-empty" id="evEmpty">No events yet &mdash; follows, subs, gifts and tips will appear here.</div>';
+  var fb = document.getElementById('evFeedB');
+  if (fb) fb.innerHTML = '<div class="ev-empty" id="evEmptyB">No events routed here yet.</div>';
   document.getElementById('evPinned').style.display = 'none';
 }
 function updateLikeCounter(n) {
@@ -11758,7 +11904,7 @@ function pushMsg(m) {
     if (S.paused) { trailLog('paused', { type: m.evType || 'event', user: m.user || '' }); return; }
     trailLog('shown', { type: m.evType || 'event', user: m.user || '', bits: m.coinAmount != null ? m.coinAmount : null });
     S.evs++; updateStatBar(); removeEmpty();
-    addEvHistory(m.user || 'System', m.text || '', m.plat, m.big, m.giftHtml || null, m.evMessage || '', m.avatar || '');
+    addEvHistory(m.user || 'System', m.text || '', m.plat, m.big, m.giftHtml || null, m.evMessage || '', m.avatar || '', m.evType);
     if (m.plat === 'tw') { try { _autoThankMaybe(m.evType, m.user, m.text); } catch (e) {} }
     ttsEventSpeak(m.plat, m.evType || '', m.user || '', m.text || '', m.coinAmount);
     tintBackground(m.plat, 'strong');
@@ -19192,6 +19338,7 @@ window.addEventListener('load', function() {
   document.getElementById('chatInputBtn').classList.toggle('on', S.chatInputVisible);
   evPanelEl.style.width = evPanelOpen ? evPanelWidth + 'px' : '0';
   document.getElementById('evPanelBtn').classList.toggle('on', evPanelOpen);
+  try { initEvLayoutControls(); applyEvLayout(); } catch (e) {}
   document.getElementById('qsendBar').classList.toggle('hidden', !qsendVisible);
   document.getElementById('qsendBtn').classList.toggle('on', qsendVisible);
   renderBlocked(); renderKeywords(); renderQSend(); updateViewers(); updateStreamStats(); updateLiveBar();
