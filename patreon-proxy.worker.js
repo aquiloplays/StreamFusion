@@ -109,6 +109,10 @@ export default {
     // Multi-tenancy: per-channel identity directory (read side). See §7 of
     // docs/MULTI-TENANCY-PLAN.md. Public read, non-secret fields only.
     if (path === '/tenant/resolve')     return handleTenantResolve(request, env);
+    // Service-secret write: set operator fields (discordGuildId, ownerDiscordId,
+    // kickSlug, ytChannelId) on an existing tenant. Used by the loadout worker's
+    // Discord-claim flow to bridge guild <-> tenant. Never creates a record.
+    if (path === '/tenant/patch')       return handleTenantPatch(request, env);
     // Kick + YouTube channel/bot connect + vault (mirror the Twitch flow,
     // parameterized by PLATFORM_CFG). Dark until the platform's client id is set.
     if (path === '/kick/connect')        return handlePlatformConnect(request, env, PLATFORM_CFG.kick);
@@ -1284,6 +1288,15 @@ async function handlePlatformCallback(request, env, cfg) {
     if (!vault.connectedAt) vault.connectedAt = Date.now();
     // Authorize the site to find this vault by the streamer's Twitch id.
     await env.LOADOUT_BOLTS.put('link:tw2' + cfg.key + ':' + twitchOwner, who.id);
+    // Multi-tenancy: reflect this platform connection into the streamer's
+    // tenant directory record so ?ch= resolves their Kick/YouTube too. Additive
+    // + best-effort — only patches an EXISTING record, never creates one.
+    try {
+      var _tp = cfg.key === 'kick' ? { kickSlug: who.login }
+              : cfg.key === 'youtube' ? { ytChannelId: who.id }
+              : null;
+      if (_tp) await _patchTenant(env, twitchOwner, _tp);
+    } catch (e) { /* directory patch is best-effort */ }
   }
   vault.updatedAt = Date.now();
   await env.LOADOUT_BOLTS.put(vkey, JSON.stringify(vault));
@@ -1474,7 +1487,13 @@ async function upsertTenantOnConnect(env, ident) {
   var key = _tenantKey(twitchId);
   var prevRaw = await env.LOADOUT_BOLTS.get(key);
   var prev; try { prev = prevRaw ? JSON.parse(prevRaw) : null; } catch (e) { prev = null; }
-  var invited = _tenantInvited(env, twitchId) || !!(prev && prev.status === 'active');
+  // Open enrollment (self-serve onboarding via aquilo.gg/setup): a broadcaster
+  // connect activates the tenant by default so any streamer can onboard alone.
+  // Still additive — consumers fall back to the featured channel unless a
+  // request opts in with ?ch=<slug>, and admin stays gated by per-channel
+  // ownership. Kill switch: set TENANT_OPEN_ENROLLMENT='0' to require the
+  // TENANT_INVITE_IDS allow-list instead.
+  var invited = _tenantInvited(env, twitchId) || !!(prev && prev.status === 'active') || env.TENANT_OPEN_ENROLLMENT !== '0';
   var slug = (prev && prev.slug) || String(ident.login || twitchId).toLowerCase();
   var rec = {
     twitchId: twitchId,
@@ -1521,4 +1540,44 @@ async function handleTenantResolve(request, env) {
     namespace: rec.namespace, discordGuildId: rec.discordGuildId, ownerDiscordId: rec.ownerDiscordId,
     kickSlug: rec.kickSlug, ytChannelId: rec.ytChannelId, status: rec.status
   }, 200, cors);
+}
+
+// Merge a partial patch into an EXISTING tenant record (never creates one, so
+// it stays additive). Only whitelisted operator fields; keeps the guild reverse
+// index in sync when discordGuildId changes. Namespace is intentionally NOT
+// patchable here — it's pinned once at seed/connect to protect grandfathered
+// storage (see upsertTenantOnConnect).
+async function _patchTenant(env, twitchId, patch) {
+  if (!env.LOADOUT_BOLTS || !twitchId || !patch) return null;
+  var key = _tenantKey(twitchId);
+  var raw = await env.LOADOUT_BOLTS.get(key);
+  if (!raw) return null;
+  var rec; try { rec = JSON.parse(raw); } catch (e) { return null; }
+  var ALLOWED = ['kickSlug', 'ytChannelId', 'discordGuildId', 'ownerDiscordId'];
+  var changed = false;
+  for (var i = 0; i < ALLOWED.length; i++) {
+    var f = ALLOWED[i];
+    if (patch[f] != null && String(patch[f]) !== String(rec[f] || '')) { rec[f] = patch[f]; changed = true; }
+  }
+  if (!changed) return rec;
+  rec.updatedAt = Date.now();
+  await env.LOADOUT_BOLTS.put(key, JSON.stringify(rec));
+  if (rec.discordGuildId) await env.LOADOUT_BOLTS.put(_tenantGuildKey(rec.discordGuildId), String(twitchId));
+  return rec;
+}
+
+// POST /tenant/patch — service-secret write of a tenant's operator fields.
+// Body: { service, twitchId, discordGuildId?, ownerDiscordId?, kickSlug?, ytChannelId? }.
+async function handleTenantPatch(request, env) {
+  if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
+  var body = await request.json().catch(function () { return null; });
+  if (!env.VAULT_SERVICE_SECRET || !body || body.service !== env.VAULT_SERVICE_SECRET) return json({ ok: false, error: 'unauthorized' }, 401);
+  var twitchId = String(body.twitchId || '');
+  if (!twitchId) return json({ ok: false, error: 'twitchId_required' }, 400);
+  var rec = await _patchTenant(env, twitchId, {
+    discordGuildId: body.discordGuildId, ownerDiscordId: body.ownerDiscordId,
+    kickSlug: body.kickSlug, ytChannelId: body.ytChannelId
+  });
+  if (!rec) return json({ ok: false, error: 'no_tenant' }, 404);
+  return json({ ok: true, twitchId: twitchId, discordGuildId: rec.discordGuildId || null, ownerDiscordId: rec.ownerDiscordId || null, kickSlug: rec.kickSlug || null, ytChannelId: rec.ytChannelId || null });
 }
