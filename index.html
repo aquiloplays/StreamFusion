@@ -1324,6 +1324,48 @@ body.has-sf-notice { padding-top: 42px !important; }
   50%{transform:scale(1.12)}
 }
 
+/* ═══ IN-APP CHAT FX ═══════════════════════════════════════════════════════
+   The same viewer-triggered effects the OBS chat overlay fires (!hype
+   confetti, !shake, first-words, flairs…) rendered over the app's own chat
+   feed. Ported from aquilo-site public/sf/overlay/chat (Viewer FX 1.14);
+   class names are afx-prefixed so overlay + app styles never collide.
+   #afxLayer is position:fixed and synced to the feed's bounding rect at fire
+   time, so effects stay confined to the chat column. All effects self-clean. */
+#afxLayer{position:fixed;overflow:hidden;pointer-events:none;z-index:60}
+.afx-flair{display:inline-flex;align-items:center;margin-left:3px;font-size:12px;line-height:1}
+.afx-flair img{height:14px;width:auto;vertical-align:middle;border-radius:3px}
+.feed.afx-shake{animation:afxShake .5s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes afxShake{10%,90%{transform:translate(-2px,0)}20%,80%{transform:translate(4px,0)}30%,50%,70%{transform:translate(-7px,0)}40%,60%{transform:translate(7px,0)}}
+.feed.afx-bounce{animation:afxBounce .6s cubic-bezier(.28,.84,.42,1) both}
+@keyframes afxBounce{0%{transform:translateY(0)}30%{transform:translateY(-26px)}55%{transform:translateY(0)}74%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+/* Zoom is toned down vs the overlay (1.12 → 1.04): the feed is a UI column
+   flanked by other panes, so a big scale would clip its neighbors. */
+.feed.afx-zoom{animation:afxZoom .7s cubic-bezier(.34,1.56,.64,1) both;transform-origin:center bottom}
+@keyframes afxZoom{0%{transform:scale(1)}40%{transform:scale(1.04)}100%{transform:scale(1)}}
+.afx-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(124,92,255,.5),transparent 65%);opacity:0;animation:afxFlash .9s ease-out forwards}
+@keyframes afxFlash{0%{opacity:0}18%{opacity:.9}100%{opacity:0}}
+.afx-confetti{position:absolute;top:-12px;width:9px;height:13px;border-radius:2px;will-change:transform,opacity;animation:afxConfFall var(--d,2.6s) cubic-bezier(.3,.6,.4,1) forwards}
+@keyframes afxConfFall{0%{opacity:0;transform:translateY(0) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translateY(var(--afx-fall,620px)) rotate(720deg)}}
+.afx-rain{position:absolute;top:-10%;font-size:28px;line-height:1;will-change:transform,opacity;animation:afxRainFall var(--d,3s) linear forwards}
+.afx-rain img{height:32px;width:auto;vertical-align:middle}
+@keyframes afxRainFall{0%{opacity:0;transform:translateY(0)}8%{opacity:1}100%{opacity:.15;transform:translateY(var(--afx-fall,620px))}}
+.afx-word{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.4);font-weight:900;letter-spacing:2px;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.6),0 0 26px rgba(124,92,255,.6);-webkit-text-stroke:2px #7c5cff;opacity:0;white-space:nowrap;animation:afxWord 1.9s cubic-bezier(.22,1.3,.36,1) forwards}
+@keyframes afxWord{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}18%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}32%{transform:translate(-50%,-50%) scale(1)}78%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-58%) scale(1.02)}}
+.afx-fw{position:absolute;width:6px;height:6px;border-radius:50%;will-change:transform,opacity;animation:afxFw var(--d,1.1s) ease-out forwards;box-shadow:0 0 6px currentColor}
+@keyframes afxFw{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx,0),var(--ty,0)) scale(.3)}}
+.afx-heart{position:absolute;bottom:-8%;font-size:26px;will-change:transform,opacity;animation:afxHeart var(--d,3.4s) ease-in forwards}
+@keyframes afxHeart{0%{opacity:0;transform:translateY(0) translateX(0) rotate(0)}12%{opacity:1}100%{opacity:0;transform:translateY(calc(-1 * var(--afx-fall,620px))) translateX(var(--drift,0)) rotate(var(--rot,18deg))}}
+.afx-snow{position:absolute;top:-6%;color:#fff;text-shadow:0 0 6px rgba(255,255,255,.6);will-change:transform;animation:afxSnow var(--d,5s) linear forwards}
+@keyframes afxSnow{0%{opacity:.95;transform:translateY(0) translateX(0)}100%{opacity:.9;transform:translateY(var(--afx-fall,620px)) translateX(var(--drift,24px))}}
+.afx-rainbow{position:absolute;inset:0;background:linear-gradient(90deg,#ff5c5c,#ffb84d,#ffe14d,#5bff95,#4dd2ff,#9775fa,#f783ac);opacity:0;mix-blend-mode:screen;animation:afxRainbow 1.9s ease-in-out forwards}
+@keyframes afxRainbow{0%{opacity:0;transform:translateX(-100%)}28%{opacity:.45}72%{opacity:.45}100%{opacity:0;transform:translateX(100%)}}
+.afx-sparkle{position:absolute;font-size:20px;opacity:0;will-change:transform,opacity;animation:afxSparkle 1.3s ease-out forwards}
+@keyframes afxSparkle{0%{opacity:0;transform:scale(.2) rotate(0)}40%{opacity:1;transform:scale(1.2) rotate(90deg)}100%{opacity:0;transform:scale(.4) rotate(180deg)}}
+.afx-bubble{position:absolute;bottom:-8%;border-radius:50%;background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.9),rgba(180,220,255,.25) 60%,rgba(140,190,255,.12));border:1px solid rgba(255,255,255,.4);will-change:transform,opacity;animation:afxBubble var(--d,4s) ease-in forwards}
+@keyframes afxBubble{0%{opacity:0;transform:translateY(0) translateX(0)}12%{opacity:.85}100%{opacity:0;transform:translateY(calc(-1 * var(--afx-fall,620px))) translateX(var(--drift,18px))}}
+/* Perf mode flattens all app animations — kill the FX layer with it. */
+body.perf-mode #afxLayer{display:none!important}
+
 /* ═══ HYPE ANIMATION ══════════════════════════════════════════════════════ */
 @keyframes hypeSlide{0%{transform:translateX(-100%);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translateX(100%);opacity:0}}
 .ht-hype-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;text-shadow:0 0 10px rgba(255,200,0,.8);animation:hypeSlide 2s ease-in-out forwards;pointer-events:none;z-index:5;letter-spacing:3px}
@@ -2867,6 +2909,21 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Messages containing these words are highlighted in gold.</div>
             <div class="kw-list" id="kwList"></div>
             <div class="kw-input-row"><input id="kwInput" placeholder="add keyword..." onkeydown="if(event.key==='Enter')addKeyword()"><button onclick="addKeyword()">+</button></div>
+          </div>
+          <div class="sec">
+            <div class="sec-hd">Chat Effects (in-app)</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">The same viewer-triggered effects as the OBS chat overlay &mdash; a viewer types <strong style="color:var(--txt)">!hype</strong> and confetti bursts over the chat feed right here in the app. Viewer flairs and first-words effects from aquilo.gg show up automatically.</div>
+            <label class="frow"><span>Enable in-app chat effects</span><input type="checkbox" id="afxOn" checked onchange="afxUiChanged()"></label>
+            <label class="frow"><span>Hide the triggering !command</span><input type="checkbox" id="afxHideCmd" checked onchange="afxUiChanged()"></label>
+            <label class="frow"><span>Who can trigger</span><select id="afxPerm" onchange="afxUiChanged()"><option value="everyone">Everyone</option><option value="sub">Subs + mods</option><option value="mod">Mods only</option></select></label>
+            <label class="frow"><span>Cooldown (seconds)</span><input type="number" id="afxCooldown" min="0" max="600" value="8" style="width:64px" onchange="afxUiChanged()"></label>
+            <label class="frow"><span>First-words effect</span><select id="afxFirstWords" onchange="afxUiChanged()"><option value="off">Off</option><option value="confetti">Confetti</option><option value="flash">Flash</option><option value="hearts">Hearts</option><option value="sparkles">Sparkles</option><option value="firework">Fireworks</option><option value="bubbles">Bubbles</option><option value="snow">Snow</option><option value="rainbow">Rainbow</option><option value="emote-rain">Emote rain</option><option value="hype-text">Hype text</option><option value="shake">Shake</option><option value="bounce">Bounce</option><option value="zoom">Zoom</option></select></label>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">COMMANDS &mdash; one per line: <code>!trigger | effect | text | gate</code></div>
+            <textarea id="afxCommands" rows="6" spellcheck="false" onchange="afxUiChanged()" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11px;font-family:ui-monospace,monospace;resize:vertical"></textarea>
+            <div style="font-size:10px;color:var(--mut);line-height:1.5;margin-top:4px">Effects: confetti shake flash emote-rain hype-text firework hearts snow rainbow sparkles bubbles bounce zoom. Gate (optional): everyone / sub / mod.</div>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">CHAT FLAIRS &mdash; one per line: <code>login badge [#color]</code></div>
+            <textarea id="afxFlairs" rows="3" spellcheck="false" placeholder="topsupporter 👑 #ffd700" onchange="afxUiChanged()" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11px;font-family:ui-monospace,monospace;resize:vertical"></textarea>
+            <div style="margin-top:8px"><button class="tbtn" onclick="afxTest()" style="font-size:11px;font-weight:700;padding:4px 12px">Test a random effect</button></div>
           </div>
           <div class="sec">
             <div class="sec-hd">Keyboard Shortcuts</div>
@@ -11768,6 +11825,368 @@ function _xlInject(el, val, target) {
   if (mtext && mtext.parentNode) mtext.parentNode.insertBefore(div, mtext.nextSibling);
   else body.appendChild(div);
 }
+// ═══ IN-APP CHAT FX ════════════════════════════════════════════════════════
+// The OBS chat overlay's viewer effects (Viewer FX 1.14 in aquilo-site
+// public/sf/overlay/chat), mirrored into the app's own chat feed: a viewer
+// types !hype and confetti bursts over #feed right here, not just on stream.
+// Same 13-effect palette, same command syntax, same rank gating + cooldown,
+// same cloud-cosmetics shape ({ flairs, firstWords } per login) — the
+// deployed /api/sfdock/cosmetics read route is auto-derived from the
+// connected Twitch login so viewer-equipped cosmetics appear with zero setup.
+// Config is app-local (localStorage sf_afx), defaults matching the overlay's.
+var AFX_DEFAULT_COMMANDS = '!hype | confetti | HYPE!\n!shake | shake\n!rain | emote-rain | 🎉\n!fireworks | firework\n!pog | hype-text | POG\n!hearts | hearts | ❤️ | sub\n!sparkle | sparkles | ✨ | sub\n!rainbow | rainbow | | sub';
+var AFX_EFFECTS = { confetti: 1, shake: 1, flash: 1, 'emote-rain': 1, 'hype-text': 1,
+  firework: 1, hearts: 1, snow: 1, rainbow: 1, sparkles: 1, bubbles: 1, bounce: 1, zoom: 1 };
+var afxCfg = {
+  on: true, hideCmd: true, perm: 'everyone', cooldownMs: 8000,
+  firstWordsFx: 'off', commands: AFX_DEFAULT_COMMANDS, flairs: ''
+};
+var _afxCommands = null;      // parsed [{trigger,effect,param,gate}]
+var _afxFlairMap = null;      // parsed streamer list: login -> {badge,color}
+var _afxCloudFlairs = null;   // cloud cosmetics: login -> {badge,color}
+var _afxCloudFirstWords = null; // cloud: login -> effect
+var _afxLastFire = 0;
+var _afxFwLast = 0;
+var _afxCosmeticsTimer = null;
+
+function afxLoad() {
+  try {
+    var s = JSON.parse(localStorage.getItem('sf_afx') || '{}') || {};
+    Object.keys(afxCfg).forEach(function(k) { if (s[k] !== undefined) afxCfg[k] = s[k]; });
+  } catch (e) {}
+}
+function afxSave() { try { localStorage.setItem('sf_afx', JSON.stringify(afxCfg)); } catch (e) {} }
+function afxUiChanged() {
+  var g = function(id) { return document.getElementById(id); };
+  afxCfg.on = !!(g('afxOn') && g('afxOn').checked);
+  afxCfg.hideCmd = !!(g('afxHideCmd') && g('afxHideCmd').checked);
+  afxCfg.perm = (g('afxPerm') || {}).value || 'everyone';
+  afxCfg.cooldownMs = Math.max(0, (parseInt((g('afxCooldown') || {}).value, 10) || 0)) * 1000;
+  afxCfg.firstWordsFx = (g('afxFirstWords') || {}).value || 'off';
+  afxCfg.commands = (g('afxCommands') || {}).value || '';
+  afxCfg.flairs = (g('afxFlairs') || {}).value || '';
+  _afxCommands = null; _afxFlairMap = null;
+  afxSave();
+}
+function afxInitUI() {
+  var g = function(id) { return document.getElementById(id); };
+  if (g('afxOn')) g('afxOn').checked = !!afxCfg.on;
+  if (g('afxHideCmd')) g('afxHideCmd').checked = !!afxCfg.hideCmd;
+  if (g('afxPerm')) g('afxPerm').value = afxCfg.perm;
+  if (g('afxCooldown')) g('afxCooldown').value = Math.round(afxCfg.cooldownMs / 1000);
+  if (g('afxFirstWords')) g('afxFirstWords').value = afxCfg.firstWordsFx;
+  if (g('afxCommands')) g('afxCommands').value = afxCfg.commands;
+  if (g('afxFlairs')) g('afxFlairs').value = afxCfg.flairs;
+}
+// Command list parser — same two forms as the overlay:
+// "!trigger | effect | param | gate"  or  "!trigger effect param…"
+function _afxParseCommands() {
+  _afxCommands = [];
+  String(afxCfg.commands || '').split(/\r?\n/).forEach(function(line) {
+    line = line.trim();
+    if (!line || line.charAt(0) === '#') return;
+    var trig, effect, param = '', gate = '';
+    if (line.indexOf('|') >= 0) {
+      var f = line.split('|');
+      trig = (f[0] || '').trim().toLowerCase();
+      effect = (f[1] || '').trim().toLowerCase();
+      param = (f[2] || '').trim();
+      gate = (f[3] || '').trim().toLowerCase();
+    } else {
+      var parts = line.split(/\s+/);
+      trig = (parts[0] || '').toLowerCase();
+      effect = (parts[1] || '').toLowerCase();
+      param = parts.slice(2).join(' ');
+    }
+    if (!trig || !AFX_EFFECTS[effect]) return;
+    _afxCommands.push({ trigger: trig, effect: effect, param: param, gate: gate });
+  });
+}
+// Rank from the app's badge shape ({img,lbl} / {cls,lbl}): 2 = mod/broadcaster,
+// 1 = sub/member, 0 = everyone. Stringify-scan like the overlay so any badge
+// field (cls, lbl, info) can carry the signal, across all four platforms.
+function _afxRank(m) {
+  var b = m && m.badges;
+  if (!b || !b.length) return 0;
+  var s = '';
+  try { s = JSON.stringify(b).toLowerCase(); } catch (e) { return 0; }
+  if (s.indexOf('broadcaster') >= 0 || s.indexOf('owner') >= 0 || s.indexOf('moderator') >= 0 || s.indexOf('"mod"') >= 0) return 2;
+  if (s.indexOf('subscriber') >= 0 || s.indexOf('founder') >= 0 || s.indexOf('"sub"') >= 0 || s.indexOf('member') >= 0) return 1;
+  return 0;
+}
+function _afxEnabled() {
+  return afxCfg.on && !perfMode && !hideMainAnimations;
+}
+// True if the message was a recognized FX command (caller drops it from the
+// feed when hideCmd is on) — mirrors the overlay's maybeFireViewerFx.
+function afxMaybeCommand(m, text) {
+  if (!_afxEnabled()) return false;
+  if (_afxCommands == null) _afxParseCommands();
+  if (!_afxCommands.length) return false;
+  var first = String(text || '').trim().split(/\s+/)[0].toLowerCase();
+  if (!first || first.charAt(0) !== '!') return false;
+  var cmd = null;
+  for (var i = 0; i < _afxCommands.length; i++) if (_afxCommands[i].trigger === first) { cmd = _afxCommands[i]; break; }
+  if (!cmd) return false;
+  var gate = cmd.gate || afxCfg.perm || 'everyone';
+  var need = gate === 'mod' ? 2 : gate === 'sub' ? 1 : 0;
+  if (need > 0 && _afxRank(m) < need) return true;   // consumed (hidden) but no effect
+  var now = Date.now();
+  if (now - _afxLastFire < Math.max(0, afxCfg.cooldownMs || 0)) return true;
+  _afxLastFire = now;
+  afxFire(cmd.effect, cmd.param, m);
+  return true;
+}
+// First-words effect: the app's session-scoped isFirstWords detection already
+// ran in pushMsg; this just picks the effect (viewer's cloud choice wins over
+// the streamer default) and fires it, flood-throttled.
+function afxMaybeFirstWords(m) {
+  if (!_afxEnabled()) return;
+  var lk = String(m.login || m.user || '').toLowerCase();
+  var effect = (lk && _afxCloudFirstWords && _afxCloudFirstWords[lk]) ||
+               (afxCfg.firstWordsFx !== 'off' ? afxCfg.firstWordsFx : '');
+  if (!effect || !AFX_EFFECTS[effect]) return;
+  var now = Date.now();
+  if (now - _afxFwLast < 2500) return;
+  _afxFwLast = now;
+  afxFire(effect, '', m);
+}
+// ── Flairs — per-viewer badge + name color; cloud (viewer-set) wins ──────
+function _afxParseFlairs() {
+  _afxFlairMap = Object.create(null);
+  String(afxCfg.flairs || '').split(/\r?\n/).forEach(function(line) {
+    line = line.trim();
+    if (!line || line.charAt(0) === '#') return;
+    var parts = line.split(/\s+/);
+    var login = (parts[0] || '').toLowerCase().replace(/^@/, '');
+    if (!login) return;
+    var badge = '', color = '';
+    for (var i = 1; i < parts.length; i++) {
+      if (/^#[0-9a-f]{3,8}$/i.test(parts[i])) { if (!color) color = parts[i]; }
+      else if (!badge) badge = parts[i];
+    }
+    _afxFlairMap[login] = { badge: badge, color: color };
+  });
+}
+function afxFlairFor(m) {
+  var lk = String(m.login || m.user || '').toLowerCase();
+  if (!lk) return null;
+  if (_afxCloudFlairs && _afxCloudFlairs[lk]) return _afxCloudFlairs[lk];
+  if (!afxCfg.flairs) return null;
+  if (_afxFlairMap == null) _afxParseFlairs();
+  return _afxFlairMap[lk] || null;
+}
+function afxRenderFlair(fl) {
+  if (!fl || !fl.badge) return '';
+  if (/^https:\/\//i.test(fl.badge)) return '<span class="afx-flair"><img src="' + esc(fl.badge) + '" alt="" onerror="this.remove()"></span>';
+  return '<span class="afx-flair">' + esc(fl.badge) + '</span>';
+}
+// ── Cloud cosmetics — the deployed viewer-cosmetics read route, keyed by the
+// connected Twitch login. Zero-setup: as soon as the app knows the login it
+// polls { flairs, firstWords } every 3 min, same shape the overlay consumes.
+function afxFetchCosmetics() {
+  var login = String(S.twLogin || '').toLowerCase();
+  if (!login || !/^[a-z0-9_]{1,30}$/.test(login)) return;
+  var url = 'https://loadout-discord.aquiloplays.workers.dev/api/sfdock/cosmetics?ch=' + login;
+  fetch(url, { cache: 'no-store' }).then(function(r) { return r.ok ? r.json() : null; }).then(function(j) {
+    if (!j) return;
+    var f = Object.create(null), fw = Object.create(null);
+    var jf = j.flairs || {};
+    Object.keys(jf).forEach(function(login) {
+      var v = jf[login] || {};
+      f[String(login).toLowerCase()] = { badge: v.badge || '', color: v.color || '' };
+    });
+    var jw = j.firstWords || {};
+    Object.keys(jw).forEach(function(login) {
+      if (AFX_EFFECTS[jw[login]]) fw[String(login).toLowerCase()] = jw[login];
+    });
+    _afxCloudFlairs = f; _afxCloudFirstWords = fw;
+  }).catch(function() {});
+}
+// ── FX layer + renderer — the overlay's fireFx, retargeted at #feed ──────
+// The layer is fixed-position and re-synced to the feed's live bounding rect
+// on every fire, so effects track pane resizes without any layout coupling.
+function _afxLayer() {
+  var l = document.getElementById('afxLayer');
+  if (!l) { l = document.createElement('div'); l.id = 'afxLayer'; document.body.appendChild(l); }
+  try {
+    var r = feed.getBoundingClientRect();
+    l.style.left = r.left + 'px'; l.style.top = r.top + 'px';
+    l.style.width = r.width + 'px'; l.style.height = r.height + 'px';
+    l.style.setProperty('--afx-fall', (r.height + 30) + 'px');
+  } catch (e) {}
+  return l;
+}
+function afxFire(effect, param, m) {
+  if (!_afxEnabled()) return;
+  var L = _afxLayer();
+  var rm = function(el, ms) { setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, ms); };
+  switch (effect) {
+    case 'shake':
+      feed.classList.remove('afx-shake'); void feed.offsetWidth;
+      feed.classList.add('afx-shake');
+      setTimeout(function() { feed.classList.remove('afx-shake'); }, 520);
+      break;
+    case 'bounce':
+      feed.classList.remove('afx-bounce'); void feed.offsetWidth;
+      feed.classList.add('afx-bounce');
+      setTimeout(function() { feed.classList.remove('afx-bounce'); }, 640);
+      break;
+    case 'zoom':
+      feed.classList.remove('afx-zoom'); void feed.offsetWidth;
+      feed.classList.add('afx-zoom');
+      setTimeout(function() { feed.classList.remove('afx-zoom'); }, 740);
+      break;
+    case 'flash': {
+      var fl = document.createElement('div');
+      fl.className = 'afx-flash';
+      L.appendChild(fl); rm(fl, 950);
+      break;
+    }
+    case 'confetti': {
+      var pal = ['#7c5cff', '#5bff95', '#f0b429', '#ff5c8a', '#4dabf7', '#ffd23f'];
+      for (var i = 0; i < 50; i++) {
+        var c = document.createElement('div');
+        c.className = 'afx-confetti';
+        c.style.left = (Math.random() * 100) + '%';
+        c.style.background = pal[Math.floor(Math.random() * pal.length)];
+        c.style.setProperty('--d', (2 + Math.random() * 1.8).toFixed(2) + 's');
+        c.style.animationDelay = (Math.random() * 0.4).toFixed(2) + 's';
+        L.appendChild(c); rm(c, 4600);
+      }
+      break;
+    }
+    case 'emote-rain': {
+      // Rain the triggering message's own first emote if it had one,
+      // else the configured glyph.
+      var glyph = param || '⭐', emoteUrl = null;
+      if (m && m.html) {
+        var mm = /<img[^>]*class="emote[^"]*"[^>]*src="([^"]+)"/.exec(m.html);
+        if (mm) emoteUrl = mm[1];
+      }
+      for (var j = 0; j < 22; j++) {
+        var rEl = document.createElement('div');
+        rEl.className = 'afx-rain';
+        rEl.style.left = (Math.random() * 98) + '%';
+        rEl.style.setProperty('--d', (2.4 + Math.random() * 2).toFixed(2) + 's');
+        rEl.style.animationDelay = (Math.random() * 1.2).toFixed(2) + 's';
+        rEl.innerHTML = emoteUrl ? '<img src="' + esc(emoteUrl) + '" alt="">' : esc(glyph);
+        L.appendChild(rEl); rm(rEl, 5200);
+      }
+      break;
+    }
+    case 'hype-text': {
+      var w = document.createElement('div');
+      w.className = 'afx-word';
+      w.textContent = (param || 'HYPE!').slice(0, 24);
+      try { var bw = L.clientWidth || 300; w.style.fontSize = Math.max(20, Math.min(bw * 0.17, 96)) + 'px'; } catch (e) {}
+      L.appendChild(w); rm(w, 2000);
+      break;
+    }
+    case 'firework': {
+      var fwCols = ['#ff5c5c', '#ffe14d', '#5bff95', '#4dd2ff', '#f783ac', '#ffffff'];
+      for (var b = 0; b < 3; b++) {
+        var cx = 15 + Math.random() * 70, cy = 14 + Math.random() * 44, delay = b * 0.35;
+        for (var k = 0; k < 22; k++) {
+          var ang = (k / 22) * Math.PI * 2, dist = 45 + Math.random() * 55;
+          var p = document.createElement('div');
+          p.className = 'afx-fw';
+          p.style.left = cx + '%'; p.style.top = cy + '%';
+          p.style.color = fwCols[k % fwCols.length];
+          p.style.background = 'currentColor';
+          p.style.setProperty('--tx', (Math.cos(ang) * dist).toFixed(0) + 'px');
+          p.style.setProperty('--ty', (Math.sin(ang) * dist).toFixed(0) + 'px');
+          p.style.setProperty('--d', (0.9 + Math.random() * 0.5).toFixed(2) + 's');
+          p.style.animationDelay = delay.toFixed(2) + 's';
+          L.appendChild(p); rm(p, (delay + 1.7) * 1000);
+        }
+      }
+      break;
+    }
+    case 'hearts': {
+      for (var h = 0; h < 14; h++) {
+        var he = document.createElement('div');
+        he.className = 'afx-heart';
+        he.textContent = param || '❤️';
+        he.style.left = (Math.random() * 96) + '%';
+        he.style.setProperty('--d', (2.8 + Math.random() * 1.8).toFixed(2) + 's');
+        he.style.setProperty('--drift', (Math.random() * 80 - 40).toFixed(0) + 'px');
+        he.style.setProperty('--rot', (Math.random() * 50 - 25).toFixed(0) + 'deg');
+        he.style.animationDelay = (Math.random() * 0.9).toFixed(2) + 's';
+        he.style.fontSize = (20 + Math.random() * 18).toFixed(0) + 'px';
+        L.appendChild(he); rm(he, 5200);
+      }
+      break;
+    }
+    case 'snow': {
+      for (var s2 = 0; s2 < 36; s2++) {
+        var sn = document.createElement('div');
+        sn.className = 'afx-snow';
+        sn.textContent = param || '❄';
+        sn.style.left = (Math.random() * 99) + '%';
+        sn.style.fontSize = (10 + Math.random() * 16).toFixed(0) + 'px';
+        sn.style.setProperty('--d', (4 + Math.random() * 3).toFixed(2) + 's');
+        sn.style.setProperty('--drift', (Math.random() * 60 - 30).toFixed(0) + 'px');
+        sn.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
+        L.appendChild(sn); rm(sn, 7200);
+      }
+      break;
+    }
+    case 'rainbow': {
+      var rb = document.createElement('div');
+      rb.className = 'afx-rainbow';
+      L.appendChild(rb); rm(rb, 2000);
+      break;
+    }
+    case 'sparkles': {
+      for (var sp = 0; sp < 18; sp++) {
+        var se = document.createElement('div');
+        se.className = 'afx-sparkle';
+        se.textContent = param || '✨';
+        se.style.left = (Math.random() * 96) + '%';
+        se.style.top = (Math.random() * 90) + '%';
+        se.style.fontSize = (12 + Math.random() * 20).toFixed(0) + 'px';
+        se.style.animationDelay = (Math.random() * 0.8).toFixed(2) + 's';
+        L.appendChild(se); rm(se, 2200);
+      }
+      break;
+    }
+    case 'bubbles': {
+      for (var bu = 0; bu < 20; bu++) {
+        var be = document.createElement('div');
+        be.className = 'afx-bubble';
+        var sz = (12 + Math.random() * 40).toFixed(0);
+        be.style.width = sz + 'px'; be.style.height = sz + 'px';
+        be.style.left = (Math.random() * 96) + '%';
+        be.style.setProperty('--d', (3.2 + Math.random() * 2.4).toFixed(2) + 's');
+        be.style.setProperty('--drift', (Math.random() * 50 - 25).toFixed(0) + 'px');
+        be.style.animationDelay = (Math.random() * 1.4).toFixed(2) + 's';
+        L.appendChild(be); rm(be, 6400);
+      }
+      break;
+    }
+  }
+}
+// Settings-pane test button: fire a random effect so the streamer can see it
+// without needing a live chatter.
+function afxTest() {
+  var names = Object.keys(AFX_EFFECTS);
+  var pick = names[Math.floor(Math.random() * names.length)];
+  var was = afxCfg.on; afxCfg.on = true;   // test works even while disabled
+  afxFire(pick, pick === 'hype-text' ? 'HYPE!' : '', null);
+  afxCfg.on = was;
+}
+function afxInit() {
+  afxLoad();
+  afxInitUI();
+  // Cosmetics: poll every 3 min; the fetch no-ops until S.twLogin is seeded
+  // (sign-in / Streamer.bot hello), then picks it up on the next tick.
+  afxFetchCosmetics();
+  if (!_afxCosmeticsTimer) _afxCosmeticsTimer = setInterval(afxFetchCosmetics, 180000);
+  setTimeout(afxFetchCosmetics, 15000);   // early retry once login is likely seeded
+}
+try { afxInit(); } catch (e) {}
+
 function pushMsg(m) {
   // Record chat/event activity as a liveness signal per platform — used by
   // _isPlatLive() when viewer-count polling isn't available (e.g. decapi
@@ -11800,6 +12219,11 @@ function pushMsg(m) {
     return;
   }
   if (!S.show[m.plat]) return;
+  // In-app chat FX: a recognized effect command (e.g. !hype) fires over the
+  // feed. Runs BEFORE the global hide-commands filter so effects still fire
+  // when !commands are hidden; the FX hideCmd setting then drops the trigger
+  // line itself, mirroring the OBS overlay's viewerFxHideCmd behavior.
+  if (m.text && afxMaybeCommand(m, m.text) && afxCfg.hideCmd) { S.filt++; updateStatBar(); return; }
   if (m.text && m.text.trim().charAt(0) === '!' && chk('hideCmd') && !m.text.trim().toLowerCase().startsWith('!lurk')) { S.filt++; updateStatBar(); return; }
   if (m.user && S.blocked.some(function(b) { return b.toLowerCase() === m.user.toLowerCase(); })) { S.filt++; updateStatBar(); return; }
   S.msgs++; updateStatBar(); removeEmpty();
@@ -11859,6 +12283,11 @@ function pushMsg(m) {
   if (m.user) el.setAttribute('data-user', m.user.toLowerCase());
   var bhtml = (m.badges || []).map(function(b) { return b.img ? '<img class="tw-badge" src="' + esc(b.img) + '" title="' + esc(b.lbl || '') + '">' : '<span class="badge ' + esc(b.cls||'') + '">' + esc(b.lbl) + '</span>'; }).join('');
   var _ncol = safeColor(m.color);
+  // Viewer flair (cloud cosmetics / streamer list): badge next to the name +
+  // optional name-color override — same precedence as the OBS overlay.
+  var _afxFl = null;
+  try { _afxFl = afxFlairFor(m); } catch (e) {}
+  if (_afxFl && _afxFl.color && /^#[0-9a-f]{3,8}$/i.test(_afxFl.color)) _ncol = _afxFl.color;
   var nStyle = _ncol ? ' style="color:' + _ncol + '"' : '';
   var msgContent = m.html != null ? '<span class="mtext">' + m.html + '</span>' : '<div class="mtext">' + esc(m.text || '') + '</div>';
   var modHtml = '';
@@ -11905,7 +12334,7 @@ function pushMsg(m) {
   var _vLogin = (m.plat === 'tw') ? (m.login || String(m.user || '').toLowerCase()) : '';
   var _nameCls = 'mname ' + m.plat + (_vLogin ? ' vclick' : '');
   var _nameClick = _vLogin ? ' onclick="openViewerCard(\'' + escA(_vLogin) + '\',\'' + escA(m.user || '') + '\')"' : '';
-  el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="' + _nameCls + '"' + nStyle + _nameClick + '>' + esc(m.user || '?') + '</span>' + suspHtml + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
+  el.innerHTML = avatarHtml + '<div class="mbody"><div class="mmeta"><span class="' + _nameCls + '"' + nStyle + _nameClick + '>' + esc(m.user || '?') + '</span>' + afxRenderFlair(_afxFl) + suspHtml + bhtml + pronounHtml + '<span class="mtime">' + t + '</span></div>' + firstBadgeUnder + msgContent + '</div><div class="macts"><button class="mact reply" onclick="replyTo(\'' + escA(m.user || '') + '\')" title="Reply"><svg class="ic"><use href="#i-reply"/></svg></button>' + modHtml + '<button class="mact" onclick="pinMsg(\'' + escA(m.plat || '') + '\',\'' + escA(m.user || '') + '\',\'' + escA(m.text || '') + '\')" title="Pin message"><svg class="ic"><use href="#i-pin"/></svg></button><button class="mact block-btn" onclick="qBlock(\'' + escA(m.user || '') + '\')" title="Block user"><svg class="ic"><use href="#i-block"/></svg></button></div>';
   // Spam collapse: fold this message into the target row (bump ×N) instead of
   // adding a new line + re-sending it to the OBS chat overlay.
   var _collapsed = false;
@@ -11919,6 +12348,9 @@ function pushMsg(m) {
   }
   tintBackground(m.plat, 'light');
   m.isFirstWords = isFirstWords;
+  // First-words FX: viewer's cloud-chosen effect (or the streamer default)
+  // fires over the feed the first time they chat this session.
+  if (isFirstWords) { try { afxMaybeFirstWords(m); } catch (e) {} }
   if (!_collapsed) sendOverlayChat(m);
   if (!_collapsed) { try { _maybeTranslate(el, m.text); } catch (e) {} }
   if (!_collapsed) { while (feed.children.length > (perfMode ? 250 : 800)) { var f = feed.firstChild; if (f && f.id !== 'emptyState') feed.removeChild(f); else break; } }
