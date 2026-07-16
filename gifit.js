@@ -2,9 +2,9 @@
 // Auto-clip on a channel-point redeem. The renderer detects the matching
 // redeem (via EventSub) and calls gifItCapture(); this module:
 //   1) saves the OBS replay buffer + gets its file path (warden-agent),
-//   2) renders a GIF and/or MP4 of the last N seconds with bundled ffmpeg,
-//   3) uploads them to the streamer's Discord webhook (multipart),
-//   4) archives the clips under <Videos>\GifIt.
+//   2) renders a GIF of the last N seconds with bundled ffmpeg (+ an optional MP4),
+//   3) uploads the GIF to the streamer's Discord webhook (multipart),
+//   4) archives the clips under <Videos>\GifIt (the MP4 stays local, never posted).
 // Everything is best-effort and returns a { ok, reason? } result the renderer
 // turns into a toast. No state is kept here — the renderer passes config in.
 
@@ -75,7 +75,7 @@ function _uploadDiscord(webhook, files, content, cb) {
   } catch (e) { cb(false, String(e && e.message)); }
 }
 
-// opts: { user, rewardName, webhook, formats, seconds, fps, width, obsPort, obsPass }
+// opts: { user, rewardName, webhook, saveMp4, seconds, fps, width, obsPort, obsPass }
 function capture(opts) {
   opts = opts || {};
   return new Promise(function (resolve) {
@@ -93,9 +93,8 @@ function capture(opts) {
         const secs = Math.max(1, parseInt(opts.seconds) || 6);
         const fps = Math.max(5, parseInt(opts.fps) || 15);
         const width = Math.max(120, parseInt(opts.width) || 480);
-        const formats = String(opts.formats || 'both').toLowerCase();
-        const wantGif = formats === 'both' || formats === 'gif';
-        const wantMp4 = formats === 'both' || formats === 'mp4';
+        // Discord always gets the GIF; the MP4 is a local-only extra when enabled.
+        const wantMp4 = !!opts.saveMp4;
 
         let dir;
         try { dir = path.join(app.getPath('videos'), 'GifIt'); fs.mkdirSync(dir, { recursive: true }); }
@@ -105,11 +104,13 @@ function capture(opts) {
         const mp4 = path.join(dir, 'clip-' + stamp + '.mp4');
 
         const tasks = [];
-        if (wantGif) tasks.push(function (next) {
+        // GIF: always rendered — this is what Discord gets.
+        tasks.push(function (next) {
           const vf = 'fps=' + fps + ',scale=' + width +
                      ':-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse';
           _run(ffmpegPath, ['-y', '-sseof', '-' + secs, '-i', src, '-vf', vf, gif], function () { next(); });
         });
+        // MP4: local archive only, never uploaded.
         if (wantMp4) tasks.push(function (next) {
           _run(ffmpegPath, ['-y', '-sseof', '-' + secs, '-i', src,
             '-c:v', 'libx264', '-crf', '23', '-preset', 'veryfast',
@@ -124,14 +125,16 @@ function capture(opts) {
         })();
 
         function afterEncode() {
-          const files = [];
-          if (wantGif && fs.existsSync(gif)) files.push({ path: gif, name: 'clip-' + stamp + '.gif', type: 'image/gif' });
-          if (wantMp4 && fs.existsSync(mp4)) files.push({ path: mp4, name: 'clip-' + stamp + '.mp4', type: 'video/mp4' });
-          if (!files.length) { resolve({ ok: false, reason: 'ffmpeg-failed' }); return; }
+          if (!fs.existsSync(gif)) { resolve({ ok: false, reason: 'ffmpeg-failed' }); return; }
+          // Only the GIF is posted; the MP4 (if any) just stays in the archive folder.
+          const saved = [gif];
+          if (wantMp4 && fs.existsSync(mp4)) saved.push(mp4);
           const who = opts.user || 'someone';
-          _uploadDiscord(opts.webhook, files, '🎞️ New clip from the stream — redeemed by ' + who + '!', function (ok, err) {
-            resolve(ok ? { ok: true, files: files.map(function (f) { return f.path; }) }
-                       : { ok: false, reason: err || 'upload-failed', files: files.map(function (f) { return f.path; }) });
+          _uploadDiscord(opts.webhook,
+            [{ path: gif, name: 'clip-' + stamp + '.gif', type: 'image/gif' }],
+            '🎞️ New clip from the stream — redeemed by ' + who + '!', function (ok, err) {
+            resolve(ok ? { ok: true, files: saved }
+                       : { ok: false, reason: err || 'upload-failed', files: saved });
           });
         }
       }, 800);

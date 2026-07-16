@@ -3097,6 +3097,44 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
             <button class="tbtn" onclick="printerCreateCahReward()" style="font-size:11px;font-weight:700;padding:5px 10px;margin-top:4px">Create this reward on Twitch + Kick</button>
             <div id="prnCahCreateStatus" style="font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5"></div>
 
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">POLAROID</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Channel-point reward: snapshots the current OBS scene and prints it as a photo receipt with the viewer's caption. The color frame is also posted to your receipt Discord webhook. Needs OBS WebSocket on &mdash; it reuses the <b>Gif It</b> OBS connection (port + password), so set that up in the Gif It card.</div>
+            <label class="frow"><span>Print polaroids</span><input type="checkbox" id="prnEvPolaroid" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Reward name</span><input type="text" id="prnPolaroidReward" value="Polaroid" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Cost (points)</span><input type="number" id="prnPolaroidCost" value="1000" min="1" step="50" style="width:110px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px"></label>
+            <button class="tbtn" onclick="printerCreatePolaroidReward()" style="font-size:11px;font-weight:700;padding:5px 10px;margin-top:4px">Create this reward on Twitch + Kick</button>
+            <div id="prnPolaroidCreateStatus" style="font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5"></div>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DRAW ON THE STREAM</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Channel-point reward: snapshots the current OBS scene, then the viewer draws on it in the Twitch extension's <b>Draw</b> tab. Their doodled photo lands in the queue below &mdash; approve it and it prints (and posts to your receipt Discord in color). Needs OBS WebSocket on (reuses the <b>Gif It</b> connection). Requires the updated extension build.</div>
+            <label class="frow"><span>Enable draw-on-stream</span><input type="checkbox" id="prnEvPhotoDraw" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Reward name</span><input type="text" id="prnPhotoDrawReward" value="Draw on the Stream" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Cost (points)</span><input type="number" id="prnPhotoDrawCost" value="2000" min="1" step="50" style="width:110px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px"></label>
+            <button class="tbtn" onclick="printerCreatePhotoDrawReward()" style="font-size:11px;font-weight:700;padding:5px 10px;margin-top:4px">Create this reward on Twitch + Kick</button>
+            <div id="prnPhotoDrawCreateStatus" style="font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5"></div>
+            <label class="frow" style="margin-top:6px"><span>Fan-art Discord webhook <span style="color:var(--mut);font-weight:400">(approved drawings post here in color)</span></span></label>
+            <div style="display:flex;gap:6px"><input type="text" id="prnFanartWebhook" placeholder="https://discord.com/api/webhooks/…" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px"><button class="tbtn" onclick="fanartWebhookSave()" style="font-size:11px;font-weight:700;padding:5px 10px">Save</button></div>
+            <div id="prnFanartWebhookStatus" style="font-size:11px;color:var(--mut);margin-top:4px"></div>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">PHOTO DRAWS AWAITING APPROVAL</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Drawn-on snapshots wait here. Approve to print + post; reject wipes it.</div>
+            <button class="tbtn" onclick="printerPhotoQueue()" style="font-size:11px;font-weight:700;padding:5px 10px">Refresh queue</button>
+            <div id="prnPhotoDraws" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">DRAW ON MY FACE</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Like Draw on the Stream, but snapshots a single OBS source (your facecam) so viewers scribble on <i>you</i>. Drawn results land in the same <b>Photo Draws</b> queue above. Set the exact OBS source name (or leave blank to use the whole scene).</div>
+            <label class="frow"><span>Enable draw-on-face</span><input type="checkbox" id="prnEvFaceDraw" checked onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>Reward name</span><input type="text" id="prnFaceDrawReward" value="Draw on My Face" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"></label>
+            <label class="frow"><span>OBS source (facecam)</span><input type="text" id="prnFaceSource" list="prnObsSources" placeholder="e.g. Facecam" style="width:180px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px" onchange="onPrinterCfgChange()"><datalist id="prnObsSources"></datalist></label>
+            <label class="frow"><span>Cost (points)</span><input type="number" id="prnFaceDrawCost" value="2000" min="1" step="50" style="width:110px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);border-radius:5px;padding:3px 6px;font-size:11px"></label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"><button class="tbtn" onclick="printerLoadObsSources()" style="font-size:11px;font-weight:700;padding:5px 10px">Load OBS sources</button><button class="tbtn" onclick="printerCreateFaceDrawReward()" style="font-size:11px;font-weight:700;padding:5px 10px">Create this reward on Twitch + Kick</button></div>
+            <div id="prnFaceDrawCreateStatus" style="font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5"></div>
+
+            <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">CAPTION THIS</div>
+            <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:4px">Snapshot the current scene; the whole chat submits captions in the extension's <b>Caption</b> tab. Pick the funniest and print it. Streamer-run &mdash; no reward needed.</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="tbtn" onclick="captionStart()" style="font-size:11px;font-weight:700;padding:5px 10px">📸 Start a round</button><button class="tbtn" onclick="captionRefresh()" style="font-size:11px;font-weight:700;padding:5px 10px">Refresh captions</button><button class="tbtn" onclick="captionClear()" style="font-size:11px;font-weight:700;padding:5px 10px;background:rgba(248,81,73,.16)">End round</button></div>
+            <div id="prnCaptionStatus" style="font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5"></div>
+            <div id="prnCaptions" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+
             <div style="font-size:10px;font-weight:700;color:var(--mut);padding:8px 0 4px;letter-spacing:.4px">SHIFT TICKET</div>
             <div style="font-size:11px;color:var(--mut);line-height:1.5;margin-bottom:6px">Clock-in ticket for tonight: date, scheduled show + hours (from the aquilo.gg schedule), and current Twitch category. Prints even while printing is disabled.</div>
             <button class="tbtn" onclick="printerShiftTicket()" style="font-size:11px;font-weight:700;padding:5px 10px">Print tonight's shift ticket</button>
@@ -3354,7 +3392,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                  render GIF + MP4, and post them to a Discord webhook. -->
             <div class="sec">
               <div class="sec-hd">Gif It - Auto Clip</div>
-              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When a viewer redeems your chosen channel-point reward, StreamFusion grabs the last few seconds from your <strong>OBS replay buffer</strong>, makes a GIF + MP4, and posts them to Discord. Needs OBS running with the Replay Buffer on (OBS Settings &rarr; Output &rarr; Replay Buffer).</div>
+              <div style="font-size:11px;color:var(--mut);line-height:1.55;margin-bottom:8px">When a viewer redeems your chosen channel-point reward, StreamFusion grabs the last few seconds from your <strong>OBS replay buffer</strong>, makes a GIF, and posts it to Discord &mdash; and can also save a higher-quality MP4 to your PC. Needs OBS running with the Replay Buffer on (OBS Settings &rarr; Output &rarr; Replay Buffer).</div>
               <label class="frow" style="font-size:11px"><span>Enable Gif It</span><input type="checkbox" id="gifItEnable" onchange="gifItSaveFromInputs()"></label>
               <div style="display:flex;gap:6px;align-items:center;margin:8px 0">
                 <input class="minput" id="gifItWebhook" type="text" placeholder="Discord webhook URL" style="font-size:11px;padding:5px 8px;background:var(--surf2);flex:1" oninput="gifItSaveFromInputs()" onchange="gifItSaveFromInputs()">
@@ -3364,8 +3402,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                 <select id="gifItRewardSel" onchange="gifItSaveFromInputs()" style="flex:1;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:5px 8px;border-radius:4px;font-size:11px"><option value="">(any reward)</option></select>
                 <button class="cbtn" onclick="gifItLoadRewards()" style="font-size:11px;height:28px;padding:0 10px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);white-space:nowrap">Load rewards</button>
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-                <label style="font-size:10px;color:var(--mut)">Format<select id="gifItFormats" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"><option value="both">GIF + MP4</option><option value="gif">GIF only</option><option value="mp4">MP4 only</option></select></label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                 <label style="font-size:10px;color:var(--mut)">Seconds<input type="number" id="gifItSeconds" min="2" max="30" value="6" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
                 <label style="font-size:10px;color:var(--mut)">GIF width<input type="number" id="gifItWidth" min="160" max="1280" step="20" value="480" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
               </div>
@@ -3374,6 +3411,7 @@ button:disabled, .tbtn:disabled, .cbtn:disabled {
                 <label style="font-size:10px;color:var(--mut)">OBS port<input type="number" id="gifItObsPort" min="1" max="65535" value="4455" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
                 <label style="font-size:10px;color:var(--mut)">OBS pass<input type="password" id="gifItObsPass" placeholder="(if set)" onchange="gifItSaveFromInputs()" style="width:100%;margin-top:2px;background:var(--surf3);border:1px solid var(--bdr);color:var(--txt);padding:4px 6px;border-radius:4px;font-size:11px"></label>
               </div>
+              <label class="frow" style="font-size:11px;margin-top:8px"><span>Also save an MP4 to my PC <span style="color:var(--mut)">(local only, not posted)</span></span><input type="checkbox" id="gifItSaveMp4" onchange="gifItSaveFromInputs()"></label>
               <div id="gifItStatus" style="font-size:10px;color:var(--mut);margin-top:8px;min-height:12px"></div>
             </div>
 
@@ -6107,7 +6145,7 @@ function saveSettings() {
 // ── Gif It (auto-clip a channel-point redeem to Discord) ──────────────────
 // Config lives in sf_settings.gifit; the capture itself runs in the main
 // process (gifit.js) — this side just decides when to fire and shows toasts.
-var gifItCfg = { enabled: false, reward: 'Gif It', webhook: '', formats: 'both', seconds: 6, fps: 15, width: 480, obsPort: 4455, obsPass: '' };
+var gifItCfg = { enabled: false, reward: 'Gif It', webhook: '', saveMp4: false, seconds: 6, fps: 15, width: 480, obsPort: 4455, obsPass: '' };
 var gifItBusy = false;
 function gifItReason(r){
   var m = { 'buffer-off':"OBS replay buffer isn't running", 'no-obs':"Can't reach OBS (check WebSocket port/password)", 'no-ffmpeg':'ffmpeg missing - reinstall StreamFusion', 'no-webhook':'Add a Discord webhook first', 'ffmpeg-failed':'Clip encoding failed', 'no-path':"OBS didn't return a clip file", 'save-failed':"OBS couldn't save the replay", 'upload-failed':'Discord upload failed' };
@@ -6122,7 +6160,7 @@ function gifItApplyToInputs(){
     if (g.reward && !have) { var op = document.createElement('option'); op.textContent = g.reward; e.appendChild(op); }
     e.value = g.reward || '';
   }
-  if (e = document.getElementById('gifItFormats')) e.value = g.formats || 'both';
+  if (e = document.getElementById('gifItSaveMp4')) e.checked = !!g.saveMp4;
   if (e = document.getElementById('gifItSeconds')) e.value = g.seconds || 6;
   if (e = document.getElementById('gifItWidth')) e.value = g.width || 480;
   if (e = document.getElementById('gifItFps')) e.value = g.fps || 15;
@@ -6136,7 +6174,7 @@ function gifItSaveFromInputs(){
   if ((t = c('gifItEnable')) !== undefined) g.enabled = t;
   if ((t = v('gifItWebhook')) !== undefined) g.webhook = String(t).trim();
   if ((t = v('gifItRewardSel')) !== undefined) g.reward = t;
-  if ((t = v('gifItFormats')) !== undefined) g.formats = t;
+  if ((t = c('gifItSaveMp4')) !== undefined) g.saveMp4 = t;
   if ((t = v('gifItSeconds')) !== undefined) g.seconds = Math.max(2, parseInt(t) || 6);
   if ((t = v('gifItWidth')) !== undefined) g.width = Math.max(160, parseInt(t) || 480);
   if ((t = v('gifItFps')) !== undefined) g.fps = Math.max(8, parseInt(t) || 15);
@@ -6164,7 +6202,7 @@ async function gifItTest(){
   _setStat('gifItStatus', 'Testing - saving replay + rendering...');
   showToast({ title: 'Gif It', message: 'Testing capture...', kind: 'info' });
   try {
-    var res = await window.electronAPI.gifItCapture({ user: 'Test', rewardName: gifItCfg.reward || '', webhook: gifItCfg.webhook, formats: gifItCfg.formats, seconds: gifItCfg.seconds, fps: gifItCfg.fps, width: gifItCfg.width, obsPort: gifItCfg.obsPort, obsPass: gifItCfg.obsPass });
+    var res = await window.electronAPI.gifItCapture({ user: 'Test', rewardName: gifItCfg.reward || '', webhook: gifItCfg.webhook, saveMp4: gifItCfg.saveMp4, seconds: gifItCfg.seconds, fps: gifItCfg.fps, width: gifItCfg.width, obsPort: gifItCfg.obsPort, obsPass: gifItCfg.obsPass });
     if (res && res.ok) { _setStat('gifItStatus', 'Test clip posted to Discord!'); showToast({ title: 'Gif It', message: 'Test clip posted!', kind: 'ok' }); }
     else { _setStat('gifItStatus', gifItReason(res && res.reason), true); showToast({ title: 'Gif It failed', message: gifItReason(res && res.reason), kind: 'err' }); }
   } catch (e) { _setStat('gifItStatus', 'Capture error', true); showToast({ title: 'Gif It', message: 'Capture error', kind: 'err' }); }
@@ -6178,7 +6216,7 @@ function gifItMaybeCapture(user, rewardName){
   if (!(window.electronAPI && window.electronAPI.gifItCapture)) return;
   gifItBusy = true;
   showToast({ title: 'Gif It', message: 'Capturing clip...', kind: 'info' });
-  window.electronAPI.gifItCapture({ user: user || 'someone', rewardName: rewardName || '', webhook: gifItCfg.webhook, formats: gifItCfg.formats, seconds: gifItCfg.seconds, fps: gifItCfg.fps, width: gifItCfg.width, obsPort: gifItCfg.obsPort, obsPass: gifItCfg.obsPass }).then(function(res){
+  window.electronAPI.gifItCapture({ user: user || 'someone', rewardName: rewardName || '', webhook: gifItCfg.webhook, saveMp4: gifItCfg.saveMp4, seconds: gifItCfg.seconds, fps: gifItCfg.fps, width: gifItCfg.width, obsPort: gifItCfg.obsPort, obsPass: gifItCfg.obsPass }).then(function(res){
     gifItBusy = false;
     if (res && res.ok) showToast({ title: 'Gif It', message: 'Clip posted to Discord!', kind: 'ok' });
     else showToast({ title: 'Gif It failed', message: gifItReason(res && res.reason), kind: 'err' });
@@ -10627,6 +10665,7 @@ function handleSBEvent(event, data, fromES) {
     var msg = data.message || data;
     var parts = data.parts || msg.parts || null;
     var rawText = data.text || msg.message || msg.text || '';
+    try { var _pfCmd = _pfChatCommand(rawText); if (_pfCmd) _sbSayTwitch(_pfCmd); } catch (e) {}
     var emotes = data.emotes || msg.emotes || null;
     var msgId = data.messageId || msg.msgId || null;
     var bid = (data.broadcaster && data.broadcaster.id) || (data.channel && data.channel.id) || u.id;
@@ -12838,6 +12877,7 @@ function switchSettingsTab(tab) {
   if (tab === 'integrations') renderDiscordStatus();
   if (tab === 'checkins') renderCheckinsTab();
   if (tab === 'printer' && typeof doodlePriceLoad === 'function') doodlePriceLoad();
+  if (tab === 'printer' && typeof fanartWebhookLoad === 'function') fanartWebhookLoad();
   if (tab === 'about' && typeof _renderEventTrail === 'function') _renderEventTrail();
 }
 
@@ -16887,11 +16927,15 @@ function sendObsAlert(obj) {
 var PRINTER_ALLOWLIST = ['991099623'];   // Twitch user ids that see the feature
 var printerCfg = {
   enabled: false, printerName: '', maxPerMinute: 6,
-  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true, meme: true, cah: true },
+  ev: { sub: true, gift: true, cheer: true, kicks: true, super: true, ttgift: true, raid: true, redeem: true, hype: true, songs: true, note: true, meme: true, cah: true, polaroid: true, photodraw: true, facedraw: true },
   noteReward: 'Print My Note',
   memeReward: 'Print a Meme',
   cahReward: 'Cards Against Humanity',
   cahDeck: 'pg13',   // 'clean' | 'pg13' | 'raunch'
+  polaroidReward: 'Polaroid',
+  photoDrawReward: 'Draw on the Stream',
+  faceDrawReward: 'Draw on My Face',
+  faceSource: '',   // OBS source name for the facecam (blank = whole scene)
   theme: 'auto',
   flair: true,
   follows: { tw: false, kk: false, yt: false, tt: false },
@@ -16952,6 +16996,10 @@ function _printerLoadCfg() {
       if (typeof d.memeReward === 'string') printerCfg.memeReward = d.memeReward;
       if (typeof d.cahReward === 'string') printerCfg.cahReward = d.cahReward;
       if (d.cahDeck === 'clean' || d.cahDeck === 'pg13' || d.cahDeck === 'raunch') printerCfg.cahDeck = d.cahDeck;
+      if (typeof d.polaroidReward === 'string') printerCfg.polaroidReward = d.polaroidReward;
+      if (typeof d.photoDrawReward === 'string') printerCfg.photoDrawReward = d.photoDrawReward;
+      if (typeof d.faceDrawReward === 'string') printerCfg.faceDrawReward = d.faceDrawReward;
+      if (typeof d.faceSource === 'string') printerCfg.faceSource = d.faceSource;
       if (typeof d.theme === 'string') printerCfg.theme = d.theme;
       if (typeof d.flair === 'boolean') printerCfg.flair = d.flair;
       if (d.follows) Object.assign(printerCfg.follows, d.follows);
@@ -16975,6 +17023,9 @@ function _printerSyncUi() {
   _prnEl('prnEvNote').checked = printerCfg.ev.note;    _prnEl('prnNoteReward').value = printerCfg.noteReward;
   _prnEl('prnEvMeme').checked = printerCfg.ev.meme;    _prnEl('prnMemeReward').value = printerCfg.memeReward;
   if (_prnEl('prnEvCah')) { _prnEl('prnEvCah').checked = printerCfg.ev.cah !== false; _prnEl('prnCahReward').value = printerCfg.cahReward; _prnEl('prnCahDeck').value = printerCfg.cahDeck; }
+  if (_prnEl('prnEvPolaroid')) { _prnEl('prnEvPolaroid').checked = printerCfg.ev.polaroid !== false; _prnEl('prnPolaroidReward').value = printerCfg.polaroidReward; }
+  if (_prnEl('prnEvPhotoDraw')) { _prnEl('prnEvPhotoDraw').checked = printerCfg.ev.photodraw !== false; _prnEl('prnPhotoDrawReward').value = printerCfg.photoDrawReward; }
+  if (_prnEl('prnEvFaceDraw')) { _prnEl('prnEvFaceDraw').checked = printerCfg.ev.facedraw !== false; _prnEl('prnFaceDrawReward').value = printerCfg.faceDrawReward; _prnEl('prnFaceSource').value = printerCfg.faceSource || ''; }
   _prnEl('prnTheme').value = printerCfg.theme;
   _prnEl('prnFlair').checked = printerCfg.flair;
   _prnEl('prnFollowTw').checked = printerCfg.follows.tw; _prnEl('prnFollowKk').checked = printerCfg.follows.kk;
@@ -16997,12 +17048,19 @@ function onPrinterCfgChange() {
     raid: _prnEl('prnEvRaid').checked,   redeem: _prnEl('prnEvRedeem').checked,
     hype: _prnEl('prnEvHype').checked,   songs: _prnEl('prnEvSongs').checked,
     note: _prnEl('prnEvNote').checked,   meme: _prnEl('prnEvMeme').checked,
-    cah: _prnEl('prnEvCah') ? _prnEl('prnEvCah').checked : true
+    cah: _prnEl('prnEvCah') ? _prnEl('prnEvCah').checked : true,
+    polaroid: _prnEl('prnEvPolaroid') ? _prnEl('prnEvPolaroid').checked : true,
+    photodraw: _prnEl('prnEvPhotoDraw') ? _prnEl('prnEvPhotoDraw').checked : true,
+    facedraw: _prnEl('prnEvFaceDraw') ? _prnEl('prnEvFaceDraw').checked : true
   };
   printerCfg.noteReward = _prnEl('prnNoteReward').value || 'Print My Note';
   printerCfg.memeReward = _prnEl('prnMemeReward').value || 'Print a Meme';
   if (_prnEl('prnCahReward')) printerCfg.cahReward = _prnEl('prnCahReward').value || 'Cards Against Humanity';
   if (_prnEl('prnCahDeck')) printerCfg.cahDeck = _prnEl('prnCahDeck').value || 'pg13';
+  if (_prnEl('prnPolaroidReward')) printerCfg.polaroidReward = _prnEl('prnPolaroidReward').value || 'Polaroid';
+  if (_prnEl('prnPhotoDrawReward')) printerCfg.photoDrawReward = _prnEl('prnPhotoDrawReward').value || 'Draw on the Stream';
+  if (_prnEl('prnFaceDrawReward')) printerCfg.faceDrawReward = _prnEl('prnFaceDrawReward').value || 'Draw on My Face';
+  if (_prnEl('prnFaceSource')) printerCfg.faceSource = _prnEl('prnFaceSource').value || '';
   printerCfg.theme = _prnEl('prnTheme').value || 'auto';
   printerCfg.flair = _prnEl('prnFlair').checked;
   var _wh = _prnEl('prnDiscordWebhook');
@@ -17250,6 +17308,227 @@ function _cahCreateMsg(j) {
   return parts.length ? parts.join('<br>') : 'Nothing to do.';
 }
 
+// Auto-create the Polaroid reward on Twitch + Kick (mirrors the CAH creator).
+// requiresInput:true so viewers caption their shot; the caption prints below
+// the photo and rides along to Discord.
+function printerCreatePolaroidReward() {
+  onPrinterCfgChange();
+  var st = _prnEl('prnPolaroidCreateStatus');
+  var setSt = function(html) { if (st) st.innerHTML = html; };
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) { setSt('Printer bridge unavailable.'); return; }
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) { setSt('Gallery key not configured &mdash; finish the receipt-gallery setup first, then retry.'); return; }
+    var title = ((_prnEl('prnPolaroidReward') && _prnEl('prnPolaroidReward').value) || 'Polaroid').trim().slice(0, 45);
+    var cost = Math.max(1, parseInt(_prnEl('prnPolaroidCost') && _prnEl('prnPolaroidCost').value, 10) || 1000);
+    setSt('Creating &ldquo;' + _prnEsc(title) + '&rdquo; (' + cost.toLocaleString() + ' pts)&hellip;');
+    fetch('https://loadout-discord.aquiloplays.workers.dev/api/rewards/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey },
+      body: JSON.stringify({
+        title: title, cost: cost, prompt: 'Caption your polaroid!', requiresInput: true,
+        platforms: ['tw', 'kk'], channel: String(S.twLogin || ''), streamerId: String(S.twUserId || ''), color: '#f5f0e6'
+      })
+    }).then(function(r) { return r.json(); }).then(function(j) {
+      setSt(_cahCreateMsg(j));
+    }).catch(function() { setSt('Request failed &mdash; check your connection and that the worker is reachable.'); });
+  });
+}
+
+var _PF_BASE = 'https://loadout-discord.aquiloplays.workers.dev';
+
+// Photo-draw moderation: list drawn-on snapshots from the worker (gallery-key
+// authed), show each as a thumbnail, approve (→ print + Discord) or reject.
+function printerPhotoQueue() {
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) return;
+  window.electronAPI.printerGetStatus().then(function(st) {
+    var box = _prnEl('prnPhotoDraws');
+    if (!box) return;
+    if (!st || !st.galleryKey) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">gallery key not configured</span>'; return; }
+    fetch(_PF_BASE + '/api/printflair/photo-queue', { headers: { 'x-aquilo-print-key': st.galleryKey } })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        box.innerHTML = '';
+        var items = (j && j.items) || [];
+        if (!items.length) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">queue empty</span>'; return; }
+        items.forEach(function(it) {
+          var d = document.createElement('div');
+          d.style.cssText = 'background:var(--surf3);border:1px solid var(--bdr);border-radius:6px;padding:6px;text-align:center;width:150px';
+          var img = document.createElement('img');
+          img.src = _PF_BASE + it.url;
+          img.style.cssText = 'width:138px;height:auto;border-radius:4px;display:block;background:#f6f3ea';
+          d.appendChild(img);
+          var nm = document.createElement('div');
+          nm.textContent = it.login + (it.caption ? ' · “' + it.caption + '”' : '');
+          nm.style.cssText = 'font-size:10px;color:var(--txt);margin:4px 0;word-break:break-word';
+          d.appendChild(nm);
+          [['✓ print it', true], ['✕', false]].forEach(function(bb) {
+            var b = document.createElement('button');
+            b.textContent = bb[0]; b.className = 'tbtn';
+            b.style.cssText = 'font-size:11px;padding:2px 8px;margin:0 2px';
+            b.onclick = function() { _photoReview(it.id, bb[1], st.galleryKey); };
+            d.appendChild(b);
+          });
+          box.appendChild(d);
+        });
+      }).catch(function() { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">load failed</span>'; });
+  }).catch(function() {});
+}
+function _photoReview(id, approve, gk) {
+  fetch(_PF_BASE + '/api/printflair/photo-review', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-aquilo-print-key': gk },
+    body: JSON.stringify({ id: id, approve: approve })
+  }).then(function(r) { return r.json(); }).then(function(j) {
+    if (approve && j && j.ok && j.image) {
+      _printerSend({
+        platform: 'tw', user: j.login || '', _kind: 'polaroid',
+        banner: 'POLAROID', action: 'drew on the stream',
+        message: j.caption || '', bigImageData: j.image
+      });
+    }
+    printerPhotoQueue();
+  }).catch(function() {});
+}
+
+// Auto-create the Draw-on-Stream reward on Twitch + Kick. No viewer text —
+// the caption is added later in the extension's Draw editor.
+function printerCreatePhotoDrawReward() {
+  onPrinterCfgChange();
+  var st = _prnEl('prnPhotoDrawCreateStatus');
+  var setSt = function(html) { if (st) st.innerHTML = html; };
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) { setSt('Printer bridge unavailable.'); return; }
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) { setSt('Gallery key not configured &mdash; finish the receipt-gallery setup first, then retry.'); return; }
+    var title = ((_prnEl('prnPhotoDrawReward') && _prnEl('prnPhotoDrawReward').value) || 'Draw on the Stream').trim().slice(0, 45);
+    var cost = Math.max(1, parseInt(_prnEl('prnPhotoDrawCost') && _prnEl('prnPhotoDrawCost').value, 10) || 2000);
+    setSt('Creating &ldquo;' + _prnEsc(title) + '&rdquo; (' + cost.toLocaleString() + ' pts)&hellip;');
+    fetch(_PF_BASE + '/api/rewards/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey },
+      body: JSON.stringify({
+        title: title, cost: cost, prompt: 'Snapshots the stream — then draw on it in the extension’s Draw tab.', requiresInput: false,
+        platforms: ['tw', 'kk'], channel: String(S.twLogin || ''), streamerId: String(S.twUserId || ''), color: '#22c55e'
+      })
+    }).then(function(r) { return r.json(); }).then(function(j) {
+      setSt(_cahCreateMsg(j));
+    }).catch(function() { setSt('Request failed &mdash; check your connection and that the worker is reachable.'); });
+  });
+}
+
+// Populate the facecam source picker from OBS (best-effort; leaves a text input).
+function printerLoadObsSources() {
+  if (!window.electronAPI || !window.electronAPI.wardenAgentProbeObs) return;
+  window.electronAPI.wardenAgentProbeObs().then(function(o) {
+    var dl = _prnEl('prnObsSources'); if (!dl) return;
+    var names = [].concat((o && o.sources) || [], (o && o.scenes) || []);
+    dl.innerHTML = names.map(function(n) { return '<option value="' + _prnEsc(n) + '">'; }).join('');
+    var st = _prnEl('prnFaceDrawCreateStatus'); if (st) st.textContent = names.length ? (names.length + ' OBS sources loaded — pick your facecam.') : 'No sources found (is OBS WebSocket on?)';
+  }).catch(function() {});
+}
+
+// Draw-on-Face reward (mirrors the photo-draw creator).
+function printerCreateFaceDrawReward() {
+  onPrinterCfgChange();
+  var st = _prnEl('prnFaceDrawCreateStatus');
+  var setSt = function(html) { if (st) st.innerHTML = html; };
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) { setSt('Printer bridge unavailable.'); return; }
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) { setSt('Gallery key not configured &mdash; finish the receipt-gallery setup first, then retry.'); return; }
+    var title = ((_prnEl('prnFaceDrawReward') && _prnEl('prnFaceDrawReward').value) || 'Draw on My Face').trim().slice(0, 45);
+    var cost = Math.max(1, parseInt(_prnEl('prnFaceDrawCost') && _prnEl('prnFaceDrawCost').value, 10) || 2000);
+    setSt('Creating &ldquo;' + _prnEsc(title) + '&rdquo; (' + cost.toLocaleString() + ' pts)&hellip;');
+    fetch(_PF_BASE + '/api/rewards/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey },
+      body: JSON.stringify({
+        title: title, cost: cost, prompt: 'Snapshots my facecam — draw on my face in the extension’s Draw tab.', requiresInput: false,
+        platforms: ['tw', 'kk'], channel: String(S.twLogin || ''), streamerId: String(S.twUserId || ''), color: '#e64980'
+      })
+    }).then(function(r) { return r.json(); }).then(function(j) {
+      setSt(_cahCreateMsg(j));
+    }).catch(function() { setSt('Request failed &mdash; check your connection and that the worker is reachable.'); });
+  });
+}
+
+// ── Caption This (streamer-run) ──────────────────────────────────────────────
+var _captionFrame = null, _captionId = '';
+function _capSt(html) { var el = _prnEl('prnCaptionStatus'); if (el) el.innerHTML = html; }
+function captionStart() {
+  if (!window.electronAPI || !window.electronAPI.printerCaptionStart) { _capSt('Bridge unavailable.'); return; }
+  _capSt('Snapshotting the scene&hellip;');
+  window.electronAPI.printerCaptionStart({
+    obsPort: (typeof gifItCfg !== 'undefined' && gifItCfg.obsPort) || 4455,
+    obsPass: (typeof gifItCfg !== 'undefined' && gifItCfg.obsPass) || ''
+  }).then(function(r) {
+    if (r && r.ok) { _captionFrame = r.photo; _captionId = r.id; _capSt('Round open! Chat can caption it in the extension’s <b>Caption</b> tab. Hit “Refresh captions” to see entries.'); captionRefresh(); }
+    else { var rs = (r && r.reason) || 'failed'; _capSt(rs === 'no-obs' || rs === 'obs-failed' || rs === 'timeout' ? 'Can’t reach OBS — turn on its WebSocket (Gif It card).' : rs === 'no-key' ? 'Finish the receipt-gallery setup first.' : 'Failed: ' + rs); }
+  }).catch(function() { _capSt('Failed — try again.'); });
+}
+function captionRefresh() {
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) return;
+  window.electronAPI.printerGetStatus().then(function(st) {
+    var box = _prnEl('prnCaptions'); if (!box) return;
+    if (!st || !st.galleryKey) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">gallery key not configured</span>'; return; }
+    fetch(_PF_BASE + '/api/printflair/caption-list', { headers: { 'x-aquilo-print-key': st.galleryKey } })
+      .then(function(r) { return r.json(); }).then(function(j) {
+        box.innerHTML = '';
+        var subs = (j && j.subs) || [];
+        if (!j || !j.id) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">no active round</span>'; return; }
+        if (!subs.length) { box.innerHTML = '<span style="font-size:10px;color:var(--mut)">no captions yet</span>'; return; }
+        subs.slice().reverse().forEach(function(sd) {
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;gap:8px;background:var(--surf3);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px';
+          var t = document.createElement('div');
+          t.style.cssText = 'flex:1;min-width:0;font-size:11px;color:var(--txt)';
+          t.innerHTML = '“' + _prnEsc(sd.text) + '” <span style="color:var(--mut)">— ' + _prnEsc(sd.by || '') + '</span>';
+          row.appendChild(t);
+          var b = document.createElement('button'); b.className = 'tbtn'; b.textContent = '🖨 print';
+          b.style.cssText = 'font-size:11px;padding:3px 9px';
+          b.onclick = function() { _captionPrint(sd.by || '', sd.text || ''); };
+          row.appendChild(b);
+          box.appendChild(row);
+        });
+      }).catch(function() {});
+  }).catch(function() {});
+}
+function _captionPrint(by, text) {
+  if (!_captionFrame) { _capSt('Start a round first (the frame isn’t held anymore).'); return; }
+  _printerSend({
+    platform: 'tw', user: by || '', _kind: 'polaroid',
+    banner: 'CAPTION THIS', action: 'caption by ' + (by || 'chat'),
+    message: text || '', bigImageData: _captionFrame
+  });
+}
+function captionClear() {
+  _captionFrame = null; _captionId = '';
+  var box = _prnEl('prnCaptions'); if (box) box.innerHTML = '';
+  _capSt('Round ended.');
+  window.electronAPI.printerGetStatus().then(function(st) {
+    if (st && st.galleryKey) fetch(_PF_BASE + '/api/printflair/caption-clear', { method: 'POST', headers: { 'content-type': 'application/json', 'x-aquilo-print-key': st.galleryKey } }).catch(function() {});
+  }).catch(function() {});
+}
+
+// Fan-art Discord webhook (stored worker-side; approved drawings post there).
+function fanartWebhookLoad() {
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus || !_prnEl('prnFanartWebhook')) return;
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) return;
+    fetch(_PF_BASE + '/api/printflair/fanart-config', { headers: { 'x-aquilo-print-key': s.galleryKey } })
+      .then(function(r) { return r.json(); }).then(function(j) { if (j && j.ok && _prnEl('prnFanartWebhook')) _prnEl('prnFanartWebhook').value = j.webhook || ''; }).catch(function() {});
+  }).catch(function() {});
+}
+function fanartWebhookSave() {
+  var st = _prnEl('prnFanartWebhookStatus'); var set = function(t) { if (st) st.textContent = t; };
+  if (!window.electronAPI || !window.electronAPI.printerGetStatus) return;
+  window.electronAPI.printerGetStatus().then(function(s) {
+    if (!s || !s.galleryKey) { set('Finish the receipt-gallery setup first.'); return; }
+    var w = ((_prnEl('prnFanartWebhook') && _prnEl('prnFanartWebhook').value) || '').trim();
+    set('Saving…');
+    fetch(_PF_BASE + '/api/printflair/fanart-config', { method: 'POST', headers: { 'content-type': 'application/json', 'x-aquilo-print-key': s.galleryKey }, body: JSON.stringify({ webhook: w }) })
+      .then(function(r) { return r.json(); }).then(function(j) { set(j && j.ok ? (w ? 'Saved — drawings post to your #fan-art channel on approval.' : 'Cleared.') : ('Failed: ' + ((j && j.error) || '?'))); }).catch(function() { set('Request failed.'); });
+  }).catch(function() {});
+}
+
 function _printerSend(job) {
   if (!window.electronAPI || !window.electronAPI.printerPrint) return;
   window.electronAPI.printerPrint(job).then(function(r) {
@@ -17257,6 +17536,82 @@ function _printerSend(job) {
       _printerSkipped[job._kind] = (_printerSkipped[job._kind] || 0) + 1;
       _printerScheduleDigest();
     }
+  }).catch(function() {});
+}
+
+// Polaroid path: main-side captures the OBS frame, then prints + mirrors it.
+// Surfaces a toast on failure so a dud redeem (OBS closed, no printer) is
+// visible rather than silently swallowed.
+function _printerSendPolaroid(job) {
+  if (!window.electronAPI || !window.electronAPI.printerPolaroid) return;
+  window.electronAPI.printerPolaroid(job).then(function(r) {
+    if (r && r.ok) return;
+    var reason = (r && r.reason) || 'failed';
+    var msg = (reason === 'no-obs' || reason === 'obs-failed' || reason === 'timeout') ? 'Polaroid: can’t reach OBS — is its WebSocket server on? (set it in the Gif It card)'
+            : (reason === 'auth-required') ? 'Polaroid: OBS WebSocket needs its password (set it in the Gif It card)'
+            : (reason === 'no-scene' || reason === 'screenshot-failed') ? 'Polaroid: OBS didn’t return a frame'
+            : (reason === 'disabled') ? 'Polaroid: turn the printer on first'
+            : (reason === 'no printer selected') ? 'Polaroid: pick a printer first'
+            : (reason === 'rate') ? 'Polaroid skipped — printer rate limit'
+            : 'Polaroid failed: ' + reason;
+    try { showToast(msg, 'warn'); } catch (e) {}
+  }).catch(function() {});
+}
+
+// Send a raw message to Twitch chat via Streamer.bot (no-op if SB is offline).
+function _sbSayTwitch(msg) {
+  try {
+    if (typeof S !== 'undefined' && S.sbConnected && S.sbWS && S.sbWS.readyState === WebSocket.OPEN) {
+      S.sbWS.send(JSON.stringify({ request: 'SendMessage', id: 'sf-nudge', platform: 'Twitch', message: msg, bot: false }));
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+// Chat commands for the print/draw features. Returns a response string (or
+// null). 10s per-command cooldown so they can't be spammed. Requires SB
+// connected to actually post (see _sbSayTwitch). Only fires when the printer
+// gate is open (broadcaster), so it's inert for other channels.
+var _pfCmdCooldown = {};
+function _pfChatCommand(text) {
+  if (!_printerGate) return null;
+  var m = String(text || '').trim().toLowerCase().match(/^!(draw|caption|wall|walls|fanart|pics|pictures)\b/);
+  if (!m) return null;
+  var cmd = m[1], now = Date.now();
+  if (_pfCmdCooldown[cmd] && now - _pfCmdCooldown[cmd] < 10000) return null;
+  _pfCmdCooldown[cmd] = now;
+  if (cmd === 'draw') return '🎨 Redeem "Draw on the Stream" or "Draw on My Face" with channel points, then doodle on your snapshot at aquilo.gg/draw (or the Draw tab in the extension).';
+  if (cmd === 'caption') return '😂 Caption This runs live during stream — jump into the Caption tab in the extension when a round is open.';
+  return '🖼️ The walls: fan-art → aquilo.gg/fan-art · pictures → aquilo.gg/pictures · receipts → aquilo.gg/receipts';
+}
+
+// Draw-on-Stream: capture the OBS frame and upload it for the viewer to draw
+// on. On success, nudge the viewer in chat with a one-tap web link (works for
+// Kick/YT viewers too, no extension needed). Result returns via the queue.
+function _printerSendPhotoDraw(login, sourceName) {
+  if (!window.electronAPI || !window.electronAPI.printerPhotoUpload) return;
+  window.electronAPI.printerPhotoUpload({
+    login: login || '',
+    sourceName: sourceName || '',
+    obsPort: (typeof gifItCfg !== 'undefined' && gifItCfg.obsPort) || 4455,
+    obsPass: (typeof gifItCfg !== 'undefined' && gifItCfg.obsPass) || ''
+  }).then(function(r) {
+    if (r && r.ok) {
+      var nudged = false;
+      if (r.id) nudged = _sbSayTwitch('🎨 @' + (login || 'you') + ' your snapshot is ready — draw on it: https://aquilo.gg/draw?c=' + r.id + '  (or the Draw tab in the extension)');
+      try { showToast('🎨 Snapshot sent to ' + (login || 'viewer') + (nudged ? ' — nudged them in chat with a draw link' : ' — they can draw in the extension’s Draw tab'), 'info'); } catch (e) {}
+      return;
+    }
+    var rs = (r && r.reason) || 'failed';
+    var msg = (rs === 'no-obs' || rs === 'obs-failed' || rs === 'timeout') ? 'Draw-on-stream: can’t reach OBS — turn on its WebSocket (Gif It card)'
+            : (rs === 'auth-required') ? 'Draw-on-stream: OBS WebSocket needs its password (Gif It card)'
+            : (rs === 'no-source') ? 'Draw-on-face: OBS source not found — check the exact source name in the pane'
+            : (rs === 'no-scene' || rs === 'screenshot-failed') ? 'Draw-on-stream: OBS didn’t return a frame'
+            : (rs === 'no-key') ? 'Draw-on-stream: finish the receipt-gallery setup first'
+            : (rs === 'bad-login') ? 'Draw-on-stream: couldn’t read the redeemer’s name'
+            : 'Draw-on-stream failed: ' + rs;
+    try { showToast(msg, 'warn'); } catch (e) {}
   }).catch(function() {});
 }
 
@@ -17511,6 +17866,42 @@ function printerPost(o) {
             footer: (_cahUser ? '— ' + _cahUser + '’s hand · ' : '') + 'cards against humanity'
           });
         }, CAH_REVEAL_DELAY_MS);
+        return;
+      }
+      // "Polaroid": snapshots the current OBS program scene, prints it as a
+      // photo receipt, and posts the color frame to the receipt Discord
+      // webhook. Own toggle, like notes/memes/cah. Caption (viewer text) is
+      // optional and profanity-scrubbed. OBS is reached via Gif It's settings.
+      var _plr = String(printerCfg.polaroidReward || '').trim().toLowerCase();
+      if (_plr && String(o.reward || '').trim().toLowerCase() === _plr) {
+        if (printerCfg.ev.polaroid === false) return;
+        var cap = String(o.message || '').slice(0, 80);
+        try { if (typeof _profanityRegex !== 'undefined' && cap) cap = cap.replace(_profanityRegex, function(mm) { return '*'.repeat(mm.length); }); } catch (e) {}
+        cap = cap.replace(/\s+/g, ' ').trim();
+        _printerSendPolaroid({
+          platform: o.plat, user: o.user || '', avatarUrl: o.avatar || null,
+          banner: 'POLAROID',
+          action: 'took a polaroid' + (o.cost ? ' · ' + Number(o.cost).toLocaleString() + ' pts' : ''),
+          message: cap,
+          obsPort: (typeof gifItCfg !== 'undefined' && gifItCfg.obsPort) || 4455,
+          obsPass: (typeof gifItCfg !== 'undefined' && gifItCfg.obsPass) || ''
+        });
+        return;
+      }
+      // "Draw on the Stream": snapshots the OBS scene and uploads it so the
+      // redeemer can draw on it in the extension. Nothing prints here — the
+      // drawn result comes back through the photo-draw approval queue.
+      var _pd = String(printerCfg.photoDrawReward || '').trim().toLowerCase();
+      if (_pd && String(o.reward || '').trim().toLowerCase() === _pd) {
+        if (printerCfg.ev.photodraw === false) return;
+        _printerSendPhotoDraw(o.user || '', '');
+        return;
+      }
+      // "Draw on My Face": same pipeline, but captures one OBS source (facecam).
+      var _fd = String(printerCfg.faceDrawReward || '').trim().toLowerCase();
+      if (_fd && String(o.reward || '').trim().toLowerCase() === _fd) {
+        if (printerCfg.ev.facedraw === false) return;
+        _printerSendPhotoDraw(o.user || '', printerCfg.faceSource || '');
         return;
       }
     }
