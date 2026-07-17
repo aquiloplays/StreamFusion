@@ -1,0 +1,42 @@
+name: CI
+
+# Pull-request gate. There is no test suite or linter in this repo, so the
+# gate is deliberately small: a clean lockfile install plus `node --check`
+# over every first-party JS file (scripts/check-syntax.mjs). It does NOT
+# run electron-builder — release builds stay tag-driven via release.yml.
+#
+# ELECTRON_SKIP_BINARY_DOWNLOAD: the electron npm package's postinstall
+# downloads a ~100 MB platform binary we never launch here; skipping it
+# keeps the job fast and immune to download flakes.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Install + syntax check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 22+ required: check-syntax.mjs relies on module-syntax
+          # auto-detection to parse the ESM Cloudflare workers (.js files).
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check
+        run: npm run check
