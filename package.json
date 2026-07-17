@@ -16,6 +16,7 @@
   "scripts": {
     "gen-icon": "node scripts/gen-icon.js",
     "prebuild": "node scripts/gen-icon.js",
+    "check": "node scripts/check-syntax.mjs",
     "start": "electron .",
     "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --publish never",
     "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win portable --publish never",
@@ -54,6 +55,9 @@
       "!scripts/sf-si-import.txt",
       "!scripts/release-notes-*.md",
       "!scripts/HANDOFF.md",
+      "!scripts/check-syntax.mjs",
+      "!AGENTS.md",
+      "!CLAUDE.md",
       "!.claude/**",
       "!.github/**",
       "!marketing/**",
